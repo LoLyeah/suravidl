@@ -190,6 +190,63 @@ $("updateBtn").onclick = async () => {
   setTimeout(() => { $("updateBtn").textContent = "Update yt-dlp"; $("updateBtn").disabled = false; }, 4000);
 };
 
+/* ---------- window controls (desktop app only) ---------- */
+async function initAppControls() {
+  try {
+    const info = await api("/app/info");
+    if (!info.desktop) return;
+    if (info.can_minimize) {
+      const min = $("minBtn");
+      min.classList.remove("hidden");
+      min.onclick = () => api("/app/minimize", { method: "POST" });
+    }
+    const quit = $("quitBtn");
+    quit.classList.remove("hidden");
+    quit.onclick = async () => {
+      if (!confirm("Quit suravidl? Active downloads will be interrupted.")) return;
+      try { await api("/app/quit", { method: "POST" }); } catch (_) {}
+    };
+  } catch (_) { /* browser mode */ }
+}
+
+/* ---------- settings ---------- */
+async function loadSettings() {
+  try {
+    const s = await api("/settings");
+    $("setDir").value = s.download_dir || "";
+    $("setConc").value = s.max_concurrent;
+    $("setReveal").checked = !!s.open_dir_on_complete;
+  } catch (e) {
+    $("setMsg").textContent = "could not load settings: " + e.message;
+  }
+}
+
+$("settingsBtn").onclick = () => {
+  const card = $("settingsCard");
+  card.classList.toggle("hidden");
+  if (!card.classList.contains("hidden")) loadSettings();
+};
+
+$("setSave").onclick = async () => {
+  $("setMsg").textContent = "saving…";
+  try {
+    const s = await api("/settings", {
+      method: "POST",
+      body: JSON.stringify({
+        download_dir: $("setDir").value.trim(),
+        max_concurrent: Number($("setConc").value),
+        open_dir_on_complete: $("setReveal").checked,
+      }),
+    });
+    $("dlDir").textContent = s.download_dir;
+    $("setConc").value = s.max_concurrent;
+    $("setMsg").textContent = "saved ✓";
+  } catch (e) {
+    $("setMsg").textContent = "save failed: " + e.message;
+  }
+  setTimeout(() => { $("setMsg").textContent = ""; }, 3000);
+};
+
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
 $("bestBtn").onclick = () => startJob($("url").value.trim(), null);
@@ -197,5 +254,6 @@ $("bestBtn").onclick = () => startJob($("url").value.trim(), null);
 loadVersions();
 checkAppUpdate();
 loadHealth();
+initAppControls();
 refreshJobs();
 setInterval(refreshJobs, 1200);

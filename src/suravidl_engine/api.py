@@ -41,7 +41,10 @@ def _web_dir() -> Path:
 
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
-               update_fn=None, update_check_fn=None) -> FastAPI:
+               update_fn=None, update_check_fn=None,
+               settings_path=None, desktop_actions: dict | None = None) -> FastAPI:
+    from .settings import Settings
+
     app = FastAPI(title="suravidl engine")
     app.add_middleware(
         CORSMiddleware,
@@ -50,8 +53,23 @@ def create_app(download_dir, auth_token: str | None = None,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
-    manager = JobManager(download_dir=download_dir, db_path=db_path,
-                         max_concurrent=max_concurrent)
+    if settings_path is None and db_path:
+        settings_path = Path(db_path).parent / "settings.json"
+    settings = Settings(path=settings_path, default_download_dir=download_dir,
+                        default_max_concurrent=max_concurrent)
+    manager = JobManager(
+        download_dir=settings.get()["download_dir"],
+        db_path=db_path,
+        max_concurrent=settings.get()["max_concurrent"],
+    )
+    acts = desktop_actions or {}
+
+    if acts.get("reveal"):
+        def _maybe_reveal(job):
+            if settings.get()["open_dir_on_complete"] and job.get("filepath"):
+                acts["reveal"](job["filepath"])
+
+        manager.on_complete = _maybe_reveal
 
     def require_auth(
         creds: HTTPAuthorizationCredentials | None = Security(HTTPBearer(auto_error=False)),
@@ -94,6 +112,43 @@ def create_app(download_dir, auth_token: str | None = None,
         if update_check_fn:
             return update_check_fn()
         return updater.check_update(__version__)
+
+    @app.get("/settings")
+    def get_settings(_mgr: JobManager = Depends(require_auth)):
+        return settings.get()
+
+    @app.post("/settings")
+    def post_settings(body: dict, _mgr: JobManager = Depends(require_auth)):
+        try:
+            updated = settings.update(body)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if "download_dir" in body:
+            manager.set_download_dir(updated["download_dir"])
+        if "max_concurrent" in body:
+            manager.set_capacity(updated["max_concurrent"])
+        return updated
+
+    @app.get("/app/info")
+    def app_info(_mgr: JobManager = Depends(require_auth)):
+        return {"desktop": bool(acts.get("quit") or acts.get("minimize")),
+                "can_minimize": bool(acts.get("minimize"))}
+
+    def _window_action(name: str):
+        fn = acts.get(name)
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="not running in the desktop app")
+        fn()
+        return {"ok": True}
+
+    @app.post("/app/minimize")
+    def app_minimize(_mgr: JobManager = Depends(require_auth)):
+        return _window_action("minimize")
+
+    @app.post("/app/quit")
+    def app_quit(_mgr: JobManager = Depends(require_auth)):
+        return _window_action("quit")
 
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):

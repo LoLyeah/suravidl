@@ -6,13 +6,20 @@ from pathlib import Path
 ROOT = Path(SPECPATH)
 SEP = ";" if sys.platform == "win32" else ":"
 
+try:  # bundle pywebview's platform backends when the package is installed
+    from PyInstaller.utils.hooks import collect_submodules
+
+    _webview_hidden = collect_submodules("webview")
+except Exception:  # noqa: BLE001 - pywebview is optional
+    _webview_hidden = []
+
 a = Analysis(
     ["scripts/entry.py"],
     pathex=[str(ROOT / "src")],
     binaries=[],
     datas=[(str(ROOT / "src" / "suravidl_engine" / "web"),
             "suravidl_engine/web")],
-    hiddenimports=["suravidl_engine.__main__"],
+    hiddenimports=["suravidl_engine.__main__"] + _webview_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -47,7 +54,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.7.0",
+            "CFBundleShortVersionString": "0.8.0",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

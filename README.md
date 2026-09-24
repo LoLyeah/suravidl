@@ -56,16 +56,30 @@ Releases ship native formats: `suravidl-windows-x64.exe` (double-click),
 `suravidl-linux-x64.AppImage` (chmod +x, double-click — needs FUSE, or run
 with `--appimage-extract-and-run`), and `suravidl-macos-arm64.dmg` (drag
 suravidl.app to Applications; it's unsigned, so first launch needs
-right-click → Open). Raw extension-less binaries (`suravidl-linux-x64`,
-`suravidl-macos-arm64`) are attached too for CLI/headless use — chmod +x and
-run (Unix executables carry no extension by convention; the permission bit
-is what matters).
+right-click → Open). No raw binaries and no zips in the release; if you
+want a bare extension-less binary, `./suravidl-linux-x64.AppImage
+--appimage-extract` unpacks one to `squashfs-root/usr/bin/suravidl`.
 
 ## Desktop app
 
-`pyinstaller suravidl.spec` → single-file binary: serves the engine on
-127.0.0.1, opens the browser, tray icon (Open / Downloads / Quit) when a
-display is available. `--selftest` boots and health-checks itself (used by CI).
+`pyinstaller suravidl.spec` → single-file binary. It serves the engine on
+127.0.0.1 and opens **its own window** (pywebview: WebView2 on Windows, WKWebView
+on macOS, WebKitGTK on Linux) with the same UI — no browser tab. The header has
+minimize and quit buttons in window mode. If no webview runtime is present
+(older systems, or the Linux frozen build without GTK bindings) it falls back
+to opening your default browser. Tray icon (Open / Downloads / Quit) appears in
+browser mode.
+
+Settings (gear button in the app, persisted next to the db):
+- download folder (applies to new jobs immediately)
+- concurrent downloads (1–4, live-adjustable — waiting jobs start as you raise it)
+- open the folder when a download finishes (desktop window app only)
+
+Linux note: the frozen binary falls back to the browser — bundled GTK/PyGObject
+isn't practical in PyInstaller. Run from source (`pip install -e .` plus
+`pywebview`, `python3-gi`, `gir1.2-webkit2-4.1`) to get the native window on
+Linux.
+`--selftest` boots and health-checks itself (used by CI).
 CI builds Linux/Windows/macOS binaries on tags (`release.yml`).
 
 ## Android app
@@ -82,7 +96,7 @@ engine downloads over HTTP on-device (`EngineDownloadTest`). Android pins
 the pure-python fastapi/pydantic v1 stack — Chaquopy's wheel repo has no
 pydantic-core.
 
-## Status (M4)
+## Status (M6)
 
 - [x] M0 — engine PoC, extension spike, CORS, CI, Chaquopy APK with yt-dlp bundled
 - [x] Job persistence (SQLite): history survives restarts; crashed jobs → `interrupted`
@@ -98,6 +112,9 @@ pydantic-core.
 - [x] M5 — polish: release-signed APK (GitHub secrets), launcher icons,
       MediaStore gallery export (Android 10+), tagged release v0.5.0 with
       all binaries + APK
+- [x] M6 — desktop: standalone app window (pywebview) with minimize/quit,
+      settings (download folder, live concurrency, reveal-on-complete),
+      extension crx/xpi in releases, AppImage + dmg native formats
 
 ## API (v0.1)
 
@@ -111,6 +128,9 @@ pydantic-core.
 | `GET /jobs`, `GET /jobs/{id}` | ✓ | history / status |
 | `POST /jobs/{id}/cancel` | ✓ | cancel queued/running |
 | `POST /jobs/{id}/retry` | ✓ | re-run error/interrupted/cancelled |
+| `GET/POST /settings` | ✓ | download dir, concurrency, reveal-on-complete |
+| `GET /app/info` | ✓ | whether a desktop shell (window) is attached |
+| `POST /app/minimize`, `/app/quit` | ✓ | window controls (desktop only) |
 
 ## Dev
 

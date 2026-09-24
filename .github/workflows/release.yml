@@ -13,17 +13,13 @@ jobs:
         include:
           - os: ubuntu-22.04
             binary: suravidl
-            files: |
-              suravidl-linux-x64
-              suravidl-linux-x64.AppImage
+            files: suravidl-linux-x64.AppImage
           - os: windows-2022
             binary: suravidl.exe
             files: suravidl-windows-x64.exe
           - os: macos-14
             binary: suravidl
-            files: |
-              suravidl-macos-arm64
-              suravidl-macos-arm64.dmg
+            files: suravidl-macos-arm64.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +27,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install . pyinstaller pystray pillow
+        run: pip install . pyinstaller pystray pillow pywebview
       - name: Build macOS app icon
         if: matrix.os == 'macos-14'
         run: |

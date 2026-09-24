@@ -36,10 +36,18 @@ footer { max-width: 880px; margin: 0 auto; padding: 0 16px 24px; }
 }
 .hidden { display: none; }
 .muted { color: var(--muted); }
-.updateLink { color: var(--cyan); font-size: .85rem; margin-left: .6rem; text-decoration: none; }
+.updateLink { color: var(--accent2); font-size: .85rem; margin-left: .6rem; text-decoration: none; }
 .updateLink:hover { text-decoration: underline; }
 .small { font-size: 12px; }
 .err { color: var(--err); }
+.danger { color: var(--err); }
+.checkbox { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.field { margin-bottom: 10px; }
+.field label:not(.checkbox) { min-width: 150px; }
+input[type="number"] {
+  width: 80px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid #3b4a63; background: var(--bg); color: var(--text);
+}
 
 .row { display: flex; gap: 10px; align-items: center; }
 input[type="text"] {

@@ -14,9 +14,34 @@
   <h1>suravidl</h1>
   <span id="versions" class="muted small"></span>
   <span class="spacer"></span>
+  <button id="settingsBtn" class="ghost small" title="Settings">⚙ Settings</button>
   <button id="updateBtn" class="ghost small" title="Update yt-dlp">Update yt-dlp</button>
+  <button id="minBtn" class="ghost small hidden" title="Minimize window">—</button>
+  <button id="quitBtn" class="ghost small danger hidden" title="Quit suravidl">✕ Quit</button>
 </header>
 <main>
+  <section id="settingsCard" class="card hidden">
+    <h2>Settings</h2>
+    <div class="field row">
+      <label class="small muted" for="setDir">Download folder</label>
+      <input id="setDir" type="text"/>
+    </div>
+    <div class="field row">
+      <label class="small muted" for="setConc">Concurrent downloads</label>
+      <input id="setConc" type="number" min="1" max="4"/>
+      <span class="muted small">1–4</span>
+    </div>
+    <div class="field row">
+      <label class="checkbox small" for="setReveal">
+        <input id="setReveal" type="checkbox"/>
+        Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
+      </label>
+    </div>
+    <div class="row">
+      <button id="setSave" class="primary">Save</button>
+      <span id="setMsg" class="muted small"></span>
+    </div>
+  </section>
   <section class="card">
     <div class="row">
       <input id="url" type="text"

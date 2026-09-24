@@ -1,5 +1,7 @@
-"""Desktop entry: serve the engine, open the browser, optional tray icon.
+"""Desktop entry: serve the engine, open it in a standalone window.
 
+Falls back to the browser when no webview runtime is available (e.g. a
+headless server, or a Linux frozen build without GTK bindings).
 Runnable as `python -m suravidl_engine` or as a PyInstaller-frozen binary.
 """
 import argparse
@@ -46,14 +48,16 @@ def load_or_create_token() -> str:
     return t
 
 
-def start_server(download_dir, token: str, port: int, db_path=None):
+def start_server(download_dir, token: str, port: int, db_path=None,
+                 desktop_actions: dict | None = None):
     """Start uvicorn in a daemon thread; returns the server (for shutdown)."""
     import uvicorn
 
     from .api import create_app
 
     config = uvicorn.Config(
-        create_app(download_dir=download_dir, auth_token=token, db_path=db_path),
+        create_app(download_dir=download_dir, auth_token=token, db_path=db_path,
+                   desktop_actions=desktop_actions),
         host="127.0.0.1", port=port, log_level="warning",
     )
     server = uvicorn.Server(config)
@@ -81,6 +85,42 @@ def self_test(download_dir, port: int = 0, timeout_s: float = 20) -> bool:
             time.sleep(0.3)
     print("SELFTEST_FAIL")
     return False
+
+
+def _open_folder(path) -> None:
+    """Reveal a downloaded file in the OS file manager."""
+    import subprocess
+    from pathlib import Path as _Path
+
+    target = _Path(path)
+    if sys.platform == "win32":
+        import os
+
+        os.startfile(str(target.parent if target.is_file() else target))  # noqa: S606
+    elif sys.platform == "darwin":
+        subprocess.run(["open", "-R", str(target)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(target.parent if target.is_file() else target)],
+                       check=False)
+
+
+def _load_webview():
+    try:
+        import webview  # pywebview
+
+        return webview
+    except Exception:  # noqa: BLE001 - optional dependency
+        return None
+
+
+def _try_window(webview, url: str):
+    """Create (but don't start) the standalone window; None if impossible."""
+    try:
+        return webview.create_window(
+            "suravidl", url, width=1100, height=780, min_size=(760, 480),
+        )
+    except Exception:  # noqa: BLE001 - e.g. GTK bindings missing
+        return None
 
 
 def _try_tray(url: str, open_downloads: Path):
@@ -127,11 +167,14 @@ def _try_tray(url: str, open_downloads: Path):
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="suravidl desktop: engine + web UI + tray")
+        description="suravidl desktop: engine + UI window (+ tray fallback)")
     p.add_argument("--port", type=int, default=8787)
     p.add_argument("--download-dir", type=Path, default=Path.home() / "Downloads")
     p.add_argument("--db", type=Path, default=Path.home() / ".suravidl" / "jobs.db")
-    p.add_argument("--no-browser", action="store_true")
+    p.add_argument("--no-browser", action="store_true",
+                   help="don't fall back to opening a browser tab")
+    p.add_argument("--no-window", action="store_true",
+                   help="force browser mode instead of the app window")
     p.add_argument("--no-tray", action="store_true")
     p.add_argument("--selftest", action="store_true",
                    help="boot, verify /health, exit (CI)")
@@ -144,9 +187,27 @@ def main() -> None:
     token = load_or_create_token()
     port = find_free_port(args.port)
     url = f"http://127.0.0.1:{port}/"
-    start_server(download_dir=args.download_dir, token=token, port=port,
-                 db_path=args.db)
+
+    webview = None if args.no_window else _load_webview()
+    window = _try_window(webview, url) if webview else None
+    actions = {}
+    if window is not None:
+        actions = {"minimize": window.minimize, "quit": window.destroy,
+                   "reveal": _open_folder}
+
+    server = start_server(download_dir=args.download_dir, token=token, port=port,
+                          db_path=args.db, desktop_actions=actions or None)
     print(f"suravidl running at {url}  (token: {token[:4]}…{token[-4:]})")
+
+    if window is not None:
+        try:
+            webview.start()
+        except Exception:  # noqa: BLE001 - fall back to the browser
+            window = None
+        else:
+            server.should_exit = True
+            print("bye")
+            return
 
     if not args.no_browser:
         webbrowser.open(url)

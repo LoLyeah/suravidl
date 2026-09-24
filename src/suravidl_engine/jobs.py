@@ -53,7 +53,11 @@ class JobManager:
         self._con.row_factory = sqlite3.Row
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
-        self._slots = threading.BoundedSemaphore(max_concurrent)
+        # adaptive concurrency gate: capacity can change at runtime
+        self._cap_cv = threading.Condition(threading.Lock())
+        self._capacity = max(1, int(max_concurrent))
+        self._active = 0
+        self.on_complete = None  # optional callable(job) run after success
         self._init_db()
 
     # -- persistence -------------------------------------------------------
@@ -161,10 +165,35 @@ class JobManager:
         return self.create(src["url"], fmt=src.get("fmt"),
                            extra_headers=src.get("headers"))
 
-    # -- worker ------------------------------------------------------------
+    # -- runtime tuning ----------------------------------------------------
+    def set_download_dir(self, path) -> None:
+        """New jobs land in `path`; in-flight jobs keep their original dir."""
+        self.download_dir = Path(path)
+        self.download_dir.mkdir(parents=True, exist_ok=True)
+
+    def set_capacity(self, n: int) -> None:
+        """Live-adjust how many jobs may run at once (wakes waiters)."""
+        with self._cap_cv:
+            self._capacity = max(1, int(n))
+            self._cap_cv.notify_all()
+
+    def _acquire_slot(self) -> None:
+        with self._cap_cv:
+            while self._active >= self._capacity:
+                self._cap_cv.wait()
+            self._active += 1
+
+    def _release_slot(self) -> None:
+        with self._cap_cv:
+            self._active -= 1
+            self._cap_cv.notify_all()
+
     def _run(self, job: dict, fmt: str | None, extra_headers: dict | None):
-        with self._slots:
+        self._acquire_slot()
+        try:
             self._execute(job, fmt, extra_headers)
+        finally:
+            self._release_slot()
 
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if job["status"] == "cancelled":  # cancelled while queued
@@ -224,3 +253,8 @@ class JobManager:
                 job["error"] = str(e)
         finally:
             self._save(job)
+        if job["status"] == "completed" and self.on_complete:
+            try:
+                self.on_complete(job)
+            except Exception:  # noqa: BLE001 - a hook must never kill a job
+                pass
