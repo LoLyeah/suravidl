@@ -33,16 +33,17 @@ android {
 
 chaquopy {
     defaultConfig {
-        buildPython "python3"
-        python {
-            version "3.11"
-            // engine serves its web UI from Path(__file__)/web — needs real files
-            extractPackages "suravidl_engine"
-        }
+        version = "3.11"
+        buildPython "python3.11"
+        // engine serves its web UI from Path(__file__)/web — needs real files
+        extractPackages("suravidl_engine")
         pip {
             install "yt-dlp"
-            install "fastapi"
-            install "uvicorn"
+            // Chaquopy's wheel repo has no pydantic-core, so Android pins the
+            // last fastapi that uses pure-python pydantic v1.
+            install "fastapi==0.99.1"
+            install "pydantic>=1.10.13,<2"
+            install "uvicorn==0.23.2"
         }
     }
 }
