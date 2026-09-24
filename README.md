@@ -67,6 +67,9 @@ pydantic-core.
       (`scripts/ext_e2e.py`: handoff, detection, header capture, popup render)
 - [x] M4 — Android app: embedded engine (Chaquopy, Python 3.11), foreground service,
       WebView UI, on-device download test on CI emulator; APK verified
+- [x] M5 — polish: release-signed APK (GitHub secrets), launcher icons,
+      MediaStore gallery export (Android 10+), tagged release v0.5.0 with
+      all binaries + APK
 
 ## API (v0.1)
 
