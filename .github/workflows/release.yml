@@ -14,12 +14,15 @@ jobs:
           - os: ubuntu-22.04
             binary: suravidl
             zip: suravidl-linux-x64.zip
+            raw: suravidl-linux-x64
           - os: windows-2022
             binary: suravidl.exe
             zip: suravidl-windows-x64.zip
+            raw: suravidl-windows-x64.exe
           - os: macos-14
             binary: suravidl
             zip: suravidl-macos-arm64.zip
+            raw: suravidl-macos-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +57,7 @@ jobs:
         shell: bash
         run: |
           cd dist
+          cp ${{ matrix.binary }} ../${{ matrix.raw }}
           if [ "${{ matrix.os }}" = "windows-2022" ]; then
             7z a ../${{ matrix.zip }} suravidl.exe || zip ../${{ matrix.zip }} suravidl.exe
           else
@@ -61,8 +65,10 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.zip }}
-          path: ${{ matrix.zip }}
+          name: dist-${{ matrix.os }}
+          path: |
+            ${{ matrix.raw }}
+            ${{ matrix.zip }}
 
   publish:
     needs: build
@@ -77,5 +83,5 @@ jobs:
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/*
           generate_release_notes: true

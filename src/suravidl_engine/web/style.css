@@ -36,6 +36,8 @@ footer { max-width: 880px; margin: 0 auto; padding: 0 16px 24px; }
 }
 .hidden { display: none; }
 .muted { color: var(--muted); }
+.updateLink { color: var(--cyan); font-size: .85rem; margin-left: .6rem; text-decoration: none; }
+.updateLink:hover { text-decoration: underline; }
 .small { font-size: 12px; }
 .err { color: var(--err); }
 

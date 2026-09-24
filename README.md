@@ -33,6 +33,19 @@ the engine starts). Header capture is whitelisted engine-side (cookie,
 user-agent, referer, origin, accept) — nothing else from the page reaches
 yt-dlp.
 
+## Updates
+
+- **yt-dlp**: `POST /update` (button in the UI) pip-upgrades yt-dlp in place.
+- **suravidl itself**: `GET /update-check` compares the engine version with the
+  latest GitHub release; the UI shows a "⬆ update available" link when one
+  exists. Set `SURAVIDL_GITHUB_TOKEN` for private-repo checks (the check
+  degrades gracefully without it).
+
+Releases ship both raw binaries (`suravidl-windows-x64.exe`, `suravidl-linux-x64`,
+`suravidl-macos-arm64`) and zips — unzip preserves the executable bit, which
+plain downloads don't; on macOS/Linux use `chmod +x suravidl-*` after a raw
+download.
+
 ## Desktop app
 
 `pyinstaller suravidl.spec` → single-file binary: serves the engine on

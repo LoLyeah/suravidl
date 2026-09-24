@@ -41,7 +41,7 @@ def _web_dir() -> Path:
 
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
-               update_fn=None) -> FastAPI:
+               update_fn=None, update_check_fn=None) -> FastAPI:
     app = FastAPI(title="suravidl engine")
     app.add_middleware(
         CORSMiddleware,
@@ -86,6 +86,14 @@ def create_app(download_dir, auth_token: str | None = None,
 
         # sync endpoint -> runs in FastAPI's worker thread; pip may take a while
         return (update_fn or updater.self_update)()
+
+    @app.get("/update-check")
+    def update_check(_mgr: JobManager = Depends(require_auth)):
+        from . import updater
+
+        if update_check_fn:
+            return update_check_fn()
+        return updater.check_update(__version__)
 
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):

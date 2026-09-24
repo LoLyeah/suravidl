@@ -155,6 +155,21 @@ async function loadVersions() {
   } catch (_) { $("versions").textContent = ""; }
 }
 
+async function checkAppUpdate() {
+  try {
+    const u = await api("/update-check");
+    if (u.update_available && u.url) {
+      const a = document.createElement("a");
+      a.href = u.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.className = "updateLink";
+      a.textContent = `⬆ suravidl ${u.latest} available`;
+      $("versions").after(a);
+    }
+  } catch (_) { /* update check is best-effort (private repos need a token) */ }
+}
+
 async function loadHealth() {
   try {
     const r = await fetch("/health");
@@ -180,6 +195,7 @@ $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); 
 $("bestBtn").onclick = () => startJob($("url").value.trim(), null);
 
 loadVersions();
+checkAppUpdate();
 loadHealth();
 refreshJobs();
 setInterval(refreshJobs, 1200);
