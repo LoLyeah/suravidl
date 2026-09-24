@@ -38,8 +38,8 @@ yt-dlp.
 - **yt-dlp**: `POST /update` (button in the UI) pip-upgrades yt-dlp in place.
 - **suravidl itself**: `GET /update-check` compares the engine version with the
   latest GitHub release; the UI shows a "⬆ update available" link when one
-  exists. Set `SURAVIDL_GITHUB_TOKEN` for private-repo checks (the check
-  degrades gracefully without it).
+  exists. Anonymous checks work out of the box (public repo); set
+  `SURAVIDL_GITHUB_TOKEN` if you ever point it at a private repo/fork.
 
 Releases ship both raw binaries (`suravidl-windows-x64.exe`, `suravidl-linux-x64`,
 `suravidl-macos-arm64`) and zips — unzip preserves the executable bit, which
