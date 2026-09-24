@@ -48,12 +48,41 @@ class EngineService : Service() {
             while (polling) {
                 try {
                     updateCount()
+                    importCompleted()
                 } catch (_: Exception) {
                 }
                 Thread.sleep(2000)
             }
         }
         return START_STICKY
+    }
+
+    private val importedIds = HashSet<String>()
+
+    /** Push newly completed engine downloads into the system gallery. */
+    private fun importCompleted() {
+        val c = URL("http://127.0.0.1:$ENGINE_PORT/jobs").openConnection()
+            as HttpURLConnection
+        c.setRequestProperty("Authorization", "Bearer $token")
+        c.connectTimeout = 2000
+        val jobs = JSONObject(c.inputStream.bufferedReader().readText())
+            .getJSONArray("jobs")
+        for (i in 0 until jobs.length()) {
+            val j = jobs.getJSONObject(i)
+            if (j.getString("status") != "completed") continue
+            val id = j.getString("id")
+            if (!importedIds.add(id)) continue
+            val path = j.optString("filepath", "")
+            if (path.isNotEmpty()) {
+                val f = File(path)
+                if (f.exists()) {
+                    try {
+                        MediaImporter.importToGallery(this, f)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
     }
 
     private fun activeCount(): Int {
