@@ -1,0 +1,82 @@
+"""FastAPI app exposing the engine over HTTP."""
+import argparse
+import os
+import secrets
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+
+from .jobs import JobManager
+from .probe import probe
+
+
+class JobRequest(BaseModel):
+    url: str
+    fmt: str | None = None
+    headers: dict | None = None
+
+
+class ProbeRequest(BaseModel):
+    url: str
+    headers: dict | None = None
+
+
+def create_app(download_dir, auth_token: str | None = None) -> FastAPI:
+    app = FastAPI(title="vidl engine")
+    manager = JobManager(download_dir=download_dir)
+
+    def require_auth(
+        creds: HTTPAuthorizationCredentials | None = Security(HTTPBearer(auto_error=False)),
+    ):
+        if auth_token and (creds is None or creds.credentials != auth_token):
+            raise HTTPException(status_code=401, detail="unauthorized")
+        return manager
+
+    @app.get("/health")
+    def health():
+        return {"ok": True, "version": "0.0.1"}
+
+    @app.post("/probe")
+    def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
+        try:
+            return probe(body.url, extra_headers=body.headers)
+        except Exception as e:  # noqa: BLE001 - error goes to the client
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.post("/jobs")
+    def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
+        return mgr.create(body.url, fmt=body.fmt, extra_headers=body.headers)
+
+    @app.get("/jobs")
+    def list_jobs(mgr: JobManager = Depends(require_auth)):
+        return {"jobs": mgr.list()}
+
+    @app.get("/jobs/{job_id}")
+    def get_job(job_id: str, mgr: JobManager = Depends(require_auth)):
+        try:
+            return mgr.get(job_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+
+    return app
+
+
+def main() -> None:  # console entry: python -m vidl_engine.api
+    import uvicorn
+
+    p = argparse.ArgumentParser(description="vidl engine server")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--download-dir", default=Path.home() / "Downloads")
+    args = p.parse_args()
+    token = os.environ.get("VIDL_TOKEN") or secrets.token_hex(16)
+    if not os.environ.get("VIDL_TOKEN"):
+        print(f"Generated API token: {token}")
+    uvicorn.run(create_app(download_dir=args.download_dir, auth_token=token),
+                host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

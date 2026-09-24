@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vidl-engine"
+version = "0.0.1"
+description = "vidl engine - universal web video downloader engine (yt-dlp wrapper API)"
+requires-python = ">=3.10"
+dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
