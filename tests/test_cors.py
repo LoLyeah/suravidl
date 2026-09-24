@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 
 def test_preflight_from_extension_origin_is_allowed(tmp_path):
-    import vidl_engine.api as api
+    import suravidl_engine.api as api
 
     app = api.create_app(download_dir=tmp_path, auth_token="t")
     client = TestClient(app)
@@ -21,7 +21,7 @@ def test_preflight_from_extension_origin_is_allowed(tmp_path):
 
 
 def test_preflight_from_random_site_is_not_allowed(tmp_path):
-    import vidl_engine.api as api
+    import suravidl_engine.api as api
 
     app = api.create_app(download_dir=tmp_path, auth_token="t")
     client = TestClient(app)

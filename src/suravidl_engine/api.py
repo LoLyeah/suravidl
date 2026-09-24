@@ -25,7 +25,7 @@ class ProbeRequest(BaseModel):
 
 
 def create_app(download_dir, auth_token: str | None = None) -> FastAPI:
-    app = FastAPI(title="vidl engine")
+    app = FastAPI(title="suravidl engine")
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"^chrome-extension://[a-p]+$",
@@ -71,10 +71,10 @@ def create_app(download_dir, auth_token: str | None = None) -> FastAPI:
     return app
 
 
-def main() -> None:  # console entry: python -m vidl_engine.api
+def main() -> None:  # console entry: python -m suravidl_engine.api
     import uvicorn
 
-    p = argparse.ArgumentParser(description="vidl engine server")
+    p = argparse.ArgumentParser(description="suravidl engine server")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8787)
     p.add_argument("--download-dir", default=Path.home() / "Downloads")

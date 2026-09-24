@@ -35,10 +35,10 @@ def main():
     threading.Thread(target=fs.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{fs.server_address[1]}"
 
-    dl_dir = Path(tempfile.mkdtemp(prefix="vidl_smoke_"))
+    dl_dir = Path(tempfile.mkdtemp(prefix="suravidl_smoke_"))
     env = dict(os.environ, VIDL_TOKEN=TOKEN)
     eng = subprocess.Popen(
-        [str(PY), "-m", "vidl_engine.api", "--port", "8799",
+        [str(PY), "-m", "suravidl_engine.api", "--port", "8799",
          "--download-dir", str(dl_dir)],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 

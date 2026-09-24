@@ -1,4 +1,4 @@
-package com.vidl.app
+package com.suravidl.app
 
 import android.os.Bundle
 import android.widget.TextView
@@ -15,7 +15,7 @@ class MainActivity : AppCompatActivity() {
         tv.text = try {
             if (!Python.isStarted()) Python.start(AndroidPlatform(this))
             val info = Python.getInstance().getModule("info")
-            "vidl engine spike OK — bundled yt_dlp " + info.callAttr("yt_dlp_version").toString()
+            "suravidl engine spike OK — bundled yt_dlp " + info.callAttr("yt_dlp_version").toString()
         } catch (e: Exception) {
             "spike FAILED: ${e.message}"
         }

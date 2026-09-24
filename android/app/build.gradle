@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace 'com.vidl.app'
+    namespace 'com.suravidl.app'
     compileSdk 35
 
     compileOptions {
@@ -15,7 +15,7 @@ android {
     kotlinOptions { jvmTarget = '17' }
 
     defaultConfig {
-        applicationId "com.vidl.app"
+        applicationId "com.suravidl.app"
         minSdk 24
         targetSdk 35
         versionCode 1

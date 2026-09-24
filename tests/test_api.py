@@ -24,7 +24,7 @@ def fixture_server():
 
 @pytest.fixture()
 def client(tmp_path, fixture_server, monkeypatch):
-    import vidl_engine.api as api
+    import suravidl_engine.api as api
 
     app = api.create_app(download_dir=tmp_path, auth_token="testtoken")
     with TestClient(app) as c:

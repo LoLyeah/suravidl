@@ -22,7 +22,7 @@ def fixture_server():
 
 
 def test_probe_direct_mp4_returns_metadata(fixture_server):
-    from vidl_engine.probe import probe
+    from suravidl_engine.probe import probe
 
     info = probe(f"{fixture_server}/tiny.mp4")
     assert info["ext"] == "mp4"
@@ -31,7 +31,7 @@ def test_probe_direct_mp4_returns_metadata(fixture_server):
 
 
 def test_probe_unsupported_url_raises_clear_error():
-    from vidl_engine.probe import probe
+    from suravidl_engine.probe import probe
 
     with pytest.raises(Exception) as exc:
         probe("http://127.0.0.1:1/nonexistent.mp4")

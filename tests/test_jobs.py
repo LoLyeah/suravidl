@@ -32,7 +32,7 @@ def wait_done(mgr, job_id, timeout=30):
 
 
 def test_download_job_completes_with_progress_and_file(tmp_path, fixture_server):
-    from vidl_engine.jobs import JobManager
+    from suravidl_engine.jobs import JobManager
 
     mgr = JobManager(download_dir=tmp_path)
     job = mgr.create(f"{fixture_server}/tiny.mp4")
@@ -54,7 +54,7 @@ def test_download_job_completes_with_progress_and_file(tmp_path, fixture_server)
 
 
 def test_download_job_error_on_bad_url(tmp_path):
-    from vidl_engine.jobs import JobManager
+    from suravidl_engine.jobs import JobManager
 
     mgr = JobManager(download_dir=tmp_path)
     job = mgr.create("http://127.0.0.1:1/nonexistent.mp4")
@@ -64,7 +64,7 @@ def test_download_job_error_on_bad_url(tmp_path):
 
 
 def test_hls_job_merges_to_playable_file(tmp_path, fixture_server):
-    from vidl_engine.jobs import JobManager
+    from suravidl_engine.jobs import JobManager
 
     mgr = JobManager(download_dir=tmp_path)
     job = mgr.create(f"{fixture_server}/hls/index.m3u8")

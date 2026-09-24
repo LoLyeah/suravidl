@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vidl-engine"
+name = "suravidl-engine"
 version = "0.0.1"
-description = "vidl engine - universal web video downloader engine (yt-dlp wrapper API)"
+description = "suravidl engine - universal web video downloader engine (yt-dlp wrapper API)"
 requires-python = ">=3.10"
 dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
 

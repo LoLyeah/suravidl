@@ -11,7 +11,7 @@ FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures"
 class HeaderGateHandler(http.server.SimpleHTTPRequestHandler):
     """Serves the fixtures dir only to a specific User-Agent; 403 otherwise."""
 
-    required_ua = "vidl-test-agent/1.0"
+    required_ua = "suravidl-test-agent/1.0"
 
     def do_GET(self):
         if self.headers.get("User-Agent") != self.required_ua:
@@ -33,14 +33,14 @@ def gated_server():
 
 
 def test_probe_without_headers_is_blocked(gated_server):
-    from vidl_engine.probe import probe
+    from suravidl_engine.probe import probe
 
     with pytest.raises(Exception):
         probe(f"{gated_server}/tiny.mp4")
 
 
 def test_probe_with_captured_headers_succeeds(gated_server):
-    from vidl_engine.probe import probe
+    from suravidl_engine.probe import probe
 
     info = probe(f"{gated_server}/tiny.mp4",
                  extra_headers={"User-Agent": HeaderGateHandler.required_ua})
@@ -51,7 +51,7 @@ def test_download_job_with_captured_headers_succeeds(tmp_path, gated_server):
     import time
     from pathlib import Path
 
-    from vidl_engine.jobs import JobManager
+    from suravidl_engine.jobs import JobManager
 
     mgr = JobManager(download_dir=tmp_path)
     job = mgr.create(f"{gated_server}/tiny.mp4",

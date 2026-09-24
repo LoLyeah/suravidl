@@ -1,4 +1,6 @@
-# vidl
+# suravidl
+
+<img src="assets/logo.png" width="96" align="right" alt="suravidl logo" />
 
 Universal web-video downloader: a yt-dlp wrapper engine + UI, with a browser
 extension for detecting videos on any site (VideoDownloadHelper-style, but the
@@ -15,9 +17,9 @@ Planned targets: Windows, macOS, Linux, Android (web postponed).
 ## Status (M0)
 
 - [x] Engine PoC: probe, background jobs with progress, HLS merge, header pass-through
-- [x] HTTP API: `/health`, `/probe`, `/jobs` (token auth)
-- [ ] Extension handoff spike
-- [ ] GH Actions: lint + test + Android skeleton build
+- [x] HTTP API: `/health`, `/probe`, `/jobs` (token auth, chrome-extension CORS)
+- [x] Extension handoff spike (MV3: webRequest detection → engine POST)
+- [x] GH Actions: test matrix green, Chaquopy APK builds with yt-dlp bundled
 
 ## Dev
 

@@ -13,7 +13,7 @@ function render(items) {
     const short = m.url.length > 90 ? m.url.slice(0, 90) + "…" : m.url;
     div.innerHTML = `<div>${short}</div><div class="url">${new URL(m.url).protocol} stream</div>`;
     const btn = document.createElement("button");
-    btn.textContent = "Download with vidl";
+    btn.textContent = "Download with suravidl";
     btn.onclick = async () => {
       statusEl.textContent = "sending…";
       statusEl.className = "";
