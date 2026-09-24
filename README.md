@@ -40,7 +40,21 @@ yt-dlp.
 display is available. `--selftest` boots and health-checks itself (used by CI).
 CI builds Linux/Windows/macOS binaries on tags (`release.yml`).
 
-## Status (M2)
+## Android app
+
+Same engine, same UI: Chaquopy embeds Python 3.11 + the engine + yt-dlp
+inside the APK. A foreground service runs uvicorn on 127.0.0.1:8787
+(persistent notification with active-download count); the activity is a
+WebView kiosk of the engine UI. Files land in the app's external dir
+(`Android/data/com.suravidl.app/files/Movies/suravidl`).
+
+Build with `gradle -p android assembleDebug` (needs the Android SDK; CI does
+it in `android.yml`). The emulator instrumentation test proves the real
+engine downloads over HTTP on-device (`EngineDownloadTest`). Android pins
+the pure-python fastapi/pydantic v1 stack — Chaquopy's wheel repo has no
+pydantic-core.
+
+## Status (M4)
 
 - [x] M0 — engine PoC, extension spike, CORS, CI, Chaquopy APK with yt-dlp bundled
 - [x] Job persistence (SQLite): history survives restarts; crashed jobs → `interrupted`
@@ -51,7 +65,8 @@ CI builds Linux/Windows/macOS binaries on tags (`release.yml`).
 - [x] M3 — extension MVP: cookie/UA/referer capture (engine whitelist), badge count,
       Firefox port (MV2 manifest, web-ext lint 0/0/0), real-Chrome E2E
       (`scripts/ext_e2e.py`: handoff, detection, header capture, popup render)
-- [ ] M4 — Android app (foreground service, downloads UI)
+- [x] M4 — Android app: embedded engine (Chaquopy, Python 3.11), foreground service,
+      WebView UI, on-device download test on CI emulator; APK verified
 
 ## API (v0.1)
 
