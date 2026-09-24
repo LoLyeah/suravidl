@@ -52,6 +52,25 @@ jobs:
         run: gradle -p android assembleRelease --no-daemon
       - name: Verify signature
         run: $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs android/app/build/outputs/apk/release/app-release.apk
+      - name: Verify 16 KB page size compatibility
+        run: |
+          set -e
+          APK=$GITHUB_WORKSPACE/android/app/build/outputs/apk/release/app-release.apk
+          BT=$ANDROID_HOME/build-tools/35.0.0
+          echo "--- zipalign (uncompressed .so must be 16 KB aligned in the APK) ---"
+          $BT/zipalign -c -P 16 -v 4 "$APK"
+          echo "--- ELF LOAD segment alignment (must be 0x4000) ---"
+          mkdir -p /tmp/apk16k && cd /tmp/apk16k && rm -rf lib
+          unzip -q -o "$APK" 'lib/*'
+          FAIL=0
+          for so in $(find lib -name '*.so' | sort); do
+            aligns=$(readelf -lW "$so" | awk '$1=="LOAD"{print $NF}' | sort -u | tr '\n' ' ')
+            echo "$so -> LOAD align: $aligns"
+            for a in $aligns; do
+              if [ "$a" != "0x4000" ]; then echo "::error file=$so::LOAD segment not 16 KB aligned ($a)"; FAIL=1; fi
+            done
+          done
+          [ "$FAIL" = "0" ] && echo "16 KB page size compatible"
       - uses: actions/upload-artifact@v4
         with:
           name: suravidl-release-apk
