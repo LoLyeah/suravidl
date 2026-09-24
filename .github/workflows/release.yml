@@ -13,16 +13,17 @@ jobs:
         include:
           - os: ubuntu-22.04
             binary: suravidl
-            zip: suravidl-linux-x64.zip
-            raw: suravidl-linux-x64
+            files: |
+              suravidl-linux-x64
+              suravidl-linux-x64.AppImage
           - os: windows-2022
             binary: suravidl.exe
-            zip: suravidl-windows-x64.zip
-            raw: suravidl-windows-x64.exe
+            files: suravidl-windows-x64.exe
           - os: macos-14
             binary: suravidl
-            zip: suravidl-macos-arm64.zip
-            raw: suravidl-macos-arm64
+            files: |
+              suravidl-macos-arm64
+              suravidl-macos-arm64.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,25 +51,37 @@ jobs:
         run: pyinstaller suravidl.spec --noconfirm
       - name: Ad-hoc sign (macOS arm64 needs it to run)
         if: matrix.os == 'macos-14'
-        run: codesign --force -s - dist/suravidl
+        run: |
+          codesign --force -s - dist/suravidl
+          codesign --force -s - --deep dist/suravidl.app
       - name: Smoke test frozen binary
         run: ./dist/${{ matrix.binary }} --selftest --download-dir ./smoke_dl
       - name: Package
         shell: bash
         run: |
-          cd dist
-          cp ${{ matrix.binary }} ../${{ matrix.raw }}
-          if [ "${{ matrix.os }}" = "windows-2022" ]; then
-            7z a ../${{ matrix.zip }} suravidl.exe || zip ../${{ matrix.zip }} suravidl.exe
-          else
-            zip ../${{ matrix.zip }} suravidl
-          fi
+          set -e
+          case "${{ matrix.os }}" in
+            ubuntu-22.04)
+              cp dist/suravidl ../suravidl-linux-x64
+              sudo apt-get update -q && sudo apt-get install -y -q squashfs-tools
+              ./scripts/build_appimage.sh dist/suravidl ../suravidl-linux-x64.AppImage
+              ;;
+            macos-14)
+              cp dist/suravidl ../suravidl-macos-arm64
+              mkdir -p dmg_stage
+              cp -R dist/suravidl.app dmg_stage/
+              ln -s /Applications dmg_stage/Applications
+              hdiutil create -volname suravidl -srcfolder dmg_stage \
+                -ov -format UDZO ../suravidl-macos-arm64.dmg
+              ;;
+            windows-2022)
+              cp dist/suravidl.exe ../suravidl-windows-x64.exe
+              ;;
+          esac
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}
-          path: |
-            ${{ matrix.raw }}
-            ${{ matrix.zip }}
+          path: ${{ matrix.files }}
 
   extension:
     if: startsWith(github.ref, 'refs/tags/v')

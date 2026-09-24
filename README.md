@@ -52,10 +52,14 @@ yt-dlp.
   exists. Anonymous checks work out of the box (public repo); set
   `SURAVIDL_GITHUB_TOKEN` if you ever point it at a private repo/fork.
 
-Releases ship both raw binaries (`suravidl-windows-x64.exe`, `suravidl-linux-x64`,
-`suravidl-macos-arm64`) and zips — unzip preserves the executable bit, which
-plain downloads don't; on macOS/Linux use `chmod +x suravidl-*` after a raw
-download.
+Releases ship native formats: `suravidl-windows-x64.exe` (double-click),
+`suravidl-linux-x64.AppImage` (chmod +x, double-click — needs FUSE, or run
+with `--appimage-extract-and-run`), and `suravidl-macos-arm64.dmg` (drag
+suravidl.app to Applications; it's unsigned, so first launch needs
+right-click → Open). Raw extension-less binaries (`suravidl-linux-x64`,
+`suravidl-macos-arm64`) are attached too for CLI/headless use — chmod +x and
+run (Unix executables carry no extension by convention; the permission bit
+is what matters).
 
 ## Desktop app
 

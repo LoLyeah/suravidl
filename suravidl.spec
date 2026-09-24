@@ -38,3 +38,17 @@ exe = EXE(
     icon=str(ROOT / ("assets/icon.ico" if sys.platform == "win32"
                      else "assets/logo.png")),
 )
+
+# macOS: wrap the one-file binary in a real .app bundle.
+if sys.platform == "darwin":
+    app = BUNDLE(
+        exe,
+        name="suravidl.app",
+        icon=str(ROOT / "assets/icon.icns"),
+        bundle_identifier="com.suravidl.app",
+        info_plist={
+            "CFBundleShortVersionString": "0.7.0",
+            "CFBundleName": "suravidl",
+            "NSHighResolutionCapable": True,
+        },
+    )
