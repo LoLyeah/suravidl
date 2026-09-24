@@ -1,74 +1,143 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-glass="frosted">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>suravidl</title>
 <link rel="icon" href="/static/icon.png"/>
 <link rel="stylesheet" href="/static/style.css"/>
+<script>window.__SURAVIDL__ = "__CFG__";</script>
+<script>
+/* apply persisted theme/glass before first paint (no flash) */
+(function () {
+  try {
+    var c = window.__SURAVIDL__;
+    if (c && typeof c === "object") {
+      document.documentElement.dataset.theme = c.theme || "dark";
+      document.documentElement.dataset.glass = c.glass || "frosted";
+    }
+  } catch (e) { /* keep defaults */ }
+})();
+</script>
 </head>
 <body>
-<script>window.__SURAVIDL__ = "__CFG__";</script>
 <header>
-  <img src="/static/icon.png" class="logo" alt=""/>
+  <div class="mark">s</div>
   <h1>suravidl</h1>
-  <span id="versions" class="muted small"></span>
+  <span id="versions" class="meta"></span>
+  <span id="updateSlot"></span>
   <span class="spacer"></span>
-  <button id="settingsBtn" class="ghost small" title="Settings">⚙ Settings</button>
-  <button id="updateBtn" class="ghost small" title="Update yt-dlp">Update yt-dlp</button>
-  <button id="minBtn" class="ghost small hidden" title="Minimize window">—</button>
-  <button id="quitBtn" class="ghost small danger hidden" title="Quit suravidl">✕ Quit</button>
+  <button id="settingsBtn" class="btn sm" title="Settings">⚙ Settings</button>
+  <button id="updateBtn" class="btn sm" title="Update yt-dlp">Update yt-dlp</button>
+  <button id="minBtn" class="btn sm hidden" title="Minimize window">—</button>
+  <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl">✕ Quit</button>
 </header>
+
 <main>
-  <section id="settingsCard" class="card hidden">
-    <h2>Settings</h2>
-    <div class="field row">
-      <label class="small muted" for="setDir">Download folder</label>
-      <input id="setDir" type="text"/>
-    </div>
-    <div class="field row">
-      <label class="small muted" for="setConc">Concurrent downloads</label>
-      <input id="setConc" type="number" min="1" max="4"/>
-      <span class="muted small">1–4</span>
-    </div>
-    <div class="field row">
-      <label class="checkbox small" for="setReveal">
-        <input id="setReveal" type="checkbox"/>
-        Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
-      </label>
-    </div>
-    <div class="row">
-      <button id="setSave" class="primary">Save</button>
-      <span id="setMsg" class="muted small"></span>
-    </div>
-  </section>
-  <section class="card">
-    <div class="row">
-      <input id="url" type="text"
+  <section class="card paste-card">
+    <div class="paste">
+      <input id="url" type="text" spellcheck="false"
              placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
-      <button id="probeBtn" class="primary">Probe</button>
+      <button id="probeBtn" class="btn prime">Probe</button>
     </div>
-    <div id="probeMsg" class="muted small"></div>
+    <div id="probeMsg" class="msg muted"></div>
   </section>
 
   <section id="probeCard" class="card hidden">
-    <h2 id="probeTitle"></h2>
-    <div class="row">
-      <button id="bestBtn" class="primary">Download best quality</button>
-      <span class="muted small" id="probeMeta"></span>
+    <div class="probe-head">
+      <span id="probeTitle" class="title"></span>
+      <span id="probeMeta" class="chip"></span>
+      <span class="spacer"></span>
+      <button id="bestBtn" class="btn prime sm">Download best quality</button>
     </div>
     <table id="formats">
-      <thead><tr><th>ext</th><th>quality</th><th>codecs</th><th>size</th><th></th></tr></thead>
+      <thead><tr><th>quality</th><th>format</th><th>size</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
 
   <section class="card">
     <h2>Downloads</h2>
-    <div id="jobs"><div class="muted small">no jobs yet</div></div>
+    <div id="jobs"></div>
   </section>
 </main>
-<footer class="muted small">downloads → <span id="dlDir"></span></footer>
+
+<footer class="meta">downloads → <span id="dlDir"></span></footer>
+
+<!-- toasts -->
+<div id="toasts" aria-live="polite"></div>
+
+<!-- settings modal -->
+<div id="settingsModal" class="overlay hidden">
+  <div class="modal glass">
+    <div class="modal-head">
+      <h2>Settings</h2>
+      <button id="setClose" class="btn sm" title="Close">✕</button>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Appearance</label>
+      <div class="swatches" id="themeSwatches">
+        <button class="swatch" data-theme="light" type="button">
+          <span class="sw-preview sw-light"></span><span class="sw-label">Light</span>
+        </button>
+        <button class="swatch" data-theme="dark" type="button">
+          <span class="sw-preview sw-dark"></span><span class="sw-label">Dark</span>
+        </button>
+        <button class="swatch" data-theme="amoled" type="button">
+          <span class="sw-preview sw-amoled"></span><span class="sw-label">AMOLED</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Glass style</label>
+      <div class="swatches" id="glassSwatches">
+        <button class="swatch" data-glass="frosted" type="button">
+          <span class="sw-preview g-frosted"></span><span class="sw-label">Frosted</span>
+        </button>
+        <button class="swatch" data-glass="liquid" type="button">
+          <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="setDir">Download folder</label>
+      <input id="setDir" type="text" spellcheck="false"/>
+    </div>
+
+    <div class="field row">
+      <label class="lbl" for="setConc">Concurrent downloads</label>
+      <input id="setConc" type="number" min="1" max="4"/>
+      <span class="muted small">1–4 · applied live</span>
+    </div>
+
+    <div class="field">
+      <label class="check small" for="setReveal">
+        <input id="setReveal" type="checkbox"/>
+        Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
+      </label>
+    </div>
+
+    <div class="modal-foot">
+      <button id="setSave" class="btn prime">Save</button>
+      <span id="setMsg" class="muted small"></span>
+    </div>
+  </div>
+</div>
+
+<!-- confirm modal -->
+<div id="confirmModal" class="overlay hidden">
+  <div class="modal glass narrow">
+    <div id="confirmMsg" class="confirm-msg"></div>
+    <div class="modal-foot right">
+      <button id="confirmNo" class="btn">Cancel</button>
+      <button id="confirmYes" class="btn danger">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>

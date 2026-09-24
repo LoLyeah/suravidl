@@ -45,6 +45,29 @@ def test_settings_defaults(tmp_path):
     assert s["max_concurrent"] == 2
     assert s["open_dir_on_complete"] is False
     assert s["download_dir"] == str(tmp_path / "dl")
+    assert s["theme"] == "dark"
+    assert s["glass"] == "frosted"
+
+
+def test_theme_and_glass_validation(tmp_path):
+    c = TestClient(make_app(tmp_path))
+    # valid values round-trip and persist
+    r = c.post("/settings", headers=AUTH,
+               json={"theme": "amoled", "glass": "liquid"})
+    assert r.status_code == 200
+    assert r.json()["theme"] == "amoled"
+    assert r.json()["glass"] == "liquid"
+    c2 = TestClient(make_app(tmp_path))
+    s2 = c2.get("/settings", headers=AUTH).json()
+    assert s2["theme"] == "amoled" and s2["glass"] == "liquid"
+    # light is valid too
+    assert c.post("/settings", headers=AUTH,
+                  json={"theme": "light"}).json()["theme"] == "light"
+    # junk is rejected
+    assert c.post("/settings", headers=AUTH,
+                  json={"theme": "neon"}).status_code == 400
+    assert c.post("/settings", headers=AUTH,
+                  json={"glass": "bubbly"}).status_code == 400
 
 
 def test_settings_update_persist_and_validate(tmp_path):

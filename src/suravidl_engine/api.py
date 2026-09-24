@@ -87,7 +87,9 @@ def create_app(download_dir, auth_token: str | None = None,
     def index():
         html = (_web_dir() / "index.html").read_text(encoding="utf-8")
         cfg = json.dumps({"token": auth_token or "",
-                          "downloadDir": str(download_dir)})
+                          "downloadDir": str(manager.download_dir),
+                          "theme": settings.get()["theme"],
+                          "glass": settings.get()["glass"]})
         return HTMLResponse(html.replace('"__CFG__"', cfg))
 
     app.mount("/static", StaticFiles(directory=str(_web_dir())), name="static")
@@ -189,6 +191,21 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=404, detail="job not found") from None
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+
+    @app.post("/jobs/{job_id}/reveal")
+    def reveal_job(job_id: str, mgr: JobManager = Depends(require_auth)):
+        try:
+            job = mgr.get(job_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        if not job.get("filepath"):
+            raise HTTPException(status_code=409,
+                                detail="this job has no file yet")
+        if not acts.get("reveal"):
+            raise HTTPException(status_code=501,
+                                detail="not running in the desktop app")
+        acts["reveal"](job["filepath"])
+        return {"ok": True}
 
     return app
 

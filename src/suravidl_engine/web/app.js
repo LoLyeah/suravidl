@@ -1,4 +1,4 @@
-const CFG = window.__SURAVIDL__;
+const CFG = window.__SURAVIDL__ || {};
 const H = () => ({
   "Authorization": "Bearer " + CFG.token,
   "Content-Type": "application/json",
@@ -27,6 +27,70 @@ function humanBytes(n) {
 }
 
 const ACTIVE = new Set(["queued", "downloading", "merging"]);
+let DESKTOP = false;
+
+/* ---------- toasts ---------- */
+function toast(msg, kind = "ok") {
+  const t = el("div", "toast " + kind);
+  t.append(el("span", "dot"), el("span", "", msg));
+  t.onclick = () => dismiss(t);
+  $("toasts").append(t);
+  setTimeout(() => dismiss(t), 4200);
+}
+function dismiss(t) {
+  if (!t.parentNode) return;
+  t.classList.add("leaving");
+  setTimeout(() => t.remove(), 260);
+}
+
+/* ---------- confirm modal ---------- */
+function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
+  return new Promise((resolve) => {
+    const modal = $("confirmModal");
+    $("confirmMsg").textContent = message;
+    const yes = $("confirmYes"), no = $("confirmNo");
+    yes.textContent = okText;
+    yes.className = "btn " + (danger ? "danger" : "prime");
+    const done = (val) => {
+      modal.classList.add("hidden");
+      yes.onclick = no.onclick = modal.onclick = null;
+      document.removeEventListener("keydown", onKey);
+      resolve(val);
+    };
+    const onKey = (e) => { if (e.key === "Escape") done(false); };
+    yes.onclick = () => done(true);
+    no.onclick = () => done(false);
+    modal.onclick = (e) => { if (e.target === modal) done(false); };
+    document.addEventListener("keydown", onKey);
+    modal.classList.remove("hidden");
+  });
+}
+
+/* ---------- theme / glass ---------- */
+function applyTheme(theme, glass) {
+  const r = document.documentElement;
+  if (theme) r.dataset.theme = theme;
+  if (glass) r.dataset.glass = glass;
+}
+function markSwatches(values) {
+  document.querySelectorAll("#themeSwatches .swatch").forEach((b) =>
+    b.classList.toggle("on", b.dataset.theme === values.theme));
+  document.querySelectorAll("#glassSwatches .swatch").forEach((b) =>
+    b.classList.toggle("on", b.dataset.glass === values.glass));
+}
+let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted" };
+
+async function setAppearance(patch, label) {
+  try {
+    const s = await api("/settings", { method: "POST", body: JSON.stringify(patch) });
+    CURRENT = { theme: s.theme, glass: s.glass };
+    applyTheme(s.theme, s.glass);
+    markSwatches(CURRENT);
+    toast(label, "info");
+  } catch (e) {
+    toast("could not apply: " + e.message, "bad");
+  }
+}
 
 /* ---------- probe ---------- */
 async function doProbe() {
@@ -67,29 +131,35 @@ function renderProbe(url, info) {
   for (const f of fmts) {
     const tr = el("tr");
     tr.append(
-      el("td", "", f.ext),
-      el("td", "", fmtQuality(f) || "—"),
-      el("td", "muted small",
-        [f.vcodec !== "none" ? f.vcodec : null, f.acodec !== "none" ? f.acodec : null]
-          .filter(Boolean).join(" + ") || "—"),
-      el("td", "", humanBytes(f.filesize || f.filesize_approx)),
+      el("td", "fmt-q", fmtQuality(f) || "—"),
+      el("td", "fmt-c",
+        [f.ext, f.vcodec !== "none" ? f.vcodec : null, f.acodec !== "none" ? f.acodec : null]
+          .filter(Boolean).join(" · ") || "—"),
+      el("td", "fmt-s", humanBytes(f.filesize || f.filesize_approx)),
     );
     const td = el("td");
-    const btn = el("button", "small", "Download");
+    const btn = el("button", "get", "Get");
     btn.onclick = () => startJob(url, f.format_id);
     td.append(btn);
     tr.append(td);
     tb.append(tr);
   }
-  if (!fmts.length) tb.append(el("tr")).append(el("td", "muted", "no formats found"));
+  if (!fmts.length) {
+    const tr = el("tr");
+    tr.append(el("td", "muted", "no formats found"));
+    tb.append(tr);
+  }
 }
 
 /* ---------- jobs ---------- */
 async function startJob(url, fmt) {
   try {
     await api("/jobs", { method: "POST", body: JSON.stringify({ url, fmt }) });
+    toast("Added to downloads", "info");
     refreshJobs();
-  } catch (e) { alert("could not start download: " + e.message); }
+  } catch (e) {
+    toast("could not start download: " + e.message, "bad");
+  }
 }
 
 function jobRow(j) {
@@ -97,41 +167,63 @@ function jobRow(j) {
   const top = el("div", "jobtop");
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
-  const status = el("span", "badge " + j.status, j.status);
-  top.append(title, status);
+  top.append(title, el("span", "pill " + j.status, j.status));
   row.append(top);
 
   if (ACTIVE.has(j.status)) {
-    const pct = j.progress && j.progress.total_bytes
-      ? Math.min(100, (j.progress.downloaded_bytes / j.progress.total_bytes) * 100)
-      : 0;
-    const bar = el("div", "bar");
-    const fill = el("div", "fill");
-    fill.style.width = pct.toFixed(1) + "%";
-    bar.append(fill);
-    row.append(bar);
-    const meta = el("div", "muted small");
-    const spd = j.progress?.speed ? humanBytes(j.progress.speed) + "/s" : "";
-    const eta = j.progress?.eta != null ? " · ETA " + j.progress.eta + "s" : "";
-    meta.textContent = `${humanBytes(j.progress?.downloaded_bytes)} / ${humanBytes(j.progress?.total_bytes)} ${spd}${eta}`;
-    row.append(meta);
+    if (j.status === "downloading") {
+      const pct = j.progress && j.progress.total_bytes
+        ? Math.min(100, (j.progress.downloaded_bytes / j.progress.total_bytes) * 100)
+        : 0;
+      const bar = el("div", "bar");
+      const fill = el("div", "fill active");
+      fill.style.width = pct.toFixed(1) + "%";
+      bar.append(fill);
+      row.append(bar);
+      const meta = el("div", "jmeta");
+      const spd = j.progress?.speed ? humanBytes(j.progress.speed) + "/s" : "";
+      const eta = j.progress?.eta != null ? "ETA " + j.progress.eta + "s" : "";
+      meta.append(
+        el("span", "", Math.round(pct) + "%"),
+        ...(spd ? [el("span", "", spd)] : []),
+        ...(eta ? [el("span", "", eta)] : []),
+        el("span", "", `${humanBytes(j.progress?.downloaded_bytes)} / ${humanBytes(j.progress?.total_bytes)}`),
+      );
+      row.append(meta);
+    }
   } else if (j.status === "error" || j.status === "interrupted") {
-    row.append(el("div", "muted small err", (j.error || "").slice(0, 160)));
+    const r = el("div", "jrow");
+    r.append(el("span", "jerr", (j.error || "").slice(0, 160)));
+    const retry = el("button", "ghost-sm", "Retry");
+    retry.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
+      .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
+    r.append(retry);
+    row.append(r);
   } else if (j.filepath) {
-    row.append(el("div", "muted small", j.filepath));
+    const r = el("div", "jrow");
+    r.append(el("span", "path", j.filepath));
+    if (DESKTOP) {
+      const open = el("button", "ghost-sm", "Open folder");
+      open.onclick = () => api(`/jobs/${j.id}/reveal`, { method: "POST" })
+        .catch((e) => toast("could not open: " + e.message, "bad"));
+      r.append(open);
+    }
+    row.append(r);
   }
 
-  const actions = el("div", "actions");
+  const actions = el("div", "jrow");
   if (ACTIVE.has(j.status)) {
-    const c = el("button", "small ghost", "Cancel");
-    c.onclick = () => api(`/jobs/${j.id}/cancel`, { method: "POST" }).then(refreshJobs);
+    const c = el("button", "ghost-sm", "Cancel");
+    c.onclick = () => api(`/jobs/${j.id}/cancel`, { method: "POST" })
+      .then(refreshJobs).catch((e) => toast("cancel failed: " + e.message, "bad"));
     actions.append(c);
-  } else if (["error", "interrupted", "cancelled"].includes(j.status)) {
-    const r = el("button", "small ghost", "Retry");
-    r.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" }).then(refreshJobs);
+  } else if (j.status === "cancelled") {
+    const r = el("button", "ghost-sm", "Retry");
+    r.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
+      .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     actions.append(r);
   }
-  row.append(actions);
+  if (actions.children.length) row.append(actions);
   return row;
 }
 
@@ -140,7 +232,10 @@ async function refreshJobs() {
     const { jobs } = await api("/jobs");
     const box = $("jobs");
     box.innerHTML = "";
-    if (!jobs.length) { box.append(el("div", "muted small", "no jobs yet")); return; }
+    if (!jobs.length) {
+      box.append(el("div", "empty", "Nothing yet — paste a link above and hit Probe."));
+      return;
+    }
     jobs
       .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
       .forEach((j) => box.append(jobRow(j)));
@@ -165,29 +260,27 @@ async function checkAppUpdate() {
       a.rel = "noopener";
       a.className = "updateLink";
       a.textContent = `⬆ suravidl ${u.latest} available`;
-      $("versions").after(a);
+      $("updateSlot").append(a);
     }
-  } catch (_) { /* update check is best-effort (private repos need a token) */ }
-}
-
-async function loadHealth() {
-  try {
-    const r = await fetch("/health");
-    const h = await r.json();
-    $("dlDir").textContent = h.download_dir || "";
-  } catch (_) {}
+  } catch (_) { /* best-effort */ }
 }
 
 $("updateBtn").onclick = async () => {
-  if (!confirm("Run yt-dlp self-update? The engine may briefly stall new jobs."))
-    return;
+  const ok = await askConfirm(
+    "Run yt-dlp self-update? The engine may briefly stall new jobs.",
+    { okText: "Update", danger: false });
+  if (!ok) return;
   $("updateBtn").disabled = true;
+  const old = $("updateBtn").textContent;
   $("updateBtn").textContent = "updating…";
   try {
     const r = await api("/update", { method: "POST" });
-    $("updateBtn").textContent = r.updated ? `updated → ${r.after}` : "already latest";
-  } catch (e) { $("updateBtn").textContent = "update failed"; }
-  setTimeout(() => { $("updateBtn").textContent = "Update yt-dlp"; $("updateBtn").disabled = false; }, 4000);
+    toast(r.updated ? `yt-dlp updated → ${r.after}` : "yt-dlp already latest");
+  } catch (e) {
+    toast("update failed: " + e.message, "bad");
+  }
+  $("updateBtn").textContent = old;
+  $("updateBtn").disabled = false;
 };
 
 /* ---------- window controls (desktop app only) ---------- */
@@ -195,6 +288,7 @@ async function initAppControls() {
   try {
     const info = await api("/app/info");
     if (!info.desktop) return;
+    DESKTOP = true;
     if (info.can_minimize) {
       const min = $("minBtn");
       min.classList.remove("hidden");
@@ -203,7 +297,9 @@ async function initAppControls() {
     const quit = $("quitBtn");
     quit.classList.remove("hidden");
     quit.onclick = async () => {
-      if (!confirm("Quit suravidl? Active downloads will be interrupted.")) return;
+      const ok = await askConfirm(
+        "Quit suravidl? Active downloads will be interrupted.", { okText: "Quit" });
+      if (!ok) return;
       try { await api("/app/quit", { method: "POST" }); } catch (_) {}
     };
   } catch (_) { /* browser mode */ }
@@ -213,19 +309,44 @@ async function initAppControls() {
 async function loadSettings() {
   try {
     const s = await api("/settings");
+    CURRENT = { theme: s.theme, glass: s.glass };
     $("setDir").value = s.download_dir || "";
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
+    $("dlDir").textContent = s.download_dir || "";
+    markSwatches(CURRENT);
   } catch (e) {
-    $("setMsg").textContent = "could not load settings: " + e.message;
+    toast("could not load settings: " + e.message, "bad");
   }
 }
 
-$("settingsBtn").onclick = () => {
-  const card = $("settingsCard");
-  card.classList.toggle("hidden");
-  if (!card.classList.contains("hidden")) loadSettings();
+function openSettings() {
+  $("settingsModal").classList.remove("hidden");
+  loadSettings();
+}
+function closeSettings() {
+  $("settingsModal").classList.add("hidden");
+}
+
+$("settingsBtn").onclick = openSettings;
+$("setClose").onclick = closeSettings;
+$("settingsModal").onclick = (e) => {
+  if (e.target === $("settingsModal")) closeSettings();
 };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("settingsModal").classList.contains("hidden")) {
+    closeSettings();
+  }
+});
+
+document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
+  b.onclick = () => setAppearance({ theme: b.dataset.theme },
+    "Theme: " + b.querySelector(".sw-label").textContent);
+});
+document.querySelectorAll("#glassSwatches .swatch").forEach((b) => {
+  b.onclick = () => setAppearance({ glass: b.dataset.glass },
+    "Glass: " + b.querySelector(".sw-label").textContent);
+});
 
 $("setSave").onclick = async () => {
   $("setMsg").textContent = "saving…";
@@ -240,20 +361,23 @@ $("setSave").onclick = async () => {
     });
     $("dlDir").textContent = s.download_dir;
     $("setConc").value = s.max_concurrent;
-    $("setMsg").textContent = "saved ✓";
+    $("setMsg").textContent = "";
+    toast("Settings saved");
   } catch (e) {
     $("setMsg").textContent = "save failed: " + e.message;
   }
-  setTimeout(() => { $("setMsg").textContent = ""; }, 3000);
 };
 
+/* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
 $("bestBtn").onclick = () => startJob($("url").value.trim(), null);
 
+applyTheme(CURRENT.theme, CURRENT.glass);
+$("dlDir").textContent = CFG.downloadDir || "";
 loadVersions();
 checkAppUpdate();
-loadHealth();
+loadSettings();
 initAppControls();
 refreshJobs();
 setInterval(refreshJobs, 1200);

@@ -6,7 +6,12 @@ DEFAULTS = {
     "download_dir": None,
     "max_concurrent": 2,
     "open_dir_on_complete": False,
+    "theme": "dark",       # light | dark | amoled
+    "glass": "frosted",    # frosted | liquid
 }
+
+THEMES = ("light", "dark", "amoled")
+GLASS_STYLES = ("frosted", "liquid")
 
 
 class Settings:
@@ -53,6 +58,16 @@ class Settings:
             return max(1, min(4, int(value)))
         if key == "open_dir_on_complete":
             return bool(value)
+        if key == "theme":
+            value = str(value)
+            if value not in THEMES:
+                raise ValueError(f"theme must be one of {THEMES}")
+            return value
+        if key == "glass":
+            value = str(value)
+            if value not in GLASS_STYLES:
+                raise ValueError(f"glass must be one of {GLASS_STYLES}")
+            return value
         raise ValueError(f"unknown setting: {key}")
 
     def _save(self) -> None:

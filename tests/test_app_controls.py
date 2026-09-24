@@ -57,8 +57,56 @@ def test_window_actions_need_auth(tmp_path):
     assert c.post("/app/quit").status_code == 401
 
 
+def test_reveal_endpoint(tmp_path):
+    """POST /jobs/{id}/reveal: 404 unknown, 409 no filepath, 501 no desktop."""
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        c = TestClient(make_app(tmp_path))
+        # unknown job -> 404
+        assert c.post("/jobs/nope/reveal", headers=AUTH).status_code == 404
+        # job with no filepath yet -> 409 (this one will fail to download)
+        job = c.post("/jobs", headers=AUTH,
+                     json={"url": "http://example.invalid/x.mp4"}).json()
+        assert c.post(f"/jobs/{job['id']}/reveal",
+                      headers=AUTH).status_code == 409
+        # finished job but no desktop shell -> 501
+        job2 = c.post("/jobs", headers=AUTH,
+                      json={"url": f"http://127.0.0.1:{srv.server_address[1]}/tiny.mp4"}).json()
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if c.get(f"/jobs/{job2['id']}", headers=AUTH).json()["status"] == "completed":
+                break
+            time.sleep(0.2)
+        assert c.post(f"/jobs/{job2['id']}/reveal",
+                      headers=AUTH).status_code == 501
+    finally:
+        srv.shutdown()
+
+
+def test_reveal_desktop_only_and_calls_action(tmp_path):
+    """With a desktop shell, reveal opens the finished file."""
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        calls = []
+        actions = {"reveal": calls.append}
+        c = TestClient(make_app(tmp_path / "desk", desktop_actions=actions))
+        job = c.post("/jobs", headers=AUTH,
+                     json={"url": f"http://127.0.0.1:{srv.server_address[1]}/tiny.mp4"}).json()
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if c.get(f"/jobs/{job['id']}", headers=AUTH).json()["status"] == "completed":
+                break
+            time.sleep(0.2)
+        r = c.post(f"/jobs/{job['id']}/reveal", headers=AUTH)
+        assert r.status_code == 200
+        assert calls and calls[0].endswith("tiny.mp4")
+    finally:
+        srv.shutdown()
+
+
 def test_reveal_on_complete(tmp_path):
-    """With the option on, a finished job reveals its file (desktop only)."""
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:

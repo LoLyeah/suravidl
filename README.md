@@ -71,9 +71,15 @@ to opening your default browser. Tray icon (Open / Downloads / Quit) appears in
 browser mode.
 
 Settings (gear button in the app, persisted next to the db):
+- appearance: **Light / Dark / AMOLED** themes (AMOLED = true-black for OLED screens),
+  applied instantly and remembered per install
+- glass style: **Frosted** (classic blur) or **Liquid** (heavier blur, saturation
+  boost, specular highlights) — pick per taste
 - download folder (applies to new jobs immediately)
 - concurrent downloads (1–4, live-adjustable — waiting jobs start as you raise it)
 - open the folder when a download finishes (desktop window app only)
+Finished downloads get an "Open folder" button in the desktop app
+(`POST /jobs/{id}/reveal`).
 
 Linux note: the frozen binary falls back to the browser — bundled GTK/PyGObject
 isn't practical in PyInstaller. Run from source (`pip install -e .` plus
@@ -96,7 +102,7 @@ engine downloads over HTTP on-device (`EngineDownloadTest`). Android pins
 the pure-python fastapi/pydantic v1 stack — Chaquopy's wheel repo has no
 pydantic-core.
 
-## Status (M6)
+## Status (M7)
 
 - [x] M0 — engine PoC, extension spike, CORS, CI, Chaquopy APK with yt-dlp bundled
 - [x] Job persistence (SQLite): history survives restarts; crashed jobs → `interrupted`
@@ -115,6 +121,9 @@ pydantic-core.
 - [x] M6 — desktop: standalone app window (pywebview) with minimize/quit,
       settings (download folder, live concurrency, reveal-on-complete),
       extension crx/xpi in releases, AppImage + dmg native formats
+- [x] M7 — UI overhaul: aurora glass design, Light/Dark/AMOLED themes,
+      Frosted/Liquid glass switch, toasts + glass modals, reveal-in-folder,
+      selection cards in settings
 
 ## API (v0.1)
 
@@ -128,6 +137,7 @@ pydantic-core.
 | `GET /jobs`, `GET /jobs/{id}` | ✓ | history / status |
 | `POST /jobs/{id}/cancel` | ✓ | cancel queued/running |
 | `POST /jobs/{id}/retry` | ✓ | re-run error/interrupted/cancelled |
+| `POST /jobs/{id}/reveal` | ✓ | open the finished file (desktop only) |
 | `GET/POST /settings` | ✓ | download dir, concurrency, reveal-on-complete |
 | `GET /app/info` | ✓ | whether a desktop shell (window) is attached |
 | `POST /app/minimize`, `/app/quit` | ✓ | window controls (desktop only) |
