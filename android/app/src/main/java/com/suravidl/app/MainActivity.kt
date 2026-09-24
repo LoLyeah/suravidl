@@ -4,11 +4,17 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -19,29 +25,52 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Android 15+ always draws edge-to-edge. Apply the system bar insets
+        // ourselves so no UI ever hides behind the status/navigation bars.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
-        setContentView(webView)
+        webView.setBackgroundColor(BG_DARK)
+
+        val root = FrameLayout(this)
+        root.setBackgroundColor(BG_DARK)
+        root.addView(webView, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        setContentView(root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars()
+                    or WindowInsetsCompat.Type.displayCutout()
+                    or WindowInsetsCompat.Type.ime())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
 
         ContextCompat.startForegroundService(this, Intent(this, EngineService::class.java))
         if (Build.VERSION.SDK_INT >= 33) {
             ActivityCompat.requestPermissions(
                 this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
-        waitAndLoad()
+        waitAndLoad(root)
     }
 
-    private fun waitAndLoad() {
+    private fun waitAndLoad(root: FrameLayout) {
         thread {
-            repeat(60) {
+            repeat(120) {  // 60 s — Python bootstrap can be slow on first run
                 try {
                     val c = URL("http://127.0.0.1:${EngineService.ENGINE_PORT}/health")
                         .openConnection() as HttpURLConnection
                     c.connectTimeout = 2000
                     if (c.responseCode == 200) {
+                        val color = themeBackground()
                         runOnUiThread {
+                            root.setBackgroundColor(color)
+                            webView.setBackgroundColor(color)
                             webView.loadUrl("http://127.0.0.1:${EngineService.ENGINE_PORT}/")
                         }
                         return@thread
@@ -69,8 +98,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Colour of the strip behind the system bars, matched to the saved theme. */
+    private fun themeBackground(): Int = try {
+        val token = getSharedPreferences("engine", MODE_PRIVATE)
+            .getString("token", "") ?: ""
+        val c = URL("http://127.0.0.1:${EngineService.ENGINE_PORT}/settings")
+            .openConnection() as HttpURLConnection
+        c.setRequestProperty("Authorization", "Bearer $token")
+        c.connectTimeout = 2000
+        when (JSONObject(c.inputStream.bufferedReader().readText())
+                .optString("theme", "dark")) {
+            "light" -> BG_LIGHT
+            "amoled" -> BG_AMOLED
+            else -> BG_DARK
+        }
+    } catch (_: Throwable) {
+        BG_DARK
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    }
+
+    companion object {
+        const val BG_DARK = 0xFF06080F.toInt()
+        const val BG_LIGHT = 0xFFEEF1F7.toInt()
+        const val BG_AMOLED = 0xFF000000.toInt()
     }
 }

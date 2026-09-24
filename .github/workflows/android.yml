@@ -160,9 +160,15 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            set -e
             echo "device page size: $(adb shell getconf PAGESIZE)"
             gradle -p android connectedDebugAndroidTest --no-daemon
+            STATUS=$?
+            mkdir -p ci-artifacts
+            adb shell am start -n com.suravidl.app/.MainActivity || true
+            sleep 45
+            adb exec-out screencap -p > ci-artifacts/app-screen.png || true
+            ls -la ci-artifacts
+            exit $STATUS
       - name: Collect crash evidence
         if: failure()
         run: |

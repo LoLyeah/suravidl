@@ -178,7 +178,7 @@ button { font: inherit; border: 0; cursor: pointer; }
 
 /* ---------- layout ---------- */
 main { max-width: 980px; margin: 0 auto; padding: 22px 20px 40px; }
-footer { max-width: 980px; margin: 0 auto; padding: 0 20px 30px; }
+footer { max-width: 980px; margin: 0 auto; padding: 0 20px 30px; overflow-wrap: anywhere; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
