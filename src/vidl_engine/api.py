@@ -5,6 +5,7 @@ import secrets
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -25,6 +26,13 @@ class ProbeRequest(BaseModel):
 
 def create_app(download_dir, auth_token: str | None = None) -> FastAPI:
     app = FastAPI(title="vidl engine")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^chrome-extension://[a-p]+$",
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
     manager = JobManager(download_dir=download_dir)
 
     def require_auth(

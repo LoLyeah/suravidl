@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px system-ui; width: 340px; margin: 0; padding: 10px; }
+      h1 { font-size: 14px; margin: 0 0 8px; }
+      .item { padding: 6px; border: 1px solid #ddd; border-radius: 6px;
+              margin-bottom: 6px; word-break: break-all; }
+      .url { color: #555; font-size: 11px; }
+      button { margin-top: 4px; }
+      .empty { color: #888; padding: 12px 0; text-align: center; }
+      #status { margin-top: 6px; font-size: 12px; }
+      .ok { color: #0a0; } .err { color: #c00; }
+    </style>
+  </head>
+  <body>
+    <h1>vidl — media on this page</h1>
+    <div id="list"><div class="empty">loading…</div></div>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
