@@ -164,9 +164,13 @@ jobs:
             gradle -p android connectedDebugAndroidTest --no-daemon
             STATUS=$?
             mkdir -p ci-artifacts
+            adb install -r -t android/app/build/outputs/apk/debug/app-debug.apk || true
+            adb shell pm grant com.suravidl.app android.permission.POST_NOTIFICATIONS || true
             adb shell am start -n com.suravidl.app/.MainActivity || true
             sleep 45
+            adb shell dumpsys window 2>/dev/null | grep -E "mCurrentFocus" > ci-artifacts/focus.txt || true
             adb exec-out screencap -p > ci-artifacts/app-screen.png || true
+            adb logcat -d -t 300 > ci-artifacts/app-logcat.txt || true
             ls -la ci-artifacts
             exit $STATUS
       - name: Collect crash evidence
