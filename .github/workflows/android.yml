@@ -131,6 +131,7 @@ jobs:
   # /health) must boot a real 16 KB page size environment.
   instrumentation-16k:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -151,34 +152,17 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm
-      - name: Install a 16 KB page size emulator image
-        run: |
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/emulator:$PATH"
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager --list > /tmp/sdklist.txt 2>&1 || true
-          echo "--- candidate 16 KB system images ---"
-          grep -iE "system-images;android-(35|36)[^ ]*x86_64" /tmp/sdklist.txt | sed 's/|.*//' | sort -u | head -40 || true
-          IMG=$(grep -oE "system-images;android-(35|36);[A-Za-z0-9_.]*ps16k[A-Za-z0-9_.]*;x86_64" /tmp/sdklist.txt | sort -u | tail -1)
-          if [ -z "$IMG" ]; then
-            IMG=$(grep -oE "system-images;android-(35|36);[A-Za-z0-9_.]*16k[A-Za-z0-9_.]*;x86_64" /tmp/sdklist.txt | sort -u | tail -1)
-          fi
-          if [ -z "$IMG" ]; then echo "::error::no 16 KB page size system image found"; exit 1; fi
-          echo "using $IMG"
-          echo "SYSIMG=$IMG" >> "$GITHUB_ENV"
-          sdkmanager "$IMG" emulator platform-tools > /dev/null
-      - name: Boot the 16 KB emulator
-        run: |
-          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
-          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/emulator:$PATH"
-          echo no | avdmanager create avd -n suravidl16k -k "$SYSIMG" --force
-          nohup emulator -avd suravidl16k -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -wipe-data > /tmp/emu.log 2>&1 &
-          adb wait-for-device
-          timeout 900 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
-          echo "device page size: $(adb shell getconf PAGESIZE)"
-          adb shell getprop ro.build.version.sdk
-      - name: Run full app + engine tests on 16 KB emulator
-        run: gradle -p android connectedDebugAndroidTest --no-daemon
+      - name: Run full app + engine tests on a 16 KB page size emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis_ps16k
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            set -e
+            echo "device page size: $(adb shell getconf PAGESIZE)"
+            gradle -p android connectedDebugAndroidTest --no-daemon
       - name: Collect crash evidence
         if: failure()
         run: |
