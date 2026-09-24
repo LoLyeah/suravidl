@@ -1,12 +1,16 @@
 """FastAPI app exposing the engine over HTTP."""
 import argparse
+import json
 import os
 import secrets
+import sys
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
@@ -23,6 +27,16 @@ class JobRequest(BaseModel):
 class ProbeRequest(BaseModel):
     url: str
     headers: dict | None = None
+
+
+def _web_dir() -> Path:
+    """Location of the bundled web UI (differs in PyInstaller-frozen builds)."""
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
+        for cand in (base / "suravidl_engine" / "web", base / "web"):
+            if (cand / "index.html").exists():
+                return cand
+    return Path(__file__).parent / "web"
 
 
 def create_app(download_dir, auth_token: str | None = None,
@@ -48,7 +62,17 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.get("/health")
     def health():
-        return {"ok": True, "version": __version__}
+        return {"ok": True, "version": __version__,
+                "download_dir": str(download_dir)}
+
+    @app.get("/", response_class=HTMLResponse)
+    def index():
+        html = (_web_dir() / "index.html").read_text(encoding="utf-8")
+        cfg = json.dumps({"token": auth_token or "",
+                          "downloadDir": str(download_dir)})
+        return HTMLResponse(html.replace('"__CFG__"', cfg))
+
+    app.mount("/static", StaticFiles(directory=str(_web_dir())), name="static")
 
     @app.get("/version")
     def version(_mgr: JobManager = Depends(require_auth)):

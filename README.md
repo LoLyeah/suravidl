@@ -11,17 +11,26 @@ Planned targets: Windows, macOS, Linux, Android (web postponed).
 ## Layout
 
 - `src/suravidl_engine/` — Python engine (FastAPI + yt-dlp as a module)
+- `src/suravidl_engine/web/` — the UI, served by the engine at `/`
 - `extension/` — browser extension (detects videos, hands off to the engine)
 - `android/` — Android app (Chaquopy: same engine, embedded Python)
 - `tests/` — pytest suite, fully offline (local fixture servers, real ffmpeg)
 
-## Status (M1)
+## Desktop app
+
+`pyinstaller suravidl.spec` → single-file binary: serves the engine on
+127.0.0.1, opens the browser, tray icon (Open / Downloads / Quit) when a
+display is available. `--selftest` boots and health-checks itself (used by CI).
+CI builds Linux/Windows/macOS binaries on tags (`release.yml`).
+
+## Status (M2)
 
 - [x] M0 — engine PoC, extension spike, CORS, CI, Chaquopy APK with yt-dlp bundled
 - [x] Job persistence (SQLite): history survives restarts; crashed jobs → `interrupted`
 - [x] Cancel (queued instantly, running via progress-hook interrupt) + retry (reuses url/fmt/headers)
 - [x] Format selection (`fmt` on `/jobs`), yt-dlp self-update (`POST /update`), `/version`
-- [ ] M2 — web UI MVP + desktop binaries (PyInstaller)
+- [x] M2 — web UI (probe → formats → download w/ progress, history, update button)
+- [x] Desktop binary: PyInstaller onefile, tray + browser open, `--selftest` for CI
 - [ ] M3 — extension MVP polish (cookie capture, Firefox)
 - [ ] M4 — Android app (foreground service, downloads UI)
 

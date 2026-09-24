@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>suravidl</title>
+<link rel="icon" href="/static/icon.png"/>
+<link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+<script>window.__SURAVIDL__ = "__CFG__";</script>
+<header>
+  <img src="/static/icon.png" class="logo" alt=""/>
+  <h1>suravidl</h1>
+  <span id="versions" class="muted small"></span>
+  <span class="spacer"></span>
+  <button id="updateBtn" class="ghost small" title="Update yt-dlp">Update yt-dlp</button>
+</header>
+<main>
+  <section class="card">
+    <div class="row">
+      <input id="url" type="text"
+             placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
+      <button id="probeBtn" class="primary">Probe</button>
+    </div>
+    <div id="probeMsg" class="muted small"></div>
+  </section>
+
+  <section id="probeCard" class="card hidden">
+    <h2 id="probeTitle"></h2>
+    <div class="row">
+      <button id="bestBtn" class="primary">Download best quality</button>
+      <span class="muted small" id="probeMeta"></span>
+    </div>
+    <table id="formats">
+      <thead><tr><th>ext</th><th>quality</th><th>codecs</th><th>size</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Downloads</h2>
+    <div id="jobs"><div class="muted small">no jobs yet</div></div>
+  </section>
+</main>
+<footer class="muted small">downloads → <span id="dlDir"></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
