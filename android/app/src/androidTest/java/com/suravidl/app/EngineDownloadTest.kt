@@ -25,15 +25,17 @@ class EngineDownloadTest {
         val mgr = jobs.callAttr("JobManager", dir.absolutePath)
 
         val job = mgr.callAttr("create", "http://10.0.2.2:8801/tiny.mp4")
-            .toJava(Map::class.java) as Map<*, *>
-        val id = job["id"].toString()
+        val id = job.callAttr("__getitem__", "id").toString()
 
         var status = ""
         for (i in 1..60) {
-            val j = mgr.callAttr("get", id).toJava(Map::class.java) as Map<*, *>
-            status = j["status"].toString()
+            val j = mgr.callAttr("get", id)
+            status = j.callAttr("__getitem__", "status").toString()
             if (status == "completed") break
-            if (status == "error") throw AssertionError("engine job errored: $j")
+            if (status == "error") {
+                throw AssertionError(
+                    "engine job errored: " + j.callAttr("__getitem__", "error"))
+            }
             Thread.sleep(1000)
         }
         assertEquals("completed", status)
