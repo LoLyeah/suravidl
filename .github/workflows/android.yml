@@ -44,6 +44,12 @@ jobs:
           gradle-version: '8.7'
       - name: Start fixture server (reached by emulator at 10.0.2.2:8801)
         run: nohup python3 -m http.server 8801 --directory tests/fixtures > /tmp/fixture.log 2>&1 &
+      - name: Grant KVM access (hardware-accelerated emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
       - name: Run engine download test on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
