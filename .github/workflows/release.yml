@@ -62,20 +62,20 @@ jobs:
           set -e
           case "${{ matrix.os }}" in
             ubuntu-22.04)
-              cp dist/suravidl ../suravidl-linux-x64
+              cp dist/suravidl suravidl-linux-x64
               sudo apt-get update -q && sudo apt-get install -y -q squashfs-tools
-              ./scripts/build_appimage.sh dist/suravidl ../suravidl-linux-x64.AppImage
+              ./scripts/build_appimage.sh dist/suravidl suravidl-linux-x64.AppImage
               ;;
             macos-14)
-              cp dist/suravidl ../suravidl-macos-arm64
+              cp dist/suravidl suravidl-macos-arm64
               mkdir -p dmg_stage
               cp -R dist/suravidl.app dmg_stage/
               ln -s /Applications dmg_stage/Applications
               hdiutil create -volname suravidl -srcfolder dmg_stage \
-                -ov -format UDZO ../suravidl-macos-arm64.dmg
+                -ov -format UDZO suravidl-macos-arm64.dmg
               ;;
             windows-2022)
-              cp dist/suravidl.exe ../suravidl-windows-x64.exe
+              cp dist/suravidl.exe suravidl-windows-x64.exe
               ;;
           esac
       - uses: actions/upload-artifact@v4
