@@ -36,7 +36,7 @@ def main():
     base = f"http://127.0.0.1:{fs.server_address[1]}"
 
     dl_dir = Path(tempfile.mkdtemp(prefix="suravidl_smoke_"))
-    env = dict(os.environ, VIDL_TOKEN=TOKEN)
+    env = dict(os.environ, SURAVIDL_TOKEN=TOKEN)
     eng = subprocess.Popen(
         [str(PY), "-m", "suravidl_engine.api", "--port", "8799",
          "--download-dir", str(dl_dir)],
@@ -69,14 +69,39 @@ def main():
         assert j["status"] == "completed", j
         assert Path(j["filepath"]).exists(), j
 
+        # M1 surface: version, error->retry flow, persistence
+        ver = req("GET", "http://127.0.0.1:8799/version")
+        assert ver["engine"] and ver["yt_dlp"], ver
+
+        bad = req("POST", "http://127.0.0.1:8799/jobs",
+                  {"url": "http://127.0.0.1:1/nope.mp4"})
+        for _ in range(200):
+            bj = req("GET", f"http://127.0.0.1:8799/jobs/{bad['id']}")
+            if bj["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert bj["status"] == "error", bj
+
+        retried = req("POST", f"http://127.0.0.1:8799/jobs/{bad['id']}/retry")
+        assert retried["id"] != bad["id"] and retried["url"] == bad["url"]
+        # retry of the dead URL errors again — that's the expected outcome here
+        for _ in range(200):
+            j2 = req("GET", f"http://127.0.0.1:8799/jobs/{retried['id']}")
+            if j2["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert j2["status"] == "error", j2
+
         print(json.dumps({
             "SMOKE": "OK",
             "engine": h,
+            "version": ver,
             "probe_ext": info["ext"],
             "probe_formats": len(info["formats"]),
             "job_status": j["status"],
             "file": j["filepath"],
             "bytes": Path(j["filepath"]).stat().st_size,
+            "retry_of_error_job": j2["status"],
         }, indent=2))
     finally:
         eng.terminate()

@@ -10,23 +10,41 @@ Planned targets: Windows, macOS, Linux, Android (web postponed).
 
 ## Layout
 
-- `src/vidl_engine/` — Python engine (FastAPI + yt-dlp as a module)
+- `src/suravidl_engine/` — Python engine (FastAPI + yt-dlp as a module)
 - `extension/` — browser extension (detects videos, hands off to the engine)
-- `tests/` — pytest suite, fully offline (local fixture server, real ffmpeg)
+- `android/` — Android app (Chaquopy: same engine, embedded Python)
+- `tests/` — pytest suite, fully offline (local fixture servers, real ffmpeg)
 
-## Status (M0)
+## Status (M1)
 
-- [x] Engine PoC: probe, background jobs with progress, HLS merge, header pass-through
-- [x] HTTP API: `/health`, `/probe`, `/jobs` (token auth, chrome-extension CORS)
-- [x] Extension handoff spike (MV3: webRequest detection → engine POST)
-- [x] GH Actions: test matrix green, Chaquopy APK builds with yt-dlp bundled
+- [x] M0 — engine PoC, extension spike, CORS, CI, Chaquopy APK with yt-dlp bundled
+- [x] Job persistence (SQLite): history survives restarts; crashed jobs → `interrupted`
+- [x] Cancel (queued instantly, running via progress-hook interrupt) + retry (reuses url/fmt/headers)
+- [x] Format selection (`fmt` on `/jobs`), yt-dlp self-update (`POST /update`), `/version`
+- [ ] M2 — web UI MVP + desktop binaries (PyInstaller)
+- [ ] M3 — extension MVP polish (cookie capture, Firefox)
+- [ ] M4 — Android app (foreground service, downloads UI)
+
+## API (v0.1)
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /health` | – | liveness + engine version |
+| `GET /version` | Bearer | engine + yt-dlp versions |
+| `POST /update` | ✓ | self-update yt-dlp (pip) |
+| `POST /probe` | ✓ | metadata + formats for a URL |
+| `POST /jobs` | ✓ | enqueue download (`url`, `fmt`, `headers`) |
+| `GET /jobs`, `GET /jobs/{id}` | ✓ | history / status |
+| `POST /jobs/{id}/cancel` | ✓ | cancel queued/running |
+| `POST /jobs/{id}/retry` | ✓ | re-run error/interrupted/cancelled |
 
 ## Dev
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/python -m pytest tests/ -q
-VIDL_TOKEN=x .venv/bin/python -m vidl_engine.api --port 8787
+SURAVIDL_TOKEN=x .venv/bin/python -m suravidl_engine.api --port 8787
+.venv/bin/python scripts/smoke.py   # full live end-to-end check
 ```
 
 ## Limits
