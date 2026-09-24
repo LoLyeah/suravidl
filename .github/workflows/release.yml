@@ -70,8 +70,43 @@ jobs:
             ${{ matrix.raw }}
             ${{ matrix.zip }}
 
+  extension:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Chrome .crx (signed) + Firefox .xpi + source zips
+        run: |
+          set -e
+          echo "${{ secrets.CHROME_EXT_KEY_B64 }}" | base64 -d > /tmp/ext-key.pem
+          # Chrome crx3 via Chrome's own packer (stable extension ID from the key)
+          xvfb-run -a google-chrome --pack-extension="$PWD/extension" \
+            --pack-extension-key=/tmp/ext-key.pem --no-sandbox || \
+            google-chrome --pack-extension="$PWD/extension" \
+              --pack-extension-key=/tmp/ext-key.pem --no-sandbox
+          mv extension.crx suravidl-extension-chrome.crx
+          # Firefox build dir: MV2 manifest + shared files
+          rm -rf /tmp/ffext && cp -r extension /tmp/ffext
+          rm -rf /tmp/ffext/firefox
+          cp extension/firefox/manifest.json /tmp/ffext/manifest.json
+          # unsigned xpi (stable Firefox needs an AMO-signed build to install)
+          (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox.xpi" .)
+          # load-unpacked convenience zips
+          (cd extension && zip -qr "$OLDPWD/suravidl-extension-chrome.zip" . -x "firefox/*")
+          (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox-src.zip" .)
+          # sanity: crx3 magic
+          head -c 4 suravidl-extension-chrome.crx | grep -q "Cr24"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: |
+            suravidl-extension-chrome.crx
+            suravidl-extension-firefox.xpi
+            suravidl-extension-chrome.zip
+            suravidl-extension-firefox-src.zip
+
   publish:
-    needs: build
+    needs: [build, extension]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

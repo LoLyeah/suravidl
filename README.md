@@ -22,11 +22,20 @@ Detects videos on any page (webRequest observer) and hands them to the engine
 with the site's cookies/UA/referer so logged-in sites work. Badges the count
 of detected media per tab.
 
-- **Chrome/Edge/Brave**: `chrome://extensions` → Developer mode → Load unpacked
-  → select `extension/`
-- **Firefox**: same, selecting `extension/` after copying
-  `extension/firefox/manifest.json` over `extension/manifest.json`
-  (or `npx web-ext run --source-dir <dir-with-firefox-manifest>`)
+- **From a release**: `suravidl-extension-chrome.crx` (signed, stable ID),
+  `suravidl-extension-firefox.xpi`, or the `-chrome.zip` / `-firefox-src.zip`
+  for loading unpacked.
+- **From the repo**: `chrome://extensions` → Developer mode → Load unpacked
+  → select `extension/` (Chrome/Edge/Brave). Firefox: copy
+  `extension/firefox/manifest.json` over `extension/manifest.json` first
+  (or `npx web-ext run --source-dir <dir-with-firefox-manifest>`).
+
+Install caveats, so nobody is surprised: Chrome no longer installs
+off-store `.crx` files by double-click (blocked since ~2019 except via
+enterprise policy or Chromium builds) — for most users *Load unpacked* is
+the way. Firefox stable refuses unsigned `.xpi` — the release one installs on
+Firefox Developer Edition / Nightly, or after the add-on gets signed on
+addons.mozilla.org (free, automated once API keys are wired in).
 
 The engine token is set once in the extension options page (it's printed when
 the engine starts). Header capture is whitelisted engine-side (cookie,
