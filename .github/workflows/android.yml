@@ -153,6 +153,8 @@ jobs:
           ls -l /dev/kvm
       - name: Install a 16 KB page size emulator image
         run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/emulator:$PATH"
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager --list > /tmp/sdklist.txt 2>&1 || true
           echo "--- candidate 16 KB system images ---"
@@ -167,8 +169,10 @@ jobs:
           sdkmanager "$IMG" emulator platform-tools > /dev/null
       - name: Boot the 16 KB emulator
         run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/emulator:$PATH"
           echo no | avdmanager create avd -n suravidl16k -k "$SYSIMG" --force
-          nohup $ANDROID_HOME/emulator/emulator -avd suravidl16k -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -wipe-data > /tmp/emu.log 2>&1 &
+          nohup emulator -avd suravidl16k -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -wipe-data > /tmp/emu.log 2>&1 &
           adb wait-for-device
           timeout 900 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 5; done'
           echo "device page size: $(adb shell getconf PAGESIZE)"
