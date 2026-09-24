@@ -98,9 +98,18 @@ WebView kiosk of the engine UI. Files land in the app's external dir
 
 Build with `gradle -p android assembleDebug` (needs the Android SDK; CI does
 it in `android.yml`). The emulator instrumentation test proves the real
-engine downloads over HTTP on-device (`EngineDownloadTest`). Android pins
-the pure-python fastapi/pydantic v1 stack — Chaquopy's wheel repo has no
-pydantic-core.
+engine downloads over HTTP on-device (`EngineDownloadTest`) and that the full
+app boot path works (`AppStartupTest`: MainActivity → EngineService → /health).
+
+- **16 KB page size devices** (Android 15+): native libs ship 16 KB-aligned
+  (Chaquopy 17); CI verifies ELF alignment in the release APK and runs the
+  full test suite on a 16 KB page size emulator.
+- If the app ever misbehaves, it writes a log readable with any file manager
+  at `Android/media/com.suravidl.app/logs/` (crash traces + engine errors);
+  the in-app error page shows the same log on screen.
+
+Android pins the pure-python fastapi/pydantic v1 stack — Chaquopy's wheel
+repo has no pydantic-core.
 
 ## Status (M7)
 

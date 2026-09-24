@@ -46,13 +46,24 @@ class MainActivity : AppCompatActivity() {
                         }
                         return@thread
                     }
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
                 }
                 Thread.sleep(500)
             }
             runOnUiThread {
+                val logs = LogStore.readAll(this).replace("&", "&amp;")
+                    .replace("<", "&lt;").replace(">", "&gt;")
+                val body = if (logs.isEmpty()) {
+                    "<p style='color:#888'>No log recorded. A copy would be at " +
+                    "Android/media/com.suravidl.app/logs/</p>"
+                } else {
+                    "<p style='color:#888'>Log (also saved at " +
+                    "Android/media/com.suravidl.app/logs/ — please share it):</p>" +
+                    "<pre style='white-space:pre-wrap;font-size:11px'>$logs</pre>"
+                }
                 webView.loadData(
-                    "<h3 style='font-family:sans-serif'>suravidl engine did not start</h3>",
+                    "<div style='font-family:sans-serif;padding:16px'>" +
+                    "<h3>suravidl engine did not start</h3>$body</div>",
                     "text/html", "utf-8")
             }
         }

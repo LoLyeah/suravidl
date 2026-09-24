@@ -8,6 +8,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.chaquo.python.Python
@@ -19,10 +20,18 @@ import java.net.URL
 import java.util.UUID
 import kotlin.concurrent.thread
 
-/** Foreground service hosting the engine (uvicorn on 127.0.0.1:8787). */
+/**
+ * Foreground service hosting the engine (uvicorn on 127.0.0.1:8787).
+ *
+ * Every background thread here is fully guarded: an uncaught exception on
+ * ANY thread kills the whole Android process ("app keeps stopping"), so all
+ * failure paths are caught, logged to Android/data/.../files/logs, and
+ * surfaced in the notification instead.
+ */
 class EngineService : Service() {
     private var token = ""
     @Volatile private var polling = true
+    @Volatile private var engineError: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -31,30 +40,72 @@ class EngineService : Service() {
         token = prefs.getString("token", null) ?: UUID.randomUUID().toString().also {
             prefs.edit().putString("token", it).apply()
         }
-        startInForeground()
+        try {
+            startInForeground()
+        } catch (t: Throwable) {
+            Log.e(SuravidlApp.TAG, "startForeground failed", t)
+            writeLog("engine-error", t)
+        }
 
         val dl = File(getExternalFilesDir(Environment.DIRECTORY_MOVIES), "suravidl")
         dl.mkdirs()
         val db = File(filesDir, "jobs.db")
 
         thread(name = "engine") {
-            if (!Python.isStarted()) Python.start(AndroidPlatform(this))
-            Python.getInstance().getModule("suravidl_engine.__main__")
-                .callAttr("start_server", dl.absolutePath, token, ENGINE_PORT,
-                          db.absolutePath)
-            updateCount()
+            try {
+                if (!Python.isStarted()) Python.start(AndroidPlatform(this))
+                Python.getInstance().getModule("suravidl_engine.__main__")
+                    .callAttr("start_server", dl.absolutePath, token, ENGINE_PORT,
+                              db.absolutePath)
+                awaitEngine()
+                updateCount()
+            } catch (t: Throwable) {
+                engineError = t.stackTraceToString()
+                Log.e(SuravidlApp.TAG, "engine failed to start", t)
+                writeLog("engine-error", t)
+                try {
+                    updateCount()
+                } catch (_: Throwable) {
+                }
+            }
         }
         thread(name = "notifier") {
             while (polling) {
                 try {
                     updateCount()
                     importCompleted()
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
+                    // never let a polling hiccup kill the process
                 }
                 Thread.sleep(2000)
             }
         }
         return START_STICKY
+    }
+
+    /** Wait until the engine's /health answers (uvicorn binds asynchronously). */
+    private fun awaitEngine(timeoutMs: Long = 60_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (healthOk()) return
+            Thread.sleep(500)
+        }
+        throw IllegalStateException("engine did not answer /health within ${timeoutMs} ms")
+    }
+
+    private fun healthOk(): Boolean = try {
+        val c = URL("http://127.0.0.1:$ENGINE_PORT/health").openConnection()
+                as HttpURLConnection
+        c.connectTimeout = 2000
+        c.responseCode == 200
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun writeLog(prefix: String, t: Throwable) {
+        LogStore.write(
+            this, "$prefix-${System.currentTimeMillis()}.txt",
+            "thread=${Thread.currentThread().name}\n${t.stackTraceToString()}")
     }
 
     private val importedIds = HashSet<String>()
@@ -102,9 +153,15 @@ class EngineService : Service() {
     }
 
     private fun updateCount() {
-        val n = activeCount()
-        val text = if (n == 0) "engine running — no active downloads"
-        else "downloading $n…"
+        val text = engineError?.let { err ->
+            "engine failed — log saved (${err.lineSequence().first()})"
+        } ?: try {
+            val n = activeCount()
+            if (n == 0) "engine running — no active downloads"
+            else "downloading $n…"
+        } catch (_: Exception) {
+            "starting engine…"
+        }
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("suravidl")
