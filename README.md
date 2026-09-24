@@ -33,7 +33,9 @@ of detected media per tab.
 Install caveats, so nobody is surprised: Chrome no longer installs
 off-store `.crx` files by double-click (blocked since ~2019 except via
 enterprise policy or Chromium builds) — for most users *Load unpacked* is
-the way. Firefox stable refuses unsigned `.xpi` — the release one installs on
+the way. The signed crx's stable identity is
+`habomdhpjdcddccplapkncnfokpknfle` (that's the ID to pin in enterprise
+policy). Firefox stable refuses unsigned `.xpi` — the release one installs on
 Firefox Developer Edition / Nightly, or after the add-on gets signed on
 addons.mozilla.org (free, automated once API keys are wired in).
 
