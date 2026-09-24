@@ -29,6 +29,16 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 ACTIVE_STATUSES = ("queued", "downloading", "merging")
 
+# Only these captured browser headers are forwarded to yt-dlp.
+ALLOWED_HEADER_KEYS = {"cookie", "user-agent", "referer", "origin",
+                       "accept", "accept-language"}
+
+
+def _safe_headers(h: dict | None) -> dict | None:
+    if not h:
+        return None
+    return {k: v for k, v in h.items() if str(k).lower() in ALLOWED_HEADER_KEYS}
+
 
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2):
@@ -102,6 +112,7 @@ class JobManager:
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
                extra_headers: dict | None = None) -> dict:
+        extra_headers = _safe_headers(extra_headers)
         job_id = uuid.uuid4().hex[:12]
         job = {
             "id": job_id,

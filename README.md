@@ -16,6 +16,23 @@ Planned targets: Windows, macOS, Linux, Android (web postponed).
 - `android/` — Android app (Chaquopy: same engine, embedded Python)
 - `tests/` — pytest suite, fully offline (local fixture servers, real ffmpeg)
 
+## Browser extension
+
+Detects videos on any page (webRequest observer) and hands them to the engine
+with the site's cookies/UA/referer so logged-in sites work. Badges the count
+of detected media per tab.
+
+- **Chrome/Edge/Brave**: `chrome://extensions` → Developer mode → Load unpacked
+  → select `extension/`
+- **Firefox**: same, selecting `extension/` after copying
+  `extension/firefox/manifest.json` over `extension/manifest.json`
+  (or `npx web-ext run --source-dir <dir-with-firefox-manifest>`)
+
+The engine token is set once in the extension options page (it's printed when
+the engine starts). Header capture is whitelisted engine-side (cookie,
+user-agent, referer, origin, accept) — nothing else from the page reaches
+yt-dlp.
+
 ## Desktop app
 
 `pyinstaller suravidl.spec` → single-file binary: serves the engine on
@@ -31,7 +48,9 @@ CI builds Linux/Windows/macOS binaries on tags (`release.yml`).
 - [x] Format selection (`fmt` on `/jobs`), yt-dlp self-update (`POST /update`), `/version`
 - [x] M2 — web UI (probe → formats → download w/ progress, history, update button)
 - [x] Desktop binary: PyInstaller onefile, tray + browser open, `--selftest` for CI
-- [ ] M3 — extension MVP polish (cookie capture, Firefox)
+- [x] M3 — extension MVP: cookie/UA/referer capture (engine whitelist), badge count,
+      Firefox port (MV2 manifest, web-ext lint 0/0/0), real-Chrome E2E
+      (`scripts/ext_e2e.py`: handoff, detection, header capture, popup render)
 - [ ] M4 — Android app (foreground service, downloads UI)
 
 ## API (v0.1)

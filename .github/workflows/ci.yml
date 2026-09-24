@@ -22,3 +22,19 @@ jobs:
         run: pip install -e '.[dev]'
       - name: Run tests
         run: pytest tests/ -q
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax-check extension JS (parses = catches template-literal bugs)
+        run: |
+          node --check extension/background.js
+          node --check extension/popup.js
+          node --check extension/options.js
+      - name: Validate manifests
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json')); JSON.parse(require('fs').readFileSync('extension/firefox/manifest.json')); console.log('manifests OK')"

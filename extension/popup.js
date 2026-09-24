@@ -11,22 +11,27 @@ function render(items) {
     const div = document.createElement("div");
     div.className = "item";
     const short = m.url.length > 90 ? m.url.slice(0, 90) + "…" : m.url;
-    div.innerHTML = `<div>${short}</div><div class="url">${new URL(m.url).protocol} stream</div>`;
+    const title = document.createElement("div");
+    title.textContent = short;
+    const meta = document.createElement("div");
+    meta.className = "url";
+    meta.textContent = (m.hasHeaders ? "with site cookies · " : "") +
+      new URL(m.url).protocol + " stream";
     const btn = document.createElement("button");
     btn.textContent = "Download with suravidl";
     btn.onclick = async () => {
       statusEl.textContent = "sending…";
       statusEl.className = "";
       const res = await chrome.runtime.sendMessage({ type: "sendToEngine", url: m.url });
-      if (res?.ok) {
+      if (res && res.ok) {
         statusEl.textContent = "✓ sent to engine (job " + res.job.id + ")";
         statusEl.className = "ok";
       } else {
-        statusEl.textContent = "✗ " + (res?.error || "engine unreachable — is it running?");
+        statusEl.textContent = "✗ " + ((res && res.error) || "engine unreachable — is it running?");
         statusEl.className = "err";
       }
     };
-    div.appendChild(btn);
+    div.append(title, meta, btn);
     listEl.appendChild(div);
   });
 }
@@ -35,5 +40,5 @@ function render(items) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) return render([]);
   const res = await chrome.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
-  render(res?.items || []);
+  render((res && res.items) || []);
 })();
