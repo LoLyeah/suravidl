@@ -75,30 +75,47 @@ class SuravidlApp : Application() {
     }
 
     /**
-     * The APK bundles a static ffmpeg as a jniLib (libffmpeg.so). Files
-     * extracted into nativeLibraryDir are the one place Android allows us to
-     * exec from, so export its path for the engine (yt-dlp's ffmpeg_location).
+     * The APK bundles a static ffmpeg + ffprobe as jniLibs (libffmpeg.so,
+     * libffprobe.so). Files extracted into nativeLibraryDir are the one place
+     * Android allows us to exec from, so export both for the engine. yt-dlp
+     * resolves ffprobe from the ffmpeg path it is given (it substitutes the
+     * program name), which is why the sibling file is enough.
      */
     private fun setupFfmpeg() {
         val f = ffmpegBinary(this)
         if (f == null) {
             Log.w(TAG, "bundled ffmpeg missing from nativeLibraryDir")
-            return
-        }
-        if (!f.canExecute()) {
+        } else {
+            makeExecutable(f, "ffmpeg")
             try {
-                Os.chmod(f.absolutePath, 0b111101101) // rwxr-xr-x
+                Os.setenv("SURAVIDL_FFMPEG", f.absolutePath, true)
+                Log.i(TAG, "bundled ffmpeg: ${f.absolutePath}")
             } catch (e: Throwable) {
-                // the lib dir belongs to the platform: extraction already
-                // applies 0755, so an EACCES here is not fatal by itself
-                Log.w(TAG, "chmod on bundled ffmpeg failed: $e")
+                Log.e(TAG, "could not export SURAVIDL_FFMPEG", e)
             }
         }
+        val probe = ffprobeBinary(this)
+        if (probe == null) {
+            Log.w(TAG, "bundled ffprobe missing from nativeLibraryDir")
+        } else {
+            makeExecutable(probe, "ffprobe")
+            try {
+                Os.setenv("SURAVIDL_FFPROBE", probe.absolutePath, true)
+                Log.i(TAG, "bundled ffprobe: ${probe.absolutePath}")
+            } catch (e: Throwable) {
+                Log.e(TAG, "could not export SURAVIDL_FFPROBE", e)
+            }
+        }
+    }
+
+    private fun makeExecutable(f: File, what: String) {
+        if (f.canExecute()) return
         try {
-            Os.setenv("SURAVIDL_FFMPEG", f.absolutePath, true)
-            Log.i(TAG, "bundled ffmpeg: ${f.absolutePath}")
+            Os.chmod(f.absolutePath, 0b111101101) // rwxr-xr-x
         } catch (e: Throwable) {
-            Log.e(TAG, "could not export SURAVIDL_FFMPEG", e)
+            // the lib dir belongs to the platform: extraction already applies
+            // 0755, so an EACCES here is not fatal by itself
+            Log.w(TAG, "chmod on bundled $what failed: $e")
         }
     }
 
@@ -106,8 +123,13 @@ class SuravidlApp : Application() {
         const val TAG = "suravidl"
 
         /** The bundled ffmpeg executable, or null when the APK lacks one. */
-        fun ffmpegBinary(ctx: Context): File? {
-            val f = File(ctx.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        fun ffmpegBinary(ctx: Context): File? = nativeBinary(ctx, "libffmpeg.so")
+
+        /** The bundled ffprobe executable (yt-dlp's stream inspector). */
+        fun ffprobeBinary(ctx: Context): File? = nativeBinary(ctx, "libffprobe.so")
+
+        private fun nativeBinary(ctx: Context, name: String): File? {
+            val f = File(ctx.applicationInfo.nativeLibraryDir, name)
             return if (f.exists()) f else null
         }
     }

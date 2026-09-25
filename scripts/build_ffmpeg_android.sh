@@ -130,19 +130,23 @@ echo "--- 16 KB LOAD alignment (must be 0x4000):"
 readelf -lW "$OUT/ffmpeg" | awk '/LOAD/{print $NF}' | sort -u
 readelf -lW "$OUT/ffprobe" | awk '/LOAD/{print $NF}' | sort -u
 
-# ---- smoke test: only the x86_64 binaries run on the CI runner -------------
-if [ "$ABI" = "x86_64" ]; then
-  echo "--- smoke: write a file with ffmpeg, read it back with ffprobe"
-  cd "$OUT"
-  ./ffmpeg -v error -y -f lavfi -i anullsrc=r=8000:cl=mono -t 1 -c:a aac _smoke.m4a
-  ./ffprobe -v error -show_entries format=duration:stream=codec_name -of json _smoke.m4a
-  codec=$(./ffprobe -v error -show_entries stream=codec_name -of default=nw=1:nk=1 _smoke.m4a)
-  [ "$codec" = "aac" ] || { echo "ffprobe read the wrong codec: '$codec'" >&2; exit 1; }
-  ./ffprobe -v error -show_entries format=duration -of default=nw=1 _smoke.m4a
-  rm -f _smoke.m4a
-  ./ffprobe -version | head -1
-  echo "--- smoke OK: ffprobe read codec_name=$codec back"
-fi
-
-strings -a "$OUT/ffprobe" 2>/dev/null | grep -m1 "ffprobe version" || true
-strings -a "$OUT/ffmpeg" 2>/dev/null | grep -m1 "ffmpeg version" || true
+# ---- what the runner can check ---------------------------------------------
+# The binaries are Android ELF (interpreter /system/bin/linker64), so they
+# cannot be executed here — behaviour is proven on-device by the instrumentation
+# test FfmpegBinaryTest (runs both binaries, probes a file ffmpeg wrote, and
+# asserts yt-dlp resolves ffprobe from the ffmpeg path it is handed).
+echo "--- sanity: target ISA, alignment and the slim ffprobe"
+readelf -h "$OUT/ffmpeg"  | awk -F: '/Machine/{print "ffmpeg  machine:" $2}'
+readelf -h "$OUT/ffprobe" | awk -F: '/Machine/{print "ffprobe machine:" $2}'
+pp_size=$(stat -c%s "$OUT/ffprobe")
+ff_size=$(stat -c%s "$OUT/ffmpeg")
+echo "ffmpeg  $ff_size bytes"
+echo "ffprobe $pp_size bytes"
+[ "$pp_size" -lt "$((ff_size / 2))" ] || {
+  echo "ffprobe is no longer slim (${pp_size}B vs ffmpeg ${ff_size}B) — did" >&2
+  echo "the probe-only configure lose its --disable flags?" >&2
+  exit 1
+}
+"$TC/llvm-strings" "$OUT/ffprobe" | grep -m1 -q "ffprobe version" \
+  || { echo "no ffprobe version string in the binary" >&2; exit 1; }
+"$TC/llvm-strings" "$OUT/ffmpeg" | grep -m1 "ffmpeg version" || true

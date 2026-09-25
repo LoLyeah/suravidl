@@ -133,7 +133,8 @@ def check_auth(settings: dict, url: str | None = None) -> dict:
                                  "expired — export a fresh one.")
             return result
         where = ", ".join(info["domains"][:4]) or "unknown domains"
-        result["message"] = (f"{info['count']} cookies for {where}"
+        plural = "" if info["count"] == 1 else "s"
+        result["message"] = (f"{info['count']} cookie{plural} for {where}"
                              + (f" ({info['expired']} expired)"
                                 if info["expired"] else ""))
     else:

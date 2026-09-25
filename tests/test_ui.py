@@ -1,7 +1,14 @@
 """Engine serves the web UI on / with the API token injected."""
 import re
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+
+WEB = Path(__file__).resolve().parents[1] / "src" / "suravidl_engine" / "web"
+
+
+def _app_js() -> str:
+    return (WEB / "app.js").read_text()
 
 
 def _app(tmp_path):
@@ -66,6 +73,9 @@ def test_index_is_a_four_tab_shell(tmp_path):
                     "setSleepRequests", "setGeoBypass", "setGeoCountry",
                     "setExtractorArgs", "ytdlpSave", "ytdlpMsg",
                     "rawEditor", "rawOffHint", "queueCount",
+                    # M18: retries / playlist limit / quality picks / cookie test
+                    "setRetries", "setMaxDownloads", "qualityRow", "qualityBtns",
+                    "testCookies", "cookiesMsg",
                     # M17: per-download overrides + presets + empty states
                     "ovBlock", "ovCount", "ovPreset", "ovApply", "ovClear",
                     "ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb",
@@ -122,3 +132,15 @@ def test_progress_bar_styles_stay_scoped(tmp_path):
     assert ".bar .fill {" in css and ".bar .fill.active::after {" in css
     assert re.search(r"(?m)^\.fill\s*\{", css) is None
     assert 'class="col fill"' not in html
+
+
+def test_app_js_wires_the_minimal_inline_ids():
+    """The quality picks and the cookie test are wired inline (the wheel is
+    small here): make sure the halves stay together."""
+    js = _app_js()
+    assert "renderQualityRow" in js and "qualityBtns" in js
+    assert "OV.qualities" in js and "renderQualityRow(url)" in js
+    assert "/auth/check" in js and 'testCookies").onclick' in js
+    # the list must come from the engine, never hard-coded here
+    assert "height<=1080" not in js
+    assert "setRetries" in js and "setMaxDownloads" in js

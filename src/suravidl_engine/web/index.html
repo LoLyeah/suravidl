@@ -59,6 +59,10 @@
         <button id="probeBtn" class="btn prime">Probe</button>
       </div>
       <div id="probeMsg" class="msg muted"></div>
+      <div id="qualityRow" class="audioRow hidden">
+        <span class="muted">Quality:</span>
+        <span id="qualityBtns" class="qrow"></span>
+      </div>
     </section>
 
     <section id="probeCard" class="card hidden">
@@ -310,6 +314,16 @@
           <span class="muted small">1–16 · faster HLS/DASH downloads</span>
         </div>
         <div class="field row">
+          <label class="lbl" for="setRetries">Retries</label>
+          <input id="setRetries" type="number" min="0" max="30"/>
+          <span class="muted small">0–30 · per download, on a flaky connection</span>
+        </div>
+        <div class="field row">
+          <label class="lbl" for="setMaxDownloads">Playlist limit</label>
+          <input id="setMaxDownloads" type="number" min="0" max="1000"/>
+          <span class="muted small">stop after N downloads · 0 = the whole list</span>
+        </div>
+        <div class="field row">
           <label class="lbl" for="setRateLimit">Speed limit</label>
           <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
         </div>
@@ -345,6 +359,10 @@
           </div>
           <span class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
             or read the cookies straight from a browser (close it first). On Android, use Import.</span>
+          <div class="jrow">
+            <button id="testCookies" class="btn sm" type="button">Test cookies</button>
+            <span id="cookiesMsg" class="msg muted small"></span>
+          </div>
         </div>
       </div>
 

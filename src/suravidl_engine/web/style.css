@@ -509,6 +509,11 @@ details.card[open] > summary { margin-bottom: 10px; }
 .msg.ok { color: var(--ok); }
 .msg.warn { color: var(--warn); }
 .msg.bad { color: var(--err); }
+.msg.good { color: var(--ok); }
+
+/* one-click quality picks under the probe box */
+.qrow { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.qrow .btn { padding: 5px 10px; font-size: 12.5px; }
 .fmt-kind { font-size: 11px; margin-top: 3px; }
 .k-both { color: var(--ok); }
 .k-video { color: var(--warn); }

@@ -232,6 +232,7 @@ function renderProbe(url, info) {
 
   if (info.playlist) {
     $("playlistRow").classList.remove("hidden");
+    $("qualityRow").classList.add("hidden");
     $("probeMeta").textContent =
       (info.count ? info.count + " videos" : "playlist") +
       (info.extractor ? " · " + info.extractor : "");
@@ -255,6 +256,7 @@ function renderProbe(url, info) {
   }
 
   $("playlistRow").classList.add("hidden");
+  renderQualityRow(url);
   const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
   // a video-only pick only makes sense to pair with audio when the site
   // actually publishes a separate audio stream (YouTube does, a plain .mp4 doesn't)
@@ -289,6 +291,27 @@ function renderProbe(url, info) {
 }
 
 /* ---------- jobs ---------- */
+/** One-click quality picks for the probed video: the engine owns the format
+ *  expressions (see QUALITY_PRESETS) so every shell offers the same list. */
+function renderQualityRow(url) {
+  const row = $("qualityRow");
+  const box = $("qualityBtns");
+  if (!row || !box) return;
+  box.innerHTML = "";
+  const list = OV.qualities || [];
+  if (!list.length) {
+    row.classList.add("hidden");
+    return;
+  }
+  for (const q of list) {
+    const btn = el("button", "btn sm" + (q.key === "best" ? " prime" : ""), q.label);
+    btn.title = "download the best stream up to " + q.label + " (" + q.fmt + ")";
+    btn.onclick = () => startJob(url, q.fmt);
+    box.append(btn);
+  }
+  row.classList.remove("hidden");
+}
+
 /** How many jobs are in flight — shown on the Queue tab. */
 function renderQueueBadge(jobs) {
   const badge = $("queueCount");
@@ -906,6 +929,8 @@ async function loadSettings() {
     $("setSbCats").value = s.sponsorblock_categories || "";
     $("setArchive").checked = !!s.archive;
     $("setFragments").value = s.fragments != null ? s.fragments : 1;
+    $("setRetries").value = s.retries != null ? s.retries : 10;
+    $("setMaxDownloads").value = s.max_downloads != null ? s.max_downloads : 0;
     $("setRateLimit").value = s.rate_limit || "";
     $("setProxy").value = s.proxy || "";
     $("setRawEnabled").checked = !!s.raw_args_enabled;
@@ -1039,6 +1064,7 @@ async function loadPresets() {
     PRESETS = data.presets || [];
     OV.defaults = data.defaults || {};
     OV.perJobKeys = data.per_job_keys || [];
+    OV.qualities = data.qualities || [];
   } catch (e) {
     PRESETS = [];
   }
@@ -1171,6 +1197,8 @@ function saveSettings() {
       sponsorblock_categories: $("setSbCats").value.trim(),
       archive: $("setArchive").checked,
       fragments: Number($("setFragments").value),
+      retries: Number($("setRetries").value),
+      max_downloads: Number($("setMaxDownloads").value),
       rate_limit: $("setRateLimit").value.trim(),
       proxy: $("setProxy").value.trim(),
       raw_args_enabled: $("setRawEnabled").checked,
@@ -1209,6 +1237,38 @@ async function saveAndToast(msgEl) {
 $("setSave").onclick = () => saveAndToast($("setMsg"));
 $("ytdlpSave").onclick = () => saveAndToast($("ytdlpMsg"));
 $("setRawEnabled").onchange = (e) => renderRawAccess(e.target.checked);
+
+/* ---------- test cookies: the button that answers "did it work?" ---------- */
+async function testCookies() {
+  const msg = $("cookiesMsg");
+  const btn = $("testCookies");
+  btn.disabled = true;
+  msg.textContent = "testing…";
+  msg.classList.remove("good", "bad");
+  try {
+    // save first: the test must check what is on screen, not what was saved
+    await saveSettings();
+    // the URL box is the natural subject when the user just pasted something
+    const url = ($("url").value || "").trim();
+    const r = await api("/auth/check", {
+      method: "POST",
+      body: JSON.stringify({ url: url || null }),
+    });
+    msg.textContent = r.message;
+    msg.classList.toggle("good", !!r.ok);
+    msg.classList.toggle("bad", !r.ok);
+    if (r.detail) msg.title = r.detail;
+    if (r.cookies) {
+      msg.textContent += ` (${r.cookies.domains.join(", ") || "no domains"})`;
+    }
+  } catch (e) {
+    msg.textContent = "test failed: " + e.message;
+    msg.classList.add("bad");
+  } finally {
+    btn.disabled = false;
+  }
+}
+$("testCookies").onclick = testCookies;
 
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
