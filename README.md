@@ -87,12 +87,22 @@ Same engine, same UI: Chaquopy embeds Python 3.11 + the engine + yt-dlp in the
 APK. A foreground service runs uvicorn on `127.0.0.1:8787` (notification with
 the active-download count) and the activity is a WebView kiosk of the engine UI.
 
+- **Installs on Android 7.0 (API 24) and newer — 64-bit devices only**
+  (`arm64-v8a`, `x86_64`). API 24 isn't arbitrary: it is Chaquopy's own floor
+  for Python 3.11. 32-bit-only phones are left out on purpose — an extra
+  `armeabi-v7a` build would nearly double the APK for hardware that stopped
+  shipping years ago. Newer Android is what CI tests against (15, including
+  16 KB page-size builds).
 - Files: `Android/data/com.suravidl.app/files/Movies/suravidl` (video) and
-  `…/Music/suravidl` (audio) — plus a Gallery/Music copy, which is the part your
-  phone's apps can actually open. Finished jobs get **Open** and **Share**.
+  `…/Music/suravidl` (audio). On **Android 10+** the app also makes a
+  Gallery/Music copy, which is the part your phone's apps can open — on
+  Android 7–9 the app folder is already reachable, so no copy is made and the
+  UI says so instead of pointing at an empty place. Finished jobs get **Open**
+  and **Share** either way.
 - Share a link from any app and it lands in the download box, probed and ready.
-- If something misbehaves, a log readable by any file manager sits at
-  `Android/media/com.suravidl.app/logs/`, and the in-app error page shows it.
+- If something misbehaves, the in-app error page shows the log; on Android 10+
+  a copy readable by any file manager sits at
+  `Android/media/com.suravidl.app/logs/`.
 - 16 KB page-size devices (Android 15+) are supported: native libs are
   aligned, and CI runs the suite on a 16 KB emulator.
 - Build: `gradle -p android assembleDebug` (needs the Android SDK; CI does it).

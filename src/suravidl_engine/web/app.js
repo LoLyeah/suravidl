@@ -771,7 +771,7 @@ function deleteButton(j) {
     const msg = (running ? `Stop “${name}” and delete the partial file?`
       : j.filepath ? `Delete “${name}”?`
         : `Remove “${name}” from the list?`)
-      + (j.filepath && ANDROID() ? " Its Gallery/Music copy goes too." : "")
+      + (j.filepath && GALLERY() ? " Its Gallery/Music copy goes too." : "")
       + " This cannot be undone.";
     if (!(await askConfirm(msg, { okText: running ? "Stop and delete" : "Delete" }))) {
       return;
@@ -1089,16 +1089,31 @@ function wireQuitButton() {
 /* ---------- host-aware download location ---------- */
 const ANDROID = () => !!window.AndroidHost;
 
+/** Does this host give finished downloads a Gallery/Music copy?
+ *
+ *  The host answers, because only it knows: below Android 10 (API 29) there is
+ *  no scoped storage, the app's own folder is already browsable, and the import
+ *  is skipped — so promising "Gallery → suravidl" there sends the user looking
+ *  for something that was never written. */
+function GALLERY() {
+  if (!ANDROID()) return false;
+  try { return !!window.AndroidHost.galleryExport(); } catch (_) { return false; }
+}
+
 /** Android's app folder lives under Android/data/, which no file manager will
- *  open — so say where the user can actually find their files (the gallery /
- *  music copies the app adds), and keep the raw path one tap away. */
+ *  open on Android 11+ — so say where the user can actually find their files
+ *  (the gallery/music copies the app adds), and keep the raw path one tap away. */
 function renderWhere(dir) {
   const d = dir || "";
   $("dlDir").textContent = d;
   if (ANDROID()) {
-    $("dlWhere").textContent =
-      "saved where you can open it — Gallery → suravidl (audio: Music → suravidl)";
-    $("dlDir").title = "the app's own folder (not browsable): " + d;
+    const gallery = GALLERY();
+    $("dlWhere").textContent = gallery
+      ? "saved where you can open it — Gallery → suravidl (audio: Music → suravidl)"
+      : "saved in the app's folder — use Open or Share on a finished download";
+    $("dlDir").title = gallery
+      ? "the app's own folder (not browsable): " + d
+      : "the app's folder (reachable by file managers on this Android): " + d;
   } else {
     $("dlWhere").textContent = "downloads";
   }
@@ -1210,7 +1225,7 @@ async function initStorageSection() {
     const one = known && s.files === 1;
     const ok = await askConfirm(
       known ? (`Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
-      (ANDROID() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
+      (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
       "? This cannot be undone.")
         : "Delete every downloaded file? (its size could not be read) " +
           "This cannot be undone.",

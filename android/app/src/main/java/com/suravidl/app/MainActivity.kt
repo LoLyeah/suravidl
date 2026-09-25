@@ -297,8 +297,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl,
-     *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed}. */
+     *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed,
+     *  galleryExport}. */
     inner class HostBridge {
+        /**
+         * Does a finished download also get a Gallery/Music copy?
+         *
+         * Below API 29 there is no scoped storage, so the app's own folder is
+         * already reachable by file managers and `MediaImporter` skips the
+         * import (it returns null). The UI must not promise a copy that was
+         * never made — it asks this instead of guessing from a user agent.
+         */
+        @JavascriptInterface
+        fun galleryExport(): Boolean = Build.VERSION.SDK_INT >= 29
+
         @JavascriptInterface
         fun quit() {
             runOnUiThread { quitCompletely() }
