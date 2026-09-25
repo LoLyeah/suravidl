@@ -6,6 +6,7 @@ name: ffmpeg-android
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - scripts/build_ffmpeg_android.sh
       - .github/workflows/ffmpeg-android.yml
