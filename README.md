@@ -282,6 +282,11 @@ repo has no pydantic-core.
       window instead of starting a second engine, and the link is handed to
       the UI (`window.suravidlShared`) only once the page is up — prefilled
       and probed, never downloaded behind the user's back.
+- [x] **M20 — playlist browsing + per-site memory**: the probe's entries are a
+      pick list (checkbox per row, All/None, "*n* of *m* picked", the button
+      says how many videos it will start), in step with the range field the
+      engine is sent. The quality you pick for a site is remembered and
+      offered again as a marked chip — never applied for you.
 
 ## API (v0.1)
 

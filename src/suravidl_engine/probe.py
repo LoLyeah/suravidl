@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import yt_dlp
 
-MAX_ENTRIES = 100
+MAX_ENTRIES = 500
 
 
 PROTECTED_PROBE_KEYS = (
@@ -53,12 +53,15 @@ def probe(url: str, extra_headers: dict | None = None,
             "count": info.get("playlist_count") or len(entries),
             "entries": [
                 {
+                    # 1-based, in playlist order: the number the pick list
+                    # writes into playlist_items
+                    "index": i + 1,
                     "id": e.get("id"),
                     "title": e.get("title"),
                     "url": e.get("url") or e.get("webpage_url"),
                     "duration": e.get("duration"),
                 }
-                for e in entries[:MAX_ENTRIES]
+                for i, e in enumerate(entries[:MAX_ENTRIES])
             ],
         }
 

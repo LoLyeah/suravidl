@@ -632,3 +632,17 @@ html[data-host="android"] .modal-foot {
   background: var(--panel-solid);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
+
+/* ---------- playlist pick list (M20) ------------------------------------- */
+/* the number keeps its column width, the box is the target on a phone */
+.fmt-q .plnum { display: inline-block; min-width: 1.4em; color: var(--muted); }
+.plpick { margin-left: .4em; width: 1.05em; height: 1.05em; accent-color: var(--accent); }
+#playlistRow { flex-wrap: wrap; }
+#playlistRow #plCount { margin-left: auto; font-size: .85em; }
+#playlistRow .ghost-sm { padding: .35em .7em; }
+
+/* a remembered pick for this site: marked, still one click away */
+.btn.pick {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-line, var(--accent));
+}

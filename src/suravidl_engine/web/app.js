@@ -240,8 +240,16 @@ function renderProbe(url, info) {
     for (const [i, e] of entries.entries()) {
       const tr = el("tr", "enter");
       tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
+      const n = e.index || i + 1;
+      const pick = el("td", "fmt-q");
+      const box = el("input", "plpick");
+      box.type = "checkbox";
+      box.dataset.index = String(n);
+      box.title = "include item " + n;
+      box.onchange = syncPlaylistPicks;
+      pick.append(el("span", "plnum", String(n)), box);
       tr.append(
-        el("td", "fmt-q", String(i + 1)),
+        pick,
         el("td", "fmt-c", e.title || e.url || "—"),
         el("td", "fmt-s", e.duration ? Math.round(e.duration / 60) + " min" : "—"),
       );
@@ -252,11 +260,12 @@ function renderProbe(url, info) {
       tr.append(el("td", "", ""), el("td", "muted", `… ${info.count - entries.length} more`), el("td"));
       tb.append(tr);
     }
+    syncPlaylistPicks();
     return;
   }
 
   $("playlistRow").classList.add("hidden");
-  renderQualityRow(url);
+  renderQualityRow(url, info.site_quality);
   const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
   // a video-only pick only makes sense to pair with audio when the site
   // actually publishes a separate audio stream (YouTube does, a plain .mp4 doesn't)
@@ -293,7 +302,7 @@ function renderProbe(url, info) {
 /* ---------- jobs ---------- */
 /** One-click quality picks for the probed video: the engine owns the format
  *  expressions (see QUALITY_PRESETS) so every shell offers the same list. */
-function renderQualityRow(url) {
+function renderQualityRow(url, remembered) {
   const row = $("qualityRow");
   const box = $("qualityBtns");
   if (!row || !box) return;
@@ -304,8 +313,15 @@ function renderQualityRow(url) {
     return;
   }
   for (const q of list) {
-    const btn = el("button", "btn sm" + (q.key === "best" ? " prime" : ""), q.label);
-    btn.title = "download the best stream up to " + q.label + " (" + q.fmt + ")";
+    // what you picked for this site last time is marked, not applied: the
+    // click is still yours (M20)
+    const last = remembered && q.key === remembered;
+    const btn = el("button",
+      "btn sm" + (last ? " pick" : (q.key === "best" ? " prime" : "")),
+      last ? q.label + " ✓" : q.label);
+    btn.title = last
+      ? "your pick for this site last time — click to download at " + q.label
+      : "download the best stream up to " + q.label + " (" + q.fmt + ")";
     btn.onclick = () => startJob(url, q.fmt);
     box.append(btn);
   }
@@ -324,6 +340,81 @@ function renderQueueBadge(jobs) {
 
 function playlistMode() {
   return !$("playlistRow").classList.contains("hidden");
+}
+
+/* --- picking playlist items -------------------------------------------------
+   The range field is what the engine is sent (blank = every item). The pick
+   list is the honest way to fill it on a phone, and the two stay in step:
+   boxes → field, and a typed range → boxes. */
+
+/** "1-5,8" → {1,2,3,4,5,8}; null when it is not a range at all (blank = all). */
+function parseItemRange(text) {
+  const out = new Set();
+  if (!text) return null;
+  for (const part of text.split(",")) {
+    const t = part.trim();
+    if (!t) continue;
+    const m = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      const a = Number(m[1]);
+      const b = Number(m[2]);
+      if (a < 1 || b < a || b - a > 5000) return null;
+      for (let i = a; i <= b; i++) out.add(i);
+    } else if (/^\d+$/.test(t)) {
+      if (Number(t) < 1) return null;
+      out.add(Number(t));
+    } else {
+      return null;
+    }
+  }
+  return out;
+}
+
+function pickedBoxes() {
+  return Array.from(document.querySelectorAll("#formats .plpick"));
+}
+
+/** The picked items, in the syntax the field and the engine speak. */
+function selectedPlaylistItems() {
+  return pickedBoxes()
+    .filter((b) => b.checked)
+    .map((b) => Number(b.dataset.index))
+    .sort((a, b) => a - b)
+    .join(",");
+}
+
+function syncPlaylistPicks() {
+  const boxes = pickedBoxes();
+  const value = selectedPlaylistItems();
+  const field = $("playlistItems");
+  if (field && field.value !== value) field.value = value;
+  const label = $("plCount");
+  if (label) {
+    const picked = value ? value.split(",").length : 0;
+    label.textContent = !boxes.length ? ""
+      : picked ? `${picked} of ${boxes.length} picked` : `all ${boxes.length}`;
+  }
+  // name what the button will do: nobody should download 300 videos by accident
+  const btn = $("playlistBtn");
+  if (btn) {
+    const picked = value ? value.split(",").length : 0;
+    btn.textContent = picked ? `Download ${picked} picked` : "Download playlist";
+  }
+}
+
+/** A typed range ticks the matching boxes back (junk leaves them alone). */
+function checkboxFromRange() {
+  const want = parseItemRange($("playlistItems").value.trim());
+  if (want === null && $("playlistItems").value.trim()) return;
+  for (const b of pickedBoxes()) {
+    b.checked = want === null ? false : want.has(Number(b.dataset.index));
+  }
+  syncPlaylistPicks();
+}
+
+function pickAll(checked) {
+  for (const b of pickedBoxes()) b.checked = checked;
+  syncPlaylistPicks();
 }
 
 async function startJob(url, fmt, preset, playlist) {
@@ -1289,6 +1380,9 @@ $("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio
 $("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode());
 $("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode());
 $("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
+$("plAll").onclick = () => pickAll(true);
+$("plNone").onclick = () => pickAll(false);
+$("playlistItems").addEventListener("change", checkboxFromRange);
 
 applyTheme(CURRENT.theme, CURRENT.glass);
 if (ANDROID()) document.documentElement.dataset.host = "android";

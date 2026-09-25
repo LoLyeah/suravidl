@@ -289,4 +289,18 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     prefills the box, probes and says so — the format stays the user's choice,
     exactly like a paste. Delivery writes one line to `share.log` so a share
     that "did nothing" is diagnosable from the phone.
-  - Next up: M20 — (open) playlist browsing UI, per-site format memory.
+  - **v0.21.0 — M20 (playlist browsing + per-site memory):** a playlist probe
+    already listed its entries; they are now a **pick list**. Every entry row
+    carries a checkbox (`index` is the playlist number the engine probes with,
+    up to 500 entries), All/None buttons and a live "*n* of *m* picked" label,
+    and the Download button names what it will do ("Download 3 picked"). The
+    range field stays the single thing sent to the engine (blank = all) and
+    the two halves are kept in step both ways: boxes → field, and a typed
+    range ticks the matching boxes back. Second half: the engine remembers the
+    **quality you pick per site** (`settings.site_quality`, host → quality
+    key, bounded to 50 sites, cleaned on the way in, refused as a per-job
+    override) and `/probe` returns it as `site_quality` — an *offer*: the chip
+    is marked ("720p ✓, your pick for this site last time") and still needs
+    the click, and an arbitrary typed format teaches the engine nothing.
+  - Next up: M21 — (open) subtitles language picker per site, scheduled
+    downloads (cron-style watch list).

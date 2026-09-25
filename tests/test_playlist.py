@@ -90,6 +90,15 @@ def test_probe_detects_a_playlist(client, fixture_server):
     assert len(body["entries"]) == 2
     assert [e["url"].rsplit("/", 1)[-1] for e in body["entries"]] == \
         ["tiny.mp4", "tiny2.mp4"]
+    # entries carry the number the pick list writes into playlist_items
+    assert [e["index"] for e in body["entries"]] == [1, 2]
+
+
+def test_a_playlist_is_browsable_beyond_a_hundred_entries():
+    """The pick list is only useful if the probe returns enough to pick from."""
+    from suravidl_engine import probe as probe_mod
+
+    assert probe_mod.MAX_ENTRIES >= 500
 
 
 def test_probe_single_video_still_reports_formats(client, fixture_server):

@@ -27,6 +27,8 @@ DEFAULTS = {
     "archive": False,            # skip URLs already in the download archive
     "sponsorblock_mode": "off",  # off | mark | remove
     "sponsorblock_categories": "sponsor, selfpromo",
+    # --- per-site memory (M20) -------------------------------------------
+    "site_quality": {},          # {"youtube.com": "720"} — an offer, never a rule
     # advanced tier (raw yt-dlp arguments; default-OFF by design)
     "raw_args_enabled": False,
     "raw_args": "",              # e.g. "--no-mtime --extractor-args ..."
@@ -53,6 +55,7 @@ PER_JOB_DENIED = {
     "auto_resume",
     "theme",
     "glass",
+    "site_quality",      # memory about you, not an option for this download
 }
 PER_JOB_KEYS = tuple(k for k in DEFAULTS if k not in PER_JOB_DENIED)
 
@@ -256,6 +259,10 @@ class Settings:
                 raise ValueError("extractor_args is too long (max 300 characters)")
             parse_extractor_args(value)
             return value
+        if key == "site_quality":
+            from .site_memory import clean
+
+            return clean(value)
         raise ValueError(f"unknown setting: {key}")
 
     def _save(self) -> None:

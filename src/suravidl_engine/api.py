@@ -18,6 +18,7 @@ from .auth import check_auth, cookie_session
 from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
+from . import site_memory
 
 
 class JobRequest(BaseModel):
@@ -98,6 +99,20 @@ def create_app(download_dir, auth_token: str | None = None,
         download_opts=_download_opts,
     )
     acts = desktop_actions or {}
+
+    def remember_site_quality(url: str, fmt: str | None) -> None:
+        """A quality pick is also a preference for that site (M20).
+
+        Memory is a nicety: a broken settings file must never fail a download,
+        so write failures are swallowed and the offer simply stays as it was.
+        """
+        try:
+            memory = site_memory.record(
+                settings.get().get("site_quality"), url, fmt)
+            if memory is not None:
+                settings.update({"site_quality": memory})
+        except (ValueError, OSError):
+            pass
 
     if acts.get("reveal"):
         def _maybe_reveal(job):
@@ -254,11 +269,19 @@ def create_app(download_dir, auth_token: str | None = None,
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
         try:
             with cookie_session(settings.get()) as cookie_opts:
-                return probe(body.url, extra_headers=body.headers,
+                info = probe(body.url, extra_headers=body.headers,
                              cookie_opts=cookie_opts,
                              extra_opts=probe_extra_opts(settings.get()))
         except Exception as e:  # noqa: BLE001 - error goes to the client
             raise HTTPException(status_code=400, detail=str(e)) from e
+        # the site's remembered quality rides along as an offer (M20): the UI
+        # marks that chip, the user still decides
+        site = site_memory.host_of(body.url)
+        if site:
+            info["site"] = site
+            info["site_quality"] = site_memory.clean(
+                settings.get().get("site_quality") or {}).get(site)
+        return info
 
     @app.post("/auth/check")
     def auth_check(body: AuthCheckRequest, mgr: JobManager = Depends(require_auth)):
@@ -295,14 +318,16 @@ def create_app(download_dir, auth_token: str | None = None,
                 preset = audio
                 overrides = {**(overrides or {}), **patch} or None
         try:
-            return redact_job(mgr.create(body.url, fmt=body.fmt,
-                                         extra_headers=body.headers,
-                                         preset=preset,
-                                         playlist_items=body.playlist_items,
-                                         raw_args=raw,
-                                         overrides=overrides))
+            job = mgr.create(body.url, fmt=body.fmt,
+                             extra_headers=body.headers,
+                             preset=preset,
+                             playlist_items=body.playlist_items,
+                             raw_args=raw,
+                             overrides=overrides)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        remember_site_quality(body.url, body.fmt)
+        return redact_job(job)
 
     @app.get("/presets")
     def list_presets(_mgr: JobManager = Depends(require_auth)):

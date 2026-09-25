@@ -139,11 +139,46 @@ def test_app_js_wires_the_minimal_inline_ids():
     small here): make sure the halves stay together."""
     js = _app_js()
     assert "renderQualityRow" in js and "qualityBtns" in js
-    assert "OV.qualities" in js and "renderQualityRow(url)" in js
+    assert "OV.qualities" in js and "renderQualityRow(url, info.site_quality)" in js
     assert "/auth/check" in js and 'testCookies").onclick' in js
     # the list must come from the engine, never hard-coded here
     assert "height<=1080" not in js
     assert "setRetries" in js and "setMaxDownloads" in js
+
+
+def test_app_js_builds_the_playlist_pick_list():
+    """M20: the entries are pickable, and the pick list and the range field
+    stay in step — the field is still what the engine is sent."""
+    js = _app_js()
+    assert "function parseItemRange" in js
+    assert "function selectedPlaylistItems" in js
+    assert "function syncPlaylistPicks" in js and "function checkboxFromRange" in js
+    assert '"plpick"' in js and "b.dataset.index" in js
+    assert '$("plAll").onclick = () => pickAll(true)' in js
+    assert '$("plNone").onclick = () => pickAll(false)' in js
+    assert '$("playlistItems").addEventListener("change", checkboxFromRange)' in js
+    # the range field remains the single thing handed to the engine
+    assert 'body.playlist_items = $("playlistItems").value.trim()' in js
+    # and the button says how many videos it would start
+    assert "Download ${picked} picked" in js
+
+
+def test_app_js_marks_the_remembered_quality_without_applying_it():
+    """M20: a remembered pick is an offer — the chip is marked, not clicked."""
+    js = _app_js()
+    assert "renderQualityRow(url, info.site_quality)" in js
+    assert "function renderQualityRow(url, remembered)" in js
+    assert 'q.key === remembered' in js and "last ? q.label" in js
+    # every chip still starts a download only on click
+    assert "btn.onclick = () => startJob(url, q.fmt)" in js
+
+
+def test_index_has_the_playlist_pick_controls(tmp_path):
+    app = _app(tmp_path)
+    with TestClient(app) as c:
+        html = c.get("/").text
+    for elem_id in ('id="plAll"', 'id="plNone"', 'id="plCount"'):
+        assert elem_id in html, elem_id
 
 
 def test_app_js_accepts_a_shared_link_from_android():

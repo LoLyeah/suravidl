@@ -41,6 +41,12 @@ QUALITY_PRESETS = (
     {"key": "480", "label": "480p", "fmt": "bv*[height<=480]+ba/b[height<=480]/b"},
 )
 
+QUALITY_KEYS = tuple(p["key"] for p in QUALITY_PRESETS)
+
+# Reverse lookup, so a finished pick can be recognised again ("this job used
+# the 720p expression" → "720", the per-site memory and the UI both use it).
+QUALITY_BY_FMT = {p["fmt"]: p["key"] for p in QUALITY_PRESETS}
+
 # The curated groups the yt-dlp tab exposes as named controls (as opposed to
 # raw arguments). Kept here so the UI, the engine and the tests share one list.
 CURATED_KEYS = (
