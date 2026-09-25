@@ -26,7 +26,7 @@ then made green by the fix.
 | 06 | The Firefox extension (`moz-extension://`) is rejected by the CORS allow-list — every call dies in preflight | confirmed | `moz-extension://<uuid>` accepted alongside `chrome-extension://<id>` |
 | 07 | A hand-edited/corrupt `settings.json` (uncreatable `download_dir`, `"nan"`) bricks every start | confirmed | per-key validation on load with default fallback; `download_dir` must be provably writable before it is saved |
 | 08 | A cancel that lands while yt-dlp is finishing still reports `completed` and fires the completion action | confirmed | the lock decides; a cancelled row stays cancelled |
-| 09 | Per-job overrides can enable raw arguments, and raw arguments can move the output path (`-o/-P`) | confirmed | `raw_args`/`raw_args_enabled` added to the per-job deny list; `-o/-P/--output/--paths` denied in raw args |
+| 09 | Per-job overrides can enable raw arguments, and raw arguments can move the output path (`-o/-P`) | confirmed | `raw_args_enabled` added to the per-job deny list — the *switch* is app-level; `raw_args` itself stays a feature (an override's arguments are inert while the switch is off, asserted at the opts level); `-o/-P/--output/--paths` denied in raw args |
 | 10 | A cancelled playlist leaves every entry it had already written | confirmed | finished entries are appended to `files` as they land |
 | 11 | On Android a playlist row asks the gallery to delete the *folder's* name (matches nothing) and offers Open/Share on a folder | confirmed | the UI works from the recorded `files` list; the Kotlin hand-off refuses a directory |
 | 12 | `DELETE /presets/{name}` fails CORS preflight (DELETE missing from `allow_methods`) | confirmed | `DELETE` allowed |

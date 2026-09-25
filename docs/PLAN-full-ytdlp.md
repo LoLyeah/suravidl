@@ -394,7 +394,10 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `download_dir`, `"nan"` for `max_concurrent`) — loaded values are
     validated per key now and `download_dir` must be provably writable
     before it is saved; per-job overrides could **enable raw arguments**
-    and raw arguments could **redirect output** (`-o/-P/--output/--paths`).
+    (the *switch* is denied per job now — the first cut of this release
+    denied `raw_args` too and would have quietened the per-download
+    arguments field, so the tag was re-cut with that corrected) and raw
+    arguments could **redirect output** (`-o/-P/--output/--paths`).
     UI/Android/extension: Tags could only say "on", so a global embed could
     not be turned **off for one download** (three-state selects, preset
     `false` shows as off); a playlist row asked the gallery to delete the
