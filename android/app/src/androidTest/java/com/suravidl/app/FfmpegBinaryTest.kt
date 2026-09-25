@@ -97,12 +97,12 @@ class FfmpegBinaryTest {
         // 3. yt-dlp, running in this process, resolves that same binary
         if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))
         val py = Python.getInstance()
-        val ydlClass = py.getModule("yt_dlp").get("YoutubeDL")
+        val ydlClass = py.getModule("yt_dlp").get("YoutubeDL")!!
         val ydl = ydlClass.call(mapOf(
             "ffmpeg_location" to System.getenv("SURAVIDL_FFMPEG"),
             "quiet" to true))
         val versions = py.getModule("yt_dlp.postprocessor.ffmpeg")
-            .get("FFmpegPostProcessor")
+            .get("FFmpegPostProcessor")!!
             .callAttr("get_versions_and_features", ydl).asList()[0].asMap()
         val found = versions.entries.first { it.key.toString() == "ffprobe" }.value.toString()
         assertTrue("yt-dlp could not run ffprobe (got '$found')", found.isNotBlank() &&
