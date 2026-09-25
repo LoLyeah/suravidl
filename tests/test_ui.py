@@ -21,6 +21,16 @@ def test_index_serves_html_with_injected_token(tmp_path):
         assert r.headers["content-type"].startswith("text/html")
 
 
+def test_index_has_new_controls(tmp_path):
+    """Settings + host controls the JS expects must exist in the markup."""
+    app = _app(tmp_path)
+    with TestClient(app) as c:
+        html = c.get("/").text
+    for elem_id in ("setResume", "androidSection", "batteryBtn", "quitAppBtn",
+                    "quitBtn", "minBtn", "settingsModal"):
+        assert f'id="{elem_id}"' in html, elem_id
+
+
 def test_static_assets_served(tmp_path):
     app = _app(tmp_path)
     with TestClient(app) as c:
