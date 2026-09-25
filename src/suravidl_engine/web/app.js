@@ -92,8 +92,20 @@ function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
 /* ---------- theme / glass ---------- */
 function applyTheme(theme, glass) {
   const r = document.documentElement;
+  const changed = (theme && r.dataset.theme !== theme)
+    || (glass && r.dataset.glass !== glass);
   if (theme) r.dataset.theme = theme;
   if (glass) r.dataset.glass = glass;
+  // A theme switch repaints every surface. Without this the big cards eased
+  // their colours over 350ms while every button, pill and input inside them
+  // snapped instantly — the UI looked torn for a third of a second (motion
+  // review). Scoped to a class that lives only for the switch, so hover
+  // feedback keeps its own much faster timing the rest of the time.
+  if (changed) {
+    clearTimeout(applyTheme._t);
+    r.classList.add("theming");
+    applyTheme._t = setTimeout(() => r.classList.remove("theming"), 460);
+  }
 }
 function markSwatches(values) {
   document.querySelectorAll("#themeSwatches .swatch").forEach((b) =>
@@ -317,7 +329,9 @@ function renderProbe(url, info) {
     PLAYLIST_NONE = false;
     for (const [i, e] of entries.entries()) {
       const tr = el("tr", "enter");
-      tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
+      // capped lower than a full stagger: a table that takes a quarter second
+      // to finish arriving reads as slow
+      tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
       const n = e.index || i + 1;
       const pick = el("td", "fmt-q");
       const box = el("input", "plpick");
@@ -359,7 +373,9 @@ function renderProbe(url, info) {
 
   for (const [i, f] of fmts.entries()) {
     const tr = el("tr", "enter");
-    tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
+    // capped lower than a full stagger: a table that takes a quarter second
+    // to finish arriving reads as slow
+    tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
     const kind = fmtKind(f);
     const cell = el("td", "fmt-c");
     cell.append(el("div", "", fmtCodecs(f) || "—"));
@@ -371,7 +387,7 @@ function renderProbe(url, info) {
     );
     const td = el("td");
     const btn = el("button", "get", "Get");
-    btn.onclick = () => startJob(url, fmtSpec(f, separateAudio));
+    btn.onclick = () => startJob(url, fmtSpec(f, separateAudio), null, false, btn);
     td.append(btn);
     tr.append(td);
     tb.append(tr);
@@ -406,7 +422,7 @@ function renderQualityRow(url, remembered) {
     btn.title = last
       ? "your pick for this site last time — click to download at " + q.label
       : "download the best stream up to " + q.label + " (" + q.fmt + ")";
-    btn.onclick = () => startJob(url, q.fmt);
+    btn.onclick = () => startJob(url, q.fmt, null, false, btn);
     box.append(btn);
   }
   row.classList.remove("hidden");
@@ -546,10 +562,21 @@ function pickAll(checked) {
   renderPlaylistState();
 }
 
-async function startJob(url, fmt, preset, playlist) {
+async function startJob(url, fmt, preset, playlist, triggerBtn) {
   if (playlist && PLAYLIST_NONE && !playlistFieldText()) {
     toast("pick at least one item first", "bad");
     return;
+  }
+  if (!url) {
+    toast("paste a video link first", "bad");
+    return;
+  }
+  // A start can take most of a second (SQLite lock, a busy worker), and a
+  // button that does not move invites a second and third tap — which queued
+  // the same video twice (motion review). Disable it for the round-trip.
+  if (triggerBtn) {
+    triggerBtn.disabled = true;
+    triggerBtn.classList.add("busy");
   }
   try {
     const body = { url };
@@ -570,6 +597,11 @@ async function startJob(url, fmt, preset, playlist) {
     refreshJobs();
   } catch (e) {
     toast("could not start download: " + e.message, "bad");
+  } finally {
+    if (triggerBtn) {
+      triggerBtn.disabled = false;
+      triggerBtn.classList.remove("busy");
+    }
   }
 }
 
@@ -641,6 +673,56 @@ function clearOv() {
   renderOvCount();
 }
 
+/** 300+ rows must not become 300 tab stops: the catalogue owns ONE, and the
+ *  arrow keys move inside it (the standard roving-tabindex pattern). Enter or
+ *  Space picks, exactly as a click does. Without this the whole yt-dlp option
+ *  browser was mouse-only (motion review). */
+function makeOptionRowReachable(row, activate) {
+  row.tabIndex = -1;
+  row.setAttribute("role", "button");
+  row.addEventListener("focus", () => {
+    const list = row.closest(".optlist");
+    if (!list) return;
+    list.querySelectorAll('.optrow[tabindex="0"]')
+      .forEach((r) => { r.tabIndex = -1; });
+    row.tabIndex = 0;
+  });
+  row.addEventListener("keydown", (e) => {
+    const list = row.closest(".optlist");
+    if (!list) return;
+    const rows = [...list.querySelectorAll(".optrow")];
+    const i = rows.indexOf(row);
+    if (e.key === "ArrowDown" && i >= 0 && i < rows.length - 1) {
+      e.preventDefault();
+      rows[i + 1].focus();
+    } else if (e.key === "ArrowUp" && i > 0) {
+      e.preventDefault();
+      rows[i - 1].focus();
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const target = e.key === "Home" ? rows[0] : rows[rows.length - 1];
+      if (target) target.focus();
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      activate();
+    }
+  });
+}
+
+/** The single tab stop for the option list: focusing it lands on the first
+ *  row, so Tab from the search box can reach the catalogue at all. */
+function initOptionListKeyboard() {
+  const list = $("optionsList");
+  if (!list || list.tabIndex >= 0) return;
+  list.tabIndex = 0;
+  list.addEventListener("focus", () => {
+    if (document.activeElement === list) {
+      const first = list.querySelector(".optrow");
+      if (first) first.focus();
+    }
+  });
+}
+
 /** The little "N options" chip on the collapsed summary. */
 function renderOvCount() {
   const patch = readOv();
@@ -649,6 +731,7 @@ function renderOvCount() {
   if (!n) {
     chip.classList.add("hidden");
     chip.textContent = "";
+    chip.removeAttribute("title");
     return;
   }
   const parts = [];
@@ -656,6 +739,15 @@ function renderOvCount() {
   if (patch) parts.push(Object.keys(patch).length + " option" +
     (Object.keys(patch).length === 1 ? "" : "s"));
   chip.textContent = parts.join(" · ");
+  // name them on hover/for screen readers: the chip says how many, but the
+  // question people actually have is WHICH — a leftover clip or subtitle
+  // filter from a preset used to be invisible until the download was wrong
+  // (motion review)
+  const keys = patch ? Object.keys(patch) : [];
+  chip.title = [OV.preset ? "preset " + OV.preset : "", ...keys]
+    .filter(Boolean).join(", ");
+  chip.setAttribute("aria-label", chip.title
+    ? "active for this download: " + chip.title : "");
   chip.classList.remove("hidden");
 }
 
@@ -749,13 +841,19 @@ function jobSig(j) {
 }
 
 function metaParts(j) {
+  const downloading = j.status === "downloading";
   const pct = Math.round(progressPct(j));
   const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
   const eta = j.progress && j.progress.eta != null ? "ETA " + j.progress.eta + "s" : "";
   const pl = j.progress && j.progress.playlist_index && j.progress.playlist_count
     ? "video " + j.progress.playlist_index + "/" + j.progress.playlist_count : "";
   const size = `${humanBytes(j.progress && j.progress.downloaded_bytes)} / ${humanBytes(j.progress && j.progress.total_bytes)}`;
-  return [...(pl ? [pl] : []), pct + "%", ...(spd ? [spd] : []), ...(eta ? [eta] : []), size];
+  // A queued or merging job has no percentage worth printing ("0%" beside a
+  // moving bar reads as a stall) and nothing has been fetched yet, so its
+  // bytes read as "0 B / 0 B" — show only what is actually known.
+  const known = j.progress && (j.progress.total_bytes || j.progress.downloaded_bytes);
+  return [...(pl ? [pl] : []), ...(downloading ? [pct + "%"] : []),
+          ...(spd ? [spd] : []), ...(eta ? [eta] : []), ...(known ? [size] : [])];
 }
 
 /** Stop a still-running job (cancel + wait for the worker), then delete it. */
@@ -788,6 +886,16 @@ function deleteButton(j) {
     if (!(await askConfirm(msg, { okText: running ? "Stop and delete" : "Delete" }))) {
       return;
     }
+    // The settle can take up to three seconds (cancel → the worker returns →
+    // the delete lands). The confirm dialog is gone by then, so without a mark
+    // the row sat there looking untouched and people clicked Delete again
+    // (motion review). `.pending` dims it and says what is happening.
+    const row = $("jobs").querySelector(`.job[data-id="${j.id}"]`);
+    if (row) {
+      row.classList.add("pending");
+      const pill = row.querySelector(".pill");
+      if (pill) pill.textContent = running ? "stopping…" : "deleting…";
+    }
     try {
       const r = await settleThenDelete(j);
       // Gallery cleanup: one name per file. A playlist row's filepath is the
@@ -808,6 +916,7 @@ function deleteButton(j) {
       refreshJobs();
     } catch (e) {
       toast("could not delete: " + e.message, "bad");
+      if (row) row.classList.remove("pending");   // the row is staying: undo it
     }
   };
   return b;
@@ -837,16 +946,18 @@ function jobRow(j) {
   let trashHost = null;   // the button row the trash belongs to
 
   if (ACTIVE.has(j.status)) {
-    if (j.status === "downloading") {
-      const bar = el("div", "bar");
-      const fill = el("div", "fill active");
-      fill.style.width = progressPct(j).toFixed(1) + "%";
-      bar.append(fill);
-      row.append(bar);
-      const meta = el("div", "jmeta");
-      meta.append(...metaParts(j).map((t) => el("span", "", t)));
-      row.append(meta);
-    }
+    // Every active state gets a bar: "downloading" carries real progress, and
+    // queued/merging get an indeterminate track. A 15–45s ffmpeg mux with no
+    // motion anywhere reads as a hung engine (motion review).
+    const downloading = j.status === "downloading";
+    const bar = el("div", "bar");
+    const fill = el("div", "fill active" + (downloading ? "" : " indet"));
+    fill.style.width = downloading ? progressPct(j).toFixed(1) + "%" : "100%";
+    bar.append(fill);
+    row.append(bar);
+    const meta = el("div", "jmeta");
+    meta.append(...metaParts(j).map((t) => el("span", "", t)));
+    row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
     const r = el("div", "jrow");
     r.append(el("span", "jerr", (j.error || "").slice(0, 160)));
@@ -957,7 +1068,9 @@ function updateJobRow(row, j) {
   const text = j.title || j.url;
   if (title && title.textContent !== text) title.textContent = text;
   const fill = row.querySelector(".fill");
-  if (fill) fill.style.width = progressPct(j).toFixed(1) + "%";
+  if (fill && !fill.classList.contains("indet")) {
+    fill.style.width = progressPct(j).toFixed(1) + "%";
+  }
   const meta = row.querySelector(".jmeta");
   if (meta) meta.replaceChildren(...metaParts(j).map((t) => el("span", "", t)));
   return row;
@@ -975,6 +1088,31 @@ function showQueueTrouble(e) {
   box.prepend(el("div", "empty trouble",
     "cannot reach the engine (" + ((e && e.message) || "no answer") +
     ") — retrying every couple of seconds."));
+}
+
+/** Take a queue row (or the empty-state box) off screen with an exit.
+ *
+ *  Deleting used to `remove()` the node between two frames — a glitch next to
+ *  toasts, which slide away properly — and it also meant the row was gone
+ *  before anyone could see WHICH row left. Transform/opacity only: animating
+ *  height would put layout on the main thread on every tick, which is exactly
+ *  what the WebView cannot afford. The node is dropped when the animation
+ *  ends, with a timer as a backstop for a hidden tab (where animations do not
+ *  run and `animationend` never arrives), and the guard keeps a second poll
+ *  from restarting an exit already in flight. */
+function leaveRow(node) {
+  if (!node || node.classList.contains("leaving")) return;
+  node.classList.add("leaving");
+  let gone = false;
+  const drop = () => {
+    if (gone) return;
+    gone = true;
+    node.remove();
+  };
+  node.addEventListener("animationend", (e) => {
+    if (e.target === node) drop();
+  });
+  setTimeout(drop, 400);
 }
 
 async function refreshJobs() {
@@ -996,8 +1134,10 @@ async function refreshJobs() {
     const list = jobs.sort(
       (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     if (!list.length) {
+      // rows that are gone should leave, not blink out: the same exit the
+      // delete path uses, then the empty state fades in behind them
+      box.querySelectorAll(".job").forEach(leaveRow);
       if (!box.querySelector(".empty")) {
-        box.innerHTML = "";
         box.append(el("div", "empty",
           "Nothing in the queue. Downloads you start land here — finished ones " +
           "stay put so you can open, share or delete them."));
@@ -1005,7 +1145,7 @@ async function refreshJobs() {
       return;
     }
     const empty = box.querySelector(".empty");
-    if (empty) empty.remove();
+    if (empty) leaveRow(empty);
 
     const keep = new Set();
     let prev = null;
@@ -1024,7 +1164,7 @@ async function refreshJobs() {
       prev = row;
     }
     box.querySelectorAll(".job").forEach((r) => {
-      if (!keep.has(r.dataset.id)) r.remove();
+      if (!keep.has(r.dataset.id)) leaveRow(r);
     });
   } catch (e) {
     if (seq !== JOBS_SEQ) return;
@@ -1280,6 +1420,16 @@ window.onCookiesPicked = (path) => {
 // what the user typed but has not saved yet (v0.21.1 audit)
 let SETTINGS_DIRTY = false;
 
+/** A dot on the Settings tab while the form holds edits the engine has not
+ *  been told about. The tab is a primary destination: someone who changes the
+ *  template and walks away had no way to know the next download would still
+ *  use the OLD values (motion review). */
+function markSettingsDirty(on) {
+  SETTINGS_DIRTY = on;
+  const tab = document.querySelector('#tabs .tab[data-tab="settings"]');
+  if (tab) tab.classList.toggle("has-dirty", on);
+}
+
 async function loadSettings() {
   try {
     const s = await api("/settings");
@@ -1322,7 +1472,7 @@ async function loadSettings() {
     $("setExtractorArgs").value = s.extractor_args || "";
     renderWhere(s.download_dir);
     markSwatches(CURRENT);
-    SETTINGS_DIRTY = false;   // the form now mirrors the server
+    markSettingsDirty(false);   // the form now mirrors the server
   } catch (e) {
     toast("could not load settings: " + e.message, "bad");
   }
@@ -1410,7 +1560,7 @@ function renderOptions(query) {
     left.append(el("div", "flag", o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name));
     left.append(el("div", "ogrp", o.group));
     row.append(left, el("div", "ohelp", o.help || ""));
-    row.onclick = () => {
+    const add = () => {
       const ta = $("setRawArgs");
       ta.value = (ta.value.trim() + " " +
         (o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name)).trim();
@@ -1418,6 +1568,8 @@ function renderOptions(query) {
       renderRawAccess(true);
       toast(`added ${o.name} — save to keep it`);
     };
+    row.onclick = add;
+    makeOptionRowReachable(row, add);
     box.append(row);
   }
   if (!list.length) box.append(el("div", "muted small", "nothing matches that search"));
@@ -1622,7 +1774,7 @@ function saveSettings() {
     }),
   }).then((s) => {
     SETTINGS_SNAPSHOT = s;   // the preset diff reads this
-    SETTINGS_DIRTY = false;  // the form was accepted as-is
+    markSettingsDirty(false);  // the form was accepted as-is
     renderWhere(s.download_dir);
     $("setConc").value = s.max_concurrent;
     renderRawAccess(!!s.raw_args_enabled);
@@ -1653,7 +1805,7 @@ $("setRawEnabled").onchange = (e) => renderRawAccess(e.target.checked);
   const panel = $("panel-settings");
   if (panel) {
     for (const ev of ["input", "change"]) {
-      panel.addEventListener(ev, () => { SETTINGS_DIRTY = true; });
+      panel.addEventListener(ev, () => { markSettingsDirty(true); });
     }
   }
 }
@@ -1704,10 +1856,10 @@ window.suravidlShared = (url) => {
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
-$("bestBtn").onclick = () => startJob($("url").value.trim(), null, null, playlistMode());
-$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native", playlistMode());
-$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode());
-$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode());
+$("bestBtn").onclick = () => startJob($("url").value.trim(), null, null, playlistMode(), $("bestBtn"));
+$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native", playlistMode(), $("audioNativeBtn"));
+$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode(), $("audioM4aBtn"));
+$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode(), $("audioMp3Btn"));
 // the formats people kept asking for (review #9) — a picker beats raw args
 $("audioMore").onchange = () => {
   const preset = $("audioMore").value;
@@ -1715,12 +1867,30 @@ $("audioMore").onchange = () => {
   if (!preset) return;
   const url = $("url").value.trim();
   if (!url) { toast("paste a link first", "bad"); return; }
-  startJob(url, null, preset, playlistMode());
+  startJob(url, null, preset, playlistMode(), $("audioMore"));
 };
-$("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
+$("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true, $("playlistBtn"));
 $("plAll").onclick = () => pickAll(true);
 $("plNone").onclick = () => pickAll(false);
+$("playlistItems").addEventListener("input", checkboxFromRange);   // typing reacts at once
 $("playlistItems").addEventListener("change", checkboxFromRange);
+
+/** Keep the field being typed into above the sticky save bar. Tapping an
+ *  input on a phone raises the keyboard, which shrinks the visual viewport —
+ *  the field ended up underneath the pinned footer exactly when the user was
+ *  looking at it (motion review). Only scrolls when the field is actually
+ *  obscured, so desktop focus never moves the page. */
+document.addEventListener("focusin", (e) => {
+  const t = e.target;
+  if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || "")) return;
+  const r = t.getBoundingClientRect();
+  const pad = 90;   // the sticky header and footer own this much of each edge
+  if (r.top >= pad && r.bottom <= window.innerHeight - pad) return;   // visible
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  t.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+});
+
+initOptionListKeyboard();
 
 applyTheme(CURRENT.theme, CURRENT.glass);
 if (ANDROID()) document.documentElement.dataset.host = "android";
@@ -1786,8 +1956,10 @@ function openPlayer(job) {
 }
 
 function closePlayer() {
-  $("playBody").replaceChildren();   // stops the audio of a hidden player
-  $("playModal").classList.add("hidden");
+  // the same exit every other dialog uses, then release the media element so a
+  // hidden player cannot keep playing; closing used to hard-cut (motion review)
+  closeModal($("playModal"));
+  setTimeout(() => $("playBody").replaceChildren(), 180);
 }
 
 function initPlayer() {

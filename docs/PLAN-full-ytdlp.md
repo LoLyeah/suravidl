@@ -453,3 +453,45 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     blank page, and README notes for what needs Android 10+ (gallery copy,
     file-manager log). Verdict table:
     `docs/audits/2026-09-26-antigravity-ui-android.md`.
+
+- **v0.23.0 — the UI/UX + motion review** (fifth Antigravity pass: how the app
+    *feels* — animation, transition, feedback). 21 findings: 17 fixed, 2
+    already fixed in this same sitting before the report landed, 2 rejected on
+    evidence (one by direct measurement). The pass came with a method rather
+    than an opinion: a throttled fixture server so a download stays in every
+    state long enough to watch, and live probes — `getAnimations()` filtered to
+    `playState === 'running'`, computed styles, and `getBoundingClientRect()`
+    sampled every 100 ms across poll boundaries.
+    Headlines. **The progress bar was animating for 220ms of every 1200ms poll
+    and then sitting dead** — a stalled-looking download; there is now a
+    `--t-poll` token that glides across the whole window, and a test pins it to
+    `setInterval(refreshJobs, …)` so the two numbers can never drift apart
+    (measured after: 15 sampled frames where the bar moved while the poll value
+    was static). **A start no longer invites a second tap**: the trigger button
+    goes disabled + `.busy` for the round-trip, and every trigger passes itself
+    in — a double-tap used to queue the same video twice. **Deleting says
+    deleting**: the row dims and its pill reads "stopping…/deleting…" through
+    `settleThenDelete`'s up-to-3s loop, and the mark is undone if it fails.
+    **Queued and merging are no longer silent** — every active status renders a
+    bar, with a muted indeterminate track for the states that know no
+    percentage, and `metaParts` stopped printing "0% · 0 B / 0 B" beside it.
+    Motion hygiene: `.swap` is opacity-only now (it dropped the row 6px on
+    every status change), the dialog exit lands on opacity 0 inside
+    `closeModal()`'s 170ms timer instead of being cut at .5, the player closes
+    through the same path as every other dialog, Android freezes the aurora
+    (`animation: none` + a 34px blur — three radial gradients under 70px of
+    blur, re-rastered every frame, is battery spent on decoration), and the
+    theme switch cross-fades through a scoped `html.theming` class for the
+    ~400ms it lasts instead of easing four selectors while the controls inside
+    them snap. UX: a dirty dot on the Settings tab, the override chip names its
+    own keys, the option catalogue got a keyboard (roving tabindex — one tab
+    stop, arrows/Home/End, Enter/Space; the review's snippet would have added
+    322 of them), the playlist range reacts as you type, the sticky save bar no
+    longer hides the field you are typing into on a phone, and the Settings ✕
+    is desktop-hidden so a tab stops looking like a dialog. Rejected: "card
+    rise replays on every tab switch" (measured false — Chrome does not restart
+    a finished animation on `display` flips) and "animate the toast stack" (it
+    would mean animating layout on each dismissal, which this stylesheet
+    deliberately avoids everywhere else). 17 new regressions in
+    `tests/test_web_motion.py`; suite **346 passed**.
+    Verdict table: `docs/audits/2026-09-26-antigravity-motion.md`.

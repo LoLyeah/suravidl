@@ -121,9 +121,39 @@ body::before { /* aurora / mesh blobs */
 html[data-theme="light"] { --blob1:#bcd3ff; --blob2:#e3d4ff; --blob3:#c2f2e4; }
 html[data-theme="amoled"] { --blob1:#1b1f4b; --blob2:#0b2b38; --blob3:#241b3f; }
 @keyframes drift { to { transform: translate(40px, 26px) scale(1.06); } }
+
+/* ---------- motion tokens ----------
+   Three speeds, two curves, chosen by frequency and weight:
+     fast — feedback on something the user just touched (press, hover, tab)
+     base — a small surface arriving or leaving (row, toast, panel)
+     slow — the one big entrance on load, and the theme colour wash
+   `out` decelerates (things arriving settle), `in` accelerates (things
+   leaving get out of the way). Utilities: nothing here may delay the user,
+   so nothing exceeds half a second. */
+:root {
+  --t-fast: .14s;
+  --t-base: .22s;
+  --t-slow: .4s;
+  /* one interval of the queue poll: a downloading bar glides for exactly this
+     long so it never sits still between two polls (see .bar .fill.active) */
+  --t-poll: 1.1s;
+  --e-out: cubic-bezier(.2, .7, .2, 1);
+  --e-in: cubic-bezier(.4, 0, 1, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  body::before { animation: none; }
-  * { animation-duration: .001s !important; transition-duration: .001s !important; }
+  /* Stop motion — do not merely shorten it. A .001s duration on an INFINITE
+     animation (floaty, pulse, shimmer) loops ~1000x/second: MORE motion and
+     more main-thread style work than the default. `*` also never matches
+     pseudo-elements, so the progress shimmer's ::after kept running at full
+     speed for reduced-motion users; the explicit body::before rule below was
+     the workaround for exactly that hole, and it is not the only pseudo. */
+  *, *::before, *::after {
+    animation-duration: .001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001s !important;
+  }
+  body::before { animation: none !important; }   /* keep the aurora still */
 }
 
 /* ---------- header ---------- */
@@ -159,7 +189,7 @@ button { font: inherit; border: 0; cursor: pointer; }
   color: var(--text);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+  transition: transform var(--t-fast) ease, background var(--t-fast) ease, border-color var(--t-fast) ease;
 }
 .btn:hover { background: var(--glass-bg-strong); transform: translateY(-1px); }
 .btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 10px; }
@@ -172,7 +202,13 @@ button { font: inherit; border: 0; cursor: pointer; }
 .btn.quit { color: var(--err); }
 .btn.danger { background: var(--err-bg); border-color: var(--err-line); color: var(--err); font-weight: 600; }
 .btn:disabled { opacity: .5; cursor: default; transform: none; }
-.btn:focus-visible, .swatch:focus-visible, input:focus-visible {
+/* The small triggers carry the same feedback as the big ones: a click that is
+   mid-request must look busy and refuse a second one (motion review — a
+   double-tap on a slow engine used to queue the same video twice). */
+.get:disabled, .ghost-sm:disabled { opacity: .55; cursor: default; transform: none; }
+.get.busy, .ghost-sm.busy { animation: pulse 1.1s ease-in-out infinite; }
+.btn:focus-visible, .swatch:focus-visible, input:focus-visible,
+.ghost-sm:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -191,7 +227,7 @@ footer .linkbtn { margin-left: 8px; }
   font: inherit; font-size: 13px; color: var(--muted);
   background: transparent; border: 1px solid transparent;
   border-radius: 12px; padding: 8px 12px; cursor: pointer;
-  transition: color .18s ease, background-color .18s ease, border-color .18s ease;
+  transition: color var(--t-fast) ease, background-color var(--t-fast) ease, border-color var(--t-fast) ease;
 }
 .tab:hover { color: var(--text); background: var(--glass-bg-strong); }
 .tab.active {
@@ -299,7 +335,7 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
   padding: 4px 8px 8px 0;
 }
 #formats td { padding: 9px 8px 9px 0; border-top: 1px solid var(--line-soft); }
-#formats tbody tr { transition: background .15s ease; }
+#formats tbody tr { transition: background var(--t-fast) ease; }
 #formats tbody tr:hover { background: var(--glass-bg-strong); }
 .fmt-q { font-weight: 600; }
 .fmt-c { color: var(--muted); font-size: 12.5px; }
@@ -307,7 +343,7 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 .get {
   padding: 6px 14px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
   color: var(--accent-ink); background: var(--accent-soft);
-  border: 1px solid var(--accent-line); transition: .18s;
+  border: 1px solid var(--accent-line); transition: var(--t-fast);
 }
 .get:hover { background: var(--accent-line); color: #fff; }
 
@@ -349,8 +385,18 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 .bar .fill {
   height: 100%; border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
-  transition: width .3s ease;
+  transition: width var(--t-base) ease;
 }
+/* While a download is running the bar must fill the WHOLE poll window, or it
+   animates for a fifth of a second and then sits dead for a second — which
+   reads as a stalled stream (motion review, measured against the 1200ms
+   interval in app.js). Kept in one token because the two must move together:
+   `--t-poll` and `setInterval(refreshJobs, …)` are a pair. */
+.bar .fill.active { transition: width var(--t-poll) linear; }
+/* Queued and merging have no percentage to show, but "nothing is happening" is
+   the wrong story during a 15–45s ffmpeg mux: a full-width muted track with
+   the same sheen says "working, position unknown". */
+.bar .fill.indet { width: 100%; background: var(--line); opacity: .6; }
 .bar .fill.active::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(100deg, transparent 20%, var(--sheen) 50%, transparent 80%);
@@ -365,7 +411,7 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ghost-sm {
   padding: 5px 11px; font-size: 12px; border-radius: 9px;
   background: transparent; border: 1px solid var(--line); color: var(--muted);
-  transition: .18s;
+  transition: var(--t-fast);
 }
 .ghost-sm:hover { color: var(--text); background: var(--glass-bg-strong); }
 .jerr { color: var(--err); font-size: 12px; font-family: ui-monospace, Menlo, monospace;
@@ -382,7 +428,7 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 .subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
 .stab { padding: 7px 13px; font-size: 13px; border-radius: 11px; cursor: pointer;
   background: transparent; border: 1px solid var(--line); color: var(--muted);
-  transition: .18s; }
+  transition: var(--t-fast); }
 .stab:hover { color: var(--text); }
 .stab.active { color: var(--text); background: var(--glass-bg-strong);
   border-color: var(--line-strong, var(--line)); }
@@ -400,10 +446,26 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
   padding: 7px 4px; border-bottom: 1px solid var(--line); cursor: pointer;
   align-items: baseline; }
 .optrow:hover { background: var(--glass-bg-strong); }
+.optrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px;
+  border-radius: 8px; }
+/* the list owns one tab stop; the row that has it shows where the keyboard is */
+#optionsList:focus-visible, #optionsList:focus { outline: none; }
 .optrow .flag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px; }
 .optrow .ohelp { font-size: 12px; color: var(--muted); }
 .optrow .ogrp { font-size: 10.5px; color: var(--muted); opacity: .8; }
+
+/* While a delete settles (up to ~3s: cancel → worker returns → unlink) the row
+   says what it is doing instead of looking untouched (motion review). */
+.job.pending { opacity: .6; pointer-events: none; }
+.job.pending .pill { color: var(--warn); }
+
+/* Settings holds unsaved edits: a dot on the tab, so walking away without
+   saving is a visible choice rather than a silent one (motion review). */
+.tab.has-dirty .tab-lbl::after {
+  content: "•"; color: var(--warn); margin-left: 4px; font-size: 14px;
+  line-height: 1;
+}
 
 /* ---------- toasts ---------- */
 #toasts { position: fixed; right: 22px; bottom: 22px; z-index: 60;
@@ -416,10 +478,10 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
   background: var(--panel-solid);
   border: 1px solid var(--line);
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
-  animation: rise .35s ease both;
+  animation: rise var(--t-base) var(--e-out) both;
   max-width: 420px;
 }
-.toast.leaving { opacity: 0; transform: translateY(8px); transition: .25s ease; }
+.toast.leaving { opacity: 0; transform: translateY(8px); transition: var(--t-base) var(--e-in); }
 .toast .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
   box-shadow: 0 0 10px var(--ok); flex-shrink: 0; }
 .toast.bad .dot { background: var(--err); box-shadow: 0 0 10px var(--err); }
@@ -433,7 +495,7 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: grid; place-items: center;
-  animation: fade .2s ease both;
+  animation: fade var(--t-base) var(--e-out) both;
 }
 html[data-theme="light"] .overlay { background: rgba(30,41,59,.25); }
 @keyframes fade { from { opacity: 0; } }
@@ -447,7 +509,7 @@ html[data-theme="light"] .overlay { background: rgba(30,41,59,.25); }
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
-  animation: pop .25s ease both;
+  animation: pop var(--t-base) var(--e-out) both;
   max-height: calc(100vh - 60px); overflow: auto;
 }
 .modal.narrow { width: min(420px, calc(100vw - 40px)); }
@@ -477,7 +539,7 @@ input[type="number"] { width: 80px; }
   background: var(--glass-bg);
   border: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 7px; align-items: stretch;
-  transition: .18s;
+  transition: var(--t-fast);
 }
 .swatch:hover { transform: translateY(-1px); }
 .swatch.on { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -500,7 +562,7 @@ details.card > summary {
   display: flex; align-items: center; gap: 8px;
 }
 details.card > summary::-webkit-details-marker { display: none; }
-details.card > summary::before { content: "▸"; color: var(--muted); transition: transform .18s ease; }
+details.card > summary::before { content: "▸"; color: var(--muted); transition: transform var(--t-fast) ease; }
 details.card[open] > summary::before { transform: rotate(90deg); }
 details.card > summary .chip { font-weight: 500; }
 details.card[open] > summary { margin-bottom: 10px; }
@@ -533,31 +595,55 @@ details.card[open] > summary { margin-bottom: 10px; }
 /* ---------- motion ---------- */
 @keyframes floaty { 50% { transform: translateY(-4px); } }
 @keyframes pulse { 50% { opacity: .55; } }
-@keyframes swapIn { from { opacity: .35; transform: translateY(6px); } }
+/* A row whose content was replaced: fade it back in WITHOUT moving it. The
+   old version dropped the whole card 6px and dipped to 35% opacity on every
+   status change — queued → downloading → merging → completed is four of those
+   in one download, and a card that jumps each time reads as a repaint bug
+   rather than as news (motion review). The information is "this row changed",
+   which opacity alone says. */
+@keyframes swapIn { from { opacity: .55; } }
 
-main > .card { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
+main > .card { animation: rise var(--t-slow) var(--e-out) both; }
 main > .card:nth-of-type(2) { animation-delay: .06s; }
 main > .card:nth-of-type(3) { animation-delay: .12s; }
 
-.enter { animation: rise .38s cubic-bezier(.2,.7,.2,1) both; }
-.swap { animation: swapIn .3s ease both; }
+.enter { animation: rise var(--t-slow) var(--e-out) both; }
+.swap { animation: swapIn var(--t-base) var(--e-out) both; }
+/* A row that is being removed leaves the way a toast leaves — down and out —
+   instead of vanishing between two frames, which reads as a glitch. Only
+   transform/opacity, so a phone in a WebView keeps it on the compositor. */
+.leaving { animation: leave var(--t-base) var(--e-in) both; pointer-events: none; }
+@keyframes leave { to { opacity: 0; transform: translateY(8px); } }
 .btn.prime.busy { animation: pulse 1.1s ease-in-out infinite; }
-.empty { animation: floaty 5.5s ease-in-out infinite; }
-.swatch.on { animation: pop .22s ease; }
+.empty { animation: fade var(--t-base) var(--e-out) both; }
+.swatch.on { animation: pop var(--t-base) var(--e-out); }
 
 .btn:active, .get:active, .ghost-sm:active, .swatch:active { transform: scale(.97); }
 
 /* smooth close for modals (open uses fade/pop keyframes) */
-.overlay.closing { animation: none; opacity: 0; transition: opacity .16s ease; }
-.overlay.closing .modal { animation: none; opacity: .5; transform: scale(.97) translateY(6px); transition: transform .16s ease, opacity .16s ease; }
+/* Entry fades and rises .38s; the exit must finish inside closeModal()'s
+   170ms timer, so it is short and lands on opacity 0 — the old value (.5)
+   meant the dialog was cut off half-visible every single time. */
+.overlay.closing { animation: none; opacity: 0; transition: opacity var(--t-fast) ease; }
+.overlay.closing .modal { animation: none; opacity: 0; transform: scale(.97) translateY(6px); transition: transform var(--t-fast) ease, opacity var(--t-fast) ease; }
 
 /* sticky header gains a shadow once the page scrolls */
-header { transition: box-shadow .25s ease; }
+header { transition: box-shadow var(--t-base) ease; }
+/* Theme switch: every surface changes colour together, for as long as the
+   switch lasts. `!important` is the point here — it overrides each component's
+   own (faster) hover timing for those 400ms, then gets out of the way. */
+html.theming, html.theming *, html.theming *::before, html.theming *::after {
+  transition: background-color var(--t-slow) ease, color var(--t-slow) ease,
+              border-color var(--t-slow) ease !important;
+}
 body.scrolled header { box-shadow: 0 8px 26px rgba(0, 0, 0, .28); }
 html[data-theme="light"] body.scrolled header { box-shadow: 0 8px 22px rgba(30, 41, 59, .12); }
 
 /* theme switches ease instead of snapping (flat colours; gradients can't tween) */
-body, header, .card, .modal { transition: background-color .35s ease, color .35s ease, border-color .35s ease; }
+/* (the old rule here eased body/header/.card/.modal colours on EVERY theme
+   change while the controls inside them snapped — replaced by the scoped
+   `html.theming` block above, which covers every surface for exactly as long
+   as the switch takes) */
 .field .col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .field .col.grow { align-items: stretch; }
 .jrow input[type="text"] { flex: 1; min-width: 0; }
@@ -635,6 +721,20 @@ html[data-host="android"] .overlay {
 html[data-host="android"] .modal-foot {
   background: var(--panel-solid);
   backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+/* Settings is a tab, not a dialog: on a desktop the tab rail is already the
+   way out, and a ✕ in the header reads as "this is a modal" (motion review).
+   On a phone it is the one-handed way back, so it stays there. */
+@media (min-width: 900px) { #setClose { display: none; } }
+
+/* The aurora is the most expensive thing in this stylesheet: three radial
+   gradients under a 70px blur, and an animated transform on top forces the
+   whole thing to be re-rastered every frame. On a phone that is battery spent
+   on decoration while a download is the actual job (motion review) — freeze
+   it there, and blur it less. */
+html[data-host="android"] body::before {
+  animation: none !important;
+  filter: blur(34px);
 }
 
 /* ---------- playlist pick list (M20) ------------------------------------- */
