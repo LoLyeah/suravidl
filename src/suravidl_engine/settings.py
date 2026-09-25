@@ -45,6 +45,23 @@ DEFAULTS = {
 THEMES = ("light", "dark", "amoled")
 GLASS_STYLES = ("frosted", "liquid")
 
+
+def int_in(value, name: str, lo: int, hi: int) -> int:
+    """An integer clamped to [lo, hi], with junk refused — never a crash.
+
+    `int(float("inf"))` raises OverflowError and `int(float("nan"))` raises
+    ValueError deep inside the endpoint, which the client sees as a 500. A
+    number a user can type (or a JSON file can carry) deserves a clear refusal
+    instead.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number") from None
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError(f"{name} must be a finite number") from None
+    return max(lo, min(hi, int(number)))
+
 # Keys a single download may override ("this download only"), and the ones that
 # belong to the app itself: a job must not be able to move the download folder,
 # change how many jobs run at once, or repaint the UI.
@@ -110,7 +127,8 @@ class Settings:
         if default_download_dir is not None:
             self._data["download_dir"] = str(Path(default_download_dir))
         if default_max_concurrent is not None:
-            self._data["max_concurrent"] = max(1, min(4, int(default_max_concurrent)))
+            self._data["max_concurrent"] = int_in(default_max_concurrent,
+                                                  "max_concurrent", 1, 4)
         if self.path and self.path.exists():
             try:
                 loaded = json.loads(self.path.read_text(encoding="utf-8"))
@@ -140,7 +158,7 @@ class Settings:
                 raise ValueError("download_dir must be an absolute path")
             return str(path)
         if key == "max_concurrent":
-            return max(1, min(4, int(value)))
+            return int_in(value, "max_concurrent", 1, 4)
         if key == "open_dir_on_complete":
             return bool(value)
         if key == "auto_resume":
@@ -195,11 +213,11 @@ class Settings:
             parse_rate_limit(str(value or ""))  # raises on junk
             return str(value or "").strip()
         if key == "fragments":
-            return max(1, min(16, int(value)))
+            return int_in(value, "fragments", 1, 16)
         if key == "retries":
-            return max(0, min(30, int(value)))
+            return int_in(value, "retries", 0, 30)
         if key == "max_downloads":
-            return max(0, min(1000, int(value)))
+            return int_in(value, "max_downloads", 0, 1000)
         if key == "proxy":
             from .download_opts import validate_proxy
 
@@ -241,7 +259,9 @@ class Settings:
             try:
                 seconds = float(value)
             except (TypeError, ValueError):
-                raise ValueError("sleep_requests must be a number of seconds")
+                raise ValueError("sleep_requests must be a number of seconds") from None
+            if seconds != seconds or seconds in (float("inf"), float("-inf")):
+                raise ValueError("sleep_requests must be a finite number") from None
             if not 0 <= seconds <= SLEEP_REQUESTS_MAX:
                 raise ValueError(
                     f"sleep_requests must be between 0 and {SLEEP_REQUESTS_MAX:g} seconds")

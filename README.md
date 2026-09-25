@@ -287,6 +287,35 @@ repo has no pydantic-core.
       says how many videos it will start), in step with the range field the
       engine is sent. The quality you pick for a site is remembered and
       offered again as a marked chip — never applied for you.
+- [x] **v0.21.1 — the audit release**: the app was probed with hostile input
+      instead of being read, and six real bugs came out. A bare
+      `POST /files/clear` wiped every download with no server-side confirm
+      (the modal existed only in the UI) — the endpoint now refuses with a
+      400 unless the body says `{"confirm": "delete"}`. `Infinity`/`NaN` in a
+      numeric setting reached `int()` and answered **500**; every numeric
+      setting now goes through one clamp that refuses non-finite junk with a
+      400 naming the field. `POST /jobs` accepted an empty or blank URL (and
+      stored it), and had no ceiling — a job now needs a real URL, trimmed,
+      at most 4096 characters. The launcher (`python -m suravidl_engine`)
+      silently ignored `SURAVIDL_TOKEN` and used `~/.suravidl/token` instead,
+      so the token the README tells you to set did nothing — the env var now
+      wins (empty value falls back to the file), which is what the extension,
+      scripts and the desktop entry all assume. A headless engine advertised
+      a desktop window it did not have: `/app/info` said `desktop: true` and
+      `/app/minimize` answered **500**. The window's actions are now dropped
+      the moment `webview.start()` fails (there is a browser fallback) and a
+      window call that raises answers 501 "not running in the desktop app"
+      instead of a server error — capabilities are never announced on the
+      strength of an import. And the UI kept its own, stale copy of the
+      engine's "the site is asking for a sign-in" heuristic — with a bare
+      `age` pattern that matched "webp**age**", so **every 404 came with an
+      "add cookies in Settings → Authentication" hint**. The engine owns that
+      judgement now (`explain_download_error`), the UI just prints what it is
+      told, and one test asserts the UI never carries its own list again. All
+      six are pinned by `tests/test_audit_fixes.py` + `tests/test_launcher.py`
+      (21 tests), the XSS path was checked against a page whose *title* is an
+      `<img onerror=…>` payload (rendered as text, no script — the UI builds
+      DOM with `textContent`), and `scripts/smoke.py` still passes end to end.
 
 ## API (v0.1)
 
@@ -302,6 +331,9 @@ repo has no pydantic-core.
 | `POST /jobs/{id}/retry` | ✓ | re-run error/interrupted/cancelled |
 | `POST /jobs/{id}/reveal` | ✓ | open the finished file (desktop only) |
 | `GET/POST /settings` | ✓ | download dir, concurrency, reveal-on-complete |
+| `GET /files/summary` | ✓ | how much is in the download folder |
+| `POST /files/clear` | ✓ | delete every downloaded file — needs `{"confirm": "delete"}` |
+| `POST /jobs/{id}/delete` | ✓ | one job: file + sidecars + row (refuses mid-download) |
 | `GET /app/info` | ✓ | whether a desktop shell (window) is attached |
 | `POST /app/minimize`, `/app/quit` | ✓ | window controls (desktop only) |
 
@@ -311,6 +343,8 @@ repo has no pydantic-core.
 python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/python -m pytest tests/ -q
 SURAVIDL_TOKEN=x .venv/bin/python -m suravidl_engine.api --port 8787
+# both entry points honor SURAVIDL_TOKEN; without it a token is generated
+# into ~/.suravidl/token (0600) and printed on start
 .venv/bin/python scripts/smoke.py   # full live end-to-end check
 ```
 

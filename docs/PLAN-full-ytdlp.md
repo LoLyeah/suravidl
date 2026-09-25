@@ -302,5 +302,28 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     override) and `/probe` returns it as `site_quality` — an *offer*: the chip
     is marked ("720p ✓, your pick for this site last time") and still needs
     the click, and an arbitrary typed format teaches the engine nothing.
+  - **v0.21.1 — the audit release (no new features):** a hostile-input pass
+    over the *running* engine and the UI, not a read-through. Six bugs, each
+    fixed and pinned by a test: `POST /files/clear` wiped every download on a
+    bare POST (the confirm existed only in the UI) — a server-side
+    `{"confirm": "delete"}` is now required (400 otherwise); `Infinity`/`NaN`
+    in a numeric setting reached `int()` and answered **500** — one clamp
+    (`settings.int_in`) refuses them with a 400 that names the field;
+    `POST /jobs` accepted a blank URL and had no ceiling — trimmed,
+    non-empty, ≤4096 chars; the launcher (`python -m suravidl_engine`)
+    ignored `SURAVIDL_TOKEN` and quietly used `~/.suravidl/token`, making the
+    README's dev command a lie — the env var now wins; a headless engine
+    advertised a desktop window (`/app/info` said `desktop: true`,
+    `/app/minimize` → 500) — the actions dict is emptied the moment
+    `webview.start()` fails and a failing window call answers 501; and the UI
+    carried its own copy of the engine's sign-in-wall heuristic, with a bare
+    `age` pattern that matched "webp**age**" — so every 404 came with a bogus
+    "add cookies in Settings → Authentication" hint. `auth.WALL_PHRASES` +
+    `auth.explain_download_error` are now the single source (used by probe
+    errors *and* job errors), the UI prints what it is told, and a test
+    asserts the UI never grows its own list again. 242 tests;
+    `scripts/smoke.py` green; the XSS path verified against a page whose title
+    is an `<img onerror=…>` payload (rendered as text — the UI builds DOM with
+    `textContent`).
   - Next up: M21 — (open) subtitles language picker per site, scheduled
     downloads (cron-style watch list).

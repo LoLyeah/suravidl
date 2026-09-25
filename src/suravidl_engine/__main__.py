@@ -38,6 +38,17 @@ def token_path() -> Path:
 
 
 def load_or_create_token() -> str:
+    """The engine's token: `SURAVIDL_TOKEN` when set, else the token file.
+
+    The env var came first here for a reason (v0.21.1 audit): the README tells
+    people to run the engine with `SURAVIDL_TOKEN=x …`, but only the `.api`
+    entry honoured it — `python -m suravid_engine` silently used the file
+    instead, so a documented way of pinning a token did nothing. An env var
+    that is set is a decision: it wins, and it is not written to disk.
+    """
+    env = os.environ.get("SURAVIDL_TOKEN", "").strip()
+    if env:
+        return env
     p = token_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     _harden(p.parent, 0o700)
@@ -235,6 +246,11 @@ def main() -> None:
             webview.start()
         except Exception:  # noqa: BLE001 - fall back to the browser
             window = None
+            # the window never came up (headless host, missing Qt/GTK, …):
+            # stop advertising a desktop app we cannot honour, so /app/info
+            # says the truth and /app/* answer 501 instead of a 500 from a
+            # window that does not exist (v0.21.1 audit)
+            actions.clear()
         else:
             server.should_exit = True
             print("bye")

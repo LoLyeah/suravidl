@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
-from .auth import check_auth, cookie_session
+from .auth import check_auth, cookie_session, explain_download_error
 from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
@@ -43,6 +43,11 @@ class ProbeRequest(BaseModel):
 
 class AuthCheckRequest(BaseModel):
     url: str | None = None
+
+
+class FilesClearRequest(BaseModel):
+    """The bulk wipe is destructive: it takes the word, not just a button."""
+    confirm: str = ""
 
 
 def _web_dir() -> Path:
@@ -215,7 +220,14 @@ def create_app(download_dir, auth_token: str | None = None,
         if not fn:
             raise HTTPException(status_code=501,
                                 detail="not running in the desktop app")
-        fn()
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001 - the window may be gone
+            # a dead window is not a server error: say what happened (501,
+            # same as an unwired action) instead of a 500 stack trace
+            raise HTTPException(
+                status_code=501,
+                detail=f"the desktop window could not {name}: {e}") from e
         return {"ok": True}
 
     @app.post("/app/minimize")
@@ -273,7 +285,10 @@ def create_app(download_dir, auth_token: str | None = None,
                              cookie_opts=cookie_opts,
                              extra_opts=probe_extra_opts(settings.get()))
         except Exception as e:  # noqa: BLE001 - error goes to the client
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            # one explanation for every shell: the engine owns the "this looks
+            # like a sign-in wall" judgement, the UI does not guess
+            raise HTTPException(status_code=400,
+                                detail=explain_download_error(str(e))) from e
         # the site's remembered quality rides along as an offer (M20): the UI
         # marks that chip, the user still decides
         site = site_memory.host_of(body.url)
@@ -367,14 +382,24 @@ def create_app(download_dir, auth_token: str | None = None,
                 "bytes": sum(p.stat().st_size for p in files)}
 
     @app.post("/files/clear")
-    def files_clear(mgr: JobManager = Depends(require_auth)):
+    def files_clear(body: FilesClearRequest | None = None,
+                    mgr: JobManager = Depends(require_auth)):
         """Delete every downloaded file (sidecars included).
 
         This exists because on Android the download folder is app-private —
         a file manager cannot open Android/data, so the app has to offer the
         cleanup itself. Completed job rows go with their files; errored jobs
         stay so they can be retried.
+
+        Destructive enough to need the word, not just a button: the UI already
+        asks, and this makes the engine refuse a stray call too (the v0.21.1
+        audit found a bare POST wiped the folder).
         """
+        if (body.confirm if body else "") != "delete":
+            raise HTTPException(
+                status_code=400,
+                detail='this deletes every downloaded file — send '
+                       '{"confirm": "delete"} to proceed')
         d = Path(manager.download_dir)
         deleted = freed = 0
         if d.exists():

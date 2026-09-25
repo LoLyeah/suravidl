@@ -36,7 +36,7 @@ def test_clear_deletes_files_sidecars_and_nested_dirs(tmp_path):
         (dl / "sub").mkdir(exist_ok=True)
         (dl / "sub" / "side.srt").write_bytes(b"y" * 20)
 
-        r = c.post("/files/clear", headers=AUTH).json()
+        r = c.post("/files/clear", json={"confirm": "delete"}, headers=AUTH).json()
         assert r["deleted"] == 2
         assert r["freed_bytes"] == 120
         assert not any(p.is_file() for p in dl.rglob("*"))
@@ -71,7 +71,7 @@ def test_clear_prunes_completed_jobs_only(tmp_path):
                     mgr._con.execute(                       # noqa: SLF001
                         "UPDATE jobs SET status=? WHERE id=?", (status, jid))
 
-        r = c.post("/files/clear", headers=AUTH).json()
+        r = c.post("/files/clear", json={"confirm": "delete"}, headers=AUTH).json()
         assert r["cleared_jobs"] == 1
         ids = {j["id"] for j in c.get("/jobs", headers=AUTH).json()["jobs"]}
         assert done["id"] not in ids
@@ -85,7 +85,7 @@ def test_clear_prunes_completed_jobs_only(tmp_path):
 
 def test_clear_on_empty_dir_is_harmless(tmp_path):
     with _client(tmp_path) as c:
-        r = c.post("/files/clear", headers=AUTH).json()
+        r = c.post("/files/clear", json={"confirm": "delete"}, headers=AUTH).json()
         assert r["deleted"] == 0
         assert r["freed_bytes"] == 0
 

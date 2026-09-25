@@ -97,6 +97,35 @@ def describe_cookies_file(path: str | Path) -> dict:
     return out
 
 
+# The phrases yt-dlp uses when a site asks for a sign-in. Kept in ONE place:
+# the UI used to carry its own copy, which drifted and started matching "age"
+# inside "webpage" — every 404 came with a bogus "add cookies" hint.
+WALL_PHRASES = (
+    "sign in to confirm", "sign in", "log in", "login",
+    "private video", "members-only", "members only",
+    "age-restricted", "age restricted", "not a bot", "cookies",
+)
+
+
+def looks_like_signin_wall(text: str) -> bool:
+    """Is this yt-dlp failure the site asking for an account?
+
+    Specific phrases only: a bare "age" matches "webpage" (a 404 then got a
+    "add cookies" hint, which sent people on a wild goose chase — the v0.21.1
+    audit found the UI still carrying its own, sloppier copy of this test).
+    """
+    lowered = (text or "").lower()
+    return any(phrase in lowered for phrase in WALL_PHRASES)
+
+
+def explain_download_error(text: str) -> str:
+    """A failure the user reads: yt-dlp's words, plus the one hint we know."""
+    if looks_like_signin_wall(text):
+        return (f"{text} — this looks like the site asking for an account: "
+                "add cookies in Settings → Authentication.")
+    return text
+
+
 def check_auth(settings: dict, url: str | None = None) -> dict:
     """Answer "are my cookies actually working?" — statically and, if a URL is
     given, by proving it with a real yt-dlp extraction.
@@ -157,12 +186,7 @@ def check_auth(settings: dict, url: str | None = None) -> dict:
         except Exception as e:  # noqa: BLE001 - yt-dlp raises many shapes
             text = str(e).strip() or e.__class__.__name__
             result["detail"] = text
-            lowered = text.lower()
-            # specific phrases only: a bare "age" matches "webpage"
-            walls = ("sign in to confirm", "sign in", "log in", "login",
-                     "private video", "members-only", "members only",
-                     "age-restricted", "age restricted", "not a bot", "cookies")
-            if any(s in lowered for s in walls):
+            if looks_like_signin_wall(text):
                 result["message"] += (" — but the site still asked for a sign-in: "
                                       "the cookies are stale, or came from a "
                                       "browser where you are logged out.")

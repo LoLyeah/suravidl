@@ -129,11 +129,9 @@ async function doProbe() {
     renderProbe(url, info);
     $("probeMsg").textContent = "";
   } catch (e) {
-    let msg = "probe failed: " + e.message;
-    if (/sign in|age|not a bot|private video|members-only|cookies/i.test(e.message)) {
-      msg += " — this video needs your account: add cookies in ⚙ Settings → Authentication.";
-    }
-    $("probeMsg").textContent = msg;
+    // the engine explains a failure (it owns the "sign-in wall" judgement and
+    // says so in its own words) — the UI does not second-guess it
+    $("probeMsg").textContent = "probe failed: " + e.message;
     $("probeCard").classList.add("hidden");
     $("dlEmpty").classList.remove("hidden");
   } finally {
@@ -973,7 +971,7 @@ async function initStorageSection() {
       "? This cannot be undone.", { okText: "Delete" });
     if (!ok) return;
     try {
-      const r = await api("/files/clear", { method: "POST" });
+      const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
       if (ANDROID() && window.AndroidHost.deleteMediaCopies) {
         try { window.AndroidHost.deleteMediaCopies(); } catch (_) { }
       }

@@ -13,6 +13,8 @@ from pathlib import Path
 
 import yt_dlp
 
+from .auth import explain_download_error
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
@@ -37,6 +39,10 @@ CREATE TABLE IF NOT EXISTS jobs (
 """
 
 ACTIVE_STATUSES = ("queued", "downloading", "merging")
+
+# A URL longer than this is junk, not a link (the audit found the engine
+# happily storing 5000 characters of "xxxx…" as a job).
+URL_MAX = 4096
 
 # Only these captured browser headers are forwarded to yt-dlp.
 ALLOWED_HEADER_KEYS = {"cookie", "user-agent", "referer", "origin",
@@ -272,6 +278,14 @@ class JobManager:
                raw_args: str | None = None,
                overrides: dict | None = None) -> dict:
         from .settings import validate_overrides
+
+        # a job with no URL is not a job: it would only fail later, in the
+        # worker, with an error nobody can act on (found by the v0.21.1 audit)
+        url = (url or "").strip()
+        if not url:
+            raise ValueError("a job needs a URL")
+        if len(url) > URL_MAX:
+            raise ValueError(f"that URL is too long (max {URL_MAX} characters)")
 
         if overrides:
             # validated here, before a row exists: a bad patch never queues
@@ -595,7 +609,7 @@ class JobManager:
                 job["error"] = "cancelled by user"
             else:
                 job["status"] = "error"
-                job["error"] = str(e)
+                job["error"] = explain_download_error(str(e))
         finally:
             self._save(job)
         if job["status"] == "completed" and self.on_complete:
