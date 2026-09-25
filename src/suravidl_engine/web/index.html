@@ -56,6 +56,12 @@
       <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
       <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
     </div>
+    <div id="playlistRow" class="audioRow hidden">
+      <span class="muted">Playlist items:</span>
+      <input id="playlistItems" type="text" spellcheck="false"
+             placeholder="blank = all · e.g. 1-10,15"/>
+      <button id="playlistBtn" class="btn prime sm">Download playlist</button>
+    </div>
     <table id="formats">
       <thead><tr><th>quality</th><th>format</th><th>size</th><th></th></tr></thead>
       <tbody></tbody>
@@ -81,6 +87,15 @@
       <button id="setClose" class="btn sm" title="Close">✕</button>
     </div>
 
+    <div class="subtabs" id="settingsTabs">
+      <button class="stab active" data-stab="general" type="button">General</button>
+      <button class="stab" data-stab="media" type="button">Media</button>
+      <button class="stab" data-stab="network" type="button">Network</button>
+      <button class="stab" data-stab="auth" type="button">Authentication</button>
+      <button class="stab hidden" data-stab="device" id="tabDevice" type="button">Device</button>
+    </div>
+
+    <div class="spanel" id="spanel-general">
     <div class="field">
       <label class="lbl">Appearance</label>
       <div class="swatches" id="themeSwatches">
@@ -132,7 +147,82 @@
         Resume interrupted downloads after a restart
       </label>
     </div>
+    </div><!-- /spanel-general -->
 
+    <div class="spanel hidden" id="spanel-media">
+      <div class="field">
+        <label class="lbl" for="setTemplate">Filename template</label>
+        <input id="setTemplate" type="text" spellcheck="false"
+               placeholder="%(title).100B.%(ext)s"/>
+        <span class="muted small">must contain %(ext)s · example:
+          <code>%(uploader)s - %(title)s.%(ext)s</code></span>
+      </div>
+
+      <div class="field">
+        <label class="check small" for="setEmbMeta">
+          <input id="setEmbMeta" type="checkbox"/>
+          Embed metadata (title, artist, description)
+        </label>
+        <label class="check small" for="setEmbThumb">
+          <input id="setEmbThumb" type="checkbox"/>
+          Embed thumbnail <span class="muted">(keeps the .jpg too)</span>
+        </label>
+      </div>
+
+      <div class="field row">
+        <label class="lbl" for="setSubMode">Subtitles</label>
+        <select id="setSubMode">
+          <option value="off">Off</option>
+          <option value="sidecar">Download as files (.vtt)</option>
+          <option value="embed">Embed into the video</option>
+        </select>
+        <input id="setSubLangs" type="text" spellcheck="false"
+               placeholder="languages, e.g. en, id" />
+      </div>
+      <div class="field">
+        <label class="check small" for="setSubAuto">
+          <input id="setSubAuto" type="checkbox"/>
+          Include auto-generated captions
+        </label>
+      </div>
+
+      <div class="field row">
+        <label class="lbl" for="setSbMode">SponsorBlock</label>
+        <select id="setSbMode">
+          <option value="off">Off</option>
+          <option value="mark">Mark segments as chapters</option>
+          <option value="remove">Remove segments (re-encodes cuts)</option>
+        </select>
+        <input id="setSbCats" type="text" spellcheck="false"
+               placeholder="sponsor, selfpromo"/>
+      </div>
+
+      <div class="field">
+        <label class="check small" for="setArchive">
+          <input id="setArchive" type="checkbox"/>
+          Skip videos already downloaded before (archive)
+        </label>
+      </div>
+    </div><!-- /spanel-media -->
+
+    <div class="spanel hidden" id="spanel-network">
+      <div class="field row">
+        <label class="lbl" for="setFragments">Parallel fragments</label>
+        <input id="setFragments" type="number" min="1" max="16"/>
+        <span class="muted small">1–16 · faster HLS/DASH downloads</span>
+      </div>
+      <div class="field row">
+        <label class="lbl" for="setRateLimit">Speed limit</label>
+        <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
+      </div>
+      <div class="field">
+        <label class="lbl" for="setProxy">Proxy</label>
+        <input id="setProxy" type="text" spellcheck="false"
+               placeholder="socks5://127.0.0.1:1080 (blank = direct)"/>
+      </div>
+    </div><!-- /spanel-network -->
+
+    <div class="spanel hidden" id="spanel-auth">
     <div class="field">
       <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
       <div class="col fill">
@@ -160,6 +250,9 @@
       </div>
     </div>
 
+    </div><!-- /spanel-auth -->
+
+    <div class="spanel hidden" id="spanel-device">
     <div id="androidSection" class="field hidden">
       <label class="lbl">Android</label>
       <div class="col">
@@ -167,6 +260,7 @@
         <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
       </div>
     </div>
+    </div><!-- /spanel-device -->
 
     <div class="modal-foot">
       <button id="setSave" class="btn prime">Save</button>

@@ -153,5 +153,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
 - Decisions applied (user): tier-1 order starts with **audio-only** ✓; the
   raw yt-dlp arguments field will be **default-off in Settings**; Android
   ffmpeg is **bundled** ✓ (latest upstream, 8.1.3).
-- Next up: M12 rest of tier-1 (playlists, subtitles, SponsorBlock, proxy…),
-  M10b Keystore encryption, M11b tabbed shell, M13 Advanced tab + raw args.
+- **v0.12.0 — M12 (rest of tier-1) done + first slice of M11:**
+  `download_opts.py` mirrors yt-dlp's CLI→postprocessor translation in one
+  tested place (subtitles embed, metadata, thumbnail, SponsorBlock
+  mark/remove, rate limit, fragments, proxy, archive, filename template).
+  Playlists: probe reports `playlist/false`+entries (`extract_flat`,
+  capped at 100); jobs take `playlist_items` (persisted, surviving retry);
+  safety rule — **no playlist_items ⇒ exactly one file**, because yt-dlp's
+  `noplaylist` alone does not stop a playlist-only URL. Settings modal got
+  sub-tabs (General · Media · Network · Authentication · Device). Progress
+  carries `playlist_index/count`; completed playlist jobs report the folder
+  plus `playlist_count`; archive skips surface as
+  `"already in the archive — skipped"`. Live-verified: template + metadata
+  embed on a real remote download (ffprobe shows the written tags), real HLS
+  probe (5 formats), real MP4 download. 121 tests + smoke. YouTube itself now
+  bot-walls this VPS IP, so YouTube checks run behind cookies (v0.10.0
+  feature) — the fixture playlist E2E covers playlist logic offline.
+- Next up: M13 Advanced tab + raw yt-dlp arguments (decided: **default-off**,
+  opt-in in Settings), M10b Keystore encryption of imported cookies, and the
+  full four-tab shell (Download · Queue · Settings · yt-dlp) — the settings
+  sub-tabs shipped here are its first slice.

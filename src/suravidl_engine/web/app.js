@@ -144,6 +144,32 @@ function renderProbe(url, info) {
 
   const tb = $("formats").querySelector("tbody");
   tb.innerHTML = "";
+
+  if (info.playlist) {
+    $("playlistRow").classList.remove("hidden");
+    $("probeMeta").textContent =
+      (info.count ? info.count + " videos" : "playlist") +
+      (info.extractor ? " · " + info.extractor : "");
+    const entries = info.entries || [];
+    for (const [i, e] of entries.entries()) {
+      const tr = el("tr", "enter");
+      tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
+      tr.append(
+        el("td", "fmt-q", String(i + 1)),
+        el("td", "fmt-c", e.title || e.url || "—"),
+        el("td", "fmt-s", e.duration ? Math.round(e.duration / 60) + " min" : "—"),
+      );
+      tb.append(tr);
+    }
+    if (info.count && entries.length < info.count) {
+      const tr = el("tr");
+      tr.append(el("td", "", ""), el("td", "muted", `… ${info.count - entries.length} more`), el("td"));
+      tb.append(tr);
+    }
+    return;
+  }
+
+  $("playlistRow").classList.add("hidden");
   const fmts = [...(info.formats || [])]
     .filter((f) => f.ext && f.format_id)
     .sort((a, b) => (b.height || b.abr || 0) - (a.height || a.abr || 0));
@@ -173,10 +199,16 @@ function renderProbe(url, info) {
 }
 
 /* ---------- jobs ---------- */
-async function startJob(url, fmt, preset) {
+function playlistMode() {
+  return !$("playlistRow").classList.contains("hidden");
+}
+
+async function startJob(url, fmt, preset, playlist) {
   try {
-    await api("/jobs", { method: "POST", body: JSON.stringify({ url, fmt, preset }) });
-    toast("Added to downloads", "info");
+    const body = { url, fmt, preset };
+    if (playlist) body.playlist_items = $("playlistItems").value.trim();
+    await api("/jobs", { method: "POST", body: JSON.stringify(body) });
+    toast(playlist ? "Playlist added to downloads" : "Added to downloads", "info");
     refreshJobs();
   } catch (e) {
     toast("could not start download: " + e.message, "bad");
@@ -196,8 +228,10 @@ function metaParts(j) {
   const pct = Math.round(progressPct(j));
   const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
   const eta = j.progress && j.progress.eta != null ? "ETA " + j.progress.eta + "s" : "";
+  const pl = j.progress && j.progress.playlist_index && j.progress.playlist_count
+    ? "video " + j.progress.playlist_index + "/" + j.progress.playlist_count : "";
   const size = `${humanBytes(j.progress && j.progress.downloaded_bytes)} / ${humanBytes(j.progress && j.progress.total_bytes)}`;
-  return [pct + "%", ...(spd ? [spd] : []), ...(eta ? [eta] : []), size];
+  return [...(pl ? [pl] : []), pct + "%", ...(spd ? [spd] : []), ...(eta ? [eta] : []), size];
 }
 
 function jobRow(j) {
@@ -242,6 +276,7 @@ function jobRow(j) {
       r.append(open);
     }
     row.append(r);
+    if (j.note) row.append(el("div", "jobhint", j.note));
   }
 
   const actions = el("div", "jrow");
@@ -380,6 +415,7 @@ async function initAppControls() {
     // inside the Android app: quit + battery settings, no minimize
     wireQuitButton();
     $("androidSection").classList.remove("hidden");
+    $("tabDevice").classList.remove("hidden");
     $("batteryBtn").onclick = () => window.AndroidHost.openBatterySettings();
     $("quitAppBtn").onclick = () => $("quitBtn").onclick();
     // browser cookie DBs aren't readable on Android — offer file import instead
@@ -439,6 +475,18 @@ async function loadSettings() {
     $("setResume").checked = !!s.auto_resume;
     $("setCookies").value = s.cookies_file || "";
     $("setCookiesBrowser").value = s.cookies_from_browser || "";
+    $("setTemplate").value = s.filename_template || "";
+    $("setEmbMeta").checked = !!s.embed_metadata;
+    $("setEmbThumb").checked = !!s.embed_thumbnail;
+    $("setSubMode").value = s.subtitles_mode || "off";
+    $("setSubLangs").value = s.subtitles_langs || "";
+    $("setSubAuto").checked = !!s.subtitles_auto;
+    $("setSbMode").value = s.sponsorblock_mode || "off";
+    $("setSbCats").value = s.sponsorblock_categories || "";
+    $("setArchive").checked = !!s.archive;
+    $("setFragments").value = s.fragments != null ? s.fragments : 1;
+    $("setRateLimit").value = s.rate_limit || "";
+    $("setProxy").value = s.proxy || "";
     $("dlDir").textContent = s.download_dir || "";
     markSwatches(CURRENT);
   } catch (e) {
@@ -446,8 +494,20 @@ async function loadSettings() {
   }
 }
 
+/* ---------- settings sub-tabs ---------- */
+function showSettingsTab(name) {
+  document.querySelectorAll("#settingsTabs .stab").forEach((b) =>
+    b.classList.toggle("active", b.dataset.stab === name));
+  document.querySelectorAll(".spanel").forEach((p) =>
+    p.classList.toggle("hidden", p.id !== "spanel-" + name));
+}
+document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
+  b.onclick = () => showSettingsTab(b.dataset.stab);
+});
+
 function openSettings() {
   openModal($("settingsModal"));
+  showSettingsTab("general");
   loadSettings();
 }
 function closeSettings() {
@@ -484,6 +544,18 @@ function saveSettings() {
       auto_resume: $("setResume").checked,
       cookies_file: $("setCookies").value.trim(),
       cookies_from_browser: $("setCookiesBrowser").value,
+      filename_template: $("setTemplate").value.trim(),
+      embed_metadata: $("setEmbMeta").checked,
+      embed_thumbnail: $("setEmbThumb").checked,
+      subtitles_mode: $("setSubMode").value,
+      subtitles_langs: $("setSubLangs").value.trim(),
+      subtitles_auto: $("setSubAuto").checked,
+      sponsorblock_mode: $("setSbMode").value,
+      sponsorblock_categories: $("setSbCats").value.trim(),
+      archive: $("setArchive").checked,
+      fragments: Number($("setFragments").value),
+      rate_limit: $("setRateLimit").value.trim(),
+      proxy: $("setProxy").value.trim(),
     }),
   }).then((s) => {
     $("dlDir").textContent = s.download_dir;
@@ -506,10 +578,11 @@ $("setSave").onclick = async () => {
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
-$("bestBtn").onclick = () => startJob($("url").value.trim(), null);
-$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native");
-$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a");
-$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3");
+$("bestBtn").onclick = () => startJob($("url").value.trim(), null, null, playlistMode());
+$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native", playlistMode());
+$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode());
+$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode());
+$("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
 
 applyTheme(CURRENT.theme, CURRENT.glass);
 $("dlDir").textContent = CFG.downloadDir || "";

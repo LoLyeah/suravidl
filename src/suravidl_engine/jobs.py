@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import threading
 import uuid
@@ -18,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     url TEXT NOT NULL,
     fmt TEXT,
     preset TEXT,
+    playlist_items TEXT,
     headers TEXT,
     status TEXT NOT NULL,
     title TEXT,
@@ -37,6 +39,9 @@ ACTIVE_STATUSES = ("queued", "downloading", "merging")
 # Only these captured browser headers are forwarded to yt-dlp.
 ALLOWED_HEADER_KEYS = {"cookie", "user-agent", "referer", "origin",
                        "accept", "accept-language"}
+
+# playlist item selections: '1-10', '2', '1,3,5-9'; empty = whole playlist
+_PLAYLIST_ITEMS_RE = re.compile(r"^[\d,\-\s]+$")
 
 # Cookie values are never written to disk: the live value stays in memory for
 # the running job (and in-session retries); anything persisted is redacted.
@@ -111,7 +116,8 @@ def ffmpeg_opts() -> dict:
 
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
-                 auto_resume: bool = False, cookie_session=None):
+                 auto_resume: bool = False, cookie_session=None,
+                 download_opts=None):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path) if db_path else ":memory:"
@@ -136,6 +142,8 @@ class JobManager:
         self.on_complete = None  # optional callable(job) run after success
         # optional callable -> context manager yielding yt-dlp cookie opts
         self._cookie_session = cookie_session
+        # optional callable(download_dir) -> settings-derived yt-dlp options
+        self._download_opts = download_opts
         self._init_db()
         if auto_resume:
             self.resume_interrupted()
@@ -151,6 +159,9 @@ class JobManager:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
                 if "preset" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
+                if "playlist_items" not in cols:
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -205,10 +216,11 @@ class JobManager:
     def _save(self, job: dict):
         with self._db_lock, self._con:
             self._con.execute(
-                "INSERT INTO jobs (id, url, fmt, preset, headers, status, title,"
+                "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
+                " headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -216,6 +228,7 @@ class JobManager:
                 " eta=excluded.eta, completed_at=excluded.completed_at",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
+                    job.get("playlist_items"),
                     json.dumps(_redacted_headers(job["headers"]))
                     if job.get("headers") else None,
                     job["status"], job.get("title"), job.get("filepath"),
@@ -230,11 +243,18 @@ class JobManager:
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
                extra_headers: dict | None = None,
-               preset: str | None = None) -> dict:
+               preset: str | None = None,
+               playlist_items: str | None = None) -> dict:
         if preset and fmt:
             raise ValueError("pass either 'preset' or 'fmt', not both")
         if preset:
             preset_opts(preset)  # validate up front, before queueing
+        if playlist_items is not None:
+            playlist_items = str(playlist_items).strip()
+            if playlist_items and not _PLAYLIST_ITEMS_RE.match(playlist_items):
+                raise ValueError(
+                    "playlist_items must look like '1-10', '2', '1,3,5-9' "
+                    "or be empty for the whole playlist")
         extra_headers = _safe_headers(extra_headers)
         job_id = uuid.uuid4().hex[:12]
         job = {
@@ -242,6 +262,7 @@ class JobManager:
             "url": url,
             "fmt": fmt,
             "preset": preset,
+            "playlist_items": playlist_items,
             "headers": extra_headers,
             "status": "queued",
             "title": None,
@@ -284,7 +305,8 @@ class JobManager:
             raise ValueError(f"cannot retry job in status '{src['status']}'")
         return self.create(src["url"], fmt=src.get("fmt"),
                            extra_headers=src.get("headers"),
-                           preset=src.get("preset"))
+                           preset=src.get("preset"),
+                           playlist_items=src.get("playlist_items"))
 
     def resume_interrupted(self) -> list[str]:
         """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
@@ -352,12 +374,18 @@ class JobManager:
                 raise _Cancelled()
             if d["status"] == "downloading":
                 job["status"] = "downloading"
+                d_info = d.get("info_dict") or {}
                 job["progress"] = {
                     "downloaded_bytes": d.get("downloaded_bytes") or 0,
                     "total_bytes": d.get("total_bytes")
                     or d.get("total_bytes_estimate"),
                     "speed": d.get("speed"),
                     "eta": d.get("eta"),
+                    # playlists: which item of how many is running
+                    "playlist_index": d_info.get("playlist_index")
+                    or d.get("playlist_index"),
+                    "playlist_count": d_info.get("n_entries")
+                    or d.get("playlist_count"),
                 }
                 self._save(job)
             elif d["status"] == "finished":
@@ -367,14 +395,38 @@ class JobManager:
         opts = {
             "quiet": True,
             "no_warnings": True,
-            "noplaylist": True,
             "outtmpl": str(self.download_dir / "%(title).100B.%(ext)s"),
             "progress_hooks": [hook],
             "postprocessor_hooks": [hook],
         }
         opts.update(ffmpeg_opts())
+        # settings-derived options (template, subtitles, embed, network, ...)
+        user_pps: list[dict] = []
+        if self._download_opts:
+            settings_opts = dict(self._download_opts(self.download_dir) or {})
+            user_pps = list(settings_opts.pop("postprocessors", []) or [])
+            opts.update(settings_opts)
+        # preset postprocessors run first (e.g. extract audio), then the
+        # settings ones (embed metadata/thumbnail/subs) on the result
+        preset_pps: list[dict] = []
         if job.get("preset"):
-            opts.update(preset_opts(job["preset"]))
+            p = preset_opts(job["preset"])
+            opts["format"] = p["format"]
+            preset_pps = list(p.get("postprocessors", []) or [])
+        pps = preset_pps + user_pps
+        if pps:
+            opts["postprocessors"] = pps
+        # playlists are opt-in: only an explicit playlist_items (even empty,
+        # meaning "everything") unlocks the whole list; a playlist URL
+        # without one yields just its first entry (yt-dlp's noplaylist alone
+        # does not stop a playlist-only URL).
+        if job.get("playlist_items") is not None:
+            opts["noplaylist"] = False
+            if job["playlist_items"]:
+                opts["playlist_items"] = job["playlist_items"]
+        else:
+            opts["noplaylist"] = True
+            opts["playlist_items"] = "1"
         if fmt:
             opts["format"] = fmt
         if extra_headers:
@@ -386,12 +438,22 @@ class JobManager:
                     opts.update(cookie_opts)
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     info = ydl.extract_info(job["url"], download=True)
-                    info = ydl.sanitize_info(info)
-            req = (info.get("requested_downloads") or [{}])[0]
-            job["title"] = info.get("title")
-            job["filepath"] = req.get("filepath") or info.get("filepath")
-            if not job["filepath"]:
-                raise RuntimeError("download finished but no filepath reported")
+                    info = ydl.sanitize_info(info) or {}
+            if (info or {}).get("_type") == "playlist":
+                entries = [e for e in (info.get("entries") or []) if e]
+                job["title"] = info.get("title") or "playlist"
+                job["filepath"] = str(self.download_dir)
+                job["playlist_count"] = len(entries)
+            else:
+                req = (info.get("requested_downloads") or [{}])[0]
+                job["title"] = info.get("title")
+                job["filepath"] = req.get("filepath") or info.get("filepath")
+                if not job["filepath"] and opts.get("download_archive"):
+                    # a URL already in the archive is skipped by design
+                    job["note"] = "already in the archive — skipped"
+                    job["filepath"] = str(self.download_dir)
+                if not job["filepath"]:
+                    raise RuntimeError("download finished but no filepath reported")
             job["status"] = "completed"
             job["completed_at"] = datetime.now(timezone.utc).isoformat()
         except _Cancelled:

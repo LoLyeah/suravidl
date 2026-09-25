@@ -30,7 +30,13 @@ def test_index_has_new_controls(tmp_path):
                     "quitBtn", "minBtn", "settingsModal",
                     "setCookies", "setCookiesBrowser", "browseCookies",
                     "importCookies", "browserRow",
-                    "audioRow", "audioNativeBtn", "audioM4aBtn", "audioMp3Btn"):
+                    "audioRow", "audioNativeBtn", "audioM4aBtn", "audioMp3Btn",
+                    "playlistRow", "playlistItems", "playlistBtn",
+                    "settingsTabs", "spanel-general", "spanel-media",
+                    "spanel-network", "spanel-auth", "spanel-device",
+                    "setTemplate", "setEmbMeta", "setEmbThumb", "setSubMode",
+                    "setSubLangs", "setSubAuto", "setSbMode", "setSbCats",
+                    "setArchive", "setFragments", "setRateLimit", "setProxy"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

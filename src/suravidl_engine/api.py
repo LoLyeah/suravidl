@@ -24,6 +24,7 @@ class JobRequest(BaseModel):
     fmt: str | None = None
     headers: dict | None = None
     preset: str | None = None
+    playlist_items: str | None = None
 
 
 class ProbeRequest(BaseModel):
@@ -59,12 +60,21 @@ def create_app(download_dir, auth_token: str | None = None,
         settings_path = Path(db_path).parent / "settings.json"
     settings = Settings(path=settings_path, default_download_dir=download_dir,
                         default_max_concurrent=max_concurrent)
+    archive_path = (Path(db_path).parent / "archive.txt") if db_path else None
+
+    def _download_opts(dl_dir):
+        from .download_opts import build_download_opts
+
+        return build_download_opts(settings.get(), dl_dir,
+                                   archive_path=archive_path)
+
     manager = JobManager(
         download_dir=settings.get()["download_dir"],
         db_path=db_path,
         max_concurrent=settings.get()["max_concurrent"],
         auto_resume=settings.get()["auto_resume"],
         cookie_session=lambda: cookie_session(settings.get()),
+        download_opts=_download_opts,
     )
     acts = desktop_actions or {}
 
@@ -183,7 +193,8 @@ def create_app(download_dir, auth_token: str | None = None,
         try:
             return redact_job(mgr.create(body.url, fmt=body.fmt,
                                          extra_headers=body.headers,
-                                         preset=body.preset))
+                                         preset=body.preset,
+                                         playlist_items=body.playlist_items))
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 

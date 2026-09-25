@@ -153,8 +153,23 @@ repo has no pydantic-core.
       `ffmpeg-android.yml` and verified on-device by instrumentation tests.
       Desktop keeps using the system ffmpeg (errors say so and point at the
       "keep original" option when it is missing)
+- [x] M11b — tier-1 download options + a settings shell that can hold them:
+      **playlists** (probe detects them and lists entries; item ranges like
+      `1-10,15` or *all*; a playlist URL with no explicit range still yields
+      one file — mass downloads are always opt-in), **subtitles**
+      (sidecar `.vtt` or embedded, language list, auto-captions),
+      **metadata & thumbnail embedding** (real ffmpeg postprocessors, wired
+      exactly like the CLI does), **filename templates** (validated: no paths,
+      `%(ext)s` required), **network** (speed limit, parallel fragments,
+      http/socks proxy), **download archive** ("skip what I already have",
+      reported as such instead of silently re-fetching), and **SponsorBlock**
+      (mark as chapters or remove segments). The settings modal is now
+      sub-tabbed — General · Media · Network · Authentication · Device — so
+      options stop piling into one column; progress reports *video 3/10* while
+      a playlist runs.
 - [ ] M12+ — plan for the rest: full yt-dlp coverage (361 options, three
-      tiers), Keystore encryption, tabbed UI → `docs/PLAN-full-ytdlp.md`
+      tiers), raw yt-dlp arguments (default-off), Keystore encryption,
+      full four-tab UI → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 
