@@ -19,7 +19,7 @@ import java.net.URL
  */
 @RunWith(AndroidJUnit4::class)
 class AppStartupTest {
-    @Test
+    @Test(timeout = 300_000)
     fun appStartsEngineAndServesHealth() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val logs = File(ctx.getExternalFilesDir(null), "logs")

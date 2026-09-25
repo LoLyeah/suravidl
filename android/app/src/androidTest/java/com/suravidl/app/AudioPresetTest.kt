@@ -17,7 +17,7 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class AudioPresetTest {
 
-    @Test
+    @Test(timeout = 240_000)
     fun mp3PresetConvertsUsingBundledFfmpeg() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))

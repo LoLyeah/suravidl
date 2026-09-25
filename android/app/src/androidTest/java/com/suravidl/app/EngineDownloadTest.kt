@@ -13,7 +13,7 @@ import java.io.File
 /** The real engine, running on-device, downloading over HTTP. */
 @RunWith(AndroidJUnit4::class)
 class EngineDownloadTest {
-    @Test
+    @Test(timeout = 240_000)
     fun engineDownloadsOverHttp() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))

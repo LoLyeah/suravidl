@@ -5,9 +5,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** The bundled static ffmpeg must exist on-device and actually execute. */
 @RunWith(AndroidJUnit4::class)
@@ -15,22 +17,34 @@ class FfmpegBinaryTest {
 
     private val ctx = InstrumentationRegistry.getInstrumentation().targetContext
 
-    @Test
+    @Test(timeout = 60_000)
     fun bundledFfmpegRuns() {
         val f = SuravidlApp.ffmpegBinary(ctx)
         assertTrue("libffmpeg.so missing from nativeLibraryDir", f != null)
-        Os.chmod(f!!.absolutePath, 0b111101101)
+        if (!f!!.canExecute()) {
+            try {
+                Os.chmod(f.absolutePath, 0b111101101)
+            } catch (_: Throwable) {
+                // extraction normally sets 0755; EACCES here is not fatal
+            }
+        }
+        assertTrue("libffmpeg.so is not executable", f.canExecute())
 
         val proc = ProcessBuilder(f.absolutePath, "-version")
             .redirectErrorStream(true)
             .start()
+        val finished = proc.waitFor(30, TimeUnit.SECONDS)
+        if (!finished) {
+            proc.destroyForcibly()
+            fail("ffmpeg -version did not finish within 30s")
+        }
         val out = proc.inputStream.bufferedReader().readText()
-        val code = proc.waitFor()
-        assertEquals("ffmpeg -version exited $code; output:\n$out", 0, code)
+        assertEquals("ffmpeg -version exited ${proc.exitValue()}; output:\n$out",
+            0, proc.exitValue())
         assertTrue("not an ffmpeg build:\n$out", out.contains("ffmpeg version"))
     }
 
-    @Test
+    @Test(timeout = 30_000)
     fun engineEnvPointsAtBundledFfmpeg() {
         // exported by SuravidlApp.onCreate; the engine reads it for yt-dlp
         val path = System.getenv("SURAVIDL_FFMPEG")

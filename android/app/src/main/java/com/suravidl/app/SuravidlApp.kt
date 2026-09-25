@@ -85,9 +85,14 @@ class SuravidlApp : Application() {
             Log.w(TAG, "bundled ffmpeg missing from nativeLibraryDir")
             return
         }
-        try {
-            Os.chmod(f.absolutePath, 0b111101101) // rwxr-xr-x
-        } catch (_: Throwable) {
+        if (!f.canExecute()) {
+            try {
+                Os.chmod(f.absolutePath, 0b111101101) // rwxr-xr-x
+            } catch (e: Throwable) {
+                // the lib dir belongs to the platform: extraction already
+                // applies 0755, so an EACCES here is not fatal by itself
+                Log.w(TAG, "chmod on bundled ffmpeg failed: $e")
+            }
         }
         try {
             Os.setenv("SURAVIDL_FFMPEG", f.absolutePath, true)

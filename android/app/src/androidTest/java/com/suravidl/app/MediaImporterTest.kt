@@ -13,7 +13,7 @@ import java.io.File
 /** Completed downloads must be visible in the system gallery (MediaStore). */
 @RunWith(AndroidJUnit4::class)
 class MediaImporterTest {
-    @Test
+    @Test(timeout = 240_000)
     fun completedFileAppearsInMediaStore() {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val f = File(ctx.cacheDir, "tiny-m5-test.mp4")
