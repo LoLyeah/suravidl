@@ -11,3 +11,6 @@ downloads/
 
 # bundled at CI build time from the ffmpeg-bin release (see ffmpeg-android.yml)
 android/app/src/main/jniLibs/
+
+# test artifacts
+x_skip/
