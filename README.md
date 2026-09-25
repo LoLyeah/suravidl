@@ -104,7 +104,10 @@ the active-download count) and the activity is a WebView kiosk of the engine UI.
   a copy readable by any file manager sits at
   `Android/media/com.suravidl.app/logs/`.
 - 16 KB page-size devices (Android 15+) are supported: native libs are
-  aligned, and CI runs the suite on a 16 KB emulator.
+  aligned, and CI runs the suite on a 16 KB emulator. The UI needs a current
+  **Android System WebView** (Play Store updates it independently of the OS);
+  an older one gets a "update WebView" note instead of a blank page, since the
+  UI's JavaScript needs Chrome 80.
 - Build: `gradle -p android assembleDebug` (needs the Android SDK; CI does it).
   Emulator tests cover the on-device engine download, the full boot path, and
   the share target.

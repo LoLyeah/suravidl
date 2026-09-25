@@ -429,3 +429,27 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     container). `tests/test_features22.py` (36 tests, written RED first).
   - Next up: M21 — (open) subtitles language picker per site (half-shipped in
     v0.22.0 as probe chips + srt), scheduled downloads (cron-style watch list).
+  - **v0.22.1 — the UI/Android review** (fourth Antigravity pass, this time
+    scoped to the UI and the Android section plus the install floor): 12
+    findings, 11 confirmed and fixed, one applied as hardening (the
+    ACTION_SEND clipData claim is not reproducible — the platform migrates
+    EXTRA_STREAM — but stating the grant explicitly costs nothing).
+    Headlines: the confirmed-fatal unguarded `NotificationChannel` (Android
+    7.0/7.1, the declared floor, died before Python started); the
+    gallery-import retry loop (`existing` counts files, so on API<29 the
+    settle condition was unreachable — a 2-second re-check forever plus log
+    spam); and the one reproduction worth framing — the Android build's
+    starlette 0.27 ignores `Range`, so the in-app player could not seek on a
+    phone while the desktop venv (starlette 1.7) passed the test. Range now
+    lives in `api.py` (206/416/suffix/open-ended) with a test that fails if
+    the file is handed back to `FileResponse`. Also: pending-share survives
+    config changes, the inert "whole video" button, the duplicate Retry, the
+    stuck outage banner, bare-host batch links + a visible 20 cap, toasts
+    above the mobile tab bar, `readAll` reading both log dirs, aria-labels /
+    `role="dialog"` / 44px touch targets, and the same empty-pick-means-all
+    trap on the manual playlist path that v0.21.2 closed for the None button.
+    Floor: `minSdk 24` kept — it IS Chaquopy's floor — with the crash guarded,
+    a WebView-age check (Chrome 80) that explains itself instead of painting a
+    blank page, and README notes for what needs Android 10+ (gallery copy,
+    file-manager log). Verdict table:
+    `docs/audits/2026-09-26-antigravity-ui-android.md`.

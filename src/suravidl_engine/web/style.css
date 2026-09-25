@@ -667,3 +667,20 @@ html[data-host="android"] .modal-foot {
 #archiveList .mono { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 #archiveList.hidden { display: none; }
+
+/* -- UI review fixes ------------------------------------------------------ */
+
+@media (max-width: 899px) {
+  /* The tab bar is fixed to the bottom of the screen and #toasts sat 22px
+     from it — on top of the bar, so a tap aimed at a tab hit the toast
+     plate first. Sit above it, and use the width that is there. */
+  #toasts { left: 12px; right: 12px; bottom: 84px; align-items: stretch; }
+  .toast { max-width: none; }
+}
+
+@media (pointer: coarse) {
+  /* Thumbs, not cursors: the small ghost buttons measured ~28px tall, under
+     every touch-target guideline. Height only, so the look is unchanged. */
+  .btn, .ghost-sm { min-height: 44px; }
+  .pill { min-height: 30px; }
+}

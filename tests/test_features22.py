@@ -355,6 +355,75 @@ def test_a_finished_file_can_be_streamed_with_range_support(tmp_path, server):
         assert body.content[:8] == Path(done["filepath"]).read_bytes()[:8]
 
 
+def test_the_range_handler_is_ours_not_the_response_class(tmp_path, server):
+    """The Android build gets starlette 0.27 (via fastapi 0.99.1), whose
+    FileResponse ignores Range outright — verified in a scratch venv: the
+    whole body came back with 200 and no Content-Range, so the in-app player
+    could not seek on the phone while the desktop build was fine. Range must
+    therefore be implemented in `api.py`; this pins that it is.
+    """
+    import inspect
+
+    import suravidl_engine.api as api_mod
+    from suravidl_engine.api import create_app
+
+    app = create_app(tmp_path, auth_token="t")
+    route = next(r for r in app.routes
+                 if getattr(r, "path", "") == "/jobs/{job_id}/stream")
+    src = inspect.getsource(route.endpoint)
+    assert "_range_span" in src and "Accept-Ranges" in src, \
+        "the stream endpoint must answer Range itself"
+    assert not hasattr(api_mod, "FileResponse"), \
+        "api.py must not hand files to FileResponse: its Range support "\
+        "depends on the starlette version, and Android pins an old one"
+
+
+def test_range_parsing_edges(tmp_path):
+    from suravidl_engine.api import _range_span
+    size = 1000
+    assert _range_span(size, None) is None
+    assert _range_span(size, "") is None
+    assert _range_span(size, "bytes=abc") is None            # unknown: whole file
+    assert _range_span(size, "bytes=0-499") == (0, 499)
+    assert _range_span(size, "bytes=500-") == (500, 999)     # open-ended
+    assert _range_span(size, "bytes=-100") == (900, 999)     # suffix
+    assert _range_span(size, "bytes=-5000") == (0, 999)      # suffix past the start
+    assert _range_span(size, "bytes=900-99999") == (900, 999)  # clamped to EOF
+    for bad in ("bytes=1000-", "bytes=50-10", "bytes=-0"):
+        try:
+            _range_span(size, bad)
+        except ValueError:
+            pass
+        else:                                                # pragma: no cover
+            raise AssertionError(f"{bad} should be unsatisfiable")
+
+
+def test_unsatisfiable_ranges_get_416_and_whole_files_get_200(tmp_path, server):
+    with _client(tmp_path) as c:
+        job = c.post("/jobs", json={"url": f"{server}/tiny.mp4"},
+                     headers=AUTH).json()
+        done = _wait(c, job["id"])
+        size = Path(done["filepath"]).stat().st_size
+        whole = c.get(f"/jobs/{job['id']}/stream", headers=AUTH)
+        assert whole.status_code == 200 and len(whole.content) == size
+        assert whole.headers["accept-ranges"] == "bytes"
+        # exact bytes, not just the length: a seek that replays from byte 0
+        # looks fine by length only when the range happens to start there
+        want = Path(done["filepath"]).read_bytes()[200:400]
+        part = c.get(f"/jobs/{job['id']}/stream",
+                     headers={**AUTH, "Range": "bytes=200-399"})
+        assert part.status_code == 206 and part.content == want
+        assert part.headers["content-range"] == f"bytes 200-399/{size}"
+        assert part.headers["content-length"] == "200"
+        tail = c.get(f"/jobs/{job['id']}/stream",
+                     headers={**AUTH, "Range": "bytes=-50"})
+        assert tail.status_code == 206 and len(tail.content) == 50
+        over = c.get(f"/jobs/{job['id']}/stream",
+                     headers={**AUTH, "Range": f"bytes={size + 10}-"})
+        assert over.status_code == 416
+        assert over.headers["content-range"] == f"bytes */{size}"
+
+
 def test_stream_refuses_unfinished_and_outside_files(tmp_path, server):
     with _client(tmp_path) as c:
         r = c.post("/jobs", json={"url": "http://127.0.0.1:1/x.mp4"}, headers=AUTH)

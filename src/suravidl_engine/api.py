@@ -7,9 +7,9 @@ import secrets
 import sys
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -89,6 +89,40 @@ _MEDIA_TYPES = {
 
 def _media_type(path: Path) -> str:
     return _MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+
+
+def _range_span(size: int, header: str | None) -> tuple[int, int] | None:
+    """Parse a single `Range: bytes=…` header into an inclusive (start, end).
+
+    `None` means "serve the whole file". A syntactically valid but
+    unsatisfiable range raises ValueError so the caller can answer 416.
+
+    This exists because Starlette only learned to honour Range in its
+    `FileResponse` at 0.39 — and the Android build pins `fastapi==0.99.1`,
+    i.e. starlette 0.27, where a Range request quietly gets the WHOLE body
+    with 200 (verified against 0.27.0 in a scratch venv). On that stack the
+    in-app player could not seek at all: every scrub replayed from byte 0.
+    """
+    if not header:
+        return None
+    m = re.match(r"bytes=(\d*)-(\d*)\s*$", header.strip())
+    if not m or (m.group(1) == "" and m.group(2) == ""):
+        return None                      # unknown form: serve the whole file
+    first, last = m.group(1), m.group(2)
+    if first == "":                      # suffix range: the final N bytes
+        n = int(last)
+        if n <= 0 or size == 0:
+            raise ValueError("empty or unsatisfiable range")
+        return (max(0, size - n), size - 1)
+    start = int(first)
+    if start >= size:
+        raise ValueError("range starts past the end")
+    if last == "":
+        return (start, size - 1)
+    end = min(int(last), size - 1)
+    if end < start:
+        raise ValueError("inverted range")
+    return (start, end)
 
 
 def _looks_like_url(text: str) -> bool:
@@ -703,10 +737,13 @@ def create_app(download_dir, auth_token: str | None = None,
         return manager
 
     @app.get("/jobs/{job_id}/stream")
-    def stream_job(job_id: str, mgr: JobManager = Depends(require_auth_media)):
+    def stream_job(request: Request, job_id: str,
+                   mgr: JobManager = Depends(require_auth_media)):
         """Play a finished download in the page (the v0.22 review's #10).
 
-        Range requests are answered with 206 so the player can seek.
+        Range is implemented here rather than handed to `FileResponse`,
+        because the Android build's starlette (0.27, via fastapi 0.99.1)
+        ignores Range and would answer every seek with the whole file.
         """
         try:
             job = mgr.get(job_id)
@@ -728,8 +765,37 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(
                 status_code=403,
                 detail="that file is outside the download folder") from None
-        return FileResponse(path, media_type=_media_type(path),
-                            filename=path.name)
+        size = path.stat().st_size
+        try:
+            span = _range_span(size, request.headers.get("range"))
+        except ValueError:
+            return Response(status_code=416,
+                            headers={"Content-Range": f"bytes */{size}",
+                                     "Accept-Ranges": "bytes"})
+        if span is None:
+            start, end, status = 0, size - 1, 200
+            headers = {"Accept-Ranges": "bytes"}
+        else:
+            start, end = span
+            status = 206
+            headers = {"Accept-Ranges": "bytes",
+                       "Content-Range": f"bytes {start}-{end}/{size}"}
+        headers["Content-Length"] = str(max(0, end - start + 1))
+        headers["Content-Disposition"] = f'inline; filename="{path.name}"'
+
+        def body():
+            with path.open("rb") as fh:
+                fh.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = fh.read(min(64 * 1024, left))
+                    if not chunk:
+                        break
+                    left -= len(chunk)
+                    yield chunk
+
+        return StreamingResponse(body(), status_code=status, headers=headers,
+                                 media_type=_media_type(path))
 
     @app.post("/jobs/{job_id}/delete")
     def delete_job_endpoint(job_id: str, mgr: JobManager = Depends(require_auth)):

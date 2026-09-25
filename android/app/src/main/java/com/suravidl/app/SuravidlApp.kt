@@ -37,12 +37,20 @@ object LogStore {
 
     /** Most recent crash/engine logs, newest first, concatenated (bounded). */
     fun readAll(ctx: Context, limit: Int = 3): String {
-        val dir = mediaDir(ctx) ?: File(ctx.getExternalFilesDir(null), "logs")
-        val files = dir.listFiles()
-            ?.filter { it.name.startsWith("crash-") || it.name.startsWith("engine-error") }
-            ?.sortedByDescending { it.name }
-            ?.take(limit)
-            ?: return ""
+        // Read BOTH places a log can live: the user-readable Android/media dir
+        // (API 29+) and the app-private fallback that `write` uses when that
+        // dir is unavailable. Reading only the first one made a crash that was
+        // safely on disk look like "No log recorded" (UI/Android review).
+        val dirs = listOfNotNull(
+            mediaDir(ctx),
+            ctx.getExternalFilesDir(null)?.let { File(it, "logs") })
+        val files = dirs.flatMap { dir ->
+            (dir.listFiles() ?: emptyArray()).filter {
+                it.name.startsWith("crash-") || it.name.startsWith("engine-error")
+            }
+        }.distinctBy { it.name }
+            .sortedByDescending { it.name }
+            .take(limit)
         return files.joinToString("\n\n") { f ->
             "== ${f.name} ==\n" + f.readText().take(4000)
         }

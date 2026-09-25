@@ -2,6 +2,7 @@ package com.suravidl.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -12,6 +13,7 @@ import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -76,12 +78,34 @@ class MainActivity : AppCompatActivity() {
         webView.setBackgroundColor(BG_DARK)
         webView.addJavascriptInterface(HostBridge(), "AndroidHost")
         pendingSharedUrl = sharedUrlFrom(intent)
+            ?: savedInstanceState?.getString(STATE_SHARED_URL)
 
         val root = FrameLayout(this)
         root.setBackgroundColor(BG_DARK)
         root.addView(webView, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(root)
+
+        // The UI is modern JS (optional chaining, replaceChildren, …). Android
+        // 7.0 ships a 2016 WebView that cannot run it — and WebView updates
+        // come from the Play Store independently of the OS, so the honest
+        // thing is to look at the engine we actually got and say what to do
+        // instead of painting a blank page (UI/Android review).
+        val ua = try {
+            WebSettings.getDefaultUserAgent(this)
+        } catch (_: Throwable) {
+            ""
+        }
+        if (!webViewCanRunTheUi(ua)) {
+            webView.loadData(
+                "<div style='font-family:sans-serif;padding:18px;color:#ccc'>" +
+                "<h3>update Android System WebView</h3>" +
+                "<p>This phone's WebView is too old to run the suravidl UI. " +
+                "The engine underneath is fine — open Play Store → " +
+                "<b>Android System WebView</b> → Update, then reopen " +
+                "suravidl.</p></div>", "text/html", "utf-8")
+            return
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(
@@ -103,6 +127,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun engineOrigin(): String =
         "http://127.0.0.1:${EngineService.ENGINE_PORT}/"
+
+    /** Chrome 80 is where optional chaining and `replaceChildren` arrive —
+     *  below it the UI's own JS cannot even parse. A UA with no Chrome/
+     *  version (a WebView we do not recognise) is given the benefit of the
+     *  doubt: a wrong refusal would be worse than a UI that might work. */
+    private fun webViewCanRunTheUi(ua: String): Boolean {
+        val ver = Regex("Chrome/(\\d+)").find(ua)?.groupValues?.get(1)
+            ?: return true
+        return (ver.toIntOrNull() ?: return true) >= 80
+    }
 
     /** The engine page, with the shell's key: without it the engine answers 401
      *  (any app on the device can reach the loopback port, and that page
@@ -245,6 +279,14 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    }
+
+    /** A link shared while the engine is still starting lives only in a field,
+     *  so a rotation or a low-memory kill dropped it and the user's share went
+     *  nowhere. Found in the UI/Android review. */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingSharedUrl?.let { outState.putString(STATE_SHARED_URL, it) }
     }
 
     /**
@@ -400,6 +442,12 @@ class MainActivity : AppCompatActivity() {
                 Intent(Intent.ACTION_SEND).apply {
                     type = mime
                     putExtra(Intent.EXTRA_STREAM, uri)
+                    // The platform migrates EXTRA_STREAM into clipData on the
+                    // way out, so the read grant normally survives anyway —
+                    // this states it instead of trusting that, because a
+                    // chooser entry that loses the grant surfaces to the user
+                    // as "suravidl crashed" (UI/Android review).
+                    clipData = ClipData.newRawUri(null, uri)
                 }
             } else {
                 Intent(Intent.ACTION_VIEW).apply {
@@ -517,6 +565,9 @@ class MainActivity : AppCompatActivity() {
         const val BG_LIGHT = 0xFFEEF1F7.toInt()
         const val BG_AMOLED = 0xFF000000.toInt()
         private const val REQUEST_COOKIES = 4101
+
+        /** Where a not-yet-delivered shared link waits out a config change. */
+        private const val STATE_SHARED_URL = "pending_shared_url"
 
         /** "https://…" / "http://…", the leading scheme is optional. */
         private val URL_RE = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)

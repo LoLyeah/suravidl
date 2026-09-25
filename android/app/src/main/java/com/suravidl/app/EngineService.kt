@@ -178,6 +178,10 @@ class EngineService : Service() {
             .getStringSet("imported_ids", emptySet())!!.toMutableSet()
     }
 
+    /** Failed gallery-import attempts per job, so one bad file cannot cause a
+     *  full re-copy on every 2-second tick. Cleared when the job settles. */
+    private val importTries = HashMap<String, Int>()
+
     private fun rememberImported(id: String) {
         importedIds.add(id)
         getSharedPreferences("engine", MODE_PRIVATE).edit()
@@ -215,6 +219,7 @@ class EngineService : Service() {
             }
             var imported = false
             var existing = 0
+            var lastError: Throwable? = null
             for (p in paths) {
                 val f = File(p)
                 if (!f.isFile) continue
@@ -222,12 +227,33 @@ class EngineService : Service() {
                 try {
                     if (MediaImporter.importToGallery(this, f) != null) imported = true
                 } catch (t: Throwable) {
-                    writeLog("import-error", t)
+                    lastError = t
                 }
             }
-            // remember what worked — and a job with nothing left to import;
-            // a transient failure is retried on the next tick instead
-            if (imported || existing == 0) rememberImported(id)
+            // Below API 29 there is no scoped storage: the app's own folder is
+            // already reachable, MediaImporter returns null by design and no
+            // copy is ever made. `existing` counts FILES, not copies, so the
+            // old condition could never be met there — every finished job was
+            // re-checked every 2 seconds forever and wrote a log line each
+            // time (found in the UI/Android review).
+            val canCopy = Build.VERSION.SDK_INT >= 29
+            if (imported || existing == 0 || !canCopy) {
+                importTries.remove(id)
+                rememberImported(id)
+                continue
+            }
+            // A copy that keeps failing (full storage, revoked permission)
+            // gets a few tries and one log line — not a full re-copy on every
+            // tick with a fresh log entry beside it.
+            val tries = (importTries[id] ?: 0) + 1
+            importTries[id] = tries
+            if (tries == 1 && lastError != null) writeLog("import-error", lastError)
+            if (tries >= IMPORT_TRIES) {
+                writeLog("import-gave-up", IllegalStateException(
+                    "gallery import failed $tries times for $id: " +
+                        (lastError?.toString() ?: "no detail")))
+                rememberImported(id)
+            }
         }
     }
 
@@ -279,9 +305,15 @@ class EngineService : Service() {
 
     private fun startInForeground() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Downloads",
-                                NotificationManager.IMPORTANCE_LOW))
+        // NotificationChannel does not exist before API 26 and its class is
+        // resolved when this line runs: unguarded, an Android 7.0/7.1 phone —
+        // which the manifest says we support — died with NoClassDefFoundError
+        // before Python ever started. Found in the UI/Android review.
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL, "Downloads",
+                                    NotificationManager.IMPORTANCE_LOW))
+        }
         val n = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("suravidl")
@@ -322,6 +354,10 @@ class EngineService : Service() {
         const val ENGINE_PORT = 8787
         const val CHANNEL = "downloads"
         const val NOTIF_ID = 1
+
+        /** How many ticks a failing Gallery/Music copy gets before the app
+         *  stops trying (and says so once in the log). */
+        const val IMPORT_TRIES = 5
 
         /** The page key the shell generated (the service writes it before the
          *  engine starts, the activity reads it to load the UI with it). */

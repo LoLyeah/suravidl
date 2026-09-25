@@ -515,6 +515,11 @@ function syncPlaylistPicks() {
   if (representable) {
     const value = selectedPlaylistItems();
     if ($("playlistItems").value !== value) $("playlistItems").value = value;
+    // unchecking the last box has to mean NOTHING, never "all": an empty
+    // field is the engine's word for the whole playlist, so arm the same
+    // refusal the None button uses (UI review — this was the trap v0.21.2
+    // closed for None, still open on the manual path)
+    if (boxes.length > 0 && !boxes.some((b) => b.checked)) PLAYLIST_NONE = true;
   }
   renderPlaylistState();
 }
@@ -720,6 +725,13 @@ function renderOvPresets() {
 function initOverrides() {
   $("ovApply").onclick = applyOvPreset;
   $("ovClear").onclick = () => { clearOv(); toast("cleared — using your settings"); };
+  // the "whole video" button sat in the clip row since v0.22.0 with nothing
+  // attached to it (UI review): pressing it did nothing at all
+  $("ovClipClear").onclick = () => {
+    $("ovClipStart").value = "";
+    $("ovClipEnd").value = "";
+    renderOvCount();
+  };
   for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw",
                     "ovClipStart", "ovClipEnd", "ovContainer", "ovArchive"]) {
     $(id).addEventListener("input", renderOvCount);
@@ -909,20 +921,20 @@ function jobRow(j) {
     res.onclick = () => api(`/jobs/${j.id}/resume`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("resume failed: " + e.message, "bad"));
     actions.append(res);
-  } else if (j.status === "cancelled" || j.status === "error"
-             || j.status === "interrupted") {
+  } else if (j.status === "cancelled") {
+    // a cancelled job shows no error line of its own, so its retry lives here
     const r = el("button", "ghost-sm", "Retry");
     r.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     actions.append(r);
-    if (j.status !== "cancelled") {
-      // retrying the exact request that just failed is a loop; load its
-      // settings into the form so the next try can differ (review #11)
-      const edit = el("button", "ghost-sm", "Edit & retry");
-      edit.title = "load this job's URL and options into the Download tab";
-      edit.onclick = () => editAndRetry(j);
-      actions.append(edit);
-    }
+  } else if (j.status === "error" || j.status === "interrupted") {
+    // only "Edit & retry": the plain Retry already sits beside the error
+    // message above, and two buttons doing one thing made failed rows look
+    // broken (UI review)
+    const edit = el("button", "ghost-sm", "Edit & retry");
+    edit.title = "load this job's URL and options into the Download tab";
+    edit.onclick = () => editAndRetry(j);
+    actions.append(edit);
   }
   // every row can be deleted (a running one is stopped first, after a confirm)
   if (!trashHost) trashHost = actions;
@@ -975,6 +987,12 @@ async function refreshJobs() {
     JOBS_FAILS = 0;
     renderQueueBadge(jobs);
     const box = $("jobs");
+    // a banner raised by an outage has to die with the outage: it was only
+    // ever removed on the non-empty path, so it stayed on screen forever over
+    // an empty queue, claiming the engine was unreachable while everything
+    // worked (UI review)
+    const stale = box.querySelector(".trouble");
+    if (stale) stale.remove();
     const list = jobs.sort(
       (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     if (!list.length) {
@@ -1786,19 +1804,30 @@ function initPlayer() {
 
 /** Several links in the box at once: offer to queue them all (review #5).
  *  Pasting into a single-line input collapses the newlines to spaces, so a
- *  multi-line paste arrives as space-separated URLs — split on whitespace. */
+ *  multi-line paste arrives as space-separated URLs — split on whitespace.
+ *
+ *  A link counts with a scheme, or as the bare host shape the engine already
+ *  accepts ("youtu.be/x"): the UI used to demand a scheme, so pasting a bare
+ *  link produced no batch at all while the engine would have taken it (UI
+ *  review). */
+const BARE_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/\S*)?$/i;
+
 function pastedUrls() {
   const text = $("url").value.trim();
   if (!text) return [];
-  return text.split(/\s+/).filter((s) => /^(https?|ftp|magnet):/i.test(s));
+  return text.split(/\s+/).filter((s) =>
+    /^(https?|ftp|magnet):/i.test(s) || BARE_HOST.test(s));
 }
 
 function renderBatchRow() {
   const urls = pastedUrls();
   const many = urls.length > 1;
+  const over = urls.length > 20;          // the engine's own batch ceiling
   $("batchRow").classList.toggle("hidden", !many);
-  $("batchCount").textContent = many
-    ? `${urls.length} links pasted — queue them all?` : "";
+  $("batchCount").textContent = !many ? ""
+    : over ? `${urls.length} links pasted — only 20 fit in one batch`
+    : `${urls.length} links pasted — queue them all?`;
+  $("batchBtn").disabled = over;
 }
 
 function initBatch() {

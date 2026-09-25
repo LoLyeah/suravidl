@@ -372,6 +372,7 @@
             <option value="embed">Embed into the video</option>
           </select>
           <input id="setSubLangs" type="text" spellcheck="false"
+                 aria-label="subtitle languages, comma separated"
                  placeholder="languages, e.g. en, id" />
         </div>
         <div class="field">
@@ -393,6 +394,7 @@
           <div class="jrow">
             <button id="archiveShow" class="btn sm" type="button">show entries</button>
             <input id="archiveEntry" type="text" spellcheck="false"
+                   aria-label="download-archive entry to forget"
                    placeholder="paste an entry to forget it"/>
             <button id="archiveForget" class="btn sm" type="button">forget</button>
           </div>
@@ -410,6 +412,7 @@
             <option value="remove">Remove segments (re-encodes cuts)</option>
           </select>
           <input id="setSbCats" type="text" spellcheck="false"
+                 aria-label="SponsorBlock categories to remove"
                  placeholder="sponsor, selfpromo"/>
         </div>
 
@@ -580,6 +583,7 @@
             Bypass “not available in your country”
           </label>
           <input id="setGeoCountry" type="text" maxlength="2" spellcheck="false"
+                 aria-label="country code to check availability from"
                  placeholder="country code, e.g. ID (blank = auto)"/>
         </div>
 
@@ -612,6 +616,7 @@
     <section class="card">
       <h2>All yt-dlp options <span id="optionsCount" class="muted small"></span></h2>
       <input id="optionsSearch" type="text" spellcheck="false"
+             aria-label="search yt-dlp options"
              placeholder="search — e.g. proxy, subtitle, metadata, sleep"/>
       <div id="optionsList" class="optlist"></div>
       <span class="muted small">Read from the yt-dlp actually installed, so the list
@@ -634,7 +639,8 @@
 <div id="toasts" aria-live="polite"></div>
 
 <!-- confirm modal -->
-<div id="confirmModal" class="overlay hidden">
+<div id="confirmModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="confirmMsg">
   <div class="modal glass narrow">
     <div id="confirmMsg" class="confirm-msg"></div>
     <div class="modal-foot right">
@@ -645,7 +651,8 @@
 </div>
 
 <!-- play modal: a finished download plays right here (v0.22.0) -->
-<div id="playModal" class="overlay hidden">
+<div id="playModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="playTitle">
   <div class="modal glass">
     <div class="modal-head">
       <span id="playTitle" class="title"></span>
