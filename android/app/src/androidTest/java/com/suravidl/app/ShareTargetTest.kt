@@ -95,11 +95,11 @@ class ShareTargetTest {
         var full = ""
         val deadline = System.currentTimeMillis() + 240_000
         while (System.currentTimeMillis() < deadline) {
-            if (detail.exists()) {
-                full = detail.readText()
-                if (full.contains("tiny.mp4")) break
-            }
+            // both files are written before this line can be reached, but read
+            // both each pass so the loop's break cannot skip one of them
             if (log.exists()) seen = log.readText()
+            if (detail.exists()) full = detail.readText()
+            if (full.contains("tiny.mp4")) break
             Thread.sleep(1000)
         }
         assertTrue(
