@@ -25,6 +25,11 @@ class JobRequest(BaseModel):
     headers: dict | None = None
     preset: str | None = None
     playlist_items: str | None = None
+    raw_args: str | None = None
+
+
+class OpenUrlRequest(BaseModel):
+    url: str
 
 
 class ProbeRequest(BaseModel):
@@ -62,11 +67,12 @@ def create_app(download_dir, auth_token: str | None = None,
                         default_max_concurrent=max_concurrent)
     archive_path = (Path(db_path).parent / "archive.txt") if db_path else None
 
-    def _download_opts(dl_dir):
+    def _download_opts(dl_dir, raw_args=None):
         from .download_opts import build_download_opts
 
         return build_download_opts(settings.get(), dl_dir,
-                                   archive_path=archive_path)
+                                   archive_path=archive_path,
+                                   raw_args=raw_args)
 
     manager = JobManager(
         download_dir=settings.get()["download_dir"],
@@ -107,6 +113,14 @@ def create_app(download_dir, auth_token: str | None = None,
         return HTMLResponse(html.replace('"__CFG__"', cfg))
 
     app.mount("/static", StaticFiles(directory=str(_web_dir())), name="static")
+
+    @app.get("/options")
+    def list_options(_mgr: JobManager = Depends(require_auth)):
+        """The full yt-dlp option catalogue (generated, never hand-written)."""
+        from .options_catalogue import build_catalogue
+
+        catalogue = build_catalogue()
+        return {"count": len(catalogue), "options": catalogue}
 
     @app.get("/version")
     def version(_mgr: JobManager = Depends(require_auth)):
@@ -149,7 +163,8 @@ def create_app(download_dir, auth_token: str | None = None,
     def app_info(_mgr: JobManager = Depends(require_auth)):
         return {"desktop": bool(acts.get("quit") or acts.get("minimize")),
                 "can_minimize": bool(acts.get("minimize")),
-                "can_pick_file": bool(acts.get("pick_file"))}
+                "can_pick_file": bool(acts.get("pick_file")),
+                "can_open_url": bool(acts.get("open_url"))}
 
     def _window_action(name: str):
         fn = acts.get(name)
@@ -179,6 +194,33 @@ def create_app(download_dir, auth_token: str | None = None,
         except Exception:  # noqa: BLE001 - a cancelled/broken dialog is not an error
             return {"path": None}
 
+    @app.post("/app/open-url")
+    def app_open_url(body: OpenUrlRequest,
+                     _mgr: JobManager = Depends(require_auth)):
+        """Open an https link in the user's real browser (desktop only).
+
+        pywebview windows cannot honour target=_blank, and Android WebViews
+        have no tabs — this is the way out of the app shell for links like
+        release pages.
+        """
+        from urllib.parse import urlparse
+
+        url = str(body.url or "").strip()
+        if len(url) > 500 or urlparse(url).scheme != "https" \
+                or not urlparse(url).hostname:
+            raise HTTPException(status_code=400,
+                                detail="only https links can be opened")
+        fn = acts.get("open_url")
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="not running in the desktop app")
+        try:
+            fn(url)
+        except Exception as e:  # noqa: BLE001 - report, don't crash the app
+            raise HTTPException(status_code=502,
+                                detail=f"could not open the browser: {e}") from e
+        return {"opened": url}
+
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
         try:
@@ -190,11 +232,22 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.post("/jobs")
     def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
+        s = settings.get()
+        raw = body.raw_args
+        if raw is not None and not s["raw_args_enabled"]:
+            raise HTTPException(
+                status_code=400,
+                detail="raw yt-dlp arguments are disabled in Settings → Advanced")
+        if raw is None and s["raw_args_enabled"]:
+            # snapshot the global arguments onto the job so retry/resume
+            # re-run exactly what ran the first time
+            raw = s["raw_args"] or None
         try:
             return redact_job(mgr.create(body.url, fmt=body.fmt,
                                          extra_headers=body.headers,
                                          preset=body.preset,
-                                         playlist_items=body.playlist_items))
+                                         playlist_items=body.playlist_items,
+                                         raw_args=raw))
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 

@@ -6,7 +6,16 @@ const H = () => ({
 
 async function api(path, opts = {}) {
   const r = await fetch(path, { ...opts, headers: H() });
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  if (!r.ok) {
+    let msg = `${r.status}`;
+    try {
+      const body = await r.json();
+      msg = body.detail ? String(body.detail) : JSON.stringify(body);
+    } catch (_) {
+      msg += " " + (await r.text().catch(() => ""));
+    }
+    throw new Error(msg);
+  }
   return r.json();
 }
 
@@ -28,6 +37,7 @@ function humanBytes(n) {
 
 const ACTIVE = new Set(["queued", "downloading", "merging"]);
 let DESKTOP = false;
+let APP_INFO = null;   // /app/info payload (desktop capabilities)
 
 /* ---------- toasts ---------- */
 function toast(msg, kind = "ok") {
@@ -279,6 +289,10 @@ function jobRow(j) {
     if (j.note) row.append(el("div", "jobhint", j.note));
   }
 
+  if (j.raw_args) {
+    row.append(el("div", "jobhint", "yt-dlp args: " + j.raw_args));
+  }
+
   const actions = el("div", "jrow");
   if (ACTIVE.has(j.status)) {
     const c = el("button", "ghost-sm", "Cancel");
@@ -365,15 +379,27 @@ async function checkAppUpdate() {
   try {
     const u = await api("/update-check");
     if (u.update_available && u.url) {
-      const a = document.createElement("a");
-      a.href = u.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.className = "updateLink";
-      a.textContent = `⬆ suravidl ${u.latest} available`;
-      $("updateSlot").append(a);
+      // a button, not a link: embedded shells (pywebview, Android WebView)
+      // cannot open target=_blank themselves
+      const b = el("button", "updateLink", `⬆ suravidl ${u.latest} available`);
+      b.onclick = () => openExternal(u.url);
+      $("updateSlot").append(b);
     }
   } catch (_) { /* best-effort */ }
+}
+
+/** Open a link outside the app shell: host bridge -> desktop opener -> browser. */
+function openExternal(url) {
+  if (!url) return;
+  if (window.AndroidHost && window.AndroidHost.openUrl) {
+    try { window.AndroidHost.openUrl(url); return; } catch (_) { /* fall through */ }
+  }
+  if (APP_INFO && APP_INFO.can_open_url) {
+    api("/app/open-url", { method: "POST", body: JSON.stringify({ url }) })
+      .catch((e) => toast("could not open browser: " + e.message, "bad"));
+    return;
+  }
+  window.open(url, "_blank", "noopener");
 }
 
 $("updateBtn").onclick = async () => {
@@ -427,6 +453,7 @@ async function initAppControls() {
   }
   try {
     const info = await api("/app/info");
+    APP_INFO = info;
     if (!info.desktop) return;
     DESKTOP = true;
     if (info.can_minimize) {
@@ -487,6 +514,8 @@ async function loadSettings() {
     $("setFragments").value = s.fragments != null ? s.fragments : 1;
     $("setRateLimit").value = s.rate_limit || "";
     $("setProxy").value = s.proxy || "";
+    $("setRawEnabled").checked = !!s.raw_args_enabled;
+    $("setRawArgs").value = s.raw_args || "";
     $("dlDir").textContent = s.download_dir || "";
     markSwatches(CURRENT);
   } catch (e) {
@@ -505,6 +534,65 @@ document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
   b.onclick = () => showSettingsTab(b.dataset.stab);
 });
 
+/* ---------- yt-dlp option browser (Advanced) ---------- */
+let OPTIONS = null;
+
+async function openOptionsBrowser() {
+  openModal($("optionsModal"));
+  $("optionsSearch").value = "";
+  if (!OPTIONS) {
+    $("optionsList").textContent = "loading…";
+    try {
+      const r = await api("/options");
+      OPTIONS = r.options || [];
+      $("optionsCount").textContent = `${r.count} options`;
+    } catch (e) {
+      $("optionsList").textContent = "could not load options: " + e.message;
+      return;
+    }
+  }
+  renderOptions("");
+  $("optionsSearch").focus();
+}
+
+function renderOptions(query) {
+  const q = (query || "").trim().toLowerCase();
+  const list = (OPTIONS || []).filter((o) =>
+    !q || o.name.toLowerCase().includes(q) || o.group.toLowerCase().includes(q) ||
+    o.help.toLowerCase().includes(q));
+  const box = $("optionsList");
+  box.innerHTML = "";
+  for (const o of list.slice(0, 400)) {
+    const row = el("div", "optrow");
+    const left = el("div");
+    left.append(el("div", "flag", o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name));
+    left.append(el("div", "ogrp", o.group));
+    row.append(left, el("div", "ohelp", o.help || ""));
+    row.onclick = () => {
+      const ta = $("setRawArgs");
+      ta.value = (ta.value.trim() + " " +
+        (o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name)).trim();
+      $("setRawEnabled").checked = true;
+      toast(`added ${o.name}`);
+      closeOptionsBrowser();
+    };
+    box.append(row);
+  }
+  if (!list.length) box.append(el("div", "muted small", "nothing matches that search"));
+  $("optionsCount").textContent = q ? `${list.length} match` : `${(OPTIONS || []).length} options`;
+}
+
+function closeOptionsBrowser() {
+  closeModal($("optionsModal"));
+}
+
+$("optionsBtn").onclick = openOptionsBrowser;
+$("optionsClose").onclick = closeOptionsBrowser;
+$("optionsModal").onclick = (e) => {
+  if (e.target === $("optionsModal")) closeOptionsBrowser();
+};
+$("optionsSearch").oninput = (e) => renderOptions(e.target.value);
+
 function openSettings() {
   openModal($("settingsModal"));
   showSettingsTab("general");
@@ -520,6 +608,10 @@ $("settingsModal").onclick = (e) => {
   if (e.target === $("settingsModal")) closeSettings();
 };
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("optionsModal").classList.contains("hidden")) {
+    closeOptionsBrowser();
+    return;
+  }
   if (e.key === "Escape" && !$("settingsModal").classList.contains("hidden")) {
     closeSettings();
   }
@@ -556,6 +648,8 @@ function saveSettings() {
       fragments: Number($("setFragments").value),
       rate_limit: $("setRateLimit").value.trim(),
       proxy: $("setProxy").value.trim(),
+      raw_args_enabled: $("setRawEnabled").checked,
+      raw_args: $("setRawArgs").value.trim(),
     }),
   }).then((s) => {
     $("dlDir").textContent = s.download_dir;

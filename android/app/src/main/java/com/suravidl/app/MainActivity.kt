@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
-    /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile}. */
+    /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl}. */
     inner class HostBridge {
         @JavascriptInterface
         fun quit() {
@@ -143,6 +143,19 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun pickCookiesFile() {
             runOnUiThread { openCookiePicker() }
+        }
+
+        /** Open a link (e.g. a release page) in the real browser: the in-app
+         *  WebView has no tabs and target=_blank goes nowhere. */
+        @JavascriptInterface
+        fun openUrl(url: String) {
+            if (!url.startsWith("https://")) return
+            runOnUiThread {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: Throwable) {
+                }
+            }
         }
     }
 

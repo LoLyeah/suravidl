@@ -24,6 +24,57 @@ SPONSORBLOCK_CATEGORIES = (
 )
 PROXY_SCHEMES = ("http", "https", "socks4", "socks4a", "socks5", "socks5h")
 
+# Raw arguments (Advanced tier) may not touch flags the engine owns, nor
+# anything that runs programs or abandons the job model. Checked twice:
+# a pre-scan (some flags break the parse itself — --batch-file reads files,
+# --exec is translated into a postprocessor and never shows up as a key)
+# and a post-parse diff (indirect effects, e.g. --dump-json implies
+# simulate). Maps flag/key -> why it is refused.
+DENIED_RAW_FLAGS: dict[str, str] = {
+    "--exec": "runs programs",
+    "--exec-before-download": "runs programs",
+    "--external-downloader": "runs external programs",
+    "--downloader": "runs external programs",
+    "--ffmpeg-location": "the app manages ffmpeg",
+    "--batch-file": "the engine owns the job list",
+    "--config-locations": "config files are app-managed",
+    "--plugin-dirs": "plugins run code",
+    "--load-info-json": "the engine owns the job model",
+    "--simulate": "nothing would be downloaded",
+    "--skip-download": "nothing would be downloaded",
+    "--dump-json": "implies --simulate",
+    "--dump-single-json": "implies --simulate",
+    "--download-archive": "the archive is a settings feature",
+    "--cookies": "auth lives in Settings → Authentication",
+    "--cookies-from-browser": "auth lives in Settings → Authentication",
+    "--flat-playlist": "playlists are a first-class feature",
+    "--playlist-items": "playlists are a first-class feature",
+    "--no-playlist": "playlists are a first-class feature",
+    "--yes-playlist": "playlists are a first-class feature",
+}
+
+DENIED_RAW_KEYS: dict[str, str] = {
+    "exec_cmd": "--exec",
+    "exec_before_dl_cmd": "--exec-before-download",
+    "external_downloader": "--external-downloader",
+    "ffmpeg_location": "--ffmpeg-location",
+    "batchfile": "--batch-file",
+    "batchurls": "--batch-file",
+    "config_locations": "--config-locations",
+    "plugin_dirs": "--plugin-dirs",
+    "load_info_json": "--load-info-json",
+    "simulate": "--simulate",
+    "skip_download": "--skip-download",
+    "download_archive": "--download-archive",
+    "cookiefile": "--cookies",
+    "cookiesfrombrowser": "--cookies-from-browser",
+    "extract_flat": "--flat-playlist",
+    "playlist_items": "--playlist-items",
+    "noplaylist": "--no-playlist",
+    "progress_hooks": "internal hooks",
+    "postprocessor_hooks": "internal hooks",
+}
+
 DEFAULT_TEMPLATE = "%(title).100B.%(ext)s"
 
 _RATE_RE = re.compile(r"^\d+(?:\.\d+)?[kKmMgG]?$")
@@ -83,7 +134,81 @@ def validate_sponsorblock_categories(value: str) -> str:
     return ", ".join(cats)
 
 
-def build_download_opts(settings: dict, download_dir, archive_path=None) -> dict:
+_BASELINE_OPTS: dict | None = None
+
+
+def _same(a, b) -> bool:
+    """Structural equality; opaque objects (DateRange etc.) compare by str()."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return set(a) == set(b) and all(_same(a[k], b[k]) for k in a)
+    if isinstance(a, (list, tuple)):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+    if isinstance(a, (str, int, float, bool, type(None))):
+        return a == b
+    return str(a) == str(b)
+
+
+def _baseline_opts() -> dict:
+    """The full option dump yt-dlp produces for an EMPTY argument list."""
+    global _BASELINE_OPTS
+    if _BASELINE_OPTS is None:
+        import yt_dlp
+
+        _BASELINE_OPTS = yt_dlp.parse_options([]).ydl_opts
+    return _BASELINE_OPTS
+
+
+def parse_raw_args(raw: str | None) -> dict:
+    """Parse a raw yt-dlp argument string into YoutubeDL options.
+
+    Uses yt-dlp's own parser (shlex-split, never a shell). The parser returns
+    a FULL option dump with every default filled in; merging that wholesale
+    would silently clobber the engine's choices, so only options the
+    arguments actually changed (versus an empty argv) are kept. Flags the
+    engine owns are refused with ValueError naming them.
+    """
+    import shlex
+    from optparse import OptParseError
+
+    import yt_dlp
+
+    raw = (raw or "").strip()
+    if not raw:
+        return {}
+    try:
+        argv = shlex.split(raw)
+    except ValueError as e:
+        raise ValueError(f"could not parse raw arguments: {e}") from e
+
+    banned = sorted({f.split("=", 1)[0] for f in argv
+                     if f.split("=", 1)[0] in DENIED_RAW_FLAGS})
+    if banned:
+        reasons = "; ".join(f"{f} ({DENIED_RAW_FLAGS[f]})" for f in banned)
+        raise ValueError(f"these arguments are not allowed: {reasons}")
+
+    try:
+        parsed = yt_dlp.parse_options(argv).ydl_opts
+    except (OptParseError, SystemExit) as e:
+        text = str(e).strip()
+        msg = text.splitlines()[-1].strip() if text else "invalid arguments"
+        raise ValueError(f"yt-dlp rejected those arguments: {msg}") from e
+
+    baseline = _baseline_opts()
+    opts: dict = {}
+    for key, value in parsed.items():
+        if _same(value, baseline.get(key)):
+            continue  # untouched default
+        if key in DENIED_RAW_KEYS:
+            flag = DENIED_RAW_KEYS[key]
+            raise ValueError(f"these arguments are not allowed: {flag}")
+        opts[key] = value
+    return opts
+
+
+def build_download_opts(settings: dict, download_dir, archive_path=None,
+                        raw_args: str | None = None) -> dict:
     """yt-dlp options derived from user settings (no per-job overrides here)."""
     opts: dict = {}
     pps: list[dict] = []
@@ -144,4 +269,17 @@ def build_download_opts(settings: dict, download_dir, archive_path=None) -> dict
     opts["outtmpl"] = outtmpl
     if pps:
         opts["postprocessors"] = pps
+
+    # -- raw arguments (Advanced tier, default-OFF) ------------------------
+    # Applied last: a power user's explicit flags win over the settings they
+    # overlap with (job-level format/preset still override afterwards).
+    if raw_args is None and settings.get("raw_args_enabled"):
+        raw_args = settings.get("raw_args") or ""
+    if raw_args:
+        extra = parse_raw_args(raw_args)
+        extra_pps = extra.pop("postprocessors", None)
+        opts.update(extra)
+        if extra_pps:
+            opts["postprocessors"] = list(opts.get("postprocessors") or []) + \
+                list(extra_pps)
     return opts

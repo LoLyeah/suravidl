@@ -169,7 +169,22 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
   probe (5 formats), real MP4 download. 121 tests + smoke. YouTube itself now
   bot-walls this VPS IP, so YouTube checks run behind cookies (v0.10.0
   feature) — the fixture playlist E2E covers playlist logic offline.
-- Next up: M13 Advanced tab + raw yt-dlp arguments (decided: **default-off**,
-  opt-in in Settings), M10b Keystore encryption of imported cookies, and the
-  full four-tab shell (Download · Queue · Settings · yt-dlp) — the settings
-  sub-tabs shipped here are its first slice.
+- **v0.13.0 — M13 (Advanced tier) done + the update-link fix:**
+  `GET /options` generates the catalogue from yt-dlp's parser (322 options,
+  17 groups — complete by construction). Raw arguments: parsed with
+  yt-dlp's own parser via shlex, merged as a **minimal diff against an empty
+  argv** (merging the parser's full default dump would clobber engine
+  choices), with a deny list checked twice — a flag pre-scan (needed:
+  `--exec` becomes a postprocessor and never shows up as an option key,
+  `--batch-file` reads files at parse time) and a key check for indirect
+  effects (`--dump-json` implies `simulate`). Refusals name the flag and
+  why. Raw args are snapshotted per job, echoed in the job row, reused on
+  retry. UI: Settings → Advanced (switch + field + one-click insert from the
+  searchable option browser). Fixed: the update banner could not open a
+  browser from pywebview/Android (`target=_blank` is a no-op there) — it is
+  a button now that goes host-bridge → desktop `/app/open-url`
+  (`webbrowser.open`, `xdg-open`/`open` fallback) → `window.open`.
+- Next up: curated option groups (verbosity/workarounds/geo), M10b Keystore
+  encryption of imported cookies, and the full four-tab shell
+  (Download · Queue · Settings · yt-dlp) — the settings sub-tabs (now
+  including Advanced) are its first slices.

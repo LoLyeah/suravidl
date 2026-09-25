@@ -25,6 +25,9 @@ DEFAULTS = {
     "archive": False,            # skip URLs already in the download archive
     "sponsorblock_mode": "off",  # off | mark | remove
     "sponsorblock_categories": "sponsor, selfpromo",
+    # advanced tier (raw yt-dlp arguments; default-OFF by design)
+    "raw_args_enabled": False,
+    "raw_args": "",              # e.g. "--no-mtime --extractor-args ..."
 }
 
 THEMES = ("light", "dark", "amoled")
@@ -143,6 +146,16 @@ class Settings:
             from .download_opts import validate_sponsorblock_categories
 
             return validate_sponsorblock_categories(str(value or ""))
+        if key == "raw_args_enabled":
+            return bool(value)
+        if key == "raw_args":
+            from .download_opts import parse_raw_args
+
+            value = str(value or "").strip()
+            if len(value) > 1000:
+                raise ValueError("raw_args is too long (max 1000 characters)")
+            parse_raw_args(value)  # raises ValueError on flags yt-dlp rejects
+            return value
         raise ValueError(f"unknown setting: {key}")
 
     def _save(self) -> None:

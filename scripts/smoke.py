@@ -124,6 +124,41 @@ def main():
         assert (home / ".suravidl" / "archive.txt").exists(), \
             list((home / ".suravidl").iterdir())
 
+        # -- raw yt-dlp arguments + option catalogue (Advanced tier) ---------
+        s2 = req("POST", "http://127.0.0.1:8799/settings",
+                 {"raw_args_enabled": True, "raw_args": "--write-info-json"})
+        assert s2["raw_args_enabled"] is True, s2
+        rj = req("POST", "http://127.0.0.1:8799/jobs",
+                 {"url": f"{base}/tiny2.mp4"})
+        for _ in range(300):
+            rjp = req("GET", f"http://127.0.0.1:8799/jobs/{rj['id']}")
+            if rjp["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert rjp["status"] == "completed", rjp
+        assert rjp["raw_args"] == "--write-info-json", rjp
+        assert any(p.name.endswith(".info.json") for p in dl_dir.iterdir()), \
+            list(dl_dir.iterdir())
+
+        # a flag the engine owns is refused, with the reason
+        try:
+            req("POST", "http://127.0.0.1:8799/settings",
+                {"raw_args_enabled": True, "raw_args": "--exec echo boom"})
+            raise AssertionError("--exec should have been refused")
+        except urllib.error.HTTPError as e:
+            assert e.code == 400 and "--exec" in e.read().decode(), e.code
+
+        cat = req("GET", "http://127.0.0.1:8799/options")
+        assert cat["count"] > 300, cat["count"]
+
+        # no desktop shell here -> opening links is 501, never a crash
+        try:
+            req("POST", "http://127.0.0.1:8799/app/open-url",
+                {"url": "https://example.com"})
+            raise AssertionError("open-url should be 501 without a shell")
+        except urllib.error.HTTPError as e:
+            assert e.code == 501, e.code
+
         # M1 surface: version, error->retry flow, persistence
         ver = req("GET", "http://127.0.0.1:8799/version")
         assert ver["engine"] and ver["yt_dlp"], ver

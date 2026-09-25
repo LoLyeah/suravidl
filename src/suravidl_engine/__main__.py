@@ -211,8 +211,20 @@ def main() -> None:
                 return None
             return picked[0] if picked else None
 
+        def _open_url(url):
+            """Open a link in the user's REAL browser: the embedded window
+            cannot honour target=_blank, so release pages must go outside."""
+            if webbrowser.open(url):
+                return
+            import subprocess
+
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            with open(os.devnull, "wb") as sink:
+                subprocess.Popen([opener, url], stdout=sink, stderr=sink)
+
         actions = {"minimize": window.minimize, "quit": window.destroy,
-                   "reveal": _open_folder, "pick_file": _pick_file}
+                   "reveal": _open_folder, "pick_file": _pick_file,
+                   "open_url": _open_url}
 
     server = start_server(download_dir=args.download_dir, token=token, port=port,
                           db_path=args.db, desktop_actions=actions or None)

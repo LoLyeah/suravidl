@@ -164,12 +164,27 @@ repo has no pydantic-core.
       http/socks proxy), **download archive** ("skip what I already have",
       reported as such instead of silently re-fetching), and **SponsorBlock**
       (mark as chapters or remove segments). The settings modal is now
-      sub-tabbed — General · Media · Network · Authentication · Device — so
-      options stop piling into one column; progress reports *video 3/10* while
-      a playlist runs.
-- [ ] M12+ — plan for the rest: full yt-dlp coverage (361 options, three
-      tiers), raw yt-dlp arguments (default-off), Keystore encryption,
-      full four-tab UI → `docs/PLAN-full-ytdlp.md`
+      sub-tabbed — General · Media · Network · Authentication · Advanced ·
+      Device — so options stop piling into one column; progress reports
+      *video 3/10* while a playlist runs.
+- [x] M12 — the Advanced tier, without cluttering anything: **raw yt-dlp
+      arguments** (default-OFF; a switch plus a field in Settings →
+      Advanced) parsed with yt-dlp's own parser — never a shell — where the
+      engine refuses the flags it owns (`--exec`/`--batch-file`/`--cookies`/
+      playlists/archive/…) with the reason spelled out, and only options the
+      arguments actually changed are merged (so a raw string can never
+      silently clobber the app's own choices). The chosen arguments are
+      snapshotted onto each job, echoed in the job row, and reused by retry.
+      Plus **an option browser**: `GET /options` generates the full
+      catalogue (322 options, 17 groups) from the installed parser — so it
+      is complete by construction — searchable in the UI, one click inserts
+      a flag into the raw-args field. Also here: the update banner is now a
+      real button, because `target="_blank"` still cannot open a window from
+      inside a pywebview or Android shell — it now asks the desktop shell
+      (or the Android bridge) to open your actual browser.
+- [ ] M13+ — what is left: curated option groups (verbosity/workarounds/geo),
+      Keystore encryption of imported cookies, the full four-tab shell
+      (Download · Queue · Settings · yt-dlp) → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 

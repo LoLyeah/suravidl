@@ -34,9 +34,13 @@ def test_index_has_new_controls(tmp_path):
                     "playlistRow", "playlistItems", "playlistBtn",
                     "settingsTabs", "spanel-general", "spanel-media",
                     "spanel-network", "spanel-auth", "spanel-device",
+                    "spanel-advanced",
                     "setTemplate", "setEmbMeta", "setEmbThumb", "setSubMode",
                     "setSubLangs", "setSubAuto", "setSbMode", "setSbCats",
-                    "setArchive", "setFragments", "setRateLimit", "setProxy"):
+                    "setArchive", "setFragments", "setRateLimit", "setProxy",
+                    "setRawEnabled", "setRawArgs", "optionsBtn",
+                    "optionsModal", "optionsSearch", "optionsList",
+                    "optionsCount", "optionsClose"):
         assert f'id="{elem_id}"' in html, elem_id
 
 
