@@ -29,8 +29,6 @@
   <h1>suravidl</h1>
   <span id="versions" class="meta"></span>
   <span class="spacer"></span>
-  <button id="settingsBtn" class="btn sm" title="Settings">⚙ Settings</button>
-  <button id="updateBtn" class="btn sm" title="Update yt-dlp">Update yt-dlp</button>
   <button id="minBtn" class="btn sm hidden" title="Minimize window">—</button>
   <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl">✕ Quit</button>
 </header>
@@ -222,10 +220,8 @@
   <!-- ============================ Settings =========================== -->
   <section class="panel hidden" id="panel-settings">
     <section class="card">
-      <div class="modal-head">
+      <div class="page-head">
         <h2>Settings</h2>
-        <button id="setClose" class="btn sm ghost-sm" title="Back to downloads"
-                aria-label="Back to downloads">✕</button>
       </div>
 
       <div class="subtabs" id="settingsTabs">
@@ -549,6 +545,18 @@
 
   <!-- ============================= yt-dlp ============================ -->
   <section class="panel hidden" id="panel-ytdlp">
+    <section class="card">
+      <h2>yt-dlp itself</h2>
+      <div class="field row">
+        <span class="small muted">Installed: <b id="ytdlpVer">…</b></span>
+        <span class="spacer"></span>
+        <button id="updateBtn" class="btn sm" title="Update yt-dlp">Update yt-dlp</button>
+      </div>
+      <p class="muted small">Updates the downloader in place. It is what knows the
+        sites — the engine around it rarely changes. New jobs may wait a moment
+        while it runs.</p>
+    </section>
+
     <section class="card">
       <h2>Curated options</h2>
       <p class="muted small">Named switches for the options that come up most —

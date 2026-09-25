@@ -557,3 +557,18 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     4.2s timeout, Skip silences it across reloads, Check now brings it back,
     Get reaches the exact release URL, Later stores ~24h and stays quiet.
     Suite: **362 passed**.
+
+- **v0.23.4 — Settings is a page, and the header stops repeating the tabs.**
+    Reported with phone screenshots, four things at once. The settings card was
+    already `border-radius: 20px` and glass, but two opaque plates sat on it: a
+    sticky `modal-head` carrying a ✕ and the sticky Save bar, both
+    `--panel-solid` (97% opaque) and both spanning the card's full width — which
+    squared off its top and bottom corners and read as "a popup that isn't a
+    popup". The ✕ and the dialog header are gone (the tab bar is the way out;
+    Escape still closes), the title scrolls with the content like every other
+    card's, and the Save bar keeps the card's glass (`--glass-bg-strong`) with a
+    matching bottom radius and no backdrop-filter (a sticky blur smears its
+    backdrop in Android's WebView). The header had a "⚙ Settings" button
+    directly above a Settings tab — one entry point now — and "Update yt-dlp"
+    moved into the yt-dlp tab, which shows the installed version beside it and
+    refreshes the label after an update. Suite: **366 passed**.

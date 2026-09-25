@@ -36,7 +36,7 @@ def test_index_has_new_controls(tmp_path):
     with TestClient(app) as c:
         html = c.get("/").text
     for elem_id in ("setResume", "androidSection", "batteryBtn", "quitAppBtn",
-                    "quitBtn", "minBtn", "settingsBtn", "setClose",
+                    "quitBtn", "minBtn", "ytdlpVer",
                     "setCookies", "setCookiesBrowser", "browseCookies",
                     "importCookies", "browserRow",
                     "audioRow", "audioNativeBtn", "audioM4aBtn", "audioMp3Btn",

@@ -531,6 +531,12 @@ html[data-theme="light"] .overlay { background: rgba(30,41,59,.25); }
 @keyframes pop { from { transform: scale(.97) translateY(6px); opacity: 0; } }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .modal-head h2 { margin: 0; }
+/* a page's title, not a dialog's: same layout, no ✕ and nothing sticky — the
+   Settings tab is a page of the app, and the tab bar (or the tab rail on a
+   desktop) is the way out (a ✕ up there read as "this is a modal" and, worse,
+   its opaque plate covered the card's rounded corners) */
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.page-head h2 { margin: 0; }
 .modal-foot { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
 .modal-foot.right { justify-content: flex-end; }
 .confirm-msg { font-size: 14px; line-height: 1.5; }
@@ -692,22 +698,21 @@ select:focus-visible { outline: 0; border-color: var(--accent-line); }
     backdrop-filter: none; -webkit-backdrop-filter: none; }
   .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
 
-  /* settings is a page panel now — keep its head and Save in reach.
-     Both are sticky, and a sticky element with backdrop-filter makes Android's
-     WebView smear its backdrop over the content beside it (a text-free
-     blurred blob). Sticky bars get a solid plate instead. */
+  /* Settings is a page, so it reads like one: the title scrolls with the
+     content instead of sitting on an opaque plate, and the only sticky thing
+     is Save. That plate — and the ✕ beside it — were what made the tab look
+     like a popup, and they were also what squared off the card's top and
+     bottom corners. The bar keeps the card's glass and its bottom radius, and
+     drops backdrop-filter: a sticky element that blurs smears its backdrop
+     over the content beside it in Android's WebView (a text-free blob). */
   #panel-settings .card { padding: 14px; }
-  #panel-settings .modal-head {
-    position: sticky; top: 52px; z-index: 3;
-    margin: -14px -14px 10px; padding: 12px 14px 10px;
-    background: var(--panel-solid); border-bottom: 1px solid var(--line);
-  }
   #panel-settings .subwrap { margin: 0; padding: 0; overflow: visible; }
   #panel-settings .modal-foot {
     position: sticky; z-index: 3; bottom: calc(66px + env(safe-area-inset-bottom));
     margin: 14px -14px -14px; padding: 12px 14px;
-    border-top: 1px solid var(--line); background: var(--panel-solid);
-    backdrop-filter: none; -webkit-backdrop-filter: none;
+    border-top: 1px solid var(--line);
+    background: var(--glass-bg-strong);
+    border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
   }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
 }
@@ -745,10 +750,6 @@ html[data-host="android"] .modal-foot {
   background: var(--panel-solid);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-/* Settings is a tab, not a dialog: on a desktop the tab rail is already the
-   way out, and a ✕ in the header reads as "this is a modal" (motion review).
-   On a phone it is the one-handed way back, so it stays there. */
-@media (min-width: 900px) { #setClose { display: none; } }
 
 /* The aurora is the most expensive thing in this stylesheet: three radial
    gradients under a 70px blur, and an animated transform on top forces the

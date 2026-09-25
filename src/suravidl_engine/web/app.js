@@ -1205,6 +1205,9 @@ async function loadVersions() {
   try {
     const v = await api("/version");
     $("versions").textContent = `engine ${v.engine} · yt-dlp ${v.yt_dlp}`;
+    // the yt-dlp tab shows it beside its own update button
+    const yv = $("ytdlpVer");
+    if (yv) yv.textContent = v.yt_dlp;
   } catch (_) { $("versions").textContent = ""; }
 }
 
@@ -1372,6 +1375,7 @@ $("updateBtn").onclick = async () => {
   try {
     const r = await api("/update", { method: "POST" });
     toast(r.updated ? `yt-dlp updated → ${r.after}` : "yt-dlp already latest");
+    loadVersions();          // the tab shows the version next to this button
   } catch (e) {
     toast("update failed: " + e.message, "bad");
   }
@@ -1865,16 +1869,11 @@ async function saveCurrentAsPreset() {
 $("optionsBtn").onclick = openOptionsBrowser;
 $("optionsSearch").oninput = (e) => renderOptions(e.target.value);
 
-function openSettings() {
-  showTab("settings");
-  showSettingsTab("general");
-}
+/** Escape is the keyboard way out of Settings (the tab bar is the visible one). */
 function closeSettings() {
   showTab("download");
 }
 
-$("settingsBtn").onclick = openSettings;
-$("setClose").onclick = closeSettings;
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("confirmModal").classList.contains("hidden")) {
