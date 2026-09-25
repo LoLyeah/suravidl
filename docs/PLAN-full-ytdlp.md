@@ -138,3 +138,20 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
 2. **Raw yt-dlp arguments field** — enable it (default off, Advanced tab)?
 3. **Android ffmpeg** — bundle it (+~20–25 MB) or keep "merging is desktop-only"
    as a documented gap?
+
+## 7. Status log
+
+- **v0.10.1 — M10a done:** cookie safety hardening shipped (redaction at rest
+  + API, private modes, startup scrub, per-run 0600 copies).
+- **v0.11.0 — M11 done:** audio-only presets (keep original / M4A / MP3 192k)
+  on the probe card, engine `preset` API, and the Android ffmpeg decision
+  (M14) resolved the hard way: a static **ffmpeg 8.1.3** CLI is built from
+  unmodified sources by `ffmpeg-android.yml` (arm64-v8a + x86_64, 16 KB
+  aligned, LGPL), published on the `ffmpeg-bin` release, bundled into the APK
+  as `libffmpeg.so`, exported to the engine via `SURAVIDL_FFMPEG`, and proven
+  on-device by instrumentation tests (`FfmpegBinaryTest`, `AudioPresetTest`).
+- Decisions applied (user): tier-1 order starts with **audio-only** ✓; the
+  raw yt-dlp arguments field will be **default-off in Settings**; Android
+  ffmpeg is **bundled** ✓ (latest upstream, 8.1.3).
+- Next up: M12 rest of tier-1 (playlists, subtitles, SponsorBlock, proxy…),
+  M10b Keystore encryption, M11b tabbed shell, M13 Advanced tab + raw args.

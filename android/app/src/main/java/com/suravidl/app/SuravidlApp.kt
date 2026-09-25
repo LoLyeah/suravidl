@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.os.Environment
+import android.system.Os
 import android.util.Log
 import java.io.File
 
@@ -54,6 +55,7 @@ object LogStore {
 class SuravidlApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        setupFfmpeg()
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             Log.e(TAG, "uncaught exception on thread ${t.name}", e)
@@ -72,7 +74,36 @@ class SuravidlApp : Application() {
         }
     }
 
+    /**
+     * The APK bundles a static ffmpeg as a jniLib (libffmpeg.so). Files
+     * extracted into nativeLibraryDir are the one place Android allows us to
+     * exec from, so export its path for the engine (yt-dlp's ffmpeg_location).
+     */
+    private fun setupFfmpeg() {
+        val f = ffmpegBinary(this)
+        if (f == null) {
+            Log.w(TAG, "bundled ffmpeg missing from nativeLibraryDir")
+            return
+        }
+        try {
+            Os.chmod(f.absolutePath, 0b111101101) // rwxr-xr-x
+        } catch (_: Throwable) {
+        }
+        try {
+            Os.setenv("SURAVIDL_FFMPEG", f.absolutePath, true)
+            Log.i(TAG, "bundled ffmpeg: ${f.absolutePath}")
+        } catch (e: Throwable) {
+            Log.e(TAG, "could not export SURAVIDL_FFMPEG", e)
+        }
+    }
+
     companion object {
         const val TAG = "suravidl"
+
+        /** The bundled ffmpeg executable, or null when the APK lacks one. */
+        fun ffmpegBinary(ctx: Context): File? {
+            val f = File(ctx.applicationInfo.nativeLibraryDir, "libffmpeg.so")
+            return if (f.exists()) f else null
+        }
     }
 }

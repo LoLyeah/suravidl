@@ -146,7 +146,14 @@ repo has no pydantic-core.
       rest and in API payloads; live value is memory-only), private file modes
       (jobs.db / settings / token 0600, dirs 0700, per-run copies 0600 and
       deleted), rows from older versions scrubbed on start
-- [ ] M10b+ — plan for the rest: full yt-dlp coverage (361 options, three
+- [x] M11 — audio-only downloads (first tier-1 feature): "keep original"
+      (no conversion, no ffmpeg anywhere), M4A and MP3 (192 kbps) presets on
+      the probe card; the Android APK now bundles a static ffmpeg 8.1.3 CLI
+      (arm64-v8a + x86_64, 16 KB-page aligned, LGPL) built by
+      `ffmpeg-android.yml` and verified on-device by instrumentation tests.
+      Desktop keeps using the system ffmpeg (errors say so and point at the
+      "keep original" option when it is missing)
+- [ ] M12+ — plan for the rest: full yt-dlp coverage (361 options, three
       tiers), Keystore encryption, tabbed UI → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)

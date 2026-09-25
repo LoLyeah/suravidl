@@ -1,0 +1,26 @@
+name: fetch-ffmpeg
+description: >
+  Download the bundled static ffmpeg binaries (built by ffmpeg-android.yml,
+  published on the `ffmpeg-bin` release) into the Android jniLibs so the APK
+  ships a working ffmpeg for audio extraction and merging.
+
+runs:
+  using: composite
+  steps:
+    - name: Download + verify ffmpeg
+      shell: bash
+      run: |
+        set -euo pipefail
+        BASE="https://github.com/LoLyeah/suravidl/releases/download/ffmpeg-bin"
+        cd "$RUNNER_TEMP"
+        curl -fsSL -o libffmpeg-arm64-v8a.so "$BASE/libffmpeg-arm64-v8a.so"
+        curl -fsSL -o libffmpeg-x86_64.so    "$BASE/libffmpeg-x86_64.so"
+        curl -fsSL -o SHA256SUMS.txt         "$BASE/SHA256SUMS.txt"
+        sha256sum -c SHA256SUMS.txt
+        DEST="$GITHUB_WORKSPACE/android/app/src/main/jniLibs"
+        mkdir -p "$DEST/arm64-v8a" "$DEST/x86_64"
+        cp libffmpeg-arm64-v8a.so "$DEST/arm64-v8a/libffmpeg.so"
+        cp libffmpeg-x86_64.so    "$DEST/x86_64/libffmpeg.so"
+        echo "--- bundled ffmpeg:"
+        ls -l "$DEST/arm64-v8a/libffmpeg.so" "$DEST/x86_64/libffmpeg.so"
+        file "$DEST/arm64-v8a/libffmpeg.so" "$DEST/x86_64/libffmpeg.so"
