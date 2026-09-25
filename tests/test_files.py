@@ -1,5 +1,7 @@
 """Clearing downloads: on Android the folder is app-private, so the app has
 to offer the cleanup itself (Settings → Device → Delete downloaded files)."""
+import time
+
 from fastapi.testclient import TestClient
 
 AUTH = {"Authorization": "Bearer testtoken"}
@@ -48,12 +50,26 @@ def test_clear_prunes_completed_jobs_only(tmp_path):
                       headers=AUTH).json()
         bad = c.post("/jobs", json={"url": "http://example.invalid/bad.mp4"},
                      headers=AUTH).json()
-        c.post(f"/jobs/{bad['id']}/cancel", headers=AUTH)   # a retryable row
+        # stop the workers first: their rows' fate must be the test's to decide,
+        # not the network's (a racing error write used to flip these statuses)
+        for j in (done, bad):
+            c.post(f"/jobs/{j['id']}/cancel", headers=AUTH)
+        for _ in range(200):
+            states = {j["id"]: j["status"]
+                      for j in c.get("/jobs", headers=AUTH).json()["jobs"]}
+            if all(states.get(j["id"]) in ("cancelled", "error")
+                   for j in (done, bad)):
+                break
+            time.sleep(0.05)
 
         mgr = c.app.state.manager
         with mgr._lock:                                     # noqa: SLF001
-            mgr._jobs[done["id"]]["status"] = "completed"
-            mgr._jobs[bad["id"]]["status"] = "error"
+            with mgr._con:                                  # noqa: SLF001
+                for jid, status in ((done["id"], "completed"),
+                                    (bad["id"], "error")):
+                    mgr._jobs[jid]["status"] = status       # noqa: SLF001
+                    mgr._con.execute(                       # noqa: SLF001
+                        "UPDATE jobs SET status=? WHERE id=?", (status, jid))
 
         r = c.post("/files/clear", headers=AUTH).json()
         assert r["cleared_jobs"] == 1
