@@ -40,12 +40,34 @@ let DESKTOP = false;
 let APP_INFO = null;   // /app/info payload (desktop capabilities)
 
 /* ---------- toasts ---------- */
-function toast(msg, kind = "ok") {
+/** msg, kind ("ok" | "bad" | "info"), and optionally:
+ *  - sticky:  do not time out; it stays until dismissed (an update notice)
+ *  - actions: [{label, prime, onClick}] — real choices on the toast itself.
+ *  The buttons stop the click from bubbling, so tapping one runs it and
+ *  dismisses the toast, while a plain toast still dismisses on any tap. */
+function toast(msg, kind = "ok", opts) {
   const t = el("div", "toast " + kind);
-  t.append(el("span", "dot"), el("span", "", msg));
-  t.onclick = () => dismiss(t);
+  t.append(el("span", "dot"));
+  t.append(el("span", "tmsg", msg));
+  const actions = opts && opts.actions;
+  if (actions && actions.length) {
+    const row = el("div", "toactions");
+    for (const a of actions) {
+      const b = el("button", "ghost-sm" + (a.prime ? " prime" : ""), a.label);
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        dismiss(t);
+        try { if (a.onClick) a.onClick(); } catch (_) { /* a choice must not throw */ }
+      };
+      row.append(b);
+    }
+    t.append(row);
+  } else {
+    t.onclick = () => dismiss(t);
+  }
   $("toasts").append(t);
-  setTimeout(() => dismiss(t), 4200);
+  if (!(opts && opts.sticky)) setTimeout(() => dismiss(t), 4200);
+  return t;
 }
 function dismiss(t) {
   if (!t.parentNode) return;
@@ -1186,17 +1208,143 @@ async function loadVersions() {
   } catch (_) { $("versions").textContent = ""; }
 }
 
-async function checkAppUpdate() {
+/* ---------- app updates --------------------------------------------------- *
+ * One check feeds two places: the Settings → General row (always visible, with
+ * a way to ask again) and one persistent toast that carries the actual
+ * choices. Skip and snooze are per-device, so they live in localStorage —
+ * Android loads this UI from a fixed origin (127.0.0.1:8787), so they survive
+ * a restart; on desktop the engine port can vary, in which case the notice may
+ * ask once more. Nothing here installs anything: "Get it" only opens the
+ * release page, because no build of this app can replace itself in place. */
+const UPD = {
+  skipped: "suravidl.upd.skipped",   // the version the user said no to
+  snooze: "suravidl.upd.snooze",     // epoch ms until which to stay quiet
+  last: "suravidl.upd.last",         // {at, latest, available, error}
+  SNOOZE_MS: 24 * 60 * 60 * 1000,
+};
+const updStore = {
+  get(k, dflt = "") {
+    try { const v = localStorage.getItem(k); return v === null ? dflt : v; }
+    catch (_) { return dflt; }
+  },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* private mode */ } },
+};
+let UPD_STATE = null;   // the last /update-check answer
+
+function humanSince(ts) {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 90) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 90) return `${m} minute${m === 1 ? "" : "s"} ago`;
+  const h = Math.round(m / 60);
+  if (h < 36) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+/** Settings → General → Updates: state, the versions, and what to do. */
+function renderUpdateRow() {
+  const state = $("updState"), meta = $("updMeta");
+  if (!state) return;
+  const get = $("updGet"), skip = $("updSkip");
+  const u = UPD_STATE;
+  let last = null;
+  try { last = JSON.parse(updStore.get(UPD.last, "") || "null"); } catch (_) { last = null; }
+  const when = last && last.at ? `checked ${humanSince(last.at)}` : "not checked yet";
+  const err = (u && u.error) || (last && last.error) || null;
+  if (err) {
+    state.textContent = "could not check for updates";
+    meta.textContent = `${err} · ${when}`;
+    get.classList.add("hidden");
+    skip.classList.add("hidden");
+    return;
+  }
+  if (!u) {                       // no answer yet: say so, offer the button
+    state.textContent = "not checked yet";
+    meta.textContent = when;
+    get.classList.add("hidden");
+    skip.classList.add("hidden");
+    return;
+  }
+  const skipped = !!u.latest && updStore.get(UPD.skipped, "") === u.latest;
+  if (u.update_available && u.url) {
+    state.textContent = `suravidl ${u.latest} is available`;
+    meta.textContent = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
+    get.textContent = `Get ${u.latest}`;
+    get.classList.remove("hidden");
+    get.onclick = () => openExternal(u.url);
+    skip.textContent = skipped ? "Stop skipping" : "Skip this version";
+    skip.classList.remove("hidden");
+    skip.onclick = () => {
+      updStore.set(UPD.skipped, skipped ? "" : u.latest);
+      renderUpdateRow();
+    };
+  } else {
+    state.textContent = "up to date ✓";
+    meta.textContent = `you have ${u.current} · ${when}`;
+    get.classList.add("hidden");
+    skip.classList.add("hidden");
+  }
+}
+
+/** The one persistent notice: a toast that waits, with the three answers. */
+function showUpdateBanner(u) {
+  if (document.querySelector(".toast.update")) return;   // one notice, not a stack
+  toast(`suravidl ${u.latest} is available — you have ${u.current}`, "info update", {
+    sticky: true,
+    actions: [
+      { label: `Get ${u.latest}`, prime: true, onClick: () => openExternal(u.url) },
+      { label: "Later", onClick: () => {
+        updStore.set(UPD.snooze, String(Date.now() + UPD.SNOOZE_MS));
+        toast("I'll remind you tomorrow");
+      } },
+      { label: "Skip this version", onClick: () => {
+        updStore.set(UPD.skipped, u.latest);
+        toast(`won't ask about ${u.latest} again`);
+        renderUpdateRow();
+      } },
+    ],
+  });
+}
+
+/** force = the user pressed Check now: show the notice even if skipped/snoozed. */
+async function checkAppUpdate(force) {
   try {
     const u = await api("/update-check");
-    if (u.update_available && u.url) {
-      // a button, not a link: embedded shells (pywebview, Android WebView)
-      // cannot open target=_blank themselves
-      const b = el("button", "updateLink", `⬆ suravidl ${u.latest} available`);
-      b.onclick = () => openExternal(u.url);
-      $("updateSlot").append(b);
-    }
-  } catch (_) { /* best-effort */ }
+    UPD_STATE = u;
+    updStore.set(UPD.last, JSON.stringify({
+      at: Date.now(), latest: u.latest || null,
+      available: !!u.update_available, error: u.error || null,
+    }));
+    renderUpdateRow();
+    if (!u.update_available || !u.url || u.error) return;
+    const skipped = updStore.get(UPD.skipped, "") === u.latest;
+    const until = Number(updStore.get(UPD.snooze, "0")) || 0;
+    if (force || (!skipped && Date.now() >= until)) showUpdateBanner(u);
+  } catch (e) {
+    updStore.set(UPD.last, JSON.stringify({
+      at: Date.now(), latest: null, available: false,
+      error: "the engine did not answer",
+    }));
+    renderUpdateRow();
+  }
+}
+
+function wireUpdateRow() {
+  const b = $("updCheck");
+  if (!b) return;
+  b.onclick = async () => {
+    const old = b.textContent;
+    b.disabled = true;
+    b.textContent = "checking…";
+    await checkAppUpdate(true);
+    b.disabled = false;
+    b.textContent = old;
+    if (UPD_STATE && UPD_STATE.error) toast("update check failed: " + UPD_STATE.error, "bad");
+    else if (UPD_STATE && !UPD_STATE.update_available)
+      toast(`you're on the latest version (${UPD_STATE.current})`);
+  };
+  renderUpdateRow();
 }
 
 /** Open a link outside the app shell: host bridge -> desktop opener -> browser. */
@@ -1921,6 +2069,7 @@ initOverrides();
 $("presetSave").onclick = saveCurrentAsPreset;
 loadVersions();
 loadPresets();
+wireUpdateRow();
 checkAppUpdate();
 loadSettings();
 initAppControls();

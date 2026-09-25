@@ -538,3 +538,22 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     frosted / 19px liquid), keeps the frozen aurora as the actual perf lever,
     and still falls back to solid panels through the `@supports` block.
     Suite: **355 passed**.
+
+- **v0.23.3 — the update notice grows up.** It used to be a one-line button
+    appended to the header: on a phone it was a squeezed strip between the
+    title and the edge (reported with a screenshot), it could not say which
+    version was newer, and it had no way to be dismissed. It is now two
+    surfaces fed by one check: **one persistent toast** (it does not time out)
+    carrying the actual choices — Get <version> · Later · Skip this version —
+    and a **Settings → General → Updates** row that can be looked at any time
+    ("up to date ✓", or "0.23.4 is available / skipped", with Check now).
+    Skip and snooze are per-device (`localStorage`; Android's UI origin is the
+    fixed 127.0.0.1:8787, so they survive restarts), "Later" means 24 hours,
+    and Check now deliberately overrides both. Nothing installs itself: "Get
+    it" opens the release page, because no build of this app can replace
+    itself in place. `toast()` gained an options argument (sticky + action
+    buttons) whose buttons stop their click from bubbling into a dismiss.
+    Verified live against a stubbed newer release: notice persists past the
+    4.2s timeout, Skip silences it across reloads, Check now brings it back,
+    Get reaches the exact release URL, Later stores ~24h and stays quiet.
+    Suite: **362 passed**.

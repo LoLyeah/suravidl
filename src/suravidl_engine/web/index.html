@@ -28,7 +28,6 @@
   <div class="mark">s</div>
   <h1>suravidl</h1>
   <span id="versions" class="meta"></span>
-  <span id="updateSlot"></span>
   <span class="spacer"></span>
   <button id="settingsBtn" class="btn sm" title="Settings">⚙ Settings</button>
   <button id="updateBtn" class="btn sm" title="Update yt-dlp">Update yt-dlp</button>
@@ -293,6 +292,18 @@
           <input id="setResume" type="checkbox"/>
           Resume interrupted downloads after a restart
         </label>
+      </div>
+
+      <div class="field">
+        <label class="lbl">Updates</label>
+        <div class="updrow">
+          <span id="updState" class="small">not checked yet</span>
+          <span class="spacer"></span>
+          <button id="updSkip" class="ghost-sm hidden" type="button">Skip this version</button>
+          <button id="updGet" class="btn sm prime hidden" type="button">Get it</button>
+          <button id="updCheck" class="btn sm" type="button">Check now</button>
+        </div>
+        <div id="updMeta" class="muted small updmeta"></div>
       </div>
       </div><!-- /spanel-general -->
 

@@ -486,6 +486,19 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
 .toast.leaving { opacity: 0; transform: translateY(8px); transition: var(--t-base) var(--e-in); }
 .toast .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
   box-shadow: 0 0 10px var(--ok); flex-shrink: 0; }
+/* with choices the row wraps under the text instead of squeezing it */
+.toast { flex-wrap: wrap; }
+.toast .tmsg { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.toast .toactions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+/* the update notice: still a toast, but it waits for an answer instead of
+   timing out, and it carries the accent so it reads as "there is something
+   for you here" rather than as another status message */
+.toast.update { border-color: var(--accent-line); }
+.toast.sticky { max-width: 480px; }
+.toast .toactions .ghost-sm { white-space: nowrap; }
+/* Settings → General → Updates */
+.updrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.updmeta { margin-top: 6px; }
 .toast.bad .dot { background: var(--err); box-shadow: 0 0 10px var(--err); }
 .toast.info .dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 @keyframes rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -586,13 +599,6 @@ details.card[open] > summary { margin-bottom: 10px; }
 .k-both { color: var(--ok); }
 .k-video { color: var(--warn); }
 .k-audio { color: var(--muted); }
-
-/* update badge */
-.updateLink {
-  color: var(--accent2); font-size: .85rem; margin-left: .6rem;
-  text-decoration: none;
-}
-.updateLink:hover { text-decoration: underline; }
 
 /* ---------- motion ---------- */
 @keyframes floaty { 50% { transform: translateY(-4px); } }
