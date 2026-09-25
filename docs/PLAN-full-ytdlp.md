@@ -519,3 +519,22 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     change a visible property on every host, the glass surfaces must consume
     the tokens, all three themes must define the same core palette, and the
     mobile toast lane must clear both bars. Suite: **353 passed**.
+
+- **v0.23.2 — the storage row stops lying, and Android gets its blur back.**
+    Two follow-ups from the same report. (1) "Downloaded files: 2 files ·
+    73.2 MB" sat above a confirm reading "Delete 0 files (0 B)": both read
+    `/files/summary`, but the row was fetched once at boot and never again, so
+    a delete done from another tab (or a download finishing) left it stale.
+    It re-reads whenever Settings comes into view and after a per-job delete,
+    and with nothing on disk the button says "nothing to delete" instead of
+    opening a destructive dialog at all. (2) A correction. The Android host
+    block claimed backdrop-filter was unreliable there and wrote that down as
+    `--glass-blur: none` plus opaque panels. The WebView is Chromium and the
+    app already refuses anything below Chrome 80, so the filter is there: the
+    original note was a *cost* decision (a big card blurred over the animated
+    aurora re-rasterized on every scroll frame) promoted to a capability limit,
+    and it made the glass setting a no-op on the platform most people use.
+    Android now blurs for real with a lighter radius than desktop (11px
+    frosted / 19px liquid), keeps the frozen aurora as the actual perf lever,
+    and still falls back to solid panels through the `@supports` block.
+    Suite: **355 passed**.

@@ -78,21 +78,38 @@ def test_the_two_glass_styles_differ_on_desktop():
 
 def test_android_glass_styles_are_not_the_same_panel():
     """The regression: the host block used to flatten both styles at once."""
-    blanket = _block('html[data-host="android"] {\n  --glass-blur: none')
-    assert "--glass-gloss: none" not in blanket, \
-        "the blanket Android block must not flatten the glass styles"
-
     frosted = _block('html[data-host="android"][data-glass="frosted"]')
     liquid = _block('html[data-host="android"][data-glass="liquid"]')
-    # frosted stays matte, liquid keeps a sheen — pure paint, no blur needed
+    # frosted stays matte, liquid keeps a sheen
     assert "--glass-gloss: none" in frosted
     assert "linear-gradient" in liquid
-    # and the highlight/border must differ too, or the change is invisible
+    # highlight, border and blur must all differ, or the change is invisible
     assert frosted != liquid
-    for token in ("--glass-hi", "--glass-border"):
+    for token in ("--glass-hi", "--glass-border", "--glass-blur"):
         f = frosted.split(token)[1].split(";")[0]
         liq = liquid.split(token)[1].split(";")[0]
         assert f != liq, f"{token} is identical in both Android glass styles"
+
+
+def test_android_is_not_denied_the_blur_it_supports():
+    """A blanket host rule used to answer "Android can't blur" with
+    `--glass-blur: none` plus opaque panels. The WebView is Chromium and the
+    app refuses anything below Chrome 80, so backdrop-filter IS there — the
+    old rule was a cost decision written down as a capability limit (and, as
+    a bonus, it made the glass setting a no-op on the platform most people
+    use it on). Android now blurs for real, with a lighter radius."""
+    blanket = _block('html[data-host="android"] {')
+    assert "--glass-blur: none" not in blanket
+    for token in ("--glass-bg", "--glass-bg-strong"):
+        assert f"{token}: var(--panel-solid)" not in blanket, \
+            f"Android panels must stay translucent (the theme's own {token})"
+    assert "blur(" in blanket, "Android must carry a real backdrop blur"
+    # the weaker-GPU lever is freezing the aurora, not removing the glass
+    assert "html[data-host=\"android\"] body::before" in CSS
+    assert "animation: none !important" in \
+        _block('html[data-host="android"] body::before')
+    # and a WebView that genuinely cannot blur still gets solid panels
+    assert "@supports not" in CSS and "var(--panel-solid) !important" in CSS
 
 
 def test_the_glass_surfaces_consume_the_glass_tokens():

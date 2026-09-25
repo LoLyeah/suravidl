@@ -914,6 +914,9 @@ function deleteButton(j) {
           `freed ${humanBytes(r.freed_bytes)}`
         : "removed from the list");
       refreshJobs();
+      // a delete empties part of the folder the Settings row reports on: keep
+      // that row from reading stale (the "Delete 0 files (0 B)?" bug)
+      if (refreshStorageInfo) refreshStorageInfo();
     } catch (e) {
       toast("could not delete: " + e.message, "bad");
       if (row) row.classList.remove("pending");   // the row is staying: undo it
@@ -1362,6 +1365,8 @@ function initVaultSection() {
 
 /** Android: storage row in Settings → Device — how much is downloaded, and a
  *  way to delete it, because the folder (Android/data/…) is unreachable. */
+let refreshStorageInfo = null;   // set below; re-read on tab open and deletes
+
 async function initStorageSection() {
   const sec = $("storageSection");
   if (!sec) return;
@@ -1377,9 +1382,19 @@ async function initStorageSection() {
     }
   };
   await show();
+  refreshStorageInfo = show;
   $("clearDownloadsBtn").onclick = async () => {
     const s = await api("/files/summary").catch(() => null);
     const known = s && typeof s.files === "number";
+    // Nothing on disk: do not offer to delete it. The row above could have
+    // read "2 files · 73.2 MB" a minute ago (it is only re-read on tab open)
+    // while a delete elsewhere emptied the folder — and "Delete 0 files
+    // (0 B)?" against a row that says 2 is the consistency bug this fixes.
+    if (known && s.files === 0) {
+      toast("nothing to delete");
+      show();
+      return;
+    }
     const one = known && s.files === 1;
     const ok = await askConfirm(
       known ? (`Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
@@ -1518,6 +1533,9 @@ function showTab(name, opts) {
     history.replaceState(null, "", "#" + target);
   }
   if (target === "settings" && !SETTINGS_DIRTY) loadSettings();
+  // the storage row counts what is on disk — downloads land and deletes happen
+  // while other tabs are up, so re-read it whenever Settings comes into view
+  if (target === "settings" && refreshStorageInfo) refreshStorageInfo();
   if (target === "ytdlp") loadOptions(false);
   if (target === "queue") refreshJobs();
   if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });

@@ -706,28 +706,27 @@ select:focus-visible { outline: 0; border-color: var(--accent-line); }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
 }
 
-/* Android's WebView: backdrop-filter is unreliable there (some devices just
-   don't blur, and a 7%-opaque "glass" card then lets the aurora background
-   show through as a colour blob over the content). Android therefore gets
-   solid panels — translucency without a blur is not glass, it is a stain —
-   and no blur to pay for. Desktop and browsers keep the full glass. */
+/* Android gets the real thing too. The WebView is Chromium and the app refuses
+   anything below Chrome 80, so backdrop-filter IS supported here: the old
+   blanket `--glass-blur: none` was never a capability limit, it was cost — a
+   big card blurred over the animated aurora re-rasterizes on every scroll
+   frame. v0.23.0 froze the aurora on Android, which is the lever that matters,
+   so the surfaces are glass again with a lighter radius than desktop as the
+   only concession to weaker GPUs. A WebView that truly cannot blur still lands
+   on solid panels through the @supports block above. */
 html[data-host="android"] {
-  --glass-blur: none;
-  --glass-bg: var(--panel-solid);
-  --glass-bg-strong: var(--panel-solid);
+  --glass-blur: blur(11px) saturate(120%);
 }
-/* Android cannot blur, so the two glass styles are carried by what is left:
-   the surface finish. Frosted goes flat and matte; Liquid keeps its gloss —
-   an accent-tinted sheen and a brighter top highlight — all of it pure paint
-   with no backdrop-filter to pay for. Before this, one blanket rule turned
-   off the blur, the gloss AND the highlight for both styles, so the setting
-   did nothing at all on the platform most people use it on. */
+/* the two styles keep their finish on Android as well — that is what tells
+   them apart at a glance — and they now differ in blur too, not just paint */
 html[data-host="android"][data-glass="frosted"] {
+  --glass-blur: blur(11px) saturate(120%);
   --glass-gloss: none;
   --glass-hi: rgba(255,255,255,.06);
   --glass-border: var(--line);
 }
 html[data-host="android"][data-glass="liquid"] {
+  --glass-blur: blur(19px) saturate(165%) brightness(1.04);
   --glass-gloss: linear-gradient(150deg, var(--accent-soft), rgba(255,255,255,.07) 34%, transparent 64%),
     linear-gradient(0deg, rgba(255,255,255,.05), transparent 55%);
   --glass-hi: rgba(255,255,255,.22);

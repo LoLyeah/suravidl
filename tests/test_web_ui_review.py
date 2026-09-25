@@ -60,6 +60,24 @@ def test_unchecking_the_last_playlist_box_refuses_instead_of_meaning_all():
     assert "btn.disabled = Boolean(junk || none)" in state
 
 
+def test_the_storage_row_and_the_delete_dialog_cannot_disagree():
+    """"Downloaded files: 2 files · 73.2 MB" sat above a confirm reading
+    "Delete 0 files (0 B)" — both read /files/summary, but the row was only
+    ever fetched once at init, so any delete done from another tab left it
+    lying. It must re-read when Settings comes into view and after a per-job
+    delete, and with nothing on disk the dialog must not open at all."""
+    assert "refreshStorageInfo = show" in APP, "the row is never wired for re-read"
+    # re-read on tab open (alongside the settings load) and after the trash button
+    assert 'if (target === "settings" && refreshStorageInfo) refreshStorageInfo();' in APP
+    after_delete = APP.split("toast(r.deleted")[1][:400].split("refreshJobs();", 1)[1]
+    assert "if (refreshStorageInfo) refreshStorageInfo();" in after_delete
+    # and no destructive dialog over an empty folder
+    clear = APP.split('$("clearDownloadsBtn").onclick')[1]
+    before_dialog = clear.split("askConfirm")[0]
+    assert 'toast("nothing to delete")' in before_dialog
+    assert "s.files === 0" in before_dialog
+
+
 def test_toasts_sit_above_the_mobile_tab_bar():
     """#toasts sat 22px from the bottom, on top of the fixed tab bar: taps
     aimed at a tab hit the toast instead. The lane also has to carry the
