@@ -157,9 +157,12 @@ class Settings:
         unknown = set(patch) - set(DEFAULTS)
         if unknown:
             raise ValueError(f"unknown settings: {sorted(unknown)}")
+        # validate EVERYTHING before touching memory: a patch with one good and
+        # one bad key used to leave the good half applied in RAM while the file
+        # on disk kept the old value (v0.21.2 audit)
+        clean = {key: self._validate(key, value) for key, value in patch.items()}
         previous = dict(self._data)
-        for key, value in patch.items():
-            self._data[key] = self._validate(key, value)
+        self._data.update(clean)
         try:
             self._save()
         except OSError:

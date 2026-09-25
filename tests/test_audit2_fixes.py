@@ -366,6 +366,22 @@ def test_android_gallery_matching_only_accepts_numbers():
     assert 'startsWith("$stem ("' not in body, "the loose prefix match is back"
 
 
+def test_a_rejected_settings_patch_applies_none_of_itself(tmp_path):
+    """Same fix, second half: a patch with one good and one bad key used to
+    leave the good half applied in memory while the file kept the old value."""
+    from suravidl_engine.settings import Settings
+
+    sp = tmp_path / "settings.json"
+    s = Settings(path=sp)
+    before = s.get()["retries"]
+    blocker = tmp_path / "afile"
+    blocker.write_text("x")
+    with pytest.raises(ValueError):
+        s.update({"retries": 7, "download_dir": str(blocker / "nope")})
+    assert s.get()["retries"] == before
+    assert Settings(path=sp).get()["retries"] == before
+
+
 def test_smoke_uses_the_running_interpreter():
     src = (ROOT / "scripts/smoke.py").read_text()
     assert "sys.executable" in src, "smoke.py must not hardcode .venv/bin/python"
