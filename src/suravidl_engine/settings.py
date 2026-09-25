@@ -67,8 +67,11 @@ def int_in(value, name: str, lo: int, hi: int) -> int:
 # change how many jobs run at once, or repaint the UI.
 PER_JOB_DENIED = {
     "download_dir",      # the manager's folder, not a job's business
-    "raw_args",          # the raw-args switch is an app-level decision:
-    "raw_args_enabled",  # a job may not turn it on for itself (v0.21.2 audit)
+    "raw_args_enabled",  # the raw-args SWITCH is app-level: a job may not
+                         # switch the escape hatch on for itself (v0.21.2
+                         # audit). `raw_args` itself stays allowed — that is
+                         # how the per-download arguments field works when the
+                         # switch IS on — and it is inert while it is off.
     "max_concurrent",    # queue policy
     "open_dir_on_complete",
     "auto_resume",

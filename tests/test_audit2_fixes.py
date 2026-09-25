@@ -303,16 +303,25 @@ def test_cancelling_at_the_finish_line_does_not_report_completed(tmp_path, slow_
 # -- DEF-09: per-job overrides may not smuggle engine-owned options ----------
 
 def test_a_job_override_cannot_enable_raw_args(tmp_path):
-    """`raw_args`/`raw_args_enabled` were missing from the per-job deny list,
-    so a client could turn raw arguments on for a job even with the switch
-    off in Settings."""
+    """`raw_args_enabled` was missing from the per-job deny list, so a client
+    could switch raw arguments on for a job even with the switch off in
+    Settings. (`raw_args` itself stays allowed — that is how the per-download
+    arguments field works when the switch IS on — and it stays inert while it
+    is off.)"""
+    from suravidl_engine.download_opts import build_download_opts
+
     app = _app(tmp_path)
     with TestClient(app) as c:
         r = c.post("/jobs", headers=AUTH, json={
             "url": "http://example.com/x",
-            "overrides": {"raw_args_enabled": True, "raw_args": "--write-info-json"}})
+            "overrides": {"raw_args_enabled": True,
+                          "raw_args": "--write-info-json"}})
         assert r.status_code == 400, r.text
         assert "cannot be set per download" in r.json()["detail"].lower()
+    # the engine-side half of the same rule: raw args are parsed only when the
+    # switch says so, whatever a job sent
+    inert = {"raw_args_enabled": False, "raw_args": "--write-info-json"}
+    assert "writeinfojson" not in build_download_opts(inert, str(tmp_path))
 
 
 def test_raw_args_cannot_redirect_the_output_path():

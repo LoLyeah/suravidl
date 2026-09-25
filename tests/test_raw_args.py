@@ -112,7 +112,22 @@ def test_denied_args_rejected_at_the_door(client, fixture_server, dl_dir):
                     headers=AUTH)
     assert r.status_code == 400
     assert "--exec" in r.json()["detail"]
+    # the refused save must not have switched raw args on: this test used to
+    # depend on a half-applied patch leaving the switch on behind a 400
+    # (v0.21.2 audit)
+    assert client.get("/settings", headers=AUTH).json()["raw_args_enabled"] is False
 
+    # with the switch OFF, a job's own raw_args is refused up front (the
+    # accurate message is about the switch, not the flag)
+    r = client.post("/jobs", json={"url": f"{fixture_server}/tiny.mp4",
+                                   "raw_args": "--exec echo boom"},
+                    headers=AUTH)
+    assert r.status_code == 400
+    assert "disabled" in r.json()["detail"].lower()
+
+    # with it ON, the denied FLAG is what the user has to hear about
+    r = client.post("/settings", json={"raw_args_enabled": True}, headers=AUTH)
+    assert r.status_code == 200, r.text
     r = client.post("/jobs", json={"url": f"{fixture_server}/tiny.mp4",
                                    "raw_args": "--exec echo boom"},
                     headers=AUTH)
