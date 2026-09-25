@@ -44,6 +44,7 @@ def test_settings_defaults(tmp_path):
     s = c.get("/settings", headers=AUTH).json()
     assert s["max_concurrent"] == 2
     assert s["open_dir_on_complete"] is False
+    assert s["auto_resume"] is True
     assert s["download_dir"] == str(tmp_path / "dl")
     assert s["theme"] == "dark"
     assert s["glass"] == "frosted"

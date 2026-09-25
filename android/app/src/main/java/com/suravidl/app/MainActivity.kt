@@ -2,9 +2,13 @@ package com.suravidl.app
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
+import android.provider.Settings
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -34,6 +38,7 @@ class MainActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
         webView.setBackgroundColor(BG_DARK)
+        webView.addJavascriptInterface(HostBridge(), "AndroidHost")
 
         val root = FrameLayout(this)
         root.setBackgroundColor(BG_DARK)
@@ -119,6 +124,44 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    }
+
+    /** JS bridge: window.AndroidHost.{quit,openBatterySettings} in the page. */
+    inner class HostBridge {
+        @JavascriptInterface
+        fun quit() {
+            runOnUiThread { quitCompletely() }
+        }
+
+        @JavascriptInterface
+        fun openBatterySettings() {
+            runOnUiThread { openBatterySettingsScreen() }
+        }
+    }
+
+    /** Full shutdown: stop the engine service, remove the task, free the RAM. */
+    private fun quitCompletely() {
+        try {
+            stopService(Intent(this, EngineService::class.java))
+        } catch (_: Throwable) {
+        }
+        finishAndRemoveTask()
+        Process.killProcess(Process.myPid())
+    }
+
+    private fun openBatterySettingsScreen() {
+        val candidates = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                   Uri.parse("package:$packageName")),
+        )
+        for (intent in candidates) {
+            try {
+                startActivity(intent)
+                return
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     companion object {

@@ -6,6 +6,7 @@ DEFAULTS = {
     "download_dir": None,
     "max_concurrent": 2,
     "open_dir_on_complete": False,
+    "auto_resume": True,   # re-queue jobs cut off by an engine restart
     "theme": "dark",       # light | dark | amoled
     "glass": "frosted",    # frosted | liquid
 }
@@ -57,6 +58,8 @@ class Settings:
         if key == "max_concurrent":
             return max(1, min(4, int(value)))
         if key == "open_dir_on_complete":
+            return bool(value)
+        if key == "auto_resume":
             return bool(value)
         if key == "theme":
             value = str(value)

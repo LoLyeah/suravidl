@@ -43,6 +43,19 @@ function dismiss(t) {
   setTimeout(() => t.remove(), 260);
 }
 
+/* ---------- modal transitions ---------- */
+function openModal(m) {
+  clearTimeout(m._closeTimer);
+  m.classList.remove("hidden", "closing");
+}
+function closeModal(m) {
+  m.classList.add("closing");
+  m._closeTimer = setTimeout(() => {
+    m.classList.remove("closing");
+    m.classList.add("hidden");
+  }, 170);
+}
+
 /* ---------- confirm modal ---------- */
 function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
   return new Promise((resolve) => {
@@ -52,7 +65,7 @@ function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
     yes.textContent = okText;
     yes.className = "btn " + (danger ? "danger" : "prime");
     const done = (val) => {
-      modal.classList.add("hidden");
+      closeModal(modal);
       yes.onclick = no.onclick = modal.onclick = null;
       document.removeEventListener("keydown", onKey);
       resolve(val);
@@ -62,7 +75,7 @@ function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
     no.onclick = () => done(false);
     modal.onclick = (e) => { if (e.target === modal) done(false); };
     document.addEventListener("keydown", onKey);
-    modal.classList.remove("hidden");
+    openModal(modal);
   });
 }
 
@@ -97,6 +110,7 @@ async function doProbe() {
   const url = $("url").value.trim();
   if (!url) return;
   $("probeMsg").textContent = "probing…";
+  $("probeBtn").classList.add("busy");
   try {
     const info = await api("/probe", {
       method: "POST", body: JSON.stringify({ url }),
@@ -106,6 +120,8 @@ async function doProbe() {
   } catch (e) {
     $("probeMsg").textContent = "probe failed: " + e.message;
     $("probeCard").classList.add("hidden");
+  } finally {
+    $("probeBtn").classList.remove("busy");
   }
 }
 
@@ -128,8 +144,9 @@ function renderProbe(url, info) {
     .filter((f) => f.ext && f.format_id)
     .sort((a, b) => (b.height || b.abr || 0) - (a.height || a.abr || 0));
 
-  for (const f of fmts) {
-    const tr = el("tr");
+  for (const [i, f] of fmts.entries()) {
+    const tr = el("tr", "enter");
+    tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
     tr.append(
       el("td", "fmt-q", fmtQuality(f) || "—"),
       el("td", "fmt-c",
@@ -162,6 +179,23 @@ async function startJob(url, fmt) {
   }
 }
 
+function progressPct(j) {
+  const t = j.progress && j.progress.total_bytes;
+  return t ? Math.min(100, (j.progress.downloaded_bytes / t) * 100) : 0;
+}
+
+function jobSig(j) {
+  return j.status + "|" + (j.filepath ? "p" : "") + "|" + (j.error ? "e" : "");
+}
+
+function metaParts(j) {
+  const pct = Math.round(progressPct(j));
+  const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
+  const eta = j.progress && j.progress.eta != null ? "ETA " + j.progress.eta + "s" : "";
+  const size = `${humanBytes(j.progress && j.progress.downloaded_bytes)} / ${humanBytes(j.progress && j.progress.total_bytes)}`;
+  return [pct + "%", ...(spd ? [spd] : []), ...(eta ? [eta] : []), size];
+}
+
 function jobRow(j) {
   const row = el("div", "job");
   const top = el("div", "jobtop");
@@ -172,23 +206,13 @@ function jobRow(j) {
 
   if (ACTIVE.has(j.status)) {
     if (j.status === "downloading") {
-      const pct = j.progress && j.progress.total_bytes
-        ? Math.min(100, (j.progress.downloaded_bytes / j.progress.total_bytes) * 100)
-        : 0;
       const bar = el("div", "bar");
       const fill = el("div", "fill active");
-      fill.style.width = pct.toFixed(1) + "%";
+      fill.style.width = progressPct(j).toFixed(1) + "%";
       bar.append(fill);
       row.append(bar);
       const meta = el("div", "jmeta");
-      const spd = j.progress?.speed ? humanBytes(j.progress.speed) + "/s" : "";
-      const eta = j.progress?.eta != null ? "ETA " + j.progress.eta + "s" : "";
-      meta.append(
-        el("span", "", Math.round(pct) + "%"),
-        ...(spd ? [el("span", "", spd)] : []),
-        ...(eta ? [el("span", "", eta)] : []),
-        el("span", "", `${humanBytes(j.progress?.downloaded_bytes)} / ${humanBytes(j.progress?.total_bytes)}`),
-      );
+      meta.append(...metaParts(j).map((t) => el("span", "", t)));
       row.append(meta);
     }
   } else if (j.status === "error" || j.status === "interrupted") {
@@ -224,6 +248,26 @@ function jobRow(j) {
     actions.append(r);
   }
   if (actions.children.length) row.append(actions);
+  row.dataset.sig = jobSig(j);
+  return row;
+}
+
+/** Patch an existing row in place (smooth progress); rebuild on status change. */
+function updateJobRow(row, j) {
+  if (row.dataset.sig !== jobSig(j)) {
+    const fresh = jobRow(j);
+    fresh.dataset.id = j.id;
+    fresh.classList.add("swap");
+    row.replaceWith(fresh);
+    return fresh;
+  }
+  const title = row.querySelector(".jobtitle");
+  const text = j.title || j.url;
+  if (title && title.textContent !== text) title.textContent = text;
+  const fill = row.querySelector(".fill");
+  if (fill) fill.style.width = progressPct(j).toFixed(1) + "%";
+  const meta = row.querySelector(".jmeta");
+  if (meta) meta.replaceChildren(...metaParts(j).map((t) => el("span", "", t)));
   return row;
 }
 
@@ -231,14 +275,37 @@ async function refreshJobs() {
   try {
     const { jobs } = await api("/jobs");
     const box = $("jobs");
-    box.innerHTML = "";
-    if (!jobs.length) {
-      box.append(el("div", "empty", "Nothing yet — paste a link above and hit Probe."));
+    const list = jobs.sort(
+      (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    if (!list.length) {
+      if (!box.querySelector(".empty")) {
+        box.innerHTML = "";
+        box.append(el("div", "empty", "Nothing yet — paste a link above and hit Probe."));
+      }
       return;
     }
-    jobs
-      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
-      .forEach((j) => box.append(jobRow(j)));
+    const empty = box.querySelector(".empty");
+    if (empty) empty.remove();
+
+    const keep = new Set();
+    let prev = null;
+    for (const j of list) {
+      keep.add(j.id);
+      let row = box.querySelector(`.job[data-id="${j.id}"]`);
+      if (!row) {
+        row = jobRow(j);
+        row.dataset.id = j.id;
+        row.classList.add("enter");
+      } else {
+        row = updateJobRow(row, j);
+      }
+      const anchor = prev ? prev.nextElementSibling : box.firstElementChild;
+      if (row !== anchor) box.insertBefore(row, anchor);
+      prev = row;
+    }
+    box.querySelectorAll(".job").forEach((r) => {
+      if (!keep.has(r.dataset.id)) r.remove();
+    });
   } catch (_) { /* engine briefly unavailable */ }
 }
 
@@ -283,8 +350,31 @@ $("updateBtn").onclick = async () => {
   $("updateBtn").disabled = false;
 };
 
-/* ---------- window controls (desktop app only) ---------- */
+/* ---------- window controls (desktop app) / host controls (android app) ---------- */
+function wireQuitButton() {
+  const quit = $("quitBtn");
+  quit.classList.remove("hidden");
+  quit.onclick = async () => {
+    const ok = await askConfirm(
+      "Quit suravidl? Active downloads will be interrupted.", { okText: "Quit" });
+    if (!ok) return;
+    if (window.AndroidHost) {
+      window.AndroidHost.quit();          // stops the service + kills the process
+    } else {
+      try { await api("/app/quit", { method: "POST" }); } catch (_) {}
+    }
+  };
+}
+
 async function initAppControls() {
+  if (window.AndroidHost) {
+    // inside the Android app: quit + battery settings, no minimize
+    wireQuitButton();
+    $("androidSection").classList.remove("hidden");
+    $("batteryBtn").onclick = () => window.AndroidHost.openBatterySettings();
+    $("quitAppBtn").onclick = () => $("quitBtn").onclick();
+    return;
+  }
   try {
     const info = await api("/app/info");
     if (!info.desktop) return;
@@ -294,14 +384,7 @@ async function initAppControls() {
       min.classList.remove("hidden");
       min.onclick = () => api("/app/minimize", { method: "POST" });
     }
-    const quit = $("quitBtn");
-    quit.classList.remove("hidden");
-    quit.onclick = async () => {
-      const ok = await askConfirm(
-        "Quit suravidl? Active downloads will be interrupted.", { okText: "Quit" });
-      if (!ok) return;
-      try { await api("/app/quit", { method: "POST" }); } catch (_) {}
-    };
+    wireQuitButton();
   } catch (_) { /* browser mode */ }
 }
 
@@ -313,6 +396,7 @@ async function loadSettings() {
     $("setDir").value = s.download_dir || "";
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
+    $("setResume").checked = !!s.auto_resume;
     $("dlDir").textContent = s.download_dir || "";
     markSwatches(CURRENT);
   } catch (e) {
@@ -321,11 +405,11 @@ async function loadSettings() {
 }
 
 function openSettings() {
-  $("settingsModal").classList.remove("hidden");
+  openModal($("settingsModal"));
   loadSettings();
 }
 function closeSettings() {
-  $("settingsModal").classList.add("hidden");
+  closeModal($("settingsModal"));
 }
 
 $("settingsBtn").onclick = openSettings;
@@ -357,6 +441,7 @@ $("setSave").onclick = async () => {
         download_dir: $("setDir").value.trim(),
         max_concurrent: Number($("setConc").value),
         open_dir_on_complete: $("setReveal").checked,
+        auto_resume: $("setResume").checked,
       }),
     });
     $("dlDir").textContent = s.download_dir;
@@ -381,3 +466,6 @@ loadSettings();
 initAppControls();
 refreshJobs();
 setInterval(refreshJobs, 1200);
+addEventListener("scroll", () => {
+  document.body.classList.toggle("scrolled", scrollY > 4);
+}, { passive: true });

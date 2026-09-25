@@ -120,6 +120,21 @@
       </label>
     </div>
 
+    <div class="field">
+      <label class="check small" for="setResume">
+        <input id="setResume" type="checkbox"/>
+        Resume interrupted downloads after a restart
+      </label>
+    </div>
+
+    <div id="androidSection" class="field hidden">
+      <label class="lbl">Android</label>
+      <div class="col">
+        <button id="batteryBtn" class="btn sm" type="button">🔋 Battery settings — allow background downloads</button>
+        <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
+      </div>
+    </div>
+
     <div class="modal-foot">
       <button id="setSave" class="btn prime">Save</button>
       <span id="setMsg" class="muted small"></span>

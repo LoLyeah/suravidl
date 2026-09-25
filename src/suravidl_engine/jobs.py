@@ -1,4 +1,6 @@
 """Job manager: background downloads, live progress, SQLite persistence."""
+from __future__ import annotations
+
 import json
 import sqlite3
 import threading
@@ -41,7 +43,8 @@ def _safe_headers(h: dict | None) -> dict | None:
 
 
 class JobManager:
-    def __init__(self, download_dir, db_path=None, max_concurrent: int = 2):
+    def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
+                 auto_resume: bool = False):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path) if db_path else ":memory:"
@@ -59,6 +62,8 @@ class JobManager:
         self._active = 0
         self.on_complete = None  # optional callable(job) run after success
         self._init_db()
+        if auto_resume:
+            self.resume_interrupted()
 
     # -- persistence -------------------------------------------------------
     def _init_db(self):
@@ -164,6 +169,30 @@ class JobManager:
             raise ValueError(f"cannot retry job in status '{src['status']}'")
         return self.create(src["url"], fmt=src.get("fmt"),
                            extra_headers=src.get("headers"))
+
+    def resume_interrupted(self) -> list[str]:
+        """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
+
+        Restarts them in place — same job id, progress reset — so a process
+        death (swipe-away, low-memory kill) doesn't strand downloads.
+        Returns the resumed job ids.
+        """
+        with self._lock:
+            stale = [j for j in self._jobs.values()
+                     if j["status"] == "interrupted"]
+        resumed: list[str] = []
+        for job in stale:
+            with self._lock:
+                job["status"] = "queued"
+                job["error"] = None
+                job["progress"] = {"downloaded_bytes": 0, "total_bytes": None,
+                                   "speed": None, "eta": None}
+            self._save(job)
+            threading.Thread(target=self._run,
+                             args=(job, job.get("fmt"), job.get("headers")),
+                             daemon=True).start()
+            resumed.append(job["id"])
+        return resumed
 
     # -- runtime tuning ----------------------------------------------------
     def set_download_dir(self, path) -> None:

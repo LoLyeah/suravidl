@@ -133,6 +133,10 @@ repo has no pydantic-core.
 - [x] M7 — UI overhaul: aurora glass design, Light/Dark/AMOLED themes,
       Frosted/Liquid glass switch, toasts + glass modals, reveal-in-folder,
       selection cards in settings
+- [x] M8 — motion pass: staggered card/row entrances, animated modals,
+      drift aurora, smooth in-place progress, scroll-shadow header;
+      Android: background downloads (wake lock + auto-resume of interrupted
+      jobs on restart) and "Quit completely" to free memory
 
 ## API (v0.1)
 

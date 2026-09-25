@@ -82,3 +82,59 @@ def test_failed_job_persists_with_error(tmp_path):
     j2 = mgr2.get(job["id"])
     assert j2["status"] == "error"
     assert j2["error"]
+
+
+def _seed_stale_downloading(db, job_id):
+    import sqlite3
+
+    con = sqlite3.connect(db)
+    con.execute("UPDATE jobs SET status='downloading' WHERE id=?", (job_id,))
+    con.commit()
+    con.close()
+
+
+def test_auto_resume_requeues_interrupted_jobs(tmp_path, fixture_server):
+    """With auto_resume, jobs cut off by a crash restart on their own."""
+    from suravidl_engine.jobs import JobManager
+
+    db = tmp_path / "jobs.db"
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=db)
+    job = mgr.create(f"{fixture_server}/tiny.mp4")
+    _wait(mgr, job["id"])
+    _seed_stale_downloading(db, job["id"])
+
+    mgr2 = JobManager(download_dir=tmp_path / "dl", db_path=db, auto_resume=True)
+    # it must not stay interrupted: it is re-queued/running/completed right away
+    assert mgr2.get(job["id"])["status"] != "interrupted"
+    j = _wait(mgr2, job["id"])
+    assert j["status"] == "completed", j
+    assert j["filepath"]
+
+
+def test_auto_resume_off_keeps_interrupted(tmp_path, fixture_server):
+    from suravidl_engine.jobs import JobManager
+
+    db = tmp_path / "jobs.db"
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=db)
+    job = mgr.create(f"{fixture_server}/tiny.mp4")
+    _wait(mgr, job["id"])
+    _seed_stale_downloading(db, job["id"])
+
+    mgr2 = JobManager(download_dir=tmp_path / "dl", db_path=db)
+    j = mgr2.get(job["id"])
+    assert j["status"] == "interrupted"
+
+
+def test_resume_interrupted_returns_ids(tmp_path, fixture_server):
+    from suravidl_engine.jobs import JobManager
+
+    db = tmp_path / "jobs.db"
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=db)
+    job = mgr.create(f"{fixture_server}/tiny.mp4")
+    _wait(mgr, job["id"])
+    _seed_stale_downloading(db, job["id"])
+
+    mgr2 = JobManager(download_dir=tmp_path / "dl", db_path=db)
+    assert mgr2.resume_interrupted() == [job["id"]]
+    j = _wait(mgr2, job["id"])
+    assert j["status"] == "completed", j

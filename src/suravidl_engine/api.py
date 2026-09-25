@@ -61,6 +61,7 @@ def create_app(download_dir, auth_token: str | None = None,
         download_dir=settings.get()["download_dir"],
         db_path=db_path,
         max_concurrent=settings.get()["max_concurrent"],
+        auto_resume=settings.get()["auto_resume"],
     )
     acts = desktop_actions or {}
 

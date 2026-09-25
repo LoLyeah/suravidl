@@ -2,12 +2,14 @@ package com.suravidl.app
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -74,6 +76,7 @@ class EngineService : Service() {
                 try {
                     updateCount()
                     importCompleted()
+                    syncWakeLock()
                 } catch (_: Throwable) {
                     // never let a polling hiccup kill the process
                 }
@@ -81,6 +84,34 @@ class EngineService : Service() {
             }
         }
         return START_STICKY
+    }
+
+    /** Keep the CPU awake while downloads are active (screen off / background). */
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun syncWakeLock() {
+        val active = try {
+            activeCount()
+        } catch (_: Exception) {
+            return  // engine not answering; leave the lock as it is
+        }
+        if (active > 0) {
+            if (wakeLock == null) {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK, "suravidl:downloads")
+            }
+            wakeLock?.takeIf { !it.isHeld }?.acquire(6 * 60 * 60 * 1000L)
+        } else {
+            releaseWakeLock()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.takeIf { it.isHeld }?.release()
+        } catch (_: Throwable) {
+        }
     }
 
     /** Wait until the engine's /health answers (uvicorn binds asynchronously). */
@@ -166,11 +197,16 @@ class EngineService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle("suravidl")
             .setContentText(text)
+            .setContentIntent(openAppIntent())
             .setOngoing(true)
             .build()
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(1, notification)
     }
+
+    private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
+        this, 0, Intent(this, MainActivity::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
     private fun startInForeground() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -193,6 +229,7 @@ class EngineService : Service() {
 
     override fun onDestroy() {
         polling = false
+        releaseWakeLock()
         super.onDestroy()
     }
 
