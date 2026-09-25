@@ -14,7 +14,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures"
-PY = ROOT / ".venv" / "bin" / "python"
+# Prefer the project venv, but fall back to the interpreter running this
+# script: a hard-coded `.venv/bin/python` breaks in a git worktree, a fresh
+# clone, or on Windows (v0.21.2 audit).
+_VENV = ROOT / ".venv" / "bin" / "python"
+PY = _VENV if _VENV.exists() else Path(sys.executable)
 TOKEN = "smoketoken123"
 
 

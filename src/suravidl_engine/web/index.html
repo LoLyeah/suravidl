@@ -131,8 +131,19 @@
         <div class="field">
           <label class="lbl" for="ovMeta">Tags</label>
           <div class="col">
-            <label class="check"><input id="ovMeta" type="checkbox"/> embed metadata</label>
-            <label class="check"><input id="ovThumb" type="checkbox"/> embed thumbnail</label>
+            <!-- three states, because a checkbox cannot say the third thing
+                 that matters for one download: "off, even though my settings
+                 say on" (v0.21.2 audit) -->
+            <select id="ovMeta" aria-label="embed metadata for this download">
+              <option value="">use my settings</option>
+              <option value="on">embed metadata</option>
+              <option value="off">do not embed metadata</option>
+            </select>
+            <select id="ovThumb" aria-label="embed thumbnail for this download">
+              <option value="">use my settings</option>
+              <option value="on">embed thumbnail</option>
+              <option value="off">do not embed thumbnail</option>
+            </select>
           </div>
         </div>
       </div>

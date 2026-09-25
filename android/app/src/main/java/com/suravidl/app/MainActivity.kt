@@ -365,6 +365,12 @@ class MainActivity : AppCompatActivity() {
     /** Hand a file to another app (player / share sheet) via our FileProvider. */
     private fun handOffFile(path: String, share: Boolean) {
         val f = File(path)
+        if (f.isDirectory) {
+            // A playlist row reports the download folder: there is no single
+            // file to hand to another app (v0.21.2 audit).
+            toast("this row is a folder — open a file's own row instead")
+            return
+        }
         if (!f.exists()) {
             toast("file is gone")
             return

@@ -527,9 +527,16 @@ function readOv() {
   }
   const sb = $("ovSb").value;
   if (sb) patch.sponsorblock_mode = sb; else delete patch.sponsorblock_mode;
-  if ($("ovMeta").checked) patch.embed_metadata = true;
+  // three-state: "" = use my settings, "on"/"off" = a claim about this job.
+  // A checkbox could only express "on", so switching a global embed off for
+  // one download was impossible (v0.21.2 audit).
+  const meta = $("ovMeta").value;
+  if (meta === "on") patch.embed_metadata = true;
+  else if (meta === "off") patch.embed_metadata = false;
   else delete patch.embed_metadata;
-  if ($("ovThumb").checked) patch.embed_thumbnail = true;
+  const thumb = $("ovThumb").value;
+  if (thumb === "on") patch.embed_thumbnail = true;
+  else if (thumb === "off") patch.embed_thumbnail = false;
   else delete patch.embed_thumbnail;
   const raw = $("ovRaw").value.trim();
   if (raw) patch.raw_args = raw; else delete patch.raw_args;
@@ -542,8 +549,8 @@ function clearOv() {
   $("ovSubs").value = "";
   $("ovSubLangs").value = "";
   $("ovSb").value = "";
-  $("ovMeta").checked = false;
-  $("ovThumb").checked = false;
+  $("ovMeta").value = "";
+  $("ovThumb").value = "";
   $("ovRaw").value = "";
   $("ovPreset").value = "";
   renderOvCount();
@@ -582,8 +589,14 @@ function applyOvPreset() {
   if (patch.subtitles_mode) $("ovSubs").value = patch.subtitles_mode;
   if (patch.subtitles_langs) $("ovSubLangs").value = patch.subtitles_langs;
   if (patch.sponsorblock_mode) $("ovSb").value = patch.sponsorblock_mode;
-  if (patch.embed_metadata) $("ovMeta").checked = true;
-  if (patch.embed_thumbnail) $("ovThumb").checked = true;
+  // a preset that says "off" must show as off: with a checkbox it looked
+  // untouched, and the next read re-sent the preset without the claim
+  $("ovMeta").value =
+    patch.embed_metadata === true ? "on"
+      : patch.embed_metadata === false ? "off" : "";
+  $("ovThumb").value =
+    patch.embed_thumbnail === true ? "on"
+      : patch.embed_thumbnail === false ? "off" : "";
   if (patch.raw_args) $("ovRaw").value = patch.raw_args;
   $("ovPreset").value = name;
   renderOvCount();
@@ -675,9 +688,16 @@ function deleteButton(j) {
     }
     try {
       const r = await settleThenDelete(j);
-      if (j.filepath && ANDROID() && window.AndroidHost.deleteMediaNamed) {
-        try { window.AndroidHost.deleteMediaNamed(j.filepath.split("/").pop()); }
-        catch (_) { /* the row is gone either way */ }
+      // Gallery cleanup: one name per file. A playlist row's filepath is the
+      // download *folder*, so the old code asked the gallery to delete a
+      // folder name that matched nothing (v0.21.2 audit).
+      if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
+        const names = (j.files && j.files.length ? j.files : [j.filepath || ""])
+          .map((p) => String(p).split("/").pop()).filter(Boolean);
+        for (const name of names) {
+          try { window.AndroidHost.deleteMediaNamed(name); }
+          catch (_) { /* the row is gone either way */ }
+        }
       }
       toast(r.deleted
         ? `deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
@@ -748,7 +768,11 @@ function jobRow(j) {
         .catch((e) => toast("could not open: " + e.message, "bad"));
       r.append(open);
     }
-    if (ANDROID()) {
+    // Hand off a *file*. A playlist row's filepath is the download folder:
+    // handing that to "open" (or share) does nothing useful, so the buttons
+    // are for single-file rows only (v0.21.2 audit).
+    const oneFile = !(j.files && j.files.length > 1);
+    if (ANDROID() && oneFile && j.filepath) {
       // Android/data is off-limits to file managers, so hand the file itself
       // to another app (a provider grant) — play it or share it right here.
       const open = el("button", "ghost-sm", "Open");

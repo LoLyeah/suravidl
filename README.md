@@ -336,6 +336,49 @@ repo has no pydantic-core.
       the boot loop, FileProvider no longer exposes the app's private dir
       (cookie session copy, `jobs.db`), backups are off, and a share is
       bounded, consumed once, and logged without the link itself.
+- [x] **v0.21.2 — the second opinion**: the app was handed to an
+      **independent agent** (Google Antigravity, run headless on a throwaway
+      git worktree) and told to find real defects. It reported 16; each one
+      was then **reproduced here** against a live engine with an ephemeral
+      HOME before anything was believed — an audit is evidence, not truth.
+      All 16 held. Data loss and correctness first: **deleting a job could
+      remove the download folder itself** (the empty-subfolder cleanup
+      compared an unresolved parent with a *resolved* root, so a relative
+      `download_dir` never matched), and **changing the download folder made
+      every earlier download undeletable** — jobs now remember the folder
+      they were created under (schema + `ALTER` migration) and
+      `_require_inside()` accepts either root. `POST /files/clear` used to
+      run **while a download was live** and unlink its `.part` (yt-dlp then
+      died on the final rename): it answers 409 with a count instead.
+      A **cancelled download left its `.part`** and a **cancelled playlist
+      left every finished entry** — the progress hook now records the target
+      the moment yt-dlp names it, and finished playlist entries are appended
+      as they land, so the row has something real to delete. A cancel that
+      races the finish line used to report **"completed"** and fire the
+      completion action; the lock decides now, and cancel wins.
+      Engine: the **Firefox build could not reach the engine at all** — CORS
+      only allowed `chrome-extension://`, so every call from
+      `moz-extension://` died in preflight (`DELETE /presets/{name}` failed
+      its preflight too). A **corrupt or hand-edited `settings.json` bricked
+      every start** (an uncreatable `download_dir`, `"nan"` for
+      `max_concurrent`): loaded values are now validated per key, fall back
+      to their defaults, and a `download_dir` must be **provably writable
+      before it is saved**. Per-job overrides could **switch raw arguments on
+      for themselves** and raw arguments could **write anywhere**
+      (`-o/-P/--output/--paths` were not denied) — both closed.
+      UI, Android and extension: the per-download Tags block could only say
+      "on", so a global embed could not be turned **off for one download**
+      (two three-state selects now: use my settings / on / off, and a
+      preset's `false` shows as off); a **playlist row asked the gallery to
+      delete the folder's name** (matched nothing) and offered
+      **Open/Share on a folder** — both work off the recorded `files` list
+      now, and the Kotlin hand-off refuses a directory; MediaStore's
+      " (N)" matching is **digits only** (the loose match also caught the
+      user's own "clip (Official Music Video).mp4"); the desktop entry calls
+      **`multiprocessing.freeze_support()`**; `scripts/smoke.py` no longer
+      hard-codes `.venv/bin/python`; and the extension captures headers for
+      **media requests only** instead of keeping cookies for every page
+      request. `tests/test_audit2_fixes.py` pins each one (20 tests).
 
 ## API (v0.1)
 

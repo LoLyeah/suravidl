@@ -371,5 +371,39 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     failed MediaStore publish no longer leaves a hidden half-row, and MediaStore's
     " (1)" renames are matched when deleting. 256 Python tests + 2 new
     instrumentation tests.
+  - **v0.21.2 — the second opinion**: an *independent* audit (Google
+    Antigravity via `agy`, headless, on a throwaway git worktree, read-only
+    prompt) reported **16 findings** in `AUDIT-AGY.md`; every claim was then
+    reproduced here against a live engine with an ephemeral HOME before it
+    was believed. All 16 held — one with an overstated blast radius. Data
+    loss: deleting a job could `rmdir` the **download folder itself** (the
+    cleanup compared an unresolved parent with a resolved root, so a
+    relative `download_dir` never matched); **changing the download folder
+    made every earlier download undeletable** (409) — jobs now record their
+    own `download_dir` (schema + ALTER) and `_require_inside()` accepts
+    either root; `POST /files/clear` ran **while a download was live** and
+    unlinked its `.part`, killing the download on the final rename (409 +
+    count now); a **cancelled download left its `.part`**, a **cancelled
+    playlist left every finished entry** (the progress hook now records the
+    target as soon as yt-dlp names it, and finished entries are appended to
+    `files`); a **cancel racing the finish line reported "completed"** and
+    fired the completion action (the lock decides; cancel wins). Engine: the
+    **Firefox build could not reach the engine** — CORS accepted only
+    `chrome-extension://` (and not `DELETE`, so presets failed preflight
+    too); a **corrupt `settings.json` bricked every start** (uncreatable
+    `download_dir`, `"nan"` for `max_concurrent`) — loaded values are
+    validated per key now and `download_dir` must be provably writable
+    before it is saved; per-job overrides could **enable raw arguments**
+    and raw arguments could **redirect output** (`-o/-P/--output/--paths`).
+    UI/Android/extension: Tags could only say "on", so a global embed could
+    not be turned **off for one download** (three-state selects, preset
+    `false` shows as off); a playlist row asked the gallery to delete the
+    **folder's name** and offered Open/Share on a **folder** (both now use
+    the recorded `files`, Kotlin refuses a directory); MediaStore matching
+    is **digits only** (the loose match also caught the user's own
+    "clip (Official Music Video).mp4" — owner-scoped, so it could only have
+    hit our own copies: fixed defensively); desktop entry calls
+    **`freeze_support()`**; `smoke.py` stops hard-coding `.venv/bin/python`;
+    the extension captures **media requests only**. 276 tests.
   - Next up: M21 — (open) subtitles language picker per site, scheduled
     downloads (cron-style watch list).

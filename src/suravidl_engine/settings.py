@@ -67,6 +67,8 @@ def int_in(value, name: str, lo: int, hi: int) -> int:
 # change how many jobs run at once, or repaint the UI.
 PER_JOB_DENIED = {
     "download_dir",      # the manager's folder, not a job's business
+    "raw_args",          # the raw-args switch is an app-level decision:
+    "raw_args_enabled",  # a job may not turn it on for itself (v0.21.2 audit)
     "max_concurrent",    # queue policy
     "open_dir_on_complete",
     "auto_resume",
@@ -135,8 +137,18 @@ class Settings:
             except (json.JSONDecodeError, OSError):
                 loaded = {}
             for k in DEFAULTS:
-                if k in loaded and loaded[k] is not None:
-                    self._data[k] = loaded[k]
+                if k not in loaded or loaded[k] is None:
+                    continue
+                # Validate what we load: a hand-edited or half-written file
+                # used to reach the engine unchecked, and one bad value
+                # (an uncreatable download_dir, `"nan"` for max_concurrent)
+                # then killed every start (v0.21.2 audit). A key that does
+                # not validate keeps its default instead of taking the app
+                # down.
+                try:
+                    self._data[k] = self._validate(k, loaded[k])
+                except (ValueError, OSError, TypeError):
+                    continue
 
     def get(self) -> dict:
         return dict(self._data)
@@ -145,9 +157,14 @@ class Settings:
         unknown = set(patch) - set(DEFAULTS)
         if unknown:
             raise ValueError(f"unknown settings: {sorted(unknown)}")
+        previous = dict(self._data)
         for key, value in patch.items():
             self._data[key] = self._validate(key, value)
-        self._save()
+        try:
+            self._save()
+        except OSError:
+            self._data = previous       # never leave a half-applied change
+            raise
         return self.get()
 
     @staticmethod
@@ -156,6 +173,16 @@ class Settings:
             path = Path(str(value)).expanduser()
             if not path.is_absolute():
                 raise ValueError("download_dir must be an absolute path")
+            # Prove we can actually write there BEFORE saving it: a folder
+            # that cannot be created used to be persisted anyway, and the
+            # next start died in mkdir — every start, forever (v0.21.2 audit)
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                raise ValueError(
+                    f"download folder cannot be used: {path} ({e.strerror or e})")
+            if not path.is_dir():
+                raise ValueError(f"download folder is not a folder: {path}")
             return str(path)
         if key == "max_concurrent":
             return int_in(value, "max_concurrent", 1, 4)

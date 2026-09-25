@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     eta INTEGER,
     created_at TEXT,
     completed_at TEXT,
-    files TEXT
+    files TEXT,
+    download_dir TEXT
 )
 """
 
@@ -181,6 +182,11 @@ class JobManager:
                         "ALTER TABLE jobs ADD COLUMN overrides TEXT")
                 if "files" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
+                if "download_dir" not in cols:
+                    # the folder this job downloaded into: a later settings
+                    # change must not make its files undeletable (v0.21.2)
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN download_dir TEXT")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -258,14 +264,14 @@ class JobManager:
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
-                " created_at, completed_at, files)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " created_at, completed_at, files, download_dir)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
                 " total_bytes=excluded.total_bytes, speed=excluded.speed,"
                 " eta=excluded.eta, completed_at=excluded.completed_at,"
-                " files=excluded.files",
+                " files=excluded.files, download_dir=excluded.download_dir",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -280,6 +286,7 @@ class JobManager:
                     job["progress"]["eta"], job.get("created_at"),
                     job.get("completed_at"),
                     json.dumps(job["files"]) if job.get("files") else None,
+                    job.get("download_dir") or str(self.download_dir),
                 ),
             )
 
@@ -339,6 +346,9 @@ class JobManager:
             "progress": {"downloaded_bytes": 0, "total_bytes": None,
                          "speed": None, "eta": None},
             "created_at": datetime.now(timezone.utc).isoformat(),
+            # remember where this job downloaded: deleting it later must work
+            # even after the download folder changes (v0.21.2 audit)
+            "download_dir": str(self.download_dir),
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -399,16 +409,31 @@ class JobManager:
                         ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt",
                         ".ass", ".lrc", ".json", ".live_chat.json")
 
-    def _require_inside(self, path: Path) -> None:
-        """A job row is not a licence to delete arbitrary paths."""
-        root = Path(self.download_dir).resolve()
+    def _require_inside(self, path: Path, job: dict | None = None) -> None:
+        """A job row is not a licence to delete arbitrary paths.
+
+        Allowed: anything inside the engine's current download folder, or
+        inside the folder the job was created under (`job["download_dir"]`).
+        The second root matters because changing the download folder in
+        Settings used to make every earlier download undeletable — the file
+        was "outside the download folder" for ever after (v0.21.2 audit).
+        """
+        roots = [Path(self.download_dir)]
+        recorded = (job or {}).get("download_dir")
+        if recorded:
+            roots.append(Path(str(recorded)))
         try:
-            inside = path.resolve().is_relative_to(root)
+            resolved = path.resolve()
         except OSError:
-            inside = False
-        if not inside:
-            raise PermissionError(
-                f"refusing to delete {path}: it is outside the download folder")
+            resolved = None
+        for root in roots:
+            try:
+                if resolved is not None and resolved.is_relative_to(root.resolve()):
+                    return
+            except OSError:
+                continue
+        raise PermissionError(
+            f"refusing to delete {path}: it is outside the download folder")
 
     def _sidecars_for(self, path: Path) -> list[Path]:
         out: list[Path] = []
@@ -416,6 +441,17 @@ class JobManager:
             sidecar = path.with_name(path.stem + suffix)
             if sidecar.exists() and sidecar.is_file() and sidecar != path:
                 out.append(sidecar)
+        return out
+
+    def _partials_for(self, path: Path) -> list[Path]:
+        """yt-dlp's work-in-progress files hang off the FULL name, not the
+        stem: `clip.mp4` in flight is `clip.mp4.part` (and `.ytdl`). The
+        v0.21.2 audit found cancelled downloads keeping both forever."""
+        out: list[Path] = []
+        for suffix in (".part", ".ytdl", ".part-Frag0", ".temp"):
+            cand = path.with_name(path.name + suffix)
+            if cand.exists() and cand.is_file():
+                out.append(cand)
         return out
 
     def _job_file_targets(self, job: dict) -> list[Path]:
@@ -429,24 +465,21 @@ class JobManager:
         says so) rather than emptying a shared folder.
         """
         listed = [Path(str(p)) for p in (job.get("files") or []) if p]
-        if listed:
-            out: list[Path] = []
-            for p in listed:
-                self._require_inside(p)
-                if p.is_file():
-                    out.append(p)
-                    out.extend(self._sidecars_for(p))
-            return out
         raw = job.get("filepath")
-        if not raw:
+        if raw and not listed:
+            path = Path(str(raw))
+            if not path.is_dir():
+                listed = [path]
+        if not listed:
             return []
-        path = Path(str(raw))
-        self._require_inside(path)
-        if path.is_dir():
-            return []
-        if not path.exists():
-            return []
-        return [path] + self._sidecars_for(path)
+        out: list[Path] = []
+        for p in listed:
+            self._require_inside(p, job)
+            if p.is_file():
+                out.append(p)
+                out.extend(self._sidecars_for(p))
+            out.extend(self._partials_for(p))
+        return out
 
     def delete_job(self, job_id: str) -> dict:
         """Delete one download: its file, its sidecars, and its row.
@@ -475,10 +508,18 @@ class JobManager:
             except OSError:
                 pass
         # a playlist that wrote into its own subfolder leaves it behind empty
+        root = Path(self.download_dir).resolve()
         for p in {t.parent for t in targets}:
-            if p != Path(self.download_dir).resolve():
+            # resolve BOTH sides: with a relative download_dir (or a symlinked
+            # one) the unresolved parent never compared equal to the resolved
+            # root, so this removed the download folder itself (v0.21.2 audit)
+            try:
+                p_resolved = p.resolve()
+            except OSError:
+                continue
+            if p_resolved != root:
                 try:
-                    p.rmdir()
+                    p_resolved.rmdir()
                 except OSError:
                     pass
         note = None
@@ -562,9 +603,22 @@ class JobManager:
         def hook(d):
             if job["status"] == "cancelled":  # cancel requested mid-run
                 raise _Cancelled()
+            d_info = d.get("info_dict") or {}
+            # Record the target as soon as yt-dlp names it. A cancelled or
+            # failed download used to keep `filepath = None`, so deleting the
+            # row left its `.part` (and every playlist entry already written)
+            # on disk forever (v0.21.2 audit).
+            name = d.get("filename")
+            if name:
+                if not job.get("filepath"):
+                    job["filepath"] = str(name)
+                if d["status"] == "finished":
+                    made = list(job.get("files") or [])
+                    if str(name) not in made:
+                        made.append(str(name))
+                        job["files"] = made
             if d["status"] == "downloading":
                 job["status"] = "downloading"
-                d_info = d.get("info_dict") or {}
                 job["progress"] = {
                     "downloaded_bytes": d.get("downloaded_bytes") or 0,
                     "total_bytes": d.get("total_bytes")
@@ -637,12 +691,14 @@ class JobManager:
                 job["filepath"] = str(self.download_dir)
                 job["playlist_count"] = len(entries)
                 # the folder holds everyone's downloads: remember the ones this
-                # job made, so deleting it takes its own files (v0.21.1 audit)
-                made = []
+                # job made, so deleting it takes its own files (v0.21.1 audit).
+                # Keep what the hook already recorded — a run that was
+                # interrupted and retried must not forget earlier entries.
+                made = list(job.get("files") or [])
                 for e in entries:
                     req = (e.get("requested_downloads") or [{}])[0]
                     fp = req.get("filepath") or e.get("filepath")
-                    if fp:
+                    if fp and str(fp) not in made:
                         made.append(str(fp))
                 job["files"] = made or None
             else:
@@ -655,8 +711,21 @@ class JobManager:
                     job["filepath"] = str(self.download_dir)
                 if not job["filepath"]:
                     raise RuntimeError("download finished but no filepath reported")
-            job["status"] = "completed"
-            job["completed_at"] = datetime.now(timezone.utc).isoformat()
+                # the finished file (after any conversion) is what the row
+                # owns; the hook may also have recorded the pre-conversion
+                # name, which is fine — a missing target is skipped on delete
+                made = list(job.get("files") or [])
+                if str(job["filepath"]) not in made:
+                    made.append(str(job["filepath"]))
+                job["files"] = made
+            with self._lock:
+                if job["status"] == "cancelled":
+                    # a cancel that landed while yt-dlp was finishing is still
+                    # a cancel: claiming "completed" (and firing the completion
+                    # action) would contradict the user (v0.21.2 audit)
+                    return
+                job["status"] = "completed"
+                job["completed_at"] = datetime.now(timezone.utc).isoformat()
         except _Cancelled:
             job["status"] = "cancelled"
             job["error"] = "cancelled by user"

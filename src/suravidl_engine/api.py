@@ -71,9 +71,13 @@ def create_app(download_dir, auth_token: str | None = None,
     app = FastAPI(title="suravidl engine")
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"^chrome-extension://[a-p]+$",
+        # both extension families talk to the engine: Chrome MV3 sends
+        # `chrome-extension://<id>`, the Firefox build `moz-extension://<uuid>`
+        # (the v0.21.2 audit found the Firefox origin getting a 400 preflight)
+        allow_origin_regex=r"^(chrome-extension://[a-p]+|moz-extension://[0-9a-fA-F-]+)$",
         allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # DELETE is a real method here: `DELETE /presets/{name}`
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
     if settings_path is None and db_path:
@@ -413,6 +417,15 @@ def create_app(download_dir, auth_token: str | None = None,
                 status_code=400,
                 detail='this deletes every downloaded file — send '
                        '{"confirm": "delete"} to proceed')
+        active = [j for j in mgr.list()
+                  if j["status"] in ("queued", "downloading", "merging")]
+        if active:
+            # unlinking a `.part` under a live worker makes yt-dlp die on the
+            # final rename, and the download is lost for nothing (v0.21.2)
+            raise HTTPException(
+                status_code=409,
+                detail=f"{len(active)} download(s) still running — "
+                       "cancel them before clearing the folder")
         d = Path(manager.download_dir)
         deleted = freed = 0
         if d.exists():

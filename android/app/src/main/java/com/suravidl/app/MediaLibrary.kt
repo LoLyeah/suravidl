@@ -66,6 +66,11 @@ object MediaLibrary {
      * "clip (1).mp4"), so the copy of a download the user did twice does not
      * carry the engine's exact file name — matching only the exact name found
      * nothing and the trash button left the copy behind (v0.21.1 audit).
+     *
+     * MediaStore only ever appends *numbers*. The loose "stem (" + ")" match
+     * used here first also accepted the user's own files — deleting a
+     * download named "clip.mp4" removed "clip (Official Music Video).mp4"
+     * with it (v0.21.2 audit).
      */
     private fun matchesName(actual: String?, wanted: String): Boolean {
         if (actual == null) return false
@@ -73,6 +78,8 @@ object MediaLibrary {
         val dot = wanted.lastIndexOf('.')
         val stem = if (dot > 0) wanted.substring(0, dot) else wanted
         val ext = if (dot > 0) wanted.substring(dot) else ""
-        return actual.startsWith("$stem (") && actual.endsWith(")$ext")
+        val numbered = Regex(
+            "^" + Regex.escape(stem) + " \\(\\d+\\)" + Regex.escape(ext) + "$")
+        return numbered.matches(actual)
     }
 }

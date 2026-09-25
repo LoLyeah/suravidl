@@ -161,6 +161,12 @@ DENIED_RAW_FLAGS: dict[str, str] = {
     "--downloader": "runs external programs",
     "--ffmpeg-location": "the app manages ffmpeg",
     "--batch-file": "the engine owns the job list",
+    # the output path is the app's decision: `-o/-P` would write anywhere
+    # the user can write (v0.21.2 audit)
+    "-o": "the app decides where downloads go",
+    "--output": "the app decides where downloads go",
+    "-P": "the app decides where downloads go",
+    "--paths": "the app decides where downloads go",
     "--config-locations": "config files are app-managed",
     "--plugin-dirs": "plugins run code",
     "--load-info-json": "the engine owns the job model",
@@ -179,6 +185,8 @@ DENIED_RAW_FLAGS: dict[str, str] = {
 
 DENIED_RAW_KEYS: dict[str, str] = {
     "exec_cmd": "--exec",
+    "outtmpl": "-o",
+    "paths": "-P",
     "exec_before_dl_cmd": "--exec-before-download",
     "external_downloader": "--external-downloader",
     "ffmpeg_location": "--ffmpeg-location",

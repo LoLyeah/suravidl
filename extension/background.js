@@ -59,6 +59,14 @@ chrome.webRequest.onBeforeRequest.addListener(
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
     if (details.tabId < 0) return;
+    // Capture only media-ish requests. Listening to every request in the tab
+    // put cookies for ordinary browsing into extension storage, and only
+    // media headers are ever handed to the engine (v0.21.2 audit).
+    const isMedia =
+      details.type === "media" ||
+      (["xmlhttprequest", "other", "media"].includes(details.type) &&
+        MEDIA_RE.test(details.url));
+    if (!isMedia) return;
     captureHeaders(details.url, details.requestHeaders);
   },
   { urls: ["<all_urls>"] },
