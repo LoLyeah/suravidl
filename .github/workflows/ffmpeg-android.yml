@@ -31,6 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install nasm (needed for x86_64 asm)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nasm
+
       - name: Install NDK
         run: |
           curl -fsSLo ndk.zip "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
@@ -46,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-${{ matrix.abi }}
-          path: build/out/${{ matrix.abi }}/ffmpeg
+          path: out/${{ matrix.abi }}/ffmpeg
           if-no-files-found: error
           retention-days: 14
 

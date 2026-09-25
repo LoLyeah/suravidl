@@ -29,7 +29,8 @@ def test_index_has_new_controls(tmp_path):
     for elem_id in ("setResume", "androidSection", "batteryBtn", "quitAppBtn",
                     "quitBtn", "minBtn", "settingsModal",
                     "setCookies", "setCookiesBrowser", "browseCookies",
-                    "importCookies", "browserRow"):
+                    "importCookies", "browserRow",
+                    "audioRow", "audioNativeBtn", "audioM4aBtn", "audioMp3Btn"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

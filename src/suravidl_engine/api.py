@@ -23,6 +23,7 @@ class JobRequest(BaseModel):
     url: str
     fmt: str | None = None
     headers: dict | None = None
+    preset: str | None = None
 
 
 class ProbeRequest(BaseModel):
@@ -179,7 +180,12 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.post("/jobs")
     def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
-        return redact_job(mgr.create(body.url, fmt=body.fmt, extra_headers=body.headers))
+        try:
+            return redact_job(mgr.create(body.url, fmt=body.fmt,
+                                         extra_headers=body.headers,
+                                         preset=body.preset))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):

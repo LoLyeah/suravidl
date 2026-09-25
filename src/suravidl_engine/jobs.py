@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     url TEXT NOT NULL,
     fmt TEXT,
+    preset TEXT,
     headers TEXT,
     status TEXT NOT NULL,
     title TEXT,
@@ -63,6 +64,51 @@ def _safe_headers(h: dict | None) -> dict | None:
     return {k: v for k, v in h.items() if str(k).lower() in ALLOWED_HEADER_KEYS}
 
 
+# One-click download intents that don't fit the per-format table.
+# audio-native keeps the source stream untouched (no ffmpeg anywhere);
+# the convert variants run yt-dlp's FFmpegExtractAudio post-processor.
+AUDIO_PRESETS: dict[str, dict] = {
+    "audio-native": {"format": "bestaudio/best"},
+    "audio-m4a": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "m4a"},
+        ],
+    },
+    "audio-mp3": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
+             "preferredquality": "192"},
+        ],
+    },
+}
+
+
+def preset_opts(preset: str | None) -> dict:
+    """yt-dlp options for a preset; ValueError on unknown names."""
+    if not preset:
+        return {}
+    if preset not in AUDIO_PRESETS:
+        raise ValueError(f"unknown preset: {preset!r}")
+    spec = AUDIO_PRESETS[preset]
+    opts: dict = {"format": spec["format"]}
+    if spec.get("postprocessors"):
+        opts["postprocessors"] = [dict(pp) for pp in spec["postprocessors"]]
+    return opts
+
+
+def ffmpeg_opts() -> dict:
+    """Point yt-dlp at the bundled ffmpeg when the host provides one.
+
+    Android ships a static ffmpeg as a jniLib (libffmpeg.so) and passes its
+    path in via this env var; desktop builds leave it unset so yt-dlp finds
+    the system ffmpeg on its own.
+    """
+    loc = os.environ.get("SURAVIDL_FFMPEG", "").strip()
+    return {"ffmpeg_location": loc} if loc else {}
+
+
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
                  auto_resume: bool = False, cookie_session=None):
@@ -103,6 +149,8 @@ class JobManager:
                 cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
                 if "headers" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
+                if "preset" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -157,17 +205,17 @@ class JobManager:
     def _save(self, job: dict):
         with self._db_lock, self._con:
             self._con.execute(
-                "INSERT INTO jobs (id, url, fmt, headers, status, title, filepath,"
-                " error, downloaded_bytes, total_bytes, speed, eta, created_at,"
-                " completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "INSERT INTO jobs (id, url, fmt, preset, headers, status, title,"
+                " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
+                " created_at, completed_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
                 " total_bytes=excluded.total_bytes, speed=excluded.speed,"
                 " eta=excluded.eta, completed_at=excluded.completed_at",
                 (
-                    job["id"], job["url"], job.get("fmt"),
+                    job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     json.dumps(_redacted_headers(job["headers"]))
                     if job.get("headers") else None,
                     job["status"], job.get("title"), job.get("filepath"),
@@ -181,13 +229,19 @@ class JobManager:
 
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
-               extra_headers: dict | None = None) -> dict:
+               extra_headers: dict | None = None,
+               preset: str | None = None) -> dict:
+        if preset and fmt:
+            raise ValueError("pass either 'preset' or 'fmt', not both")
+        if preset:
+            preset_opts(preset)  # validate up front, before queueing
         extra_headers = _safe_headers(extra_headers)
         job_id = uuid.uuid4().hex[:12]
         job = {
             "id": job_id,
             "url": url,
             "fmt": fmt,
+            "preset": preset,
             "headers": extra_headers,
             "status": "queued",
             "title": None,
@@ -229,7 +283,8 @@ class JobManager:
         if src["status"] not in ("error", "interrupted", "cancelled"):
             raise ValueError(f"cannot retry job in status '{src['status']}'")
         return self.create(src["url"], fmt=src.get("fmt"),
-                           extra_headers=src.get("headers"))
+                           extra_headers=src.get("headers"),
+                           preset=src.get("preset"))
 
     def resume_interrupted(self) -> list[str]:
         """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
@@ -317,6 +372,9 @@ class JobManager:
             "progress_hooks": [hook],
             "postprocessor_hooks": [hook],
         }
+        opts.update(ffmpeg_opts())
+        if job.get("preset"):
+            opts.update(preset_opts(job["preset"]))
         if fmt:
             opts["format"] = fmt
         if extra_headers:

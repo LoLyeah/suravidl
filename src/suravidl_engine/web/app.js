@@ -173,9 +173,9 @@ function renderProbe(url, info) {
 }
 
 /* ---------- jobs ---------- */
-async function startJob(url, fmt) {
+async function startJob(url, fmt, preset) {
   try {
-    await api("/jobs", { method: "POST", body: JSON.stringify({ url, fmt }) });
+    await api("/jobs", { method: "POST", body: JSON.stringify({ url, fmt, preset }) });
     toast("Added to downloads", "info");
     refreshJobs();
   } catch (e) {
@@ -227,6 +227,11 @@ function jobRow(j) {
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     r.append(retry);
     row.append(r);
+    if (j.error && /ffmpeg/i.test(j.error) &&
+        /not found|not installed|No such file/i.test(j.error)) {
+      row.append(el("div", "jobhint",
+        "This step needs ffmpeg. Use “keep original” for audio-only, or install ffmpeg."));
+    }
   } else if (j.filepath) {
     const r = el("div", "jrow");
     r.append(el("span", "path", j.filepath));
@@ -502,6 +507,9 @@ $("setSave").onclick = async () => {
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
 $("bestBtn").onclick = () => startJob($("url").value.trim(), null);
+$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native");
+$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a");
+$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3");
 
 applyTheme(CURRENT.theme, CURRENT.glass);
 $("dlDir").textContent = CFG.downloadDir || "";

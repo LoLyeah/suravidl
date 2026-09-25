@@ -93,5 +93,6 @@ echo "--- built:"
 file "../../out/$ABI/ffmpeg"
 echo "--- 16 KB LOAD alignment (must be 0x4000):"
 readelf -lW ffmpeg | awk '/LOAD/{print $NF}' | sort -u
-echo "--- version string:"
-strings -a ffmpeg | grep -m1 "ffmpeg version" || true
+echo "--- version (from configure):"
+grep -m1 "version" config.log 2>/dev/null | head -1 || true
+strings -a ffmpeg 2>/dev/null | grep -m1 "ffmpeg version" || echo "(version string not greppable, fine)"

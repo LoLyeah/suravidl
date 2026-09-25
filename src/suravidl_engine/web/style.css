@@ -294,6 +294,12 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ghost-sm:hover { color: var(--text); background: var(--glass-bg-strong); }
 .jerr { color: var(--err); font-size: 12px; font-family: ui-monospace, Menlo, monospace;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.jobhint { margin: 6px 0 0 4px; font-size: 12px; color: var(--muted); }
+
+/* ---------- audio-only row ---------- */
+.audioRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 0 20px 14px; }
+.audioRow .muted { font-size: 12.5px; margin-right: 2px; }
 
 /* ---------- toasts ---------- */
 #toasts { position: fixed; right: 22px; bottom: 22px; z-index: 60;
