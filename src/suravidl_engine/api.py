@@ -63,7 +63,8 @@ def _web_dir() -> Path:
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
                update_fn=None, update_check_fn=None,
-               settings_path=None, desktop_actions: dict | None = None) -> FastAPI:
+               settings_path=None, desktop_actions: dict | None = None,
+               page_key: str | None = None) -> FastAPI:
     from .settings import Settings
     from .presets import PresetStore, split_patch
 
@@ -139,12 +140,24 @@ def create_app(download_dir, auth_token: str | None = None,
                 "download_dir": str(download_dir)}
 
     @app.get("/", response_class=HTMLResponse)
-    def index():
+    def index(k: str | None = None):
+        # The page inlines the API token, and loopback is shared: on Android
+        # any other installed app can open a socket to 127.0.0.1:8787. When the
+        # shell sets a page key, only a request carrying it gets the page, so
+        # the token stops being readable by whoever asks (v0.21.1 audit). The
+        # desktop shells keep today's behaviour by not setting one.
+        if page_key and k != page_key:
+            raise HTTPException(status_code=401,
+                                detail="this page needs its shell's key")
         html = (_web_dir() / "index.html").read_text(encoding="utf-8")
         cfg = json.dumps({"token": auth_token or "",
                           "downloadDir": str(manager.download_dir),
                           "theme": settings.get()["theme"],
                           "glass": settings.get()["glass"]})
+        # < and & are escaped so a download folder containing "</script>" can
+        # never close the element it is inlined into (v0.21.1 audit; json.dumps
+        # alone escapes quotes only)
+        cfg = cfg.replace("<", "\\u003c").replace("&", "\\u0026")
         # Stamp the asset URLs with the version: embedded WebViews (Android,
         # pywebview) happily keep old styles.css/app.js cached under the same
         # URL, which showed a v0.13 HTML wearing the v0.11 CSS. A new URL per

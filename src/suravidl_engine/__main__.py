@@ -72,15 +72,21 @@ def _harden(path: Path, mode: int) -> None:
 
 
 def start_server(download_dir, token: str, port: int, db_path=None,
-                 desktop_actions: dict | None = None):
-    """Start uvicorn in a daemon thread; returns the server (for shutdown)."""
+                 desktop_actions: dict | None = None,
+                 page_key: str | None = None):
+    """Start uvicorn in a daemon thread; returns the server (for shutdown).
+
+    `page_key` gates `GET /` (see create_app): the Android shell sets it so
+    the page that carries the API token is not readable by every other app
+    that can open a socket to the loopback port (v0.21.1 audit).
+    """
     import uvicorn
 
     from .api import create_app
 
     config = uvicorn.Config(
         create_app(download_dir=download_dir, auth_token=token, db_path=db_path,
-                   desktop_actions=desktop_actions),
+                   desktop_actions=desktop_actions, page_key=page_key),
         host="127.0.0.1", port=port, log_level="warning",
     )
     server = uvicorn.Server(config)

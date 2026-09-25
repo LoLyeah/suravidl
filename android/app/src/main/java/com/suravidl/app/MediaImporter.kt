@@ -33,7 +33,7 @@ object MediaImporter {
         }
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
-            put(MediaStore.MediaColumns.MIME_TYPE, if (audio) audioMime(file) else "video/mp4")
+            put(MediaStore.MediaColumns.MIME_TYPE, if (audio) audioMime(file) else videoMime(file))
             put(MediaStore.MediaColumns.RELATIVE_PATH, relative)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
@@ -46,9 +46,15 @@ object MediaImporter {
             resolver.delete(uri, null, null)
             throw e
         }
-        resolver.update(uri, ContentValues().apply {
+        val published = resolver.update(uri, ContentValues().apply {
             put(MediaStore.MediaColumns.IS_PENDING, 0)
         }, null, null)
+        if (published <= 0) {
+            // a row left on IS_PENDING is invisible in the gallery while it
+            // still occupies disk: publish or take it back (v0.21.1 audit)
+            resolver.delete(uri, null, null)
+            throw IOException("could not publish ${file.name} to MediaStore")
+        }
         return uri
     }
 
@@ -60,6 +66,14 @@ object MediaImporter {
         "aac" -> "audio/aac"
         "flac" -> "audio/flac"
         else -> "audio/*"
+    }
+
+    private fun videoMime(file: File): String = when (file.extension.lowercase()) {
+        "webm" -> "video/webm"
+        "mkv" -> "video/x-matroska"
+        "mov" -> "video/quicktime"
+        "3gp" -> "video/3gpp"
+        else -> "video/mp4"
     }
 
     private val AUDIO_EXT = setOf("m4a", "mp3", "opus", "ogg", "wav", "aac", "flac")

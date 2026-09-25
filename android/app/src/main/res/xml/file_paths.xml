@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only finished downloads are handed out (the Open/Share buttons).
+     <files-path> used to expose the whole app-private files dir — including
+     the plaintext cookie-session copy and jobs.db — to any page holding the
+     JS bridge (v0.21.1 audit). -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <files-path name="files" path="." />
     <external-files-path name="external_files" path="." />
 </paths>

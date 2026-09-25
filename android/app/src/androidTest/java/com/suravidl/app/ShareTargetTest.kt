@@ -89,25 +89,58 @@ class ShareTargetTest {
         ctx.startActivity(intent)
 
         val log = File(logs, "share.log")
+        val detail = File(logs, "share-detail.log")
+        detail.delete()
         var seen = ""
+        var full = ""
         val deadline = System.currentTimeMillis() + 240_000
         while (System.currentTimeMillis() < deadline) {
-            if (log.exists()) {
-                seen = log.readText()
-                if (seen.contains("tiny.mp4")) break
+            if (detail.exists()) {
+                full = detail.readText()
+                if (full.contains("tiny.mp4")) break
             }
+            if (log.exists()) seen = log.readText()
             Thread.sleep(1000)
         }
         assertTrue(
-            "a shared link never reached the UI (share.log: '${seen.take(200)}')",
-            seen.contains("shared link: http://10.0.2.2:8801/tiny.mp4"))
+            "a shared link never reached the UI (share-detail.log: '${full.take(200)}')",
+            full.contains("shared link: http://10.0.2.2:8801/tiny.mp4"))
         // the punctuation around it must have been dropped, not carried over
-        assertTrue("the sentence's comma went along: '$seen'",
-            !seen.contains("tiny.mp4,"))
+        assertTrue("the sentence's comma went along: '$full'",
+            !full.contains("tiny.mp4,"))
+        // ...and the world-readable copy must not carry the link itself: a
+        // tokenised or private URL has no business sitting in Android/media
+        assertTrue("the share log names the host", seen.contains("10.0.2.2"))
+        assertTrue("the public log carries the full link: '$seen'",
+            !seen.contains("tiny.mp4"))
 
         val crashes = logs.listFiles()?.filter { it.name.startsWith("crash-") }
             ?: emptyList()
         assertTrue("app crashed while handling the share: " +
             crashes.joinToString(" | ") { it.name }, crashes.isEmpty())
+    }
+
+    @Test(timeout = 30_000)
+    fun aHugeShareIsHandledInMilliseconds() {
+        // Binder allows ~1 MB of extras, and the bare-host pattern backtracks
+        // quadratically on text with no dots: one such share blocked the UI
+        // thread for minutes — an ANR on launch and on every recreation
+        // (v0.21.1 audit).
+        val blob = "x".repeat(900_000)
+        val started = System.currentTimeMillis()
+        assertNull(MainActivity.firstUrlIn(blob))
+        val took = System.currentTimeMillis() - started
+        assertTrue("a 900 KB share took ${took} ms, not milliseconds", took < 2000)
+    }
+
+    @Test(timeout = 30_000)
+    fun aShareIsConsumedOnce() {
+        val share = Intent(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, "https://example.com/once")
+        assertEquals("https://example.com/once", MainActivity.sharedUrlFrom(share))
+        // the framework replays the intent on every recreation; the second read
+        // must find nothing instead of re-filling the box behind the user's
+        // back (v0.21.1 audit)
+        assertNull(MainActivity.sharedUrlFrom(share))
     }
 }

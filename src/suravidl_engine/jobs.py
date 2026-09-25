@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     speed REAL,
     eta INTEGER,
     created_at TEXT,
-    completed_at TEXT
+    completed_at TEXT,
+    files TEXT
 )
 """
 
@@ -178,6 +179,8 @@ class JobManager:
                 if "overrides" not in cols:
                     self._con.execute(
                         "ALTER TABLE jobs ADD COLUMN overrides TEXT")
+                if "files" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -235,6 +238,14 @@ class JobManager:
             "speed": job.get("speed"),
             "eta": job.get("eta"),
         }
+        files = job.get("files")
+        if files:
+            try:
+                job["files"] = json.loads(files)
+            except (json.JSONDecodeError, TypeError):
+                job["files"] = None
+        else:
+            job["files"] = None
         return job
 
     def _save(self, job: dict):
@@ -247,13 +258,14 @@ class JobManager:
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
-                " created_at, completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " created_at, completed_at, files)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
                 " total_bytes=excluded.total_bytes, speed=excluded.speed,"
-                " eta=excluded.eta, completed_at=excluded.completed_at",
+                " eta=excluded.eta, completed_at=excluded.completed_at,"
+                " files=excluded.files",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -267,6 +279,7 @@ class JobManager:
                     job["progress"]["total_bytes"], job["progress"]["speed"],
                     job["progress"]["eta"], job.get("created_at"),
                     job.get("completed_at"),
+                    json.dumps(job["files"]) if job.get("files") else None,
                 ),
             )
 
@@ -386,16 +399,8 @@ class JobManager:
                         ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt",
                         ".ass", ".lrc", ".json", ".live_chat.json")
 
-    def _job_file_targets(self, job: dict) -> list[Path]:
-        """The files a job owns: its path plus sidecars sharing its stem.
-
-        Anything outside the download dir is refused — a job row is not a
-        licence to delete arbitrary paths.
-        """
-        raw = job.get("filepath")
-        if not raw:
-            return []
-        path = Path(str(raw))
+    def _require_inside(self, path: Path) -> None:
+        """A job row is not a licence to delete arbitrary paths."""
         root = Path(self.download_dir).resolve()
         try:
             inside = path.resolve().is_relative_to(root)
@@ -404,18 +409,44 @@ class JobManager:
         if not inside:
             raise PermissionError(
                 f"refusing to delete {path}: it is outside the download folder")
-        if not path.exists():
-            return []
-        if path.is_dir():
-            return [p for p in sorted(path.rglob("*"),
-                                      key=lambda q: len(q.parts), reverse=True)
-                    if p.is_file() or p.is_dir()]
-        targets = [path]
+
+    def _sidecars_for(self, path: Path) -> list[Path]:
+        out: list[Path] = []
         for suffix in self.SIDECAR_SUFFIXES:
             sidecar = path.with_name(path.stem + suffix)
             if sidecar.exists() and sidecar.is_file() and sidecar != path:
-                targets.append(sidecar)
-        return targets
+                out.append(sidecar)
+        return out
+
+    def _job_file_targets(self, job: dict) -> list[Path]:
+        """The files a job owns: its path plus sidecars sharing its stem.
+
+        A playlist job's filepath is the download *folder*, so what it owns is
+        the list it recorded while downloading (`files`) — never whatever
+        happens to be in that folder. The v0.21.1 audit found the trash button
+        on a playlist row deleting every other job's downloads; a row from
+        before per-file tracking deletes nothing (the note in `delete_job`
+        says so) rather than emptying a shared folder.
+        """
+        listed = [Path(str(p)) for p in (job.get("files") or []) if p]
+        if listed:
+            out: list[Path] = []
+            for p in listed:
+                self._require_inside(p)
+                if p.is_file():
+                    out.append(p)
+                    out.extend(self._sidecars_for(p))
+            return out
+        raw = job.get("filepath")
+        if not raw:
+            return []
+        path = Path(str(raw))
+        self._require_inside(path)
+        if path.is_dir():
+            return []
+        if not path.exists():
+            return []
+        return [path] + self._sidecars_for(path)
 
     def delete_job(self, job_id: str) -> dict:
         """Delete one download: its file, its sidecars, and its row.
@@ -443,13 +474,29 @@ class JobManager:
                     deleted += 1
             except OSError:
                 pass
+        # a playlist that wrote into its own subfolder leaves it behind empty
+        for p in {t.parent for t in targets}:
+            if p != Path(self.download_dir).resolve():
+                try:
+                    p.rmdir()
+                except OSError:
+                    pass
+        note = None
+        if not targets and job.get("filepath"):
+            if Path(str(job["filepath"])).is_dir() and not job.get("files"):
+                note = ("files kept: this row predates per-file tracking, so "
+                        "only the row was removed — clean the folder in "
+                        "Settings when you want it gone")
         with self._lock:
             self._jobs.pop(job_id, None)
             self._deleted.add(job_id)
             with self._con:
                 self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
-        return {"deleted": deleted, "freed_bytes": freed,
-                "filepath": job.get("filepath")}
+        out = {"deleted": deleted, "freed_bytes": freed,
+               "filepath": job.get("filepath")}
+        if note:
+            out["note"] = note
+        return out
 
     def resume_interrupted(self) -> list[str]:
         """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
@@ -589,6 +636,15 @@ class JobManager:
                 job["title"] = info.get("title") or "playlist"
                 job["filepath"] = str(self.download_dir)
                 job["playlist_count"] = len(entries)
+                # the folder holds everyone's downloads: remember the ones this
+                # job made, so deleting it takes its own files (v0.21.1 audit)
+                made = []
+                for e in entries:
+                    req = (e.get("requested_downloads") or [{}])[0]
+                    fp = req.get("filepath") or e.get("filepath")
+                    if fp:
+                        made.append(str(fp))
+                job["files"] = made or None
             else:
                 req = (info.get("requested_downloads") or [{}])[0]
                 job["title"] = info.get("title")

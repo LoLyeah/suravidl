@@ -147,8 +147,10 @@ def test_app_js_wires_the_minimal_inline_ids():
 
 
 def test_app_js_builds_the_playlist_pick_list():
-    """M20: the entries are pickable, and the pick list and the range field
-    stay in step — the field is still what the engine is sent."""
+    """M20 + v0.21.1: the entries are pickable and the range field stays the
+    single thing handed to the engine — but the pick list only edits what it
+    shows (a typed range past the listed entries is never narrowed), junk in
+    the field disables the button, and "None" never means "the whole list"."""
     js = _app_js()
     assert "function parseItemRange" in js
     assert "function selectedPlaylistItems" in js
@@ -158,9 +160,17 @@ def test_app_js_builds_the_playlist_pick_list():
     assert '$("plNone").onclick = () => pickAll(false)' in js
     assert '$("playlistItems").addEventListener("change", checkboxFromRange)' in js
     # the range field remains the single thing handed to the engine
-    assert 'body.playlist_items = $("playlistItems").value.trim()' in js
+    assert "body.playlist_items = playlistFieldText()" in js
     # and the button says how many videos it would start
-    assert "Download ${picked} picked" in js
+    assert "Download ${count} picked" in js
+    # v0.21.1 audit: "None" is a state of its own, because a blank field means
+    # *everything* to the engine
+    assert "PLAYLIST_NONE" in js and "pick items first" in js
+    assert "pick at least one item first" in js
+    # a typed range the list cannot represent survives, and junk is refused
+    assert "representable" in js
+    assert 'btn.textContent = junk ? "fix the range"' in js
+    assert 'btn.disabled = Boolean(junk || none)' in js
 
 
 def test_app_js_marks_the_remembered_quality_without_applying_it():
@@ -192,3 +202,64 @@ def test_app_js_accepts_a_shared_link_from_android():
     assert "$(\"url\").value" in hook and "doProbe()" in hook
     # no job is started behind the user's back
     assert "startJob" not in hook and 'api("/jobs"' not in hook
+
+
+# ---------------------------------------------------------------------------
+# v0.21.1 audit: the UI half — every one of these failed before the fix.
+# ---------------------------------------------------------------------------
+
+def test_app_js_spends_the_one_off_block_on_one_download():
+    """"This download only" applied to every later job (and a preset value
+    survived a field the user had cleared)."""
+    js = _app_js()
+    assert "clearOv();\n    PLAYLIST_NONE = false;\n" in js
+    # emptying a field removes the preset's value instead of leaving it in force
+    assert "delete patch.subtitles_mode;" in js
+    assert "delete patch.sponsorblock_mode;" in js
+    assert "delete patch.embed_metadata;" in js
+    assert "delete patch.embed_thumbnail;" in js
+
+def test_app_js_polls_once_at_a_time_and_says_when_it_cannot():
+    """"A slow /jobs answer could repaint newer state, and a failing poll left
+    an empty queue that read as 'nothing downloaded'."""
+    js = _app_js()
+    assert "if (JOBS_BUSY) return;" in js
+    assert "if (seq !== JOBS_SEQ) return;" in js
+    assert "function showQueueTrouble" in js and ".trouble" in js
+    assert "cannot reach the engine" in js
+
+def test_app_js_drops_a_stale_probe_and_its_chips():
+    """A failed probe left the previous URL's quality chips armed, so a click
+    downloaded the link the user had already replaced."""
+    js = _app_js()
+    assert "if (seq !== PROBE_SEQ) return;" in js
+    assert '$("qualityRow").classList.add("hidden");' in js
+    assert '$("qualityBtns").replaceChildren();' in js
+
+def test_app_js_reports_a_preset_load_failure_as_what_it_is():
+    """A 500 from /presets was rendered as "No presets yet"."""
+    js = _app_js()
+    assert "PRESETS_ERROR" in js
+    assert "could not load presets" in js
+    assert "your saved presets are not gone" in js
+
+def test_app_js_only_closes_settings_when_it_is_open():
+    """Escape was bound document-wide and yanked the user to Download from any
+    tab; the hash router also ignored the hash changing under it."""
+    js = _app_js()
+    assert 'const panel = $("panel-settings");' in js
+    assert 'if (panel && !panel.classList.contains("hidden")) closeSettings();' in js
+    assert 'window.addEventListener("hashchange"，'.replace("，", ",") in js
+
+def test_app_js_surfaces_a_failed_window_action_and_an_unreadable_size():
+    js = _app_js()
+    assert 'toast("could not minimize: " + e.message, "bad")' in js
+    # the wipe confirm must not promise "0 files (0 B)" when the summary failed
+    assert "size could not be read" in js
+    assert 'catch(() => ({ files: 0, bytes: 0 }))' not in js
+
+def test_app_js_keeps_unsaved_settings_through_a_tab_switch():
+    js = _app_js()
+    assert "let SETTINGS_DIRTY = false;" in js
+    assert 'if (target === "settings" && !SETTINGS_DIRTY) loadSettings();' in js
+    assert 'panel.addEventListener(ev, () => { SETTINGS_DIRTY = true; });' in js

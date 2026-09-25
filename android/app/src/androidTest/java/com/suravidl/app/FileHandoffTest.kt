@@ -23,7 +23,11 @@ class FileHandoffTest {
 
     @Test(timeout = 120_000)
     fun a_download_in_the_app_folder_can_be_handed_to_another_app() {
-        val f = File(ctx.filesDir, "handoff-test.mp4")
+        // Downloads live under external-files-path, which is the only root the
+        // provider exposes — the app-private files dir (cookie session copy,
+        // jobs.db) is deliberately out of reach (v0.21.1 audit).
+        val dir = File(ctx.getExternalFilesDir(null), "handoff").apply { mkdirs() }
+        val f = File(dir, "handoff-test.mp4")
         f.writeBytes(ByteArray(4096) { 0x33 })
         try {
             val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
@@ -33,6 +37,25 @@ class FileHandoffTest {
             // the grant target (a player, the share sheet) reads it through the resolver
             val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
             assertEquals(4096, bytes.size)
+        } finally {
+            f.delete()
+        }
+    }
+
+    @Test(timeout = 120_000)
+    fun private_files_are_not_shareable() {
+        // the cookie-session copy and jobs.db must not be reachable through
+        // the provider, whatever a page with the JS bridge asks for
+        val f = File(ctx.filesDir, "handoff-private.mp4")
+        f.writeBytes(ByteArray(64) { 0x66 })
+        try {
+            var refused = false
+            try {
+                FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
+            } catch (_: IllegalArgumentException) {
+                refused = true
+            }
+            assertTrue("the provider must not hand out app-private files", refused)
         } finally {
             f.delete()
         }

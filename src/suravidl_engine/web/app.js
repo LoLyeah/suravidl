@@ -117,25 +117,37 @@ async function setAppearance(patch, label) {
 }
 
 /* ---------- probe ---------- */
+let PROBE_SEQ = 0;
+
 async function doProbe() {
   const url = $("url").value.trim();
   if (!url) return;
+  const seq = ++PROBE_SEQ;      // two probes in flight: the newest one wins
   $("probeMsg").textContent = "probing…";
   $("probeBtn").classList.add("busy");
   try {
     const info = await api("/probe", {
       method: "POST", body: JSON.stringify({ url }),
     });
+    if (seq !== PROBE_SEQ) return;
     renderProbe(url, info);
     $("probeMsg").textContent = "";
   } catch (e) {
+    if (seq !== PROBE_SEQ) return;
     // the engine explains a failure (it owns the "sign-in wall" judgement and
     // says so in its own words) — the UI does not second-guess it
     $("probeMsg").textContent = "probe failed: " + e.message;
     $("probeCard").classList.add("hidden");
     $("dlEmpty").classList.remove("hidden");
+    // chips from the *previous* probe still carry its URL: leaving them armed
+    // downloads a link the user has already replaced (v0.21.1 audit)
+    $("qualityRow").classList.add("hidden");
+    $("qualityBtns").replaceChildren();
+    $("playlistRow").classList.add("hidden");
+    PLAYLIST = null;
+    PLAYLIST_NONE = false;
   } finally {
-    $("probeBtn").classList.remove("busy");
+    if (seq === PROBE_SEQ) $("probeBtn").classList.remove("busy");
   }
 }
 
@@ -235,6 +247,8 @@ function renderProbe(url, info) {
       (info.count ? info.count + " videos" : "playlist") +
       (info.extractor ? " · " + info.extractor : "");
     const entries = info.entries || [];
+    PLAYLIST = { count: info.count || entries.length, shown: entries.length };
+    PLAYLIST_NONE = false;
     for (const [i, e] of entries.entries()) {
       const tr = el("tr", "enter");
       tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
@@ -255,7 +269,11 @@ function renderProbe(url, info) {
     }
     if (info.count && entries.length < info.count) {
       const tr = el("tr");
-      tr.append(el("td", "", ""), el("td", "muted", `… ${info.count - entries.length} more`), el("td"));
+      tr.append(el("td", "", ""),
+                el("td", "muted",
+                   `… ${info.count - entries.length} more — tick the listed ` +
+                   "ones, or type a range like 501-600"),
+                el("td"));
       tb.append(tr);
     }
     syncPlaylistPicks();
@@ -263,6 +281,8 @@ function renderProbe(url, info) {
   }
 
   $("playlistRow").classList.add("hidden");
+  PLAYLIST = null;
+  PLAYLIST_NONE = false;
   renderQualityRow(url, info.site_quality);
   const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
   // a video-only pick only makes sense to pair with audio when the site
@@ -342,8 +362,14 @@ function playlistMode() {
 
 /* --- picking playlist items -------------------------------------------------
    The range field is what the engine is sent (blank = every item). The pick
-   list is the honest way to fill it on a phone, and the two stay in step:
-   boxes → field, and a typed range → boxes. */
+   list edits the part of the playlist it shows; the field keeps anything the
+   list cannot represent, so a typed range is never silently narrowed
+   (v0.21.1 audit: "1-600" on a 500-entry probe became "1-500"). */
+
+// what the playlist on screen really holds, and whether "None" was pressed
+// (blank means *everything* to the engine, so "none" needs its own state)
+let PLAYLIST = null;
+let PLAYLIST_NONE = false;
 
 /** "1-5,8" → {1,2,3,4,5,8}; null when it is not a range at all (blank = all). */
 function parseItemRange(text) {
@@ -381,29 +407,58 @@ function selectedPlaylistItems() {
     .join(",");
 }
 
-function syncPlaylistPicks() {
-  const boxes = pickedBoxes();
-  const value = selectedPlaylistItems();
-  const field = $("playlistItems");
-  if (field && field.value !== value) field.value = value;
-  const label = $("plCount");
-  if (label) {
-    const picked = value ? value.split(",").length : 0;
-    label.textContent = !boxes.length ? ""
-      : picked ? `${picked} of ${boxes.length} picked` : `all ${boxes.length}`;
-  }
-  // name what the button will do: nobody should download 300 videos by accident
-  const btn = $("playlistBtn");
-  if (btn) {
-    const picked = value ? value.split(",").length : 0;
-    btn.textContent = picked ? `Download ${picked} picked` : "Download playlist";
-  }
+function playlistFieldText() {
+  return (($("playlistItems") || {}).value || "").trim();
 }
 
-/** A typed range ticks the matching boxes back (junk leaves them alone). */
+/** One place decides what the pick label and the button say. */
+function renderPlaylistState() {
+  const label = $("plCount");
+  const btn = $("playlistBtn");
+  if (!btn) return;
+  const boxes = pickedBoxes();
+  const shown = boxes.length;
+  const total = (PLAYLIST && PLAYLIST.count) || shown;
+  const text = playlistFieldText();
+  const want = text ? parseItemRange(text) : null;
+  const junk = text && want === null;
+  const none = PLAYLIST_NONE && !text;
+  const count = want ? want.size : 0;
+  if (boxes.some((b) => b.checked)) PLAYLIST_NONE = false;
+  if (label) {
+    label.textContent = junk ? "type a range like 1-5,8"
+      : none ? "none picked"
+      : text ? `${count} picked` + (count <= total ? ` of ${total}` : "")
+      : `all ${total}` + (shown < total ? ` · first ${shown} listed` : "");
+  }
+  btn.disabled = Boolean(junk || none);
+  btn.textContent = junk ? "fix the range"
+    : none ? "pick items first"
+    : text ? `Download ${count} picked` : "Download playlist";
+}
+
+function syncPlaylistPicks() {
+  const boxes = pickedBoxes();
+  const shown = new Set(boxes.map((b) => Number(b.dataset.index)));
+  const text = playlistFieldText();
+  const want = text ? parseItemRange(text) : null;
+  // boxes -> field, but only for indices the list can show: a range reaching
+  // past the listed entries stays exactly as typed
+  const representable = text ? (want !== null &&
+    [...want].every((i) => shown.has(i))) : true;
+  if (representable) {
+    const value = selectedPlaylistItems();
+    if ($("playlistItems").value !== value) $("playlistItems").value = value;
+  }
+  renderPlaylistState();
+}
+
+/** A typed range ticks the matching boxes back; junk is shown, not hidden. */
 function checkboxFromRange() {
-  const want = parseItemRange($("playlistItems").value.trim());
-  if (want === null && $("playlistItems").value.trim()) return;
+  const text = playlistFieldText();
+  const want = text ? parseItemRange(text) : null;
+  if (text && want === null) { renderPlaylistState(); return; }
+  PLAYLIST_NONE = false;
   for (const b of pickedBoxes()) {
     b.checked = want === null ? false : want.has(Number(b.dataset.index));
   }
@@ -411,11 +466,20 @@ function checkboxFromRange() {
 }
 
 function pickAll(checked) {
-  for (const b of pickedBoxes()) b.checked = checked;
-  syncPlaylistPicks();
+  const boxes = pickedBoxes();
+  for (const b of boxes) b.checked = checked;
+  // "All" means the listed items; "None" means nothing at all — it must never
+  // fall back to the blank field, which the engine reads as the whole playlist
+  $("playlistItems").value = checked ? selectedPlaylistItems() : "";
+  PLAYLIST_NONE = !checked && boxes.length > 0;
+  renderPlaylistState();
 }
 
 async function startJob(url, fmt, preset, playlist) {
+  if (playlist && PLAYLIST_NONE && !playlistFieldText()) {
+    toast("pick at least one item first", "bad");
+    return;
+  }
   try {
     const body = { url };
     if (fmt) body.fmt = fmt;
@@ -423,10 +487,14 @@ async function startJob(url, fmt, preset, playlist) {
     // (yt-dlp refuses fmt + preset together)
     const audio = fmt ? null : (preset || OV.preset);
     if (audio) body.preset = audio;
-    if (playlist) body.playlist_items = $("playlistItems").value.trim();
+    if (playlist) body.playlist_items = playlistFieldText();
     const overrides = readOv();
     if (overrides) body.overrides = overrides;
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
+    // the block says "this download only" — so it is spent on this download
+    // (v0.21.1 audit: it used to stick to every job for the rest of the session)
+    clearOv();
+    PLAYLIST_NONE = false;
     toast(playlist ? "Playlist added to downloads" : "Added to downloads", "info");
     refreshJobs();
   } catch (e) {
@@ -441,7 +509,10 @@ async function startJob(url, fmt, preset, playlist) {
 // carry, so the rest must ride along instead of being lost on apply
 const OV = { preset: null, patch: {}, defaults: null, perJobKeys: null };
 
-/** The block's values as a patch — only what the user actually set. */
+/** The block's values as a patch — only what the user actually set.
+ *  A field the user emptied or unticked *removes* the preset's value too:
+ *  otherwise the form says "use my settings" while the download does not
+ *  (v0.21.1 audit). */
 function readOv() {
   const patch = { ...(OV.patch || {}) };
   const subs = $("ovSubs").value;
@@ -450,13 +521,18 @@ function readOv() {
     const langs = $("ovSubLangs").value.trim();
     delete patch.subtitles_langs;          // no field, no claim
     if (langs) patch.subtitles_langs = langs;
+  } else {
+    delete patch.subtitles_mode;
+    delete patch.subtitles_langs;
   }
   const sb = $("ovSb").value;
-  if (sb) patch.sponsorblock_mode = sb;
+  if (sb) patch.sponsorblock_mode = sb; else delete patch.sponsorblock_mode;
   if ($("ovMeta").checked) patch.embed_metadata = true;
+  else delete patch.embed_metadata;
   if ($("ovThumb").checked) patch.embed_thumbnail = true;
+  else delete patch.embed_thumbnail;
   const raw = $("ovRaw").value.trim();
-  if (raw) patch.raw_args = raw;
+  if (raw) patch.raw_args = raw; else delete patch.raw_args;
   return Object.keys(patch).length ? patch : null;
 }
 
@@ -735,9 +811,28 @@ function updateJobRow(row, j) {
   return row;
 }
 
+let JOBS_SEQ = 0;
+let JOBS_BUSY = false;
+let JOBS_FAILS = 0;
+
+/** A poll that keeps failing has to say so: a silently empty queue reads as
+ *  "nothing downloaded" when the truth is "could not ask" (v0.21.1 audit). */
+function showQueueTrouble(e) {
+  const box = $("jobs");
+  if (!box || box.querySelector(".trouble")) return;
+  box.prepend(el("div", "empty trouble",
+    "cannot reach the engine (" + ((e && e.message) || "no answer") +
+    ") — retrying every couple of seconds."));
+}
+
 async function refreshJobs() {
+  if (JOBS_BUSY) return;      // one poll at a time: a slow, older snapshot
+  JOBS_BUSY = true;           // must never repaint newer state
+  const seq = ++JOBS_SEQ;
   try {
     const { jobs } = await api("/jobs");
+    if (seq !== JOBS_SEQ) return;
+    JOBS_FAILS = 0;
     renderQueueBadge(jobs);
     const box = $("jobs");
     const list = jobs.sort(
@@ -773,7 +868,13 @@ async function refreshJobs() {
     box.querySelectorAll(".job").forEach((r) => {
       if (!keep.has(r.dataset.id)) r.remove();
     });
-  } catch (_) { /* engine briefly unavailable */ }
+  } catch (e) {
+    if (seq !== JOBS_SEQ) return;
+    JOBS_FAILS += 1;
+    if (JOBS_FAILS === 3) showQueueTrouble(e);   // then keep retrying quietly
+  } finally {
+    JOBS_BUSY = false;
+  }
 }
 
 /* ---------- header ---------- */
@@ -904,7 +1005,8 @@ async function initAppControls() {
     if (info.can_minimize) {
       const min = $("minBtn");
       min.classList.remove("hidden");
-      min.onclick = () => api("/app/minimize", { method: "POST" });
+      min.onclick = () => api("/app/minimize", { method: "POST" })
+        .catch((e) => toast("could not minimize: " + e.message, "bad"));
     }
     if (info.can_pick_file) {
       const browse = $("browseCookies");
@@ -963,12 +1065,16 @@ async function initStorageSection() {
   };
   await show();
   $("clearDownloadsBtn").onclick = async () => {
-    const s = await api("/files/summary").catch(() => ({ files: 0, bytes: 0 }));
-    const one = s.files === 1;
+    const s = await api("/files/summary").catch(() => null);
+    const known = s && typeof s.files === "number";
+    const one = known && s.files === 1;
     const ok = await askConfirm(
-      `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
+      known ? (`Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
       (ANDROID() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
-      "? This cannot be undone.", { okText: "Delete" });
+      "? This cannot be undone.")
+        : "Delete every downloaded file? (its size could not be read) " +
+          "This cannot be undone.",
+      { okText: "Delete" });
     if (!ok) return;
     try {
       const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
@@ -997,6 +1103,10 @@ window.onCookiesPicked = (path) => {
 };
 
 /* ---------- settings ---------- */
+// a tab switch reloads Settings from the server (showTab); that must not wipe
+// what the user typed but has not saved yet (v0.21.1 audit)
+let SETTINGS_DIRTY = false;
+
 async function loadSettings() {
   try {
     const s = await api("/settings");
@@ -1035,6 +1145,7 @@ async function loadSettings() {
     $("setExtractorArgs").value = s.extractor_args || "";
     renderWhere(s.download_dir);
     markSwatches(CURRENT);
+    SETTINGS_DIRTY = false;   // the form now mirrors the server
   } catch (e) {
     toast("could not load settings: " + e.message, "bad");
   }
@@ -1076,7 +1187,7 @@ function showTab(name, opts) {
   if (location.hash.slice(1) !== target) {
     history.replaceState(null, "", "#" + target);
   }
-  if (target === "settings") loadSettings();
+  if (target === "settings" && !SETTINGS_DIRTY) loadSettings();
   if (target === "ytdlp") loadOptions(false);
   if (target === "queue") refreshJobs();
   if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });
@@ -1147,6 +1258,8 @@ function renderRawAccess(enabled) {
 
 let PRESETS = [];          // [{name, patch, builtin, description}]
 
+let PRESETS_ERROR = null;   // set when /presets could not be read: a server
+                            // failure must not look like "you have no presets"
 async function loadPresets() {
   try {
     const data = await api("/presets");
@@ -1154,8 +1267,10 @@ async function loadPresets() {
     OV.defaults = data.defaults || {};
     OV.perJobKeys = data.per_job_keys || [];
     OV.qualities = data.qualities || [];
+    PRESETS_ERROR = null;
   } catch (e) {
     PRESETS = [];
+    PRESETS_ERROR = (e && e.message) || "no answer";
   }
   renderOvPresets();
   renderPresetList();
@@ -1166,7 +1281,17 @@ function renderPresetList() {
   if (!box) return;
   box.innerHTML = "";
   if (!PRESETS.length) {
-    box.append(el("div", "empty", "No presets yet — save one from your settings above."));
+    if (PRESETS_ERROR) {
+      box.append(el("div", "empty",
+        "could not load presets (" + PRESETS_ERROR + ") — "));
+      const again = el("button", "btn sm ghost-sm", "retry");
+      again.onclick = () => loadPresets();
+      box.append(again);
+      box.append(el("div", "muted",
+        "your saved presets are not gone, they just could not be read"));
+    } else {
+      box.append(el("div", "empty", "No presets yet — save one from your settings above."));
+    }
     return;
   }
   for (const p of PRESETS) {
@@ -1219,9 +1344,11 @@ async function saveCurrentAsPreset() {
   const msg = $("presetMsg");
   const patch = presetPatchFromSettings();
   if (!Object.keys(patch).length) {
-    msg.textContent = "Nothing to save yet — change a download option first " +
-      "(Settings → Media / Network).";
-    msg.className = "msg warn";
+    msg.textContent = OV.perJobKeys ? ("Nothing to save yet — change a download option first " +
+      "(Settings → Media / Network).")
+      : "presets could not be loaded, so there is nothing to diff against — " +
+        "retry from Settings → Presets.";
+    msg.className = OV.perJobKeys ? "msg warn" : "msg bad";
     return;
   }
   try {
@@ -1251,10 +1378,21 @@ function closeSettings() {
 $("settingsBtn").onclick = openSettings;
 $("setClose").onclick = closeSettings;
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("confirmModal").classList.contains("hidden")) {
+  if (e.key !== "Escape") return;
+  if (!$("confirmModal").classList.contains("hidden")) {
     return;   // the confirm dialog handles its own Escape
   }
-  if (e.key === "Escape") closeSettings();
+  // only when Settings is really open: this used to close it from any tab and
+  // yank the user back to Download (v0.21.1 audit)
+  const panel = $("panel-settings");
+  if (panel && !panel.classList.contains("hidden")) closeSettings();
+});
+
+// the hash is a real address (reload lands on the same tab); when something
+// else changes it — a link, a host gesture — follow it instead of disagreeing
+window.addEventListener("hashchange", () => {
+  const name = location.hash.slice(1);
+  if (TABS.includes(name)) showTab(name);
 });
 
 document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
@@ -1303,6 +1441,7 @@ function saveSettings() {
     }),
   }).then((s) => {
     SETTINGS_SNAPSHOT = s;   // the preset diff reads this
+    SETTINGS_DIRTY = false;  // the form was accepted as-is
     renderWhere(s.download_dir);
     $("setConc").value = s.max_concurrent;
     renderRawAccess(!!s.raw_args_enabled);
@@ -1326,6 +1465,17 @@ async function saveAndToast(msgEl) {
 $("setSave").onclick = () => saveAndToast($("setMsg"));
 $("ytdlpSave").onclick = () => saveAndToast($("ytdlpMsg"));
 $("setRawEnabled").onchange = (e) => renderRawAccess(e.target.checked);
+
+// anything the user edits in Settings marks the form dirty, so a tab switch
+// does not silently reload it from the server (v0.21.1 audit)
+{
+  const panel = $("panel-settings");
+  if (panel) {
+    for (const ev of ["input", "change"]) {
+      panel.addEventListener(ev, () => { SETTINGS_DIRTY = true; });
+    }
+  }
+}
 
 /* ---------- test cookies: the button that answers "did it work?" ---------- */
 async function testCookies() {

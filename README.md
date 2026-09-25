@@ -316,6 +316,26 @@ repo has no pydantic-core.
       (21 tests), the XSS path was checked against a page whose *title* is an
       `<img onerror=…>` payload (rendered as text, no script — the UI builds
       DOM with `textContent`), and `scripts/smoke.py` still passes end to end.
+- [x] **v0.21.1, deeper pass**: a second, design-level review of engine, UI and
+      Android found one data-loss bug and a set of races. **Deleting a
+      playlist job** used to recurse into its folder (a playlist's `filepath`
+      *was* the folder) and take every other job's files with it — jobs now
+      persist their own **`files`** list and delete only those. In the UI: a
+      failed probe clears its stale quality chips (clicking one used to
+      download the *previous* URL); the playlist pick list has an explicit
+      **None** (empty used to mean "the whole playlist"), keeps a typed range
+      like `1-600`, and Start refuses an empty pick; "this download only"
+      overrides are cleared after each start instead of sticking to every
+      later job; polling is one-at-a-time, and an unreachable engine says so
+      instead of showing an empty queue that reads as "nothing downloaded".
+      On Android: the page that inlines the **API token is gated** behind a
+      per-install key (loopback is shared — any app could read the token and
+      drive the engine), the WebView **checks the responder is really our
+      engine** before it loads, the service starts **one engine per process**
+      and cleans up its notification, the cookie restore can no longer wedge
+      the boot loop, FileProvider no longer exposes the app's private dir
+      (cookie session copy, `jobs.db`), backups are off, and a share is
+      bounded, consumed once, and logged without the link itself.
 
 ## API (v0.1)
 

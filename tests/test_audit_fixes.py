@@ -7,6 +7,7 @@ found by probing the live API with hostile input, not by reading code.
 from pathlib import Path
 
 import pytest
+from suravidl_engine.jobs import JobManager
 from fastapi.testclient import TestClient
 
 AUTH = {"Authorization": "Bearer testtoken"}
@@ -155,3 +156,133 @@ def test_probe_errors_come_from_the_engine_with_the_hint(tmp_path):
         r = c.post("/probe", json={"url": "http://127.0.0.1:9/nothing"}, headers=AUTH)
         assert r.status_code == 400
         assert "Authentication" not in r.json()["detail"]
+
+
+# -- 7. a playlist row must not take the whole folder with it ---------------
+# Found by the UI auditor: a playlist job's filepath is the download *folder*,
+# so the trash button on that one row deleted every other job's files too.
+
+def _playlist_job(mgr, names=("a.mp4", "b.mp4"), files_field=True):
+    job = mgr.create("http://example.invalid/playlist")
+    d = Path(mgr.download_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    made = []
+    for n in names:
+        p = d / n
+        p.write_bytes(b"x" * 10)
+        made.append(str(p))
+    with mgr._lock:
+        j = mgr._jobs[job["id"]]
+        j.update(status="completed", filepath=str(d), title="Fixture playlist",
+                 playlist_count=len(names))
+        if files_field:
+            j["files"] = made
+        mgr._save(j)
+    return job["id"], made
+
+
+def _other_job(mgr):
+    job = mgr.create("http://example.invalid/other")
+    p = Path(mgr.download_dir) / "other.mp4"
+    p.write_bytes(b"y" * 5)
+    with mgr._lock:
+        j = mgr._jobs[job["id"]]
+        j.update(status="completed", filepath=str(p))
+        mgr._save(j)
+    return job["id"], p
+
+
+def test_a_playlist_delete_takes_only_its_own_files(tmp_path):
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        pid, made = _playlist_job(mgr)
+        oid, other = _other_job(mgr)
+        r = c.post(f"/jobs/{pid}/delete", headers=AUTH)
+        assert r.status_code == 200, r.text
+        assert r.json()["deleted"] == 2
+        assert not Path(made[0]).exists() and not Path(made[1]).exists()
+        assert Path(mgr.download_dir).is_dir(), "the folder itself must survive"
+        assert other.exists(), "an unrelated download was deleted with the playlist"
+        assert c.get(f"/jobs/{oid}", headers=AUTH).status_code == 200
+
+
+def test_an_old_playlist_row_keeps_files_it_cannot_name(tmp_path):
+    """Rows from before per-file tracking delete the row, not the folder."""
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        pid, made = _playlist_job(mgr, files_field=False)
+        oid, other = _other_job(mgr)
+        r = c.post(f"/jobs/{pid}/delete", headers=AUTH)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["deleted"] == 0
+        assert "note" in body and "folder" in body["note"]
+        assert Path(made[0]).exists() and other.exists()
+        assert c.get(f"/jobs/{pid}", headers=AUTH).status_code == 404
+
+
+def test_playlist_files_survive_a_restart(tmp_path):
+    """The file list is persisted, not just held in memory."""
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app):
+        pid, made = _playlist_job(mgr)
+    fresh = JobManager(Path(mgr.download_dir), tmp_path / "jobs.db")
+    job = fresh.get(pid)
+    assert job["files"] == made
+    fresh.delete_job(pid)
+    assert not Path(made[0]).exists()
+    assert Path(mgr.download_dir).is_dir()
+
+
+# -- 8. the UI config blob cannot close its own script tag ------------------
+
+def test_a_download_folder_cannot_break_out_of_the_config_script(tmp_path):
+    """json.dumps escapes quotes, not '<': a folder named '</script><script>'
+    ended the element early and executed (the UI config was never parsed)."""
+    app = _app(tmp_path)
+    with TestClient(app) as c:
+        nasty = str(tmp_path / "dl</script><script>window.__CFGXSS=1</script>")
+        assert c.post("/settings", json={"download_dir": nasty},
+                      headers=AUTH).status_code == 200
+        page = c.get("/").text
+        assert "</script><script>window.__CFGXSS" not in page
+        assert "\\u003c/script" in page
+
+
+# -- 9. the page that carries the token needs the shell's key ---------------
+
+def test_the_api_token_page_is_gated_by_the_shells_key(tmp_path):
+    """Loopback is shared: on Android every other installed app can open a
+    socket to 127.0.0.1:8787. With a page key set, the token page is only
+    served to a request carrying it — otherwise any app (or any page in a
+    WebView) could read the token and drive the engine."""
+    app = _app(tmp_path, page_key="s3cret-key")
+    with TestClient(app) as c:
+        assert c.get("/").status_code == 401
+        assert c.get("/?k=wrong").status_code == 401
+        ok = c.get("/?k=s3cret-key")
+        assert ok.status_code == 200
+        assert "testtoken" in ok.text          # it is the real page
+
+
+def test_without_a_page_key_the_shell_behaves_as_before(tmp_path):
+    """The desktop shells and the browser flow set no key: they must keep
+    getting the page, or every existing entry point breaks."""
+    with TestClient(_app(tmp_path)) as c:
+        assert c.get("/").status_code == 200
+
+
+def test_the_launcher_passes_the_page_key_through(tmp_path):
+    """`python -m suravidl_engine` and the Android shell share start_server:
+    a key the launcher dropped would be a silent 401 for the app."""
+    import inspect
+
+    from suravidl_engine import __main__ as launcher
+
+    sig = inspect.signature(launcher.start_server)
+    assert "page_key" in sig.parameters
+    src = inspect.getsource(launcher.start_server)
+    assert "page_key=page_key" in src

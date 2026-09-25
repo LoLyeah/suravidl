@@ -8,8 +8,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.provider.Settings
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -52,6 +54,24 @@ class MainActivity : AppCompatActivity() {
                 pageLoaded = true
                 deliverSharedUrl()      // a link shared while the UI was loading
             }
+
+            /** This WebView carries the JS bridge, so it must never leave the
+             *  engine: a stray link or redirect would hand the bridge to a
+             *  stranger's page. Everything else opens in the real browser
+             *  (v0.21.1 audit). */
+            override fun shouldOverrideUrlLoading(
+                view: WebView?, request: WebResourceRequest?
+            ): Boolean {
+                val target = request?.url?.toString() ?: return true
+                if (target.startsWith(engineOrigin())) return false
+                if (target.startsWith("https://")) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target)))
+                    } catch (_: Throwable) {
+                    }
+                }
+                return true
+            }
         }
         webView.setBackgroundColor(BG_DARK)
         webView.addJavascriptInterface(HostBridge(), "AndroidHost")
@@ -81,22 +101,105 @@ class MainActivity : AppCompatActivity() {
         waitAndLoad(root)
     }
 
+    private fun engineOrigin(): String =
+        "http://127.0.0.1:${EngineService.ENGINE_PORT}/"
+
+    /** The engine page, with the shell's key: without it the engine answers 401
+     *  (any app on the device can reach the loopback port, and that page
+     *  carries the API token — v0.21.1 audit). */
+    private fun engineUiUrl(): String {
+        val key = EngineService.pageKeyOf(this)
+        return if (key.isEmpty()) engineOrigin() else engineOrigin() + "?k=" + key
+    }
+
+    private fun engineToken(): String =
+        getSharedPreferences("engine", MODE_PRIVATE).getString("token", "") ?: ""
+
+    private fun writeLogQuietly(prefix: String, t: Throwable) {
+        try {
+            LogStore.write(this, "$prefix-${System.currentTimeMillis()}.txt",
+                           t.stackTraceToString())
+        } catch (_: Throwable) {
+        }
+    }
+
+    /**
+     * Load the engine UI — but only once the responder has proved it is our
+     * engine. The port is a fixed constant and a failed bind never reaches
+     * Kotlin, so an app that squatted 8787 would otherwise be handed this
+     * WebView and its JS bridge. The page inlines our token; only our engine
+     * knows it (v0.21.1 audit).
+     */
+    private fun loadEngineUi() {
+        val base = engineOrigin()
+        val body = try {
+            val c = URL(engineUiUrl()).openConnection() as HttpURLConnection
+            try {
+                c.connectTimeout = 4000
+                c.readTimeout = 10_000
+                if (c.responseCode == 200) {
+                    c.inputStream.bufferedReader().readText()
+                } else null
+            } finally {
+                c.disconnect()
+            }
+        } catch (_: Throwable) {
+            null
+        }
+        val token = engineToken()
+        if (body == null || token.isEmpty() || !body.contains(token)) {
+            runOnUiThread {
+                webView.loadData(
+                    "<div style='font-family:sans-serif;padding:16px'>" +
+                    "<h3>could not load the suravidl UI</h3>" +
+                    "<p style='color:#888'>Something else is answering on port " +
+                    "${EngineService.ENGINE_PORT} — close it, then reopen " +
+                    "suravidl.</p></div>",
+                    "text/html", "utf-8")
+            }
+            return
+        }
+        runOnUiThread {
+            webView.loadDataWithBaseURL(base, body, "text/html", "utf-8", null)
+        }
+    }
+
     private fun waitAndLoad(root: FrameLayout) {
         thread {
             repeat(120) {  // 60 s — Python bootstrap can be slow on first run
                 try {
                     val c = URL("http://127.0.0.1:${EngineService.ENGINE_PORT}/health")
                         .openConnection() as HttpURLConnection
-                    c.connectTimeout = 2000
-                    if (c.responseCode == 200) {
-                        val color = themeBackground()
-                        runOnUiThread {
-                            root.setBackgroundColor(color)
-                            webView.setBackgroundColor(color)
-                            webView.loadUrl("http://127.0.0.1:${EngineService.ENGINE_PORT}/")
+                    try {
+                        c.connectTimeout = 2000
+                        if (c.responseCode == 200) {
+                            val color = themeBackground()
+                            runOnUiThread {
+                                root.setBackgroundColor(color)
+                                webView.setBackgroundColor(color)
+                            }
+                            // the cookie session is a nicety, not part of the
+                            // boot: a damaged or foreign vault used to throw
+                            // inside this loop, which reloaded the whole UI
+                            // ~120 times and then showed "engine did not
+                            // start" while it was running (v0.21.1 audit)
+                            try {
+                                restoreCookieSession()
+                            } catch (t: Throwable) {
+                                Log.w(SuravidlApp.TAG, "cookie restore failed", t)
+                                writeLogQuietly("cookie-restore-error", t)
+                                // the one failure a user can act on (re-import
+                                // cookies.txt) should not be log-only
+                                val msg = t.message ?: "could not restore cookies"
+                                runOnUiThread {
+                                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            loadEngineUi()
+                            return@thread
                         }
-                        restoreCookieSession()
-                        return@thread
+                    } finally {
+                        c.disconnect()
                     }
                 } catch (_: Throwable) {
                 }
@@ -168,7 +271,24 @@ class MainActivity : AppCompatActivity() {
         if (!pageLoaded) return
         pendingSharedUrl = null
         // a real event worth a line in the log: "why didn't my share arrive?"
-        LogStore.write(this, "share.log", "shared link: $url")
+        // — the host only, because this log lives in Android/media, which any
+        // file manager can read (a private or tokenised link must not sit
+        // there in the clear — v0.21.1 audit)
+        val host = try {
+            Uri.parse(url).host ?: "link"
+        } catch (_: Throwable) {
+            "link"
+        }
+        LogStore.write(this, "share.log", "shared link from: $host")
+        // The full link stays useful for "why didn't my share arrive?" — but
+        // the media-dir copy of every log is world-readable, so the URL goes to
+        // the app-private dir only (v0.21.1 audit).
+        try {
+            val priv = File(getExternalFilesDir(null) ?: filesDir, "logs")
+                .apply { mkdirs() }
+            File(priv, "share-detail.log").appendText("shared link: $url\n")
+        } catch (_: Throwable) {
+        }
         runOnUiThread {
             webView.evaluateJavascript(
                 "window.suravidlShared && window.suravidlShared(${JSONObject.quote(url)})",
@@ -393,6 +513,10 @@ class MainActivity : AppCompatActivity() {
         /** Trailing punctuation that belongs to the sentence, not the URL. */
         private const val TRAILING = ".,;:!?)]}\u00bb\"'"
 
+        /** How much of a share we look at: a link is short, and the bare-host
+         *  pattern is quadratic on long text (v0.21.1 audit — ANR fix). */
+        private const val SHARE_MAX = 4096
+
         /** File extensions that look like a TLD but are not one ("clip.mp4"). */
         private val FILE_EXT = setOf(
             "mp4", "mp3", "m4a", "m4v", "webm", "mkv", "mov", "avi", "pdf", "jpg",
@@ -409,16 +533,27 @@ class MainActivity : AppCompatActivity() {
         fun sharedUrlFrom(intent: Intent?): String? {
             if (intent == null || intent.action != Intent.ACTION_SEND) return null
             val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+            // a share is handled once: the framework replays the intent on every
+            // recreation (rotation, dark mode, "don't keep activities") and
+            // would otherwise re-fill the URL box behind the user's back
+            // (v0.21.1 audit)
+            intent.removeExtra(Intent.EXTRA_TEXT)
             if (text.isEmpty()) return null
             return firstUrlIn(text)
         }
 
         fun firstUrlIn(text: String): String? {
-            URL_RE.find(text)?.let { return clean(it.value) }
+            // A share can carry up to a megabyte (Binder's limit) and the
+            // bare-host pattern backtracks quadratically on text without dots:
+            // one such share blocked the UI thread for minutes (an ANR, on
+            // launch and on every recreation). Bound the input first — a link
+            // is nowhere near this long (v0.21.1 audit).
+            val bounded = if (text.length > SHARE_MAX) text.take(SHARE_MAX) else text
+            URL_RE.find(bounded)?.let { return clean(it.value) }
             // No scheme: accept a bare host, but only a plausible one — not a
             // word inside an e-mail address or a file name.
-            for (match in BARE_HOST_RE.findAll(text)) {
-                val before = text.getOrNull(match.range.first - 1)
+            for (match in BARE_HOST_RE.findAll(bounded)) {
+                val before = bounded.getOrNull(match.range.first - 1)
                 if (before != null &&
                     (before == '@' || before.isLetterOrDigit() || before == '-' ||
                      before == '.')) continue

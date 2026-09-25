@@ -325,5 +325,51 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `scripts/smoke.py` green; the XSS path verified against a page whose title
     is an `<img onerror=…>` payload (rendered as text — the UI builds DOM with
     `textContent`).
+  - **v0.21.1, second half — the deeper pass** (design review of the *whole*
+    codebase, engine + UI + Android, after the hostile-input one): two
+    sub-audits reported 32 findings; the real ones are fixed here.
+    Engine: a **playlist job's `filepath` was its download folder**, so
+    deleting that one row recursed into the folder and took every other job's
+    files with it — jobs now persist their own **`files`** list (schema +
+    ALTER migration) and `delete_job` deletes only those, through
+    `_require_inside()`; legacy rows delete nothing and say so.
+    UI (~15 findings): a probe no longer paints stale quality chips
+    (`PROBE_SEQ`) and a failed probe now clears them (clicking one used to
+    download the *previous* URL); the playlist pick list got an explicit
+    **None** state (empty used to mean "the whole playlist"), keeps a typed
+    range like `1-600` (it was silently narrowed to 1-500) and disables Start
+    when nothing is picked; per-job overrides are **cleared after each start**
+    (they stuck to every later job) and an emptied preset field now *deletes*
+    the value instead of leaving it in force; polling is one-at-a-time with a
+    sequence stamp, and three failures say **"cannot reach the engine"**
+    instead of rendering an empty queue (which reads as "nothing downloaded");
+    a `/presets` failure is a load error with retry, not "No presets yet";
+    Escape only closes Settings when Settings is open; unsaved Settings survive
+    a tab switch (`SETTINGS_DIRTY`); the bulk-wipe confirm no longer claims
+    "0 files (0 B)" when the size is unreadable; `__CFG__` escapes `<`/`&`
+    (a `download_dir` containing `</script>` could break out).
+    Android (the shell, from the same reports): the engine page that inlines
+    the **API token is now gated** behind a per-install key (`GET /?k=…`) —
+    loopback is shared, so any other app could read the token and drive the
+    engine; the WebView **verifies the responder** is our engine before it
+    loads (a squatter on 8787 would otherwise get the JS bridge); the service
+    starts **one engine per process** (a re-delivered `onStartCommand` booted
+    a second one), takes its notification down when it stops, and survives an
+    FGS start failure without leaving an un-swipeable "downloading…"; the
+    cookie-restore call moved **out of the boot loop** (a damaged vault threw
+    there and reloaded the UI ~120 times, then claimed the engine never
+    started), an unreadable vault blob is dropped with a message instead of
+    failing every start; FileProvider's **`<files-path>` is gone** (it exposed
+    the plaintext cookie copy and `jobs.db` to any page with the bridge), and
+    backups/device-transfer are off; the share text is **bounded to 4 KB** (a
+    1 MB share ANR'd the launch path), a share is consumed **once** (the
+    framework replays the intent on every recreation), the shared link is
+    logged **host-only** in the world-readable log, the WebView refuses to
+    navigate off the engine, imported gallery ids are **persisted** (every
+    restart used to re-import every past download), playlist jobs import every
+    file they made, `videoMime()` stops stamping `video/mp4` on webm/mkv, a
+    failed MediaStore publish no longer leaves a hidden half-row, and MediaStore's
+    " (1)" renames are matched when deleting. 256 Python tests + 2 new
+    instrumentation tests.
   - Next up: M21 — (open) subtitles language picker per site, scheduled
     downloads (cron-style watch list).

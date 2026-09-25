@@ -313,6 +313,9 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 /* ---------- jobs ---------- */
 .empty { color: var(--muted); font-size: 13px; padding: 6px 2px 2px; }
+/* a poll that cannot reach the engine says so, instead of showing an empty
+   queue that reads as "nothing downloaded" (v0.21.1 audit) */
+.empty.trouble { color: var(--warn); }
 .job {
   padding: 14px; border-radius: 16px;
   background: var(--glass-bg);

@@ -139,21 +139,28 @@ def test_delete_one_download_takes_its_file_and_sidecars(tmp_path):
         assert mgr._con.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
 
 
-def test_delete_refuses_while_the_download_is_running(tmp_path):
-    """No silent data loss: cancel first, then delete."""
+def test_delete_refuses_while_the_download_is_running(tmp_path, monkeypatch):
+    """No silent data loss: cancel first, then delete.
+
+    The worker is stubbed to hold the job in `downloading` for good: a real
+    failing URL finishes (and writes its final row) somewhere inside this
+    test, which raced the hand-set status and made the test flaky.
+    """
+    from suravidl_engine.jobs import JobManager
+
+    def stuck_run(self, job, fmt, extra_headers):
+        job["status"] = "downloading"      # and it stays there
+
+    monkeypatch.setattr(JobManager, "_run", stuck_run)
     with _client(tmp_path) as c:
         job = c.post("/jobs", json={"url": "http://example.invalid/slow.mp4"},
                      headers=AUTH).json()
-        c.post(f"/jobs/{job['id']}/cancel", headers=AUTH)
-        for _ in range(200):                              # let the worker stop
+        for _ in range(200):                              # let the worker start
             cur = next((j for j in c.get("/jobs", headers=AUTH).json()["jobs"]
                         if j["id"] == job["id"]), None)
-            if cur and cur["status"] in ("cancelled", "error", "completed"):
+            if cur and cur["status"] == "downloading":
                 break
             time.sleep(0.05)
-        mgr = c.app.state.manager
-        with mgr._lock:                                   # noqa: SLF001
-            mgr._jobs[job["id"]]["status"] = "downloading"  # noqa: SLF001
         r = c.post(f"/jobs/{job['id']}/delete", headers=AUTH)
         assert r.status_code == 409, r.text
         assert "cancel" in r.json()["detail"].lower()

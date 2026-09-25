@@ -28,7 +28,8 @@ object LogStore {
         } catch (_: Throwable) {
         }
         try {
-            val alt = File(ctx.getExternalFilesDir(null), "logs").apply { mkdirs() }
+            val alt = File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "logs")
+                .apply { mkdirs() }
             File(alt, name).writeText(text)
         } catch (_: Throwable) {
         }
