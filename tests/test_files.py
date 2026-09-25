@@ -43,8 +43,15 @@ def test_clear_deletes_files_sidecars_and_nested_dirs(tmp_path):
         assert c.get("/files/summary", headers=AUTH).json()["files"] == 0
 
 
-def test_clear_prunes_completed_jobs_only(tmp_path):
+def test_clear_prunes_completed_jobs_only(tmp_path, monkeypatch):
     """After a wipe, finished rows should be gone; retryable ones must stay."""
+    # Stub the worker: this test decides the rows' fate, and a real worker
+    # racing its DNS failure past the hand-set status flipped "completed"
+    # back to "error" on a slower interpreter (CI: Python 3.12) — the test
+    # was racing the network for its own fixture (v0.21.2 audit).
+    from suravidl_engine.jobs import JobManager
+
+    monkeypatch.setattr(JobManager, "_run", lambda self, job_id: None)
     with _client(tmp_path) as c:
         done = c.post("/jobs", json={"url": "http://example.invalid/ok.mp4"},
                       headers=AUTH).json()
@@ -63,7 +70,10 @@ def test_clear_prunes_completed_jobs_only(tmp_path):
             time.sleep(0.05)
 
         mgr = c.app.state.manager
-        with mgr._lock:                                     # noqa: SLF001
+        # take the manager's DB lock too: `_save` serializes on it, and two
+        # threads nesting transactions on one connection is the "cannot
+        # commit - no transaction is active" traceback (v0.21.2 audit)
+        with mgr._db_lock, mgr._lock:                       # noqa: SLF001
             with mgr._con:                                  # noqa: SLF001
                 for jid, status in ((done["id"], "completed"),
                                     (bad["id"], "error")):
