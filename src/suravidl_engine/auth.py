@@ -38,11 +38,13 @@ def cookie_session(settings: dict):
         path = str(settings.get("cookies_file") or "").strip()
         if path:
             src = Path(path).expanduser()
-            if src.is_file():
-                workdir = Path(tempfile.mkdtemp(prefix="suravidl-ck-"))
-                copy = workdir / "cookies.txt"
-                shutil.copyfile(src, copy)
-                opts["cookiefile"] = str(copy)
+            if not src.is_file():
+                raise FileNotFoundError(
+                    f"cookies file not found: {src} (Settings -> Authentication)")
+            workdir = Path(tempfile.mkdtemp(prefix="suravidl-ck-"))
+            copy = workdir / "cookies.txt"
+            shutil.copyfile(src, copy)
+            opts["cookiefile"] = str(copy)
         browser = str(settings.get("cookies_from_browser") or "").strip()
         if browser:
             opts["cookiesfrombrowser"] = parse_browser(browser)

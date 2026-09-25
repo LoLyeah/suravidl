@@ -86,6 +86,16 @@ def test_cookie_session_browser_spec():
         assert opts == {}
 
 
+def test_cookie_session_missing_file_fails_loudly(tmp_path):
+    """A configured-but-deleted cookies file must not silently skip auth."""
+    from suravidl_engine.auth import cookie_session
+
+    with pytest.raises(FileNotFoundError, match="cookies file not found"):
+        with cookie_session({"cookies_file": str(tmp_path / "gone.txt"),
+                             "cookies_from_browser": ""}):
+            pass
+
+
 def test_invalid_browser_rejected_on_save(tmp_path):
     c = TestClient(make_app(tmp_path))
     r = c.post("/settings", headers=AUTH, json={"cookies_from_browser": "netscrape"})
