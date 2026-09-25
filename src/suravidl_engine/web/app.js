@@ -229,6 +229,66 @@ function dedupeFormats(list) {
   return [...best.values()];
 }
 
+/** h:mm:ss (or m:ss) — the format the clip fields and yt-dlp both take. */
+function clock(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  const mm = String(m).padStart(2, "0"), ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
+/** The subtitle languages the site actually offers — click to add one to the
+ *  wish list (typing codes blind was the review's #4 complaint). */
+function renderSubsChips(info) {
+  const box = $("subsChips");
+  box.replaceChildren();
+  const manual = Object.keys(info.subtitles || {});
+  const auto = Object.keys(info.automatic_captions || {});
+  const langs = [...new Set([...manual, ...auto])].slice(0, 14);
+  $("subsRow").classList.toggle("hidden", !langs.length);
+  for (const lang of langs) {
+    const isAuto = !manual.includes(lang);
+    const chip = el("button", "chip", lang + (isAuto ? " (auto)" : ""));
+    chip.type = "button";
+    chip.title = "download subtitles in " + lang +
+      (isAuto ? " (auto-generated — pick the site pair for real captions)" : "");
+    chip.onclick = () => {
+      const field = $("ovSubLangs");
+      const have = field.value.split(",").map((s) => s.trim()).filter(Boolean);
+      if (!have.includes(lang)) have.push(lang);
+      field.value = have.join(", ");
+      if (!$("ovSubs").value) $("ovSubs").value = "sidecar";
+      if (typeof renderOvCount === "function") renderOvCount();
+      toast(`subtitles: ${field.value}`);
+    };
+    box.append(chip);
+  }
+}
+
+/** Chapters: one click fills the clip start (and end) so a long video can be
+ *  clipped at a chapter boundary instead of typing times from memory. */
+function renderChapterChips(info) {
+  const box = $("chapterChips");
+  box.replaceChildren();
+  const chapters = (info.chapters || []).slice(0, 20);
+  $("chapterRow").classList.toggle("hidden", !chapters.length);
+  for (const ch of chapters) {
+    if (ch.start_time == null) continue;
+    const start = clock(ch.start_time);
+    const chip = el("button", "chip", ch.title || start);
+    chip.type = "button";
+    chip.title = "clip " + start +
+      (ch.end_time != null ? " → " + clock(ch.end_time) : "");
+    chip.onclick = () => {
+      $("ovClipStart").value = start;
+      $("ovClipEnd").value = ch.end_time != null ? clock(ch.end_time) : "";
+      if (typeof renderOvCount === "function") renderOvCount();
+      toast(`clip: ${ch.title || start}`);
+    };
+    box.append(chip);
+  }
+}
+
 function renderProbe(url, info) {
   $("probeCard").classList.remove("hidden");
   $("dlEmpty").classList.add("hidden");
@@ -236,6 +296,12 @@ function renderProbe(url, info) {
   const dur = info.duration
     ? " · " + Math.round(info.duration / 60) + " min" : "";
   $("probeMeta").textContent = (info.extractor || "") + dur;
+
+  // the probe has always carried these three; the UI now shows them
+  const live = info.is_live === true || info.live_status === "is_live";
+  $("liveRow").classList.toggle("hidden", !live);
+  renderSubsChips(info);
+  renderChapterChips(info);
 
   const tb = $("formats").querySelector("tbody");
   tb.innerHTML = "";
@@ -540,6 +606,16 @@ function readOv() {
   else delete patch.embed_thumbnail;
   const raw = $("ovRaw").value.trim();
   if (raw) patch.raw_args = raw; else delete patch.raw_args;
+  // clip: both times or none — half a range is not a range
+  const clipStart = $("ovClipStart").value.trim();
+  const clipEnd = $("ovClipEnd").value.trim();
+  if (clipStart && clipEnd) patch.download_sections = `${clipStart}-${clipEnd}`;
+  else delete patch.download_sections;
+  const container = $("ovContainer").value;
+  if (container) patch.video_container = container;
+  else delete patch.video_container;
+  if ($("ovArchive").value === "ignore") patch.archive_ignore = true;
+  else delete patch.archive_ignore;
   return Object.keys(patch).length ? patch : null;
 }
 
@@ -552,6 +628,10 @@ function clearOv() {
   $("ovMeta").value = "";
   $("ovThumb").value = "";
   $("ovRaw").value = "";
+  $("ovClipStart").value = "";
+  $("ovClipEnd").value = "";
+  $("ovContainer").value = "";
+  $("ovArchive").value = "";
   $("ovPreset").value = "";
   renderOvCount();
 }
@@ -598,6 +678,15 @@ function applyOvPreset() {
     patch.embed_thumbnail === true ? "on"
       : patch.embed_thumbnail === false ? "off" : "";
   if (patch.raw_args) $("ovRaw").value = patch.raw_args;
+  if (patch.download_sections) {
+    // the preset stores one string; the block shows two fields
+    const [start, end] = String(patch.download_sections)
+      .replace(/^\*/, "").split("-");
+    $("ovClipStart").value = (start || "").trim();
+    $("ovClipEnd").value = (end || "").trim();
+  }
+  if (patch.video_container) $("ovContainer").value = patch.video_container;
+  if (patch.archive_ignore) $("ovArchive").value = "ignore";
   $("ovPreset").value = name;
   renderOvCount();
   const n = Object.keys(readOv() || {}).length + (OV.preset ? 1 : 0);
@@ -631,7 +720,8 @@ function renderOvPresets() {
 function initOverrides() {
   $("ovApply").onclick = applyOvPreset;
   $("ovClear").onclick = () => { clearOv(); toast("cleared — using your settings"); };
-  for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw"]) {
+  for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw",
+                    "ovClipStart", "ovClipEnd", "ovContainer", "ovArchive"]) {
     $(id).addEventListener("input", renderOvCount);
     $(id).addEventListener("change", renderOvCount);
   }
@@ -787,6 +877,13 @@ function jobRow(j) {
       };
       r.append(open, share);
     }
+    // Play it right here (v0.22.0). Works on every platform: the engine
+    // answers Range requests, so the player can seek.
+    if (j.status === "completed" && oneFile && j.filepath) {
+      const play = el("button", "ghost-sm", "Play");
+      play.onclick = () => openPlayer(j);
+      r.append(play);
+    }
     trashHost = r;
     row.append(r);
     if (j.note) row.append(el("div", "jobhint", j.note));
@@ -798,15 +895,34 @@ function jobRow(j) {
 
   const actions = el("div", "jrow");
   if (ACTIVE.has(j.status)) {
+    // pause keeps the bytes already fetched; cancel throws them away
+    // (v0.22.0 review #6)
+    const pause = el("button", "ghost-sm", "Pause");
+    pause.onclick = () => api(`/jobs/${j.id}/pause`, { method: "POST" })
+      .then(refreshJobs).catch((e) => toast("pause failed: " + e.message, "bad"));
     const c = el("button", "ghost-sm", "Cancel");
     c.onclick = () => api(`/jobs/${j.id}/cancel`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("cancel failed: " + e.message, "bad"));
-    actions.append(c);
-  } else if (j.status === "cancelled") {
+    actions.append(pause, c);
+  } else if (j.status === "paused") {
+    const res = el("button", "ghost-sm", "Resume");
+    res.onclick = () => api(`/jobs/${j.id}/resume`, { method: "POST" })
+      .then(refreshJobs).catch((e) => toast("resume failed: " + e.message, "bad"));
+    actions.append(res);
+  } else if (j.status === "cancelled" || j.status === "error"
+             || j.status === "interrupted") {
     const r = el("button", "ghost-sm", "Retry");
     r.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     actions.append(r);
+    if (j.status !== "cancelled") {
+      // retrying the exact request that just failed is a loop; load its
+      // settings into the form so the next try can differ (review #11)
+      const edit = el("button", "ghost-sm", "Edit & retry");
+      edit.title = "load this job's URL and options into the Download tab";
+      edit.onclick = () => editAndRetry(j);
+      actions.append(edit);
+    }
   }
   // every row can be deleted (a running one is stopped first, after a confirm)
   if (!trashHost) trashHost = actions;
@@ -1143,6 +1259,10 @@ async function loadSettings() {
     $("setCookies").value = s.cookies_file || "";
     $("setCookiesBrowser").value = s.cookies_from_browser || "";
     $("setTemplate").value = s.filename_template || "";
+    $("setSubfolders").value = s.subfolders || "off";
+    $("setContainer").value = s.video_container || "auto";
+    $("setLiveFromStart").checked = !!s.live_from_start;
+    $("setSubSrt").checked = !!s.subtitles_to_srt;
     $("setEmbMeta").checked = !!s.embed_metadata;
     $("setEmbThumb").checked = !!s.embed_thumbnail;
     $("setSubMode").value = s.subtitles_mode || "off";
@@ -1439,11 +1559,15 @@ function saveSettings() {
       cookies_file: $("setCookies").value.trim(),
       cookies_from_browser: $("setCookiesBrowser").value,
       filename_template: $("setTemplate").value.trim(),
+      subfolders: $("setSubfolders").value,
+      video_container: $("setContainer").value,
+      live_from_start: $("setLiveFromStart").checked,
       embed_metadata: $("setEmbMeta").checked,
       embed_thumbnail: $("setEmbThumb").checked,
       subtitles_mode: $("setSubMode").value,
       subtitles_langs: $("setSubLangs").value.trim(),
       subtitles_auto: $("setSubAuto").checked,
+      subtitles_to_srt: $("setSubSrt").checked,
       sponsorblock_mode: $("setSbMode").value,
       sponsorblock_categories: $("setSbCats").value.trim(),
       archive: $("setArchive").checked,
@@ -1551,6 +1675,15 @@ $("bestBtn").onclick = () => startJob($("url").value.trim(), null, null, playlis
 $("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native", playlistMode());
 $("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode());
 $("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode());
+// the formats people kept asking for (review #9) — a picker beats raw args
+$("audioMore").onchange = () => {
+  const preset = $("audioMore").value;
+  $("audioMore").value = "";
+  if (!preset) return;
+  const url = $("url").value.trim();
+  if (!url) { toast("paste a link first", "bad"); return; }
+  startJob(url, null, preset, playlistMode());
+};
 $("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
 $("plAll").onclick = () => pickAll(true);
 $("plNone").onclick = () => pickAll(false);
@@ -1567,6 +1700,9 @@ loadPresets();
 checkAppUpdate();
 loadSettings();
 initAppControls();
+initPlayer();
+initBatch();
+initArchive();
 /* start on the remembered tab, unless the URL names one */
 (function bootTab() {
   let want = location.hash.slice(1);
@@ -1578,6 +1714,208 @@ initAppControls();
 })();
 refreshJobs();
 setInterval(refreshJobs, 1200);
+
+/** Play a finished download without leaving the page (the v0.22 review's #10:
+ *  "check what you downloaded, before you hunt for the file"). A media element
+ *  cannot send an Authorization header, so the stream route also takes the
+ *  page's own token in the query string. */
+function openPlayer(job) {
+  const ext = (String(job.filepath || "").split(".").pop() || "").toLowerCase();
+  const isVideo = ["mp4", "m4v", "webm", "mkv", "mov"].includes(ext);
+  const isText = ["srt", "vtt"].includes(ext);
+  $("playTitle").textContent = job.title || "download";
+  const body = $("playBody");
+  body.replaceChildren();
+  const src = `/jobs/${encodeURIComponent(job.id)}/stream?token=` +
+    encodeURIComponent(CFG.token);
+  let node;
+  if (isVideo) {
+    node = document.createElement("video");
+    node.controls = true;
+    node.autoplay = true;
+    node.className = "player-video";
+    node.playsInline = true;
+    node.src = src;
+  } else if (isText) {
+    node = document.createElement("pre");
+    node.className = "player-text";
+    fetch(src).then((r) => r.text()).then((t) => { node.textContent = t; })
+      .catch(() => { node.textContent = "could not load the subtitles"; });
+  } else {
+    node = document.createElement("audio");
+    node.controls = true;
+    node.autoplay = true;
+    node.className = "player-audio";
+    node.src = src;
+  }
+  body.append(node);
+  $("playModal").classList.remove("hidden");
+}
+
+function closePlayer() {
+  $("playBody").replaceChildren();   // stops the audio of a hidden player
+  $("playModal").classList.add("hidden");
+}
+
+function initPlayer() {
+  $("playClose").onclick = closePlayer;
+  $("playModal").onclick = (e) => {
+    if (e.target === $("playModal")) closePlayer();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("playModal").classList.contains("hidden")) {
+      closePlayer();
+    }
+  });
+}
+
+/** Several links in the box at once: offer to queue them all (review #5).
+ *  Pasting into a single-line input collapses the newlines to spaces, so a
+ *  multi-line paste arrives as space-separated URLs — split on whitespace. */
+function pastedUrls() {
+  const text = $("url").value.trim();
+  if (!text) return [];
+  return text.split(/\s+/).filter((s) => /^(https?|ftp|magnet):/i.test(s));
+}
+
+function renderBatchRow() {
+  const urls = pastedUrls();
+  const many = urls.length > 1;
+  $("batchRow").classList.toggle("hidden", !many);
+  $("batchCount").textContent = many
+    ? `${urls.length} links pasted — queue them all?` : "";
+}
+
+function initBatch() {
+  $("url").addEventListener("input", renderBatchRow);
+  $("url").addEventListener("change", renderBatchRow);
+  $("batchBtn").onclick = async () => {
+    const urls = pastedUrls();
+    if (urls.length < 2) return;
+    const body = { urls };
+    if (OV.preset) body.preset = OV.preset;
+    const overrides = readOv();
+    if (overrides) body.overrides = overrides;
+    $("batchBtn").classList.add("busy");
+    try {
+      const r = await api("/jobs/batch",
+        { method: "POST", body: JSON.stringify(body) });
+      $("url").value = "";
+      renderBatchRow();
+      clearOv();
+      const n = (r.jobs || []).length;
+      const skipped = r.skipped || [];
+      if (skipped.length) {
+        toast(`${n} queued · ${skipped.length} skipped: ` + skipped[0].error,
+          "bad");
+      } else {
+        toast(`${n} links queued`, "info");
+      }
+      refreshJobs();
+    } catch (e) {
+      toast("could not queue those links: " + e.message, "bad");
+    } finally {
+      $("batchBtn").classList.remove("busy");
+    }
+  };
+}
+
+/** The download archive used to be a black box (review #7): show what is in
+ *  it, and let the user forget an entry so that video can be fetched again. */
+async function loadArchive() {
+  try {
+    const a = await api("/archive");
+    const n = a.count || 0;
+    $("archiveCount").textContent = n
+      ? `· ${n} entr${n === 1 ? "y" : "ies"}` : "· empty";
+    const list = $("archiveList");
+    list.replaceChildren();
+    list.classList.remove("hidden");
+    if (!n) {
+      list.append(el("div", "muted small", "nothing archived yet"));
+      return;
+    }
+    const entries = (a.entries || []).slice(-50).reverse();
+    if (a.entries && entries.length < n) {
+      list.append(el("div", "muted small",
+        `showing the last ${entries.length} of ${n}`));
+    }
+    for (const line of entries) {
+      const row = el("div", "jrow");
+      row.append(el("span", "small mono", line));
+      const forget = el("button", "ghost-sm", "forget");
+      forget.onclick = async () => {
+        try {
+          await api("/archive/forget",
+            { method: "POST", body: JSON.stringify({ entry: line }) });
+          toast("forgotten — that video can be downloaded again", "info");
+          loadArchive();
+        } catch (e) {
+          toast("could not forget: " + e.message, "bad");
+        }
+      };
+      row.append(forget);
+      list.append(row);
+    }
+  } catch (e) {
+    toast("could not read the archive: " + e.message, "bad");
+  }
+}
+
+function initArchive() {
+  $("archiveShow").onclick = () => {
+    const list = $("archiveList");
+    if (!list.classList.contains("hidden") && list.childElementCount) {
+      list.classList.add("hidden");
+      return;
+    }
+    loadArchive();
+  };
+  $("archiveForget").onclick = async () => {
+    const entry = $("archiveEntry").value.trim();
+    if (!entry) { toast("paste an archive entry first", "bad"); return; }
+    try {
+      const r = await api("/archive/forget",
+        { method: "POST", body: JSON.stringify({ entry }) });
+      toast(`forgotten ${r.removed} entr${r.removed === 1 ? "y" : "ies"}`,
+        "info");
+      $("archiveEntry").value = "";
+      loadArchive();
+    } catch (e) {
+      toast("could not forget: " + e.message, "bad");
+    }
+  };
+}
+
+/** Put a failed job's URL and options back into the Download tab so the next
+ *  attempt can be different — a site that refused one format often takes
+ *  another, and re-running the identical request is a loop (review #11). */
+function editAndRetry(j) {
+  $("url").value = j.url || "";
+  clearOv();
+  if (j.preset) { OV.preset = j.preset; $("ovPreset").value = j.preset; }
+  const ov = j.overrides || {};
+  if (ov.subtitles_mode) $("ovSubs").value = ov.subtitles_mode;
+  if (ov.subtitles_langs) $("ovSubLangs").value = ov.subtitles_langs;
+  if (ov.sponsorblock_mode) $("ovSb").value = ov.sponsorblock_mode;
+  $("ovMeta").value = ov.embed_metadata === true ? "on"
+    : ov.embed_metadata === false ? "off" : "";
+  $("ovThumb").value = ov.embed_thumbnail === true ? "on"
+    : ov.embed_thumbnail === false ? "off" : "";
+  if (ov.raw_args) $("ovRaw").value = ov.raw_args;
+  if (ov.video_container) $("ovContainer").value = ov.video_container;
+  if (ov.archive_ignore) $("ovArchive").value = "ignore";
+  if (ov.download_sections) {
+    const [start, end] = String(ov.download_sections)
+      .replace(/^\*/, "").split("-");
+    $("ovClipStart").value = (start || "").trim();
+    $("ovClipEnd").value = (end || "").trim();
+  }
+  renderOvCount();
+  showTab("download");
+  toast("loaded the failed settings — change what you like, then start it", "info");
+}
+
 addEventListener("scroll", () => {
   document.body.classList.toggle("scrolled", scrollY > 4);
 }, { passive: true });

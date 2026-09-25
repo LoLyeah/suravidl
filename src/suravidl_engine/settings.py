@@ -20,6 +20,13 @@ DEFAULTS = {
     "embed_metadata": False,
     "embed_thumbnail": False,
     "rate_limit": "",            # e.g. "2M" (bytes/s)
+    "subfolders": "off",         # off | playlist | site — keep big batches tidy
+    "video_container": "auto",   # auto | mp4 | mkv — remux for compatibility
+    "live_from_start": False,    # live streams: record from the start when the
+                                 # site still has it (yt-dlp --live-from-start)
+    "download_sections": "",     # "" or a clip like "00:01:30-00:02:45"
+    "subtitles_to_srt": False,   # TVs want .srt, not YouTube's .vtt
+    "archive_ignore": False,     # this job only: download even if archived
     "fragments": 1,              # concurrent fragment downloads (1-16)
     "retries": 10,               # yt-dlp retries per download (0-30)
     "max_downloads": 0,          # stop after N downloads in a playlist (0 = all)
@@ -226,6 +233,28 @@ class Settings:
             from .download_opts import validate_template
 
             return validate_template(str(value or ""))
+        if key == "subfolders":
+            from .download_opts import SUBFOLDER_MODES
+
+            v = str(value or "off").strip().lower() or "off"
+            if v not in SUBFOLDER_MODES:
+                raise ValueError(f"subfolders must be one of {list(SUBFOLDER_MODES)}")
+            return v
+        if key == "video_container":
+            from .download_opts import CONTAINERS
+
+            v = str(value or "auto").strip().lower() or "auto"
+            if v not in CONTAINERS:
+                raise ValueError(f"video_container must be one of {list(CONTAINERS)}")
+            return v
+        if key == "download_sections":
+            from .download_opts import parse_sections
+
+            text = str(value or "").strip()
+            if not text:
+                return ""
+            start, end = parse_sections(text)
+            return f"*{start}-{end}"
         if key == "subtitles_mode":
             from .download_opts import SUBTITLE_MODES
 
@@ -238,7 +267,8 @@ class Settings:
             if any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,._-* " for c in value):
                 raise ValueError("subtitles_langs must be a comma list of language codes")
             return value
-        if key in ("subtitles_auto", "embed_metadata", "embed_thumbnail", "archive"):
+        if key in ("subtitles_auto", "embed_metadata", "embed_thumbnail", "archive",
+                   "subtitles_to_srt", "archive_ignore", "live_from_start"):
             return bool(value)
         if key == "rate_limit":
             from .download_opts import parse_rate_limit

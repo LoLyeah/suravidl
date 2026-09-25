@@ -51,7 +51,7 @@ def test_clear_prunes_completed_jobs_only(tmp_path, monkeypatch):
     # was racing the network for its own fixture (v0.21.2 audit).
     from suravidl_engine.jobs import JobManager
 
-    monkeypatch.setattr(JobManager, "_run", lambda self, job_id: None)
+    monkeypatch.setattr(JobManager, "_run", lambda self, *a, **k: None)
     with _client(tmp_path) as c:
         done = c.post("/jobs", json={"url": "http://example.invalid/ok.mp4"},
                       headers=AUTH).json()

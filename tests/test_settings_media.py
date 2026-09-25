@@ -1,6 +1,7 @@
 """Validation for the tier-1 settings: template, subtitles, network, sponsorblock."""
 import pytest
 
+from suravidl_engine.download_opts import build_download_opts
 from suravidl_engine.settings import Settings
 
 
@@ -26,18 +27,31 @@ def test_template_accepts_reasonable_values(s):
     assert s.get()["filename_template"] == "%(uploader)s - %(title)s.%(ext)s"
     s.update({"filename_template": "%(title).100B.%(ext)s"})
     assert s.get()["filename_template"] == "%(title).100B.%(ext)s"
+    # v0.22.0: a *relative* subfolder is how a channel or course stays tidy —
+    # it used to be refused, which is why every batch landed flat
+    s.update({"filename_template": "sub/dir/%(title)s.%(ext)s"})
+    assert s.get()["filename_template"] == "sub/dir/%(title)s.%(ext)s"
 
 
 @pytest.mark.parametrize("bad", [
     "",                      # empty
     "no-ext-placeholder",    # mandatory %(ext)s missing
     "../escape.%(ext)s",     # path traversal
-    "sub/dir/%(title)s.%(ext)s",  # path separators
-    "sub\\dir.%(ext)s",
+    "/etc/passwd.%(ext)s",   # absolute: writes outside the download folder
+    "sub\\dir.%(ext)s",      # a backslash is a separator on Windows
 ])
 def test_template_rejects_bad_values(s, bad):
     with pytest.raises(ValueError):
         s.update({"filename_template": bad})
+
+
+def test_a_tilde_in_a_template_stays_inside_the_download_folder(s):
+    """Verified by running it: yt-dlp does not expand `~`, so the file lands in
+    a literal `~` directory *inside* the download folder — not in $HOME."""
+    s.update({"filename_template": "~/%(title)s.%(ext)s"})
+    opts = build_download_opts({"filename_template": "~/%(title)s.%(ext)s"},
+                               "/tmp/dl_tilde_check")
+    assert opts["outtmpl"].startswith("/tmp/dl_tilde_check/~/")
 
 
 def test_subtitles_validation(s):

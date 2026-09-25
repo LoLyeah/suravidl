@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 ACTIVE_STATUSES = ("queued", "downloading", "merging")
 
+
+def _stop_requested(job: dict) -> bool:
+    """Did the user ask this job to stop — cancel or pause?
+
+    Both share the same cooperative stop: the worker returns at its next
+    progress hook, which is also what keeps the partial `.part` file on disk.
+    `cancelled` means "I do not want this"; `paused` means "not now, keep the
+    bytes" (v0.22.0 feature review #6).
+    """
+    return job["status"] in ("cancelled", "paused")
+
 # A URL longer than this is junk, not a link (the audit found the engine
 # happily storing 5000 characters of "xxxx…" as a job).
 URL_MAX = 4096
@@ -95,6 +106,36 @@ AUDIO_PRESETS: dict[str, dict] = {
         "postprocessors": [
             {"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
              "preferredquality": "192"},
+        ],
+    },
+    # the v0.22.0 feature review (#9): 192k was the only MP3, and the native
+    # Opus / lossless FLAC that YouTube and Bandcamp actually serve had no
+    # path except raw arguments. The Android build's ffmpeg already carries
+    # the mp3/flac/opus encoders and muxers, so all of these work on a phone.
+    "audio-mp3-320": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
+             "preferredquality": "320"},
+        ],
+    },
+    "audio-mp3-128": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3",
+             "preferredquality": "128"},
+        ],
+    },
+    "audio-flac": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "flac"},
+        ],
+    },
+    "audio-opus": {
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {"key": "FFmpegExtractAudio", "preferredcodec": "opus"},
         ],
     },
 }
@@ -376,17 +417,55 @@ class JobManager:
         self._save(job)
         return self.get(job_id)
 
-    def retry(self, job_id: str) -> dict:
-        """Re-run a terminal (error/interrupted/cancelled) job as a new job."""
+    def pause(self, job_id: str) -> dict:
+        """Stop a running job *without* discarding what it already has.
+
+        It is the same cooperative stop cancel uses (the worker returns at its
+        next progress hook, which is what keeps the `.part` file on disk), but
+        it is recorded as `paused` so the row can be resumed instead of
+        retried. Cancel means "I do not want this"; pause means "not now"
+        (v0.22.0 feature review #6).
+        """
+        with self._lock:
+            job = self._jobs[job_id]
+            if job["status"] not in ACTIVE_STATUSES:
+                raise ValueError(f"cannot pause job in status '{job['status']}'")
+            job["status"] = "paused"
+        self._save(job)
+        return self.get(job_id)
+
+    def resume(self, job_id: str) -> dict:
+        """Continue a paused job: a new row that reuses the partial file."""
         src = self.get(job_id)
-        if src["status"] not in ("error", "interrupted", "cancelled"):
+        if src["status"] != "paused":
+            raise ValueError(f"cannot resume job in status '{src['status']}'")
+        return self._requeue(src)
+
+    def retry(self, job_id: str,
+              patch: dict | None = None) -> dict:
+        """Re-run a terminal job as a new one, optionally with edits.
+
+        `patch` may carry {fmt, preset, overrides, raw_args}: a site that
+        answered 403 for one format often works with another, and re-running
+        the exact same failing request just loops (v0.22.0 review #11).
+        """
+        src = self.get(job_id)
+        if src["status"] not in ("error", "interrupted", "cancelled", "paused"):
             raise ValueError(f"cannot retry job in status '{src['status']}'")
-        return self.create(src["url"], fmt=src.get("fmt"),
-                           extra_headers=src.get("headers"),
-                           preset=src.get("preset"),
+        return self._requeue(src, patch)
+
+    def _requeue(self, src: dict, patch: dict | None = None) -> dict:
+        """Create a new job from an old row, with optional edits applied."""
+        patch = dict(patch or {})
+        overrides = {**(src.get("overrides") or {}),
+                     **(patch.get("overrides") or {})} or None
+        return self.create(src["url"],
+                           fmt=patch.get("fmt", src.get("fmt")),
+                           extra_headers=patch.get("headers", src.get("headers")),
+                           preset=patch.get("preset", src.get("preset")),
                            playlist_items=src.get("playlist_items"),
-                           raw_args=src.get("raw_args"),
-                           overrides=src.get("overrides"))
+                           raw_args=patch.get("raw_args", src.get("raw_args")),
+                           overrides=overrides)
 
     def clear_completed(self) -> int:
         """Forget completed jobs (their files are gone after /files/clear).
@@ -594,14 +673,14 @@ class JobManager:
             self._release_slot()
 
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
-        if job["status"] == "cancelled":  # cancelled while queued
+        if _stop_requested(job):  # cancelled or paused while queued
             return
 
         class _Cancelled(Exception):
             pass
 
         def hook(d):
-            if job["status"] == "cancelled":  # cancel requested mid-run
+            if _stop_requested(job):  # stop requested mid-run
                 raise _Cancelled()
             d_info = d.get("info_dict") or {}
             # Record the target as soon as yt-dlp names it. A cancelled or
@@ -719,19 +798,22 @@ class JobManager:
                     made.append(str(job["filepath"]))
                 job["files"] = made
             with self._lock:
-                if job["status"] == "cancelled":
-                    # a cancel that landed while yt-dlp was finishing is still
-                    # a cancel: claiming "completed" (and firing the completion
-                    # action) would contradict the user (v0.21.2 audit)
+                if _stop_requested(job):
+                    # a cancel (or pause) that landed while yt-dlp was finishing
+                    # is still a stop: claiming "completed" (and firing the
+                    # completion action) would contradict the user (v0.21.2)
                     return
                 job["status"] = "completed"
                 job["completed_at"] = datetime.now(timezone.utc).isoformat()
         except _Cancelled:
-            job["status"] = "cancelled"
-            job["error"] = "cancelled by user"
+            if not _stop_requested(job):   # keep the word the user asked for
+                job["status"] = "cancelled"
+            job["error"] = ("paused by user" if job["status"] == "paused"
+                            else "cancelled by user")
         except Exception as e:  # noqa: BLE001 - surfaced to the UI
-            if job["status"] == "cancelled":  # raced with cancel
-                job["error"] = "cancelled by user"
+            if _stop_requested(job):  # raced with cancel/pause
+                job["error"] = ("paused by user" if job["status"] == "paused"
+                                else "cancelled by user")
             else:
                 job["status"] = "error"
                 job["error"] = explain_download_error(str(e))

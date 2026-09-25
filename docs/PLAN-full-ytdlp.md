@@ -408,5 +408,24 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     hit our own copies: fixed defensively); desktop entry calls
     **`freeze_support()`**; `smoke.py` stops hard-coding `.venv/bin/python`;
     the extension captures **media requests only**. 276 tests.
-  - Next up: M21 — (open) subtitles language picker per site, scheduled
-    downloads (cron-style watch list).
+  - **v0.22.0 — the feature review**: this pass was a *product* review, not a
+    defect hunt. Antigravity was asked what the app still needs; its twelve
+    ranked findings were each checked against the code (and reproduced where
+    possible) before anything was built. Shipped: **subfolders**
+    (`off/playlist/site`, and `filename_template` may now hold a *relative*
+    folder — separators had always been refused, which is exactly why every
+    playlist landed flat), **MP4/MKV remuxing** (`video_container`),
+    **clipping** (`download_sections` + chapter chips), **subtitle chips and
+    `.vtt → .srt`**, **`POST /jobs/batch`** (≤20, per-link skips),
+    **pause/resume** (`paused` keeps the `.part`; resume continues from the
+    byte offset), **archive inspect/forget + `archive_ignore`**, **MP3
+    320/128 + FLAC + Opus presets**, **`GET /jobs/{id}/stream`** with Range
+    (and an in-page player), and **edit-and-retry** (`POST /jobs/{id}/retry`
+    takes `{fmt, preset, overrides, raw_args}`; the UI reloads the failed row
+    into the form). Live: `● LIVE` badge from the probe + `live_from_start`.
+    Deferred on purpose (both on the record): queue reordering — the report
+    itself said postpone it, and it means replacing the one-thread-per-job
+    model — and a custom live finaliser (yt-dlp already flushes the
+    container). `tests/test_features22.py` (36 tests, written RED first).
+  - Next up: M21 — (open) subtitles language picker per site (half-shipped in
+    v0.22.0 as probe chips + srt), scheduled downloads (cron-style watch list).

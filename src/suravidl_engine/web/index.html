@@ -59,6 +59,10 @@
         <button id="probeBtn" class="btn prime">Probe</button>
       </div>
       <div id="probeMsg" class="msg muted"></div>
+      <div id="batchRow" class="audioRow hidden">
+        <span class="muted" id="batchCount"></span>
+        <button id="batchBtn" class="btn prime sm">Queue all</button>
+      </div>
       <div id="qualityRow" class="audioRow hidden">
         <span class="muted">Quality:</span>
         <span id="qualityBtns" class="qrow"></span>
@@ -77,6 +81,26 @@
         <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed">keep original</button>
         <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
         <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
+        <select id="audioMore" title="more audio formats">
+          <option value="">more formats…</option>
+          <option value="audio-mp3-320">MP3 320k</option>
+          <option value="audio-mp3-128">MP3 128k</option>
+          <option value="audio-flac">FLAC lossless</option>
+          <option value="audio-opus">Opus (native)</option>
+        </select>
+      </div>
+      <div id="liveRow" class="audioRow hidden">
+        <span class="chip">● LIVE</span>
+        <span class="muted small">live stream — the download keeps recording until you cancel it</span>
+      </div>
+      <div id="subsRow" class="audioRow hidden">
+        <span class="muted">Subtitles:</span>
+        <span id="subsChips" class="qrow"></span>
+      </div>
+      <div id="chapterRow" class="audioRow hidden">
+        <span class="muted">Chapters:</span>
+        <span id="chapterChips" class="qrow"></span>
+        <span class="muted small">click one to clip from here</span>
       </div>
       <div id="playlistRow" class="audioRow hidden">
         <span class="muted">Playlist items:</span>
@@ -145,6 +169,31 @@
               <option value="off">do not embed thumbnail</option>
             </select>
           </div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovClipStart">Clip — only a section</label>
+          <div class="jrow">
+            <input id="ovClipStart" type="text" spellcheck="false" placeholder="start 1:30"/>
+            <input id="ovClipEnd" type="text" spellcheck="false" placeholder="end 2:45"/>
+            <button id="ovClipClear" class="btn ghost-sm" type="button">whole video</button>
+          </div>
+          <span class="muted small">mm:ss or hh:mm:ss — for a 30-second highlight
+            out of a 3-hour stream</span>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovContainer">Container</label>
+          <select id="ovContainer">
+            <option value="">use my settings</option>
+            <option value="mp4">MP4 — remux, plays everywhere</option>
+            <option value="mkv">MKV — remux</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovArchive">Already downloaded before</label>
+          <select id="ovArchive">
+            <option value="">use my settings</option>
+            <option value="ignore">download it again anyway</option>
+          </select>
         </div>
       </div>
       <div class="field hidden" id="ovRawRow">
@@ -271,7 +320,37 @@
           <input id="setTemplate" type="text" spellcheck="false"
                  placeholder="%(title).100B.%(ext)s"/>
           <span class="muted small">must contain %(ext)s · example:
-            <code>%(uploader)s - %(title)s.%(ext)s</code></span>
+            <code>%(uploader)s - %(title)s.%(ext)s</code> · a relative folder like
+            <code>channel/%(title).100B.%(ext)s</code> keeps things tidy</span>
+        </div>
+
+        <div class="field row">
+          <label class="lbl" for="setSubfolders">Subfolders</label>
+          <select id="setSubfolders">
+            <option value="off">Off — everything in one folder</option>
+            <option value="playlist">One per playlist or channel</option>
+            <option value="site">One per site</option>
+          </select>
+          <span class="muted small">for playlists, courses and channels</span>
+        </div>
+
+        <div class="field">
+          <label class="check small" for="setLiveFromStart">
+            <input id="setLiveFromStart" type="checkbox"/>
+            Live streams: record from the beginning
+            <span class="muted">(when the site still serves it — otherwise from
+              the moment you hit download)</span>
+          </label>
+        </div>
+
+        <div class="field row">
+          <label class="lbl" for="setContainer">Preferred container</label>
+          <select id="setContainer">
+            <option value="auto">Auto — whatever the site serves</option>
+            <option value="mp4">MP4 — plays on everything</option>
+            <option value="mkv">MKV — plays on media players</option>
+          </select>
+          <span class="muted small">MP4 remuxes the streams without re-encoding</span>
         </div>
 
         <div class="field">
@@ -300,6 +379,27 @@
             <input id="setSubAuto" type="checkbox"/>
             Include auto-generated captions
           </label>
+          <label class="check small" for="setSubSrt">
+            <input id="setSubSrt" type="checkbox"/>
+            Convert subtitles to .srt
+            <span class="muted">(TVs and most players cannot read the .vtt that
+              YouTube serves)</span>
+          </label>
+        </div>
+
+        <div class="field" id="archiveField">
+          <label class="lbl">Download archive
+            <span class="muted small" id="archiveCount"></span></label>
+          <div class="jrow">
+            <button id="archiveShow" class="btn sm" type="button">show entries</button>
+            <input id="archiveEntry" type="text" spellcheck="false"
+                   placeholder="paste an entry to forget it"/>
+            <button id="archiveForget" class="btn sm" type="button">forget</button>
+          </div>
+          <div id="archiveList" class="col hidden"></div>
+          <span class="muted small">with the archive on, a video that was already
+            downloaded is skipped — forget its entry (or turn the archive off)
+            to fetch it again</span>
         </div>
 
         <div class="field row">
@@ -541,6 +641,18 @@
       <button id="confirmNo" class="btn">Cancel</button>
       <button id="confirmYes" class="btn danger">Confirm</button>
     </div>
+  </div>
+</div>
+
+<!-- play modal: a finished download plays right here (v0.22.0) -->
+<div id="playModal" class="overlay hidden">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="playTitle" class="title"></span>
+      <span class="spacer"></span>
+      <button id="playClose" class="btn ghost-sm">Close</button>
+    </div>
+    <div id="playBody"></div>
   </div>
 </div>
 

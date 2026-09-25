@@ -20,12 +20,22 @@ BUILTIN_PRESETS: dict[str, dict] = {
     "audio-native": {"preset": "audio-native"},
     "audio-m4a": {"preset": "audio-m4a"},
     "audio-mp3": {"preset": "audio-mp3"},
+    # v0.22.0 (feature review #9): 192k MP3 was the only "convert" path, and
+    # the native Opus / lossless FLAC these sites actually serve had none.
+    "audio-mp3-320": {"preset": "audio-mp3-320"},
+    "audio-mp3-128": {"preset": "audio-mp3-128"},
+    "audio-flac": {"preset": "audio-flac"},
+    "audio-opus": {"preset": "audio-opus"},
 }
 
 BUILTIN_DESCRIPTIONS = {
     "audio-native": "keep the audio stream as the site serves it (no ffmpeg)",
     "audio-m4a": "extract the audio to m4a",
     "audio-mp3": "extract the audio to mp3 192k",
+    "audio-mp3-320": "extract the audio to mp3 320k",
+    "audio-mp3-128": "extract the audio to mp3 128k (small files)",
+    "audio-flac": "extract the audio to flac (lossless)",
+    "audio-opus": "extract the audio to opus (native, no generation loss)",
 }
 
 MAX_NAME = 40

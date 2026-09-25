@@ -342,6 +342,7 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
   box-shadow: 0 0 14px var(--err-bg);
 }
 .pill.cancelled { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
+.pill.paused { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
 .bar { height: 8px; border-radius: 999px; background: var(--bar-bg); margin: 11px 0 7px; overflow: hidden; position: relative; }
 /* scoped to the bar: a bare `.fill` also matched the settings layout helper
    <div class="col fill">, painting a big gradient capsule over the fields */
@@ -649,3 +650,20 @@ html[data-host="android"] .modal-foot {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent-line, var(--accent));
 }
+
+/* ---- v0.22.0: the in-page player, batch row, archive list ---- */
+.player-video {
+  display: block; width: 100%; max-height: 68vh;
+  border-radius: 12px; background: #000;
+}
+.player-audio { width: 100%; }
+.player-text {
+  max-height: 60vh; overflow: auto; margin: 0;
+  white-space: pre-wrap; font-size: 12.5px;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#archiveList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+#archiveList .jrow { margin-top: 0; }
+#archiveList .mono { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+#archiveList.hidden { display: none; }

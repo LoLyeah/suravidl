@@ -380,6 +380,36 @@ repo has no pydantic-core.
       **media requests only** instead of keeping cookies for every page
       request. `tests/test_audit2_fixes.py` pins each one (20 tests).
 
+- [x] **v0.22.0 — what it still needed**: the third Antigravity pass was a
+      *product* review instead of a defect hunt ("what does this app still
+      need?"). Twelve ranked findings; every claim was checked against the
+      code — and reproduced on a live engine where it could be — before a line
+      was written (`docs/audits/2026-09-26-antigravity-features.md`).
+      Shipped: **subfolders** (`off / playlist / site`, and a
+      `filename_template` may finally hold a *relative* folder — it had always
+      refused separators, which is why every playlist landed flat);
+      **MP4/MKV remuxing** (`video_container`) so a finished download opens in
+      QuickTime, iOS Files and Smart TVs, not only in VLC; **clipping**
+      (`0:10-0:20` per download, with chapter chips straight from the probe);
+      **subtitle-language chips** and `.vtt → .srt` conversion for TVs;
+      **batch queueing** (`POST /jobs/batch`, ≤20 links, bad lines named and
+      skipped instead of swallowed); **pause/resume** (cancel's cooperative
+      stop, but it keeps the `.part` and says `paused`); **archive
+      management** (ignore it for one download; list and forget an entry that
+      had made a video un-downloadable for ever); **more audio formats**
+      (MP3 320/128, FLAC, Opus — 192k MP3 had been the only conversion path);
+      an **in-page player** (`GET /jobs/{id}/stream`, Range/206, the same path
+      guard the delete path uses); and **edit-and-retry** (a 403 fails the
+      same way every time, so a retry may now carry new options — and the UI
+      loads the failed row back into the form). Live streams: the probe always
+      carried `is_live`; the UI now shows a **● LIVE** badge and
+      `live_from_start` records from the beginning when the site still has it.
+      Left out on the record: **queue reordering** (the report itself said to
+      postpone it — it means replacing the one-thread-per-job model) and a
+      custom live-stream *finaliser* (yt-dlp already flushes the container;
+      that claim was overstated). `tests/test_features22.py` (36 tests) pins
+      all of it.
+
 ## API (v0.1)
 
 | Endpoint | Auth | Purpose |

@@ -2,13 +2,14 @@
 import argparse
 import json
 import os
+import re
 import secrets
 import sys
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -48,6 +49,63 @@ class AuthCheckRequest(BaseModel):
 class FilesClearRequest(BaseModel):
     """The bulk wipe is destructive: it takes the word, not just a button."""
     confirm: str = ""
+
+
+class BatchJobRequest(BaseModel):
+    """Several links in one go — the "paste 10 links, queue them all" flow."""
+    urls: list[str]
+    fmt: str | None = None
+    headers: dict | None = None
+    preset: str | None = None
+    playlist_items: str | None = None
+    raw_args: str | None = None
+    overrides: dict | None = None
+
+
+class ArchiveForgetRequest(BaseModel):
+    entry: str = ""
+
+
+class RetryRequest(BaseModel):
+    """Edits for a retry: anything left out is reused from the original job."""
+    fmt: str | None = None
+    preset: str | None = None
+    overrides: dict | None = None
+    raw_args: str | None = None
+
+
+# one batch is a click, not a crawl: a bigger paste belongs in several goes
+BATCH_MAX = 20
+
+_MEDIA_TYPES = {
+    ".mp4": "video/mp4", ".m4v": "video/x-m4v", ".webm": "video/webm",
+    ".mkv": "video/x-matroska", ".mov": "video/quicktime",
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac",
+    ".opus": "audio/ogg", ".ogg": "audio/ogg", ".flac": "audio/flac",
+    ".wav": "audio/wav",
+    ".srt": "text/plain; charset=utf-8", ".vtt": "text/vtt",
+}
+
+
+def _media_type(path: Path) -> str:
+    return _MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+
+
+def _looks_like_url(text: str) -> bool:
+    """Is this paste item even a link?
+
+    The single-link box can afford to hand yt-dlp anything (it answers with
+    its own "not a valid URL"), but a paste of twenty lines usually carries a
+    stray word or a blank: those are named and skipped instead of queued to
+    fail later.
+    """
+    if not text or any(ch.isspace() for ch in text):
+        return False
+    if re.match(r"^[a-z][a-z0-9+.\-]*://", text, re.I):     # https://, ftp://
+        return True
+    if re.match(r"^[a-z][a-z0-9+.\-]*:[^/\s]", text, re.I):  # magnet:, ytsearch:
+        return True
+    return "." in text.split("/")[0]                        # bare host/path
 
 
 def _web_dir() -> Path:
@@ -324,8 +382,13 @@ def create_app(download_dir, auth_token: str | None = None,
         """
         return check_auth(settings.get(), (body.url or "").strip() or None)
 
-    @app.post("/jobs")
-    def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
+    def _queue_one(body: JobRequest, mgr: JobManager) -> dict:
+        """Validate and queue one job — the shared heart of /jobs and /jobs/batch.
+
+        Both paths must enforce the identical rules (raw-args gate, preset
+        expansion, override whitelist): a batch endpoint that skips them is a
+        way around the gate.
+        """
         s = settings.get()
         raw = body.raw_args
         if raw is not None and not s["raw_args_enabled"]:
@@ -349,17 +412,69 @@ def create_app(download_dir, auth_token: str | None = None,
                 audio, patch = split_patch(entry["patch"])
                 preset = audio
                 overrides = {**(overrides or {}), **patch} or None
-        try:
-            job = mgr.create(body.url, fmt=body.fmt,
-                             extra_headers=body.headers,
-                             preset=preset,
-                             playlist_items=body.playlist_items,
-                             raw_args=raw,
-                             overrides=overrides)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        job = mgr.create(body.url, fmt=body.fmt,
+                         extra_headers=body.headers,
+                         preset=preset,
+                         playlist_items=body.playlist_items,
+                         raw_args=raw,
+                         overrides=overrides)
         remember_site_quality(body.url, body.fmt)
         return redact_job(job)
+
+    @app.post("/jobs")
+    def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
+        try:
+            return _queue_one(body, mgr)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/jobs/batch")
+    def create_jobs(body: BatchJobRequest, mgr: JobManager = Depends(require_auth)):
+        """Queue several links at once (the v0.22 feature review's #5).
+
+        One bad link must not cost the user the good ones: each is queued on
+        its own and the refusals come back in `skipped`, with the reason.
+        """
+        urls = [str(u or "").strip() for u in body.urls]
+        urls = [u for u in urls if u]
+        if not urls:
+            raise HTTPException(status_code=400,
+                                detail="no links found in that paste")
+        if len(urls) > BATCH_MAX:
+            raise HTTPException(
+                status_code=400,
+                detail=f"at most {BATCH_MAX} links at a time "
+                       f"(you sent {len(urls)})")
+        # Body-level refusals fail the whole batch: they are about the request,
+        # not about one link — and POST /jobs answers them the same way. Only
+        # per-link problems become `skipped` entries.
+        s = settings.get()
+        if body.raw_args is not None and not s["raw_args_enabled"]:
+            raise HTTPException(
+                status_code=400,
+                detail="raw yt-dlp arguments are disabled in Settings → Advanced")
+        if body.preset and presets.get(body.preset) is None:
+            raise HTTPException(
+                status_code=400, detail=f"unknown preset: {body.preset!r}")
+        created: list[dict] = []
+        skipped: list[dict] = []
+        for url in urls:
+            if not _looks_like_url(url):
+                skipped.append({"url": url[:200],
+                                "error": "not a link — expecting something "
+                                         "like https://…"})
+                continue
+            try:
+                created.append(_queue_one(
+                    JobRequest(url=url, fmt=body.fmt, headers=body.headers,
+                               preset=body.preset,
+                               playlist_items=body.playlist_items,
+                               raw_args=body.raw_args, overrides=body.overrides),
+                    mgr))
+            except (ValueError, HTTPException) as e:
+                detail = e.detail if isinstance(e, HTTPException) else str(e)
+                skipped.append({"url": url[:200], "error": str(detail)})
+        return {"jobs": created, "skipped": skipped}
 
     @app.get("/presets")
     def list_presets(_mgr: JobManager = Depends(require_auth)):
@@ -397,6 +512,49 @@ def create_app(download_dir, auth_token: str | None = None,
         files = [p for p in d.rglob("*") if p.is_file()] if d.exists() else []
         return {"dir": str(d), "files": len(files),
                 "bytes": sum(p.stat().st_size for p in files)}
+
+    def _archive_lines() -> list[str]:
+        if not archive_path or not Path(archive_path).exists():
+            return []
+        try:
+            text = Path(archive_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return []
+        return [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    @app.get("/archive")
+    def get_archive(_mgr: JobManager = Depends(require_auth)):
+        """What the download archive remembers (the v0.22 review's #7).
+
+        It used to be a black box: once a video was in it, that video could
+        never be downloaded again — not even after deleting the file. The
+        list is bounded because an archive can hold tens of thousands of
+        lines while the UI shows a page of them.
+        """
+        lines = _archive_lines()
+        return {"path": str(archive_path) if archive_path else None,
+                "count": len(lines), "entries": lines[-200:]}
+
+    @app.post("/archive/forget")
+    def forget_archive(body: ArchiveForgetRequest,
+                       _mgr: JobManager = Depends(require_auth)):
+        """Forget one archived entry so that video can be downloaded again."""
+        entry = (body.entry or "").strip()
+        if not entry:
+            raise HTTPException(status_code=400, detail="nothing to forget")
+        if not archive_path or not Path(archive_path).exists():
+            raise HTTPException(status_code=404, detail="no archive yet")
+        lines = _archive_lines()
+        kept = [ln for ln in lines if ln != entry]
+        removed = len(lines) - len(kept)
+        if not removed:
+            raise HTTPException(status_code=404,
+                                detail="that entry is not in the archive")
+        path = Path(archive_path)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+        return {"removed": removed}
 
     @app.post("/files/clear")
     def files_clear(body: FilesClearRequest | None = None,
@@ -466,10 +624,46 @@ def create_app(download_dir, auth_token: str | None = None,
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
 
-    @app.post("/jobs/{job_id}/retry")
-    def retry_job(job_id: str, mgr: JobManager = Depends(require_auth)):
+    @app.post("/jobs/{job_id}/pause")
+    def pause_job(job_id: str, mgr: JobManager = Depends(require_auth)):
+        """Stop a job and keep its partial file (v0.22.0 review #6)."""
         try:
-            return redact_job(mgr.retry(job_id))
+            return redact_job(mgr.pause(job_id))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
+
+    @app.post("/jobs/{job_id}/resume")
+    def resume_job(job_id: str, mgr: JobManager = Depends(require_auth)):
+        try:
+            return redact_job(mgr.resume(job_id))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
+
+    @app.post("/jobs/{job_id}/retry")
+    def retry_job(job_id: str, body: RetryRequest | None = None,
+                  mgr: JobManager = Depends(require_auth)):
+        """Retry a failed job — optionally with edits (v0.22.0 review #11).
+
+        A 403 or a missing format will fail the same way every time, so the
+        body may carry {fmt, preset, overrides, raw_args} for the new attempt;
+        anything it leaves out is reused from the original job.
+        """
+        patch = None
+        if body is not None:
+            raw = body.raw_args
+            if raw is not None and not settings.get()["raw_args_enabled"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="raw yt-dlp arguments are disabled in Settings → Advanced")
+            patch = {"fmt": body.fmt, "preset": body.preset,
+                     "overrides": body.overrides, "raw_args": raw}
+            patch = {k: v for k, v in patch.items() if v is not None}
+        try:
+            return redact_job(mgr.retry(job_id, patch))
         except KeyError:
             raise HTTPException(status_code=404, detail="job not found") from None
         except ValueError as e:
@@ -489,6 +683,53 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail="not running in the desktop app")
         acts["reveal"](job["filepath"])
         return {"ok": True}
+
+    def require_auth_media(
+        token: str | None = None,
+        creds: HTTPAuthorizationCredentials | None = Security(
+            HTTPBearer(auto_error=False)),
+    ):
+        """Auth for the endpoint an HTML media element has to reach.
+
+        `<video src=…>` cannot send an Authorization header, so the stream
+        route also accepts the token as a query parameter: the same token the
+        page already holds, over loopback, for the user's own file. Everything
+        else keeps the header-only rule.
+        """
+        supplied = token or (creds.credentials if creds else "")
+        if auth_token and (not supplied
+                           or not secrets.compare_digest(supplied, auth_token)):
+            raise HTTPException(status_code=401, detail="unauthorized")
+        return manager
+
+    @app.get("/jobs/{job_id}/stream")
+    def stream_job(job_id: str, mgr: JobManager = Depends(require_auth_media)):
+        """Play a finished download in the page (the v0.22 review's #10).
+
+        Range requests are answered with 206 so the player can seek.
+        """
+        try:
+            job = mgr.get(job_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        if job["status"] != "completed":
+            raise HTTPException(status_code=409,
+                                detail="this download is not finished")
+        raw = job.get("filepath")
+        path = Path(str(raw)) if raw else None
+        if not path or path.is_dir() or not path.is_file():
+            raise HTTPException(status_code=404,
+                                detail="no playable file for this job")
+        try:
+            # the same guard the delete path uses: a job row is not a licence
+            # to read arbitrary host files
+            mgr._require_inside(path, job)          # noqa: SLF001
+        except PermissionError:
+            raise HTTPException(
+                status_code=403,
+                detail="that file is outside the download folder") from None
+        return FileResponse(path, media_type=_media_type(path),
+                            filename=path.name)
 
     @app.post("/jobs/{job_id}/delete")
     def delete_job_endpoint(job_id: str, mgr: JobManager = Depends(require_auth)):

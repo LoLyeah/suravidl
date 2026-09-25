@@ -16,7 +16,11 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
+from yt_dlp.utils import download_range_func
+
 SUBTITLE_MODES = ("off", "sidecar", "embed")
+CONTAINERS = ("auto", "mp4", "mkv")
+SUBFOLDER_MODES = ("off", "playlist", "site")
 SPONSORBLOCK_MODES = ("off", "mark", "remove")
 SPONSORBLOCK_CATEGORIES = (
     "sponsor", "intro", "outro", "selfpromo", "preview", "filler",
@@ -230,15 +234,83 @@ def parse_langs(value: str | None) -> list[str]:
             if s.strip()]
 
 
+def _clock_seconds(part: str) -> float:
+    pieces = [p.strip() for p in part.split(":")]
+    if len(pieces) > 3 or not pieces:
+        raise ValueError(f"bad time: {part.strip()!r}")
+    total = 0.0
+    for piece in pieces:
+        if not piece.isdigit():
+            raise ValueError(f"bad time: {part.strip()!r}")
+        total = total * 60 + int(piece)
+    return total
+
+
+def _clock(seconds: float) -> str:
+    s = int(round(seconds))
+    return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
+def parse_sections(value: str | None) -> tuple[str, str]:
+    """`1:30-2:45` (or yt-dlp's `*00:01:30-00:02:45`) -> a canonical pair.
+
+    The v0.22.0 review's #2: wanting a 30-second clip of a 3-hour podcast
+    meant downloading all of it. Only the plain time-range form is offered —
+    no chapter or date syntax — and junk is refused with a message the user
+    can act on.
+    """
+    text = (value or "").strip().lstrip("*").strip()
+    if not text:
+        raise ValueError("a clip needs a start and an end, e.g. 00:01:30-00:02:45")
+    start_text, sep, end_text = text.partition("-")
+    if not sep or not start_text.strip() or not end_text.strip():
+        raise ValueError("use START-END, e.g. 00:01:30-00:02:45")
+    start, end = _clock_seconds(start_text), _clock_seconds(end_text)
+    if end <= start:
+        raise ValueError("the clip must end after it starts")
+    if end - start > 24 * 3600:
+        raise ValueError("that clip is longer than 24 hours")
+    return _clock(start), _clock(end)
+
+
+def subfolder_prefix(mode: str | None) -> str:
+    """The folder a download lands in, inside the download folder.
+
+    The review's #1 finding: everything landed flat, so "Episode 1.mp4" from
+    three different courses collided and Android's `Movies/suravidl` became
+    one pile. `%(playlist_title&{}/|)s` is yt-dlp's conditional-field syntax:
+    the folder appears only when the field has a value.
+    """
+    if mode == "site":
+        return "%(webpage_url_domain)s/"
+    if mode == "playlist":
+        return "%(playlist_title&{}/|)s"
+    return ""
+
+
 def validate_template(value: str) -> str:
+    """A filename template, now with optional RELATIVE subfolders.
+
+    The v0.22.0 feature review found every playlist and channel download
+    landing flat in one folder — "Episode 1.mp4" from three different courses
+    collides, and on Android `Movies/suravidl` becomes a swamp. Relative
+    segments (`channel/%(title)s.%(ext)s`) are allowed now; anything that can
+    climb out of the download folder is still refused.
+    """
     v = (value or "").strip()
     if not v:
         raise ValueError("filename_template cannot be empty")
     if len(v) > 200:
         raise ValueError("filename_template is too long")
-    if any(sep in v for sep in ("/", "\\")) or ".." in v:
-        raise ValueError("filename_template must be a plain filename "
-                         "(no path separators or '..')")
+    if "\\" in v or "\x00" in v:
+        raise ValueError("filename_template must use '/' as the separator")
+    if v.startswith("/"):
+        raise ValueError("filename_template must be a relative path "
+                         "(no leading '/')")
+    for segment in v.split("/"):
+        if segment in ("", ".", ".."):
+            raise ValueError("filename_template cannot contain empty or "
+                             "'..' path segments")
     if "%(ext)s" not in v:
         raise ValueError("filename_template must contain %(ext)s")
     return v
@@ -346,7 +418,27 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     pps: list[dict] = []
 
     template = settings.get("filename_template") or DEFAULT_TEMPLATE
-    outtmpl = str(Path(download_dir) / template)
+    outtmpl = str(Path(download_dir) / (subfolder_prefix(settings.get("subfolders"))
+                                        + template))
+
+    # -- clip: download only a section (review #2) -------------------------
+    sections = (settings.get("download_sections") or "").strip()
+    if sections:
+        # yt-dlp's download_range_func takes SECONDS (its CLI parses the
+        # "mm:ss" text into floats first) — passing the text makes the
+        # downloader die with "Unknown format code 'f'" (v0.22.0)
+        from yt_dlp.utils import parse_duration
+
+        start, end = parse_sections(sections)
+        opts["download_ranges"] = download_range_func(
+            None, [(parse_duration(start), parse_duration(end))])
+        opts["force_keyframes_at_cuts"] = True
+
+    # -- live streams (v0.22.0 review #8) -----------------------------------
+    # Recording from the beginning needs the site to still serve it; when the
+    # stream is long past, yt-dlp records from "now" instead of failing.
+    if settings.get("live_from_start"):
+        opts["live_from_start"] = True
 
     # -- subtitles ---------------------------------------------------------
     sub_mode = settings.get("subtitles_mode", "off")
@@ -356,6 +448,11 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
             opts["writeautomaticsub"] = True
         langs = parse_langs(settings.get("subtitles_langs")) or ["en"]
         opts["subtitleslangs"] = langs
+        if settings.get("subtitles_to_srt"):
+            # TVs and most players want .srt, not YouTube's .vtt (review #4)
+            opts["subtitlesformat"] = "srt"
+            pps.append({"key": "FFmpegSubtitlesConvertor", "format": "srt",
+                        "when": "before_dl"})
         if sub_mode == "embed":
             pps.append({"key": "FFmpegEmbedSubtitle",
                         "already_have_subtitle": True})
@@ -395,11 +492,24 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
         opts["proxy"] = proxy
 
     # -- archive -----------------------------------------------------------
-    if settings.get("archive") and archive_path:
+    if settings.get("archive") and archive_path and \
+            not settings.get("archive_ignore"):
+        # archive_ignore is a per-job escape hatch: the review's #7 — once a
+        # video is in the archive the user could never download it again
+        # (deleted by mistake, or they want a better quality now)
         opts["download_archive"] = str(archive_path)
 
     # -- curated groups (verbosity · workarounds · geo · extractor args) ---
     opts.update(curated_settings_opts(settings))
+
+    # -- container (review #3) ---------------------------------------------
+    # MKV/WebM will not open in QuickTime, iOS Files, many Smart TVs or
+    # WhatsApp, so a "successful" download can look corrupt to a casual user.
+    # Remux repackages without re-encoding — the streams keep their quality.
+    container = settings.get("video_container") or "auto"
+    if container in ("mp4", "mkv"):
+        opts["merge_output_format"] = container
+        pps.append({"key": "FFmpegVideoRemuxer", "preferedformat": container})
 
     opts["outtmpl"] = outtmpl
     if pps:
