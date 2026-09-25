@@ -1502,6 +1502,9 @@ const TAB_KEY = "suravidl.tab";
 
 function showTab(name, opts) {
   const target = TABS.includes(name) ? name : "download";
+  // the active tab on the body, so CSS can react to it (the mobile toast lane
+  // needs to clear the Settings tab's pinned Save bar — theme review)
+  document.body.dataset.tab = target;
   TABS.forEach((t) => {
     const panel = $("panel-" + t);
     if (panel) panel.classList.toggle("hidden", t !== target);

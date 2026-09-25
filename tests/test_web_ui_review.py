@@ -62,8 +62,12 @@ def test_unchecking_the_last_playlist_box_refuses_instead_of_meaning_all():
 
 def test_toasts_sit_above_the_mobile_tab_bar():
     """#toasts sat 22px from the bottom, on top of the fixed tab bar: taps
-    aimed at a tab hit the toast instead."""
-    assert "#toasts { left: 12px; right: 12px; bottom: 84px" in CSS
+    aimed at a tab hit the toast instead. The lane also has to carry the
+    safe-area term — a gesture bar reserves 30-50px below the bar's padding
+    box, and without it the stack sat that much lower, clipped behind it."""
+    assert "#toasts { left: 12px; right: 12px;" in CSS
+    seg = CSS.split("#toasts { left: 12px; right: 12px;")[1].split("}")[0]
+    assert "bottom: calc(84px + env(safe-area-inset-bottom))" in seg
 
 
 def test_touch_targets_are_thumb_sized_on_coarse_pointers():

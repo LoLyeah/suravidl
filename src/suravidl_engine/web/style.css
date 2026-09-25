@@ -89,11 +89,13 @@ html[data-theme="amoled"] {
   --glass-blur: blur(16px) saturate(125%);
   --glass-hi: var(--inset-hi);
   --glass-gloss: none;
+  --glass-border: var(--line);
 }
 html[data-glass="liquid"] {
   --glass-blur: blur(30px) saturate(190%) brightness(1.06);
   --glass-hi: rgba(255,255,255,.28);
   --glass-gloss: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.02) 42%, rgba(255,255,255,.10));
+  --glass-border: var(--accent-line);
 }
 
 /* ---------- base ---------- */
@@ -296,7 +298,7 @@ h2 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0 0 12px;
 .card {
   background: var(--glass-bg);
   background-image: var(--glass-gloss);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   border-radius: 20px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -476,7 +478,7 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
   /* a toast is a message: it must be readable at a glance, so it sits on a
      near-opaque plate instead of blurring whatever is behind it */
   background: var(--panel-solid);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
   animation: rise var(--t-base) var(--e-out) both;
   max-width: 420px;
@@ -505,7 +507,7 @@ html[data-theme="light"] .overlay { background: rgba(30,41,59,.25); }
   padding: 20px;
   background: var(--glass-bg-strong);
   background-image: var(--glass-gloss);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-border);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
@@ -713,7 +715,23 @@ html[data-host="android"] {
   --glass-blur: none;
   --glass-bg: var(--panel-solid);
   --glass-bg-strong: var(--panel-solid);
+}
+/* Android cannot blur, so the two glass styles are carried by what is left:
+   the surface finish. Frosted goes flat and matte; Liquid keeps its gloss —
+   an accent-tinted sheen and a brighter top highlight — all of it pure paint
+   with no backdrop-filter to pay for. Before this, one blanket rule turned
+   off the blur, the gloss AND the highlight for both styles, so the setting
+   did nothing at all on the platform most people use it on. */
+html[data-host="android"][data-glass="frosted"] {
   --glass-gloss: none;
+  --glass-hi: rgba(255,255,255,.06);
+  --glass-border: var(--line);
+}
+html[data-host="android"][data-glass="liquid"] {
+  --glass-gloss: linear-gradient(150deg, var(--accent-soft), rgba(255,255,255,.07) 34%, transparent 64%),
+    linear-gradient(0deg, rgba(255,255,255,.05), transparent 55%);
+  --glass-hi: rgba(255,255,255,.22);
+  --glass-border: var(--accent-line);
 }
 html[data-host="android"] .overlay {
   backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(3,5,12,.72);
@@ -773,8 +791,20 @@ html[data-host="android"] body::before {
 @media (max-width: 899px) {
   /* The tab bar is fixed to the bottom of the screen and #toasts sat 22px
      from it — on top of the bar, so a tap aimed at a tab hit the toast
-     plate first. Sit above it, and use the width that is there. */
-  #toasts { left: 12px; right: 12px; bottom: 84px; align-items: stretch; }
+     plate first. Sit above it, and use the width that is there. The
+     safe-area term is the other half: a phone with a gesture bar reserves
+     ~30-50px below the bar's padding box, and without it the stack sat that
+     much lower — clipped behind the bar on exactly the devices that have
+     one. */
+  #toasts { left: 12px; right: 12px;
+    bottom: calc(84px + env(safe-area-inset-bottom)); align-items: stretch; }
+  /* Settings pins a Save bar into this same lane. Two toasts over it left a
+     sliver of the button's gradient showing through the gap between them,
+     which reads as a broken screen — and that is the exact screen people are
+     on when they tap a theme or glass swatch, because that is where the
+     swatches live. Give the stack its own band above the bar. */
+  body[data-tab="settings"] #toasts {
+    bottom: calc(158px + env(safe-area-inset-bottom)); }
   .toast { max-width: none; }
 }
 

@@ -495,3 +495,27 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     deliberately avoids everywhere else). 17 new regressions in
     `tests/test_web_motion.py`; suite **346 passed**.
     Verdict table: `docs/audits/2026-09-26-antigravity-motion.md`.
+
+- **v0.23.1 — "glass style doesn't do anything", fixed properly.** A bug
+    report with a screenshot: on the phone, switching Frosted/Liquid changed
+    nothing. True — the Android host block turned off the blur, the gloss AND
+    the highlight in one blanket rule, so both styles resolved to the same
+    solid panel; the only difference left was one 1px inset alpha. Android
+    cannot blur, so the styles are now carried by what is left: frosted stays
+    flat and matte, liquid keeps its gloss — an accent-tinted sheen, a brighter
+    top highlight and a tinted border (`--glass-border`), all of it pure paint
+    with no backdrop-filter to pay for. The same token sharpens the desktop
+    difference (16px vs 30px blur on top of it).
+    The screenshot held two more real defects, both reproduced before being
+    touched: the mobile toast lane was missing its `env(safe-area-inset-bottom)`
+    term (a gesture bar reserves 30-50px below the tab bar, so the stack sat
+    that much lower and clipped behind it), and on the Settings tab the toasts
+    landed on the pinned Save bar — the button's gradient showed through the
+    10px gap between two toasts, which reads as a broken screen on exactly the
+    screen where everyone taps a theme or glass swatch. `body[data-tab]` (set
+    by `showTab`) now gives the stack its own band above that bar.
+    No test had ever covered the appearance settings: `tests/test_web_theming.py`
+    asserts the difference rather than the wording — every glass style must
+    change a visible property on every host, the glass surfaces must consume
+    the tokens, all three themes must define the same core palette, and the
+    mobile toast lane must clear both bars. Suite: **353 passed**.
