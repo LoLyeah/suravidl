@@ -175,7 +175,8 @@ class MainActivity : AppCompatActivity() {
             }
             notifyCookiesPicked(target.absolutePath)
         } catch (e: Throwable) {
-            LogStore.write("cookie import failed: ${e.message}")
+            LogStore.write(this@MainActivity, "cookies-import.log",
+                           "cookie import failed: ${e.message}")
             notifyCookiesPicked(null)
         }
     }
