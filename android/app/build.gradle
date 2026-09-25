@@ -54,6 +54,16 @@ android {
             python.srcDir '../../src'   // bundle suravidl_engine as-is
         }
     }
+
+    packaging {
+        jniLibs {
+            // The bundled ffmpeg must be exec'd from nativeLibraryDir, which
+            // requires the APK to actually extract jniLibs. Modern default
+            // (extractNativeLibs=false) keeps them mmapped inside the APK and
+            // leaves nativeLibraryDir without the files.
+            useLegacyPackaging = true
+        }
+    }
 }
 
 chaquopy {
