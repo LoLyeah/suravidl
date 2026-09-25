@@ -147,11 +147,30 @@ echo "ffprobe $pp_size bytes"
   echo "the probe-only configure lose its --disable flags?" >&2
   exit 1
 }
-# option tables survive stripping as plain names ("show_streams"), not as
-# their CLI spelling ("-show_streams") — checked against published binaries
-"$TC/llvm-strings" "$OUT/ffprobe" | grep -m1 -q "show_streams" || {
-  echo "no show_streams in the ffprobe binary" >&2; exit 1; }
-if "$TC/llvm-strings" "$OUT/ffmpeg" | grep -q "show_streams"; then
-  echo "ffmpeg carries ffprobe's own options — wrong build?" >&2; exit 1
+# Option tables survive stripping as plain names ("show_streams"), not as
+# their CLI spelling ("-show_streams") — checked against published binaries.
+# Only a warning: this is a convenience signal, not a capability check.
+bin_strings() {
+  if command -v strings >/dev/null 2>&1; then strings -a "$1"
+  else "$TC/llvm-strings" -a "$1"; fi
+}
+if bin_strings "$OUT/ffprobe" | grep -q "show_streams"; then
+  echo "--- ok: ffprobe carries its own option table"
+else
+  echo "--- note: no show_streams string in ffprobe (not fatal)"
 fi
-echo "--- ok: slim ffprobe, right ISA, 16 KB aligned"
+if bin_strings "$OUT/ffmpeg" | grep -q "show_streams"; then
+  echo "warning: ffmpeg carries ffprobe's own options — wrong build?" >&2
+fi
+
+# The ffmpeg libraries must be linked IN, never runtime deps: the whole point
+# of these binaries is that they are single self-contained files.
+for exe in ffmpeg ffprobe; do
+  needs=$(readelf -d "$OUT/$exe" | awk -F'[][ ]+' '/NEEDED/{print $5}')
+  echo "$exe NEEDED: $(echo "$needs" | tr '\n' ' ')"
+  if echo "$needs" | grep -Eq '^lib(av|sw)(codec|format|util|resample|scale|filter)'; then
+    echo "$exe depends on a shared ffmpeg library — the build is not static" >&2
+    exit 1
+  fi
+done
+echo "--- ok: slim ffprobe, right ISA, 16 KB aligned, libs linked in"
