@@ -78,23 +78,36 @@ class FfmpegBinaryTest {
         val version = run(listOf(probe.absolutePath, "-version"))
         assertTrue("not an ffprobe build:\n$version", version.contains("ffprobe version"))
 
-        // 2. it can read a file the bundled ffmpeg just wrote
+        // 2. it can read a real file (built by hand: no lavfi — this build has
+        //    no avdevice — and no assets, so the test is deterministic)
+        val wav = File(ctx.cacheDir, "probe-smoke.wav")
+        writeWavSilence(wav)
+        assertTrue("could not write the test wav", wav.length() > 1000)
+        val codec = run(listOf(probe.absolutePath, "-v", "error", "-show_entries",
+            "stream=codec_name", "-of", "default=nw=1:nk=1", wav.absolutePath)).trim()
+        assertEquals("ffprobe read the wrong codec from a wav", "pcm_s16le", codec)
+        val dur = run(listOf(probe.absolutePath, "-v", "error", "-show_entries",
+            "format=duration", "-of", "default=nw=1:nk=1", wav.absolutePath)).trim()
+        assertTrue("ffprobe reported a bogus duration: '$dur'",
+            dur.toDoubleOrNull()?.let { it in 0.9..1.1 } == true)
+
+        // 3. ffmpeg writes, ffprobe reads back (the pairing yt-dlp relies on)
         val ffmpeg = SuravidlApp.ffmpegBinary(ctx)
         assertTrue("libffmpeg.so missing", ffmpeg != null)
-        val smoke = File(ctx.cacheDir, "probe-smoke.m4a")
-        smoke.delete()
-        val made = run(listOf(ffmpeg!!.absolutePath, "-v", "error", "-y", "-f", "lavfi",
-            "-i", "anullsrc=r=8000:cl=mono", "-t", "1", "-c:a", "aac", smoke.absolutePath))
-        assertTrue("ffmpeg wrote no file:\n$made", smoke.length() > 0)
-        val codec = run(listOf(probe.absolutePath, "-v", "error", "-show_entries",
-            "stream=codec_name", "-of", "default=nw=1:nk=1", smoke.absolutePath)).trim()
+        val m4a = File(ctx.cacheDir, "probe-smoke.m4a")
+        m4a.delete()
+        val made = run(listOf(ffmpeg!!.absolutePath, "-v", "error", "-y",
+            "-i", wav.absolutePath, "-c:a", "aac", m4a.absolutePath))
+        assertTrue("ffmpeg could not convert the wav:\n$made", m4a.length() > 0)
+        val m4aCodec = run(listOf(probe.absolutePath, "-v", "error", "-show_entries",
+            "stream=codec_name", "-of", "default=nw=1:nk=1", m4a.absolutePath)).trim()
         assertEquals("ffprobe read the wrong codec from an ffmpeg-written file",
-            "aac", codec)
-        smoke.delete()
+            "aac", m4aCodec)
+        wav.delete(); m4a.delete()
         assertTrue("the engine's ffprobe is a different file",
             System.getenv("SURAVIDL_FFPROBE") == probe.absolutePath)
 
-        // 3. yt-dlp, running in this process, resolves that same binary
+        // 4. yt-dlp, running in this process, resolves that same binary
         if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))
         val py = Python.getInstance()
         val ydlClass = py.getModule("yt_dlp").get("YoutubeDL")!!
@@ -107,6 +120,28 @@ class FfmpegBinaryTest {
         val found = versions.entries.first { it.key.toString() == "ffprobe" }.value.toString()
         assertTrue("yt-dlp could not run ffprobe (got '$found')", found.isNotBlank() &&
             found != "None" && found.contains("."))
+    }
+
+    /** A 1 s / 8 kHz / mono / 16-bit PCM silence WAV, built by hand: the
+     *  bundled ffmpeg has no avdevice, so `-f lavfi` is not available, and a
+     *  hand-built RIFF file keeps the test free of assets. */
+    private fun writeWavSilence(f: File, seconds: Int = 1, rate: Int = 8000) {
+        val data = rate * seconds * 2
+        f.outputStream().buffered().use { out ->
+            fun le32(v: Int) = byteArrayOf(
+                (v and 0xff).toByte(), ((v shr 8) and 0xff).toByte(),
+                ((v shr 16) and 0xff).toByte(), ((v shr 24) and 0xff).toByte())
+            fun le16(v: Int) = byteArrayOf(
+                (v and 0xff).toByte(), ((v shr 8) and 0xff).toByte())
+            out.write("RIFF".toByteArray()); out.write(le32(36 + data))
+            out.write("WAVE".toByteArray())
+            out.write("fmt ".toByteArray()); out.write(le32(16))
+            out.write(le16(1)); out.write(le16(1))         // PCM, mono
+            out.write(le32(rate)); out.write(le32(rate * 2))
+            out.write(le16(2)); out.write(le16(16))        // block align, bits
+            out.write("data".toByteArray()); out.write(le32(data))
+            out.write(ByteArray(data))
+        }
     }
 
     private fun run(argv: List<String>): String {
