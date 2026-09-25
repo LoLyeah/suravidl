@@ -27,6 +27,8 @@ class JobRequest(BaseModel):
     preset: str | None = None
     playlist_items: str | None = None
     raw_args: str | None = None
+    # "this download only": a validated patch over the saved settings
+    overrides: dict | None = None
 
 
 class OpenUrlRequest(BaseModel):
@@ -53,6 +55,7 @@ def create_app(download_dir, auth_token: str | None = None,
                update_fn=None, update_check_fn=None,
                settings_path=None, desktop_actions: dict | None = None) -> FastAPI:
     from .settings import Settings
+    from .presets import PresetStore, split_patch
 
     app = FastAPI(title="suravidl engine")
     app.add_middleware(
@@ -67,11 +70,18 @@ def create_app(download_dir, auth_token: str | None = None,
     settings = Settings(path=settings_path, default_download_dir=download_dir,
                         default_max_concurrent=max_concurrent)
     archive_path = (Path(db_path).parent / "archive.txt") if db_path else None
+    presets = PresetStore(
+        (Path(settings_path).parent / "presets.json") if settings_path else None)
 
-    def _download_opts(dl_dir, raw_args=None):
+    def _download_opts(dl_dir, raw_args=None, overrides=None):
         from .download_opts import build_download_opts
 
-        return build_download_opts(settings.get(), dl_dir,
+        effective = settings.get()
+        if overrides:
+            # a per-download ("this download only") or preset-supplied patch
+            # wins over the saved settings for this job alone
+            effective = {**effective, **overrides}
+        return build_download_opts(effective, dl_dir,
                                    archive_path=archive_path,
                                    raw_args=raw_args)
 
@@ -258,14 +268,55 @@ def create_app(download_dir, auth_token: str | None = None,
             # snapshot the global arguments onto the job so retry/resume
             # re-run exactly what ran the first time
             raw = s["raw_args"] or None
+        preset = body.preset
+        overrides = body.overrides or None
+        if preset:
+            entry = presets.get(preset)
+            if entry is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"unknown preset: {preset!r}")
+            if not entry["builtin"]:
+                # a user preset expands into an audio intent + a per-job patch
+                audio, patch = split_patch(entry["patch"])
+                preset = audio
+                overrides = {**(overrides or {}), **patch} or None
         try:
             return redact_job(mgr.create(body.url, fmt=body.fmt,
                                          extra_headers=body.headers,
-                                         preset=body.preset,
+                                         preset=preset,
                                          playlist_items=body.playlist_items,
-                                         raw_args=raw))
+                                         raw_args=raw,
+                                         overrides=overrides))
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    @app.get("/presets")
+    def list_presets(_mgr: JobManager = Depends(require_auth)):
+        # defaults + the per-job key list ride along so the UI can offer
+        # "save the settings that differ from the defaults as a preset"
+        from .settings import DEFAULTS, PER_JOB_KEYS
+
+        return {"presets": presets.list(),
+                "per_job_keys": list(PER_JOB_KEYS),
+                "defaults": {k: DEFAULTS[k] for k in PER_JOB_KEYS}}
+
+    @app.post("/presets")
+    def save_preset(body: dict, _mgr: JobManager = Depends(require_auth)):
+        try:
+            return presets.save(body.get("name", ""), body.get("patch") or {})
+        except (ValueError, TypeError) as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.delete("/presets/{name}")
+    def delete_preset(name: str, _mgr: JobManager = Depends(require_auth)):
+        try:
+            if not presets.delete(name):
+                raise HTTPException(status_code=404,
+                                    detail=f"no such preset: {name!r}")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        return {"ok": True}
 
     @app.get("/files/summary")
     def files_summary(_mgr: JobManager = Depends(require_auth)):

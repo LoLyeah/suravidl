@@ -41,6 +41,58 @@ DEFAULTS = {
 THEMES = ("light", "dark", "amoled")
 GLASS_STYLES = ("frosted", "liquid")
 
+# Keys a single download may override ("this download only"), and the ones that
+# belong to the app itself: a job must not be able to move the download folder,
+# change how many jobs run at once, or repaint the UI.
+PER_JOB_DENIED = {
+    "download_dir",      # the manager's folder, not a job's business
+    "max_concurrent",    # queue policy
+    "open_dir_on_complete",
+    "auto_resume",
+    "theme",
+    "glass",
+}
+PER_JOB_KEYS = tuple(k for k in DEFAULTS if k not in PER_JOB_DENIED)
+
+# A preset patch may additionally name the audio intent (built-in presets only).
+PRESET_PATCH_KEYS = PER_JOB_KEYS + ("preset",)
+
+
+def validate_overrides(patch: dict | None) -> dict:
+    """Validate a per-job settings patch; ValueError on anything not allowed.
+
+    Same validators as the settings screen, so a value that would be refused
+    there is refused here too — and the whitelist stops the API from smuggling
+    engine-owned keys (cookiefile, outtmpl, paths) into yt-dlp.
+    """
+    if not patch:
+        return {}
+    if not isinstance(patch, dict):
+        raise ValueError("overrides must be an object")
+    unknown = sorted(set(patch) - set(PER_JOB_KEYS))
+    if unknown:
+        raise ValueError(f"these options cannot be set per download: {unknown}")
+    return {k: Settings._validate(k, v) for k, v in patch.items()}
+
+
+def validate_preset_patch(patch: dict | None) -> dict:
+    """A preset is a named patch: per-job keys plus an optional audio intent."""
+    if not isinstance(patch, dict) or not patch:
+        raise ValueError("a preset needs a patch with at least one option")
+    unknown = sorted(set(patch) - set(PRESET_PATCH_KEYS))
+    if unknown:
+        raise ValueError(f"unknown preset options: {unknown}")
+    out: dict = {}
+    for k, v in patch.items():
+        if k == "preset":
+            from .jobs import preset_opts
+
+            preset_opts(v)   # raises ValueError for anything but the built-ins
+            out[k] = str(v)
+        else:
+            out[k] = Settings._validate(k, v)
+    return out
+
 
 class Settings:
     """Tiny validated key/value store. Unknown keys are rejected loudly."""

@@ -229,6 +229,49 @@ def main():
         except urllib.error.HTTPError as e:
             assert e.code == 404, e.code
 
+        # --- per-download overrides + named presets ---
+        # a preset stores a validated patch; applying it is an override
+        saved = req("POST", "http://127.0.0.1:8799/presets", {
+            "name": "smoke bundle",
+            "patch": {"subtitles_mode": "sidecar", "embed_metadata": True},
+        })
+        assert saved["builtin"] is False, saved
+        listing = req("GET", "http://127.0.0.1:8799/presets")
+        names = {p["name"] for p in listing["presets"]}
+        assert {"audio-native", "audio-m4a", "audio-mp3", "smoke bundle"} <= names
+        assert "filename_template" in listing["per_job_keys"]
+        # a bad patch and a bad name are refused, not stored
+        for bad in ({"name": "x", "patch": {"download_dir": "/tmp"}},
+                    {"name": "x", "patch": {"nope": 1}},
+                    {"name": "bad/name", "patch": {"archive": True}}):
+            try:
+                req("POST", "http://127.0.0.1:8799/presets", bad)
+                raise AssertionError(f"should have been refused: {bad}")
+            except urllib.error.HTTPError as e:
+                assert e.code == 400, e.code
+        # a per-download override really reaches yt-dlp (the file name proves it)
+        # and can turn an app-wide setting off for one job (the archive, which
+        # the earlier steps left enabled and which would otherwise skip this URL)
+        ov = req("POST", "http://127.0.0.1:8799/jobs", {
+            "url": f"{base}/tiny2.mp4",
+            "overrides": {"filename_template": "smoke-ov.%(ext)s",
+                          "archive": False},
+        })
+        assert ov["overrides"] == {"filename_template": "smoke-ov.%(ext)s",
+                                   "archive": False}, ov
+        for _ in range(200):
+            cur = req("GET", f"http://127.0.0.1:8799/jobs/{ov['id']}")
+            if cur["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert cur["status"] == "completed", cur
+        assert cur["filepath"].endswith("smoke-ov.mp4"), cur["filepath"]
+        assert req("GET", "http://127.0.0.1:8799/settings")["filename_template"] != \
+            "smoke-ov.%(ext)s", "global settings must not change"
+        # and the archive setting the other jobs rely on is still on
+        assert req("GET", "http://127.0.0.1:8799/settings")["archive"] is True
+        assert req("DELETE", "http://127.0.0.1:8799/presets/smoke%20bundle")["ok"]
+
         print(json.dumps({
             "SMOKE": "OK",
             "engine": h,

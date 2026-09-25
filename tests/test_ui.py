@@ -65,7 +65,13 @@ def test_index_is_a_four_tab_shell(tmp_path):
     for elem_id in ("setVerbose", "setIpVersion", "setNoCheckCerts",
                     "setSleepRequests", "setGeoBypass", "setGeoCountry",
                     "setExtractorArgs", "ytdlpSave", "ytdlpMsg",
-                    "rawEditor", "rawOffHint", "queueCount"):
+                    "rawEditor", "rawOffHint", "queueCount",
+                    # M17: per-download overrides + presets + empty states
+                    "ovBlock", "ovCount", "ovPreset", "ovApply", "ovClear",
+                    "ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb",
+                    "ovRawRow", "ovRaw", "ovHint", "dlEmpty", "stabPresets",
+                    "spanel-presets", "presetList", "presetName", "presetSave",
+                    "presetMsg"):
         assert f'id="{elem_id}"' in html, elem_id
     # the old modal shells are gone: settings and the catalogue are tabs now
     assert 'id="settingsModal"' not in html

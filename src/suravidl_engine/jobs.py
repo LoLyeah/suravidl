@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     preset TEXT,
     playlist_items TEXT,
     raw_args TEXT,
+    overrides TEXT,
     headers TEXT,
     status TEXT NOT NULL,
     title TEXT,
@@ -165,6 +166,9 @@ class JobManager:
                         "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
                 if "raw_args" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN raw_args TEXT")
+                if "overrides" not in cols:
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN overrides TEXT")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -208,6 +212,14 @@ class JobManager:
                  if not (str(k).lower() == "cookie" and v == REDACTED)}
             h = h or None
         job["headers"] = h
+        overrides = job.get("overrides")
+        if overrides:
+            try:
+                job["overrides"] = json.loads(overrides)
+            except (json.JSONDecodeError, TypeError):
+                job["overrides"] = None
+        else:
+            job["overrides"] = None
         job["progress"] = {
             "downloaded_bytes": job.get("downloaded_bytes") or 0,
             "total_bytes": job.get("total_bytes"),
@@ -220,10 +232,10 @@ class JobManager:
         with self._db_lock, self._con:
             self._con.execute(
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
-                " raw_args, headers, status, title,"
+                " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -233,6 +245,7 @@ class JobManager:
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
                     job.get("raw_args"),
+                    json.dumps(job["overrides"]) if job.get("overrides") else None,
                     json.dumps(_redacted_headers(job["headers"]))
                     if job.get("headers") else None,
                     job["status"], job.get("title"), job.get("filepath"),
@@ -249,7 +262,15 @@ class JobManager:
                extra_headers: dict | None = None,
                preset: str | None = None,
                playlist_items: str | None = None,
-               raw_args: str | None = None) -> dict:
+               raw_args: str | None = None,
+               overrides: dict | None = None) -> dict:
+        from .settings import validate_overrides
+
+        if overrides:
+            # validated here, before a row exists: a bad patch never queues
+            overrides = validate_overrides(overrides) or None
+        else:
+            overrides = None
         if preset and fmt:
             raise ValueError("pass either 'preset' or 'fmt', not both")
         if preset:
@@ -275,6 +296,7 @@ class JobManager:
             "preset": preset,
             "playlist_items": playlist_items,
             "raw_args": raw_args,
+            "overrides": overrides,
             "headers": extra_headers,
             "status": "queued",
             "title": None,
@@ -319,7 +341,8 @@ class JobManager:
                            extra_headers=src.get("headers"),
                            preset=src.get("preset"),
                            playlist_items=src.get("playlist_items"),
-                           raw_args=src.get("raw_args"))
+                           raw_args=src.get("raw_args"),
+                           overrides=src.get("overrides"))
 
     def clear_completed(self) -> int:
         """Forget completed jobs (their files are gone after /files/clear).
@@ -502,7 +525,8 @@ class JobManager:
         user_pps: list[dict] = []
         if self._download_opts:
             settings_opts = dict(self._download_opts(
-                self.download_dir, raw_args=job.get("raw_args")) or {})
+                self.download_dir, raw_args=job.get("raw_args"),
+                overrides=job.get("overrides")) or {})
             user_pps = list(settings_opts.pop("postprocessors", []) or [])
             opts.update(settings_opts)
         # preset postprocessors run first (e.g. extract audio), then the

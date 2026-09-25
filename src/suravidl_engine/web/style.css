@@ -488,6 +488,27 @@ input[type="number"] { width: 80px; }
 .sw-hint { font-size: 11px; color: var(--muted); text-align: center; }
 .ghost-sm.del { color: var(--err); }
 .ghost-sm.del:hover { background: var(--err-bg); border-color: var(--err-line); }
+
+/* ---------- "this download only" + presets ---------- */
+details.card { padding: 14px 16px; }
+details.card > summary {
+  cursor: pointer; font-weight: 600; list-style: none;
+  display: flex; align-items: center; gap: 8px;
+}
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::before { content: "▸"; color: var(--muted); transition: transform .18s ease; }
+details.card[open] > summary::before { transform: rotate(90deg); }
+details.card > summary .chip { font-weight: 500; }
+details.card[open] > summary { margin-bottom: 10px; }
+.optrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+.optrow + .optrow { border-top: 1px solid var(--line); }
+.optrow .col { flex: 1; min-width: 0; gap: 3px; }
+.optname { font-weight: 600; word-break: break-word; }
+.optsum { word-break: break-word; }
+.chip.tag { font-size: 10.5px; padding: 2px 7px; opacity: .9; }
+.msg.ok { color: var(--ok); }
+.msg.warn { color: var(--warn); }
+.msg.bad { color: var(--err); }
 .fmt-kind { font-size: 11px; margin-top: 3px; }
 .k-both { color: var(--ok); }
 .k-video { color: var(--warn); }

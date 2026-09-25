@@ -1,6 +1,8 @@
 """Audio-only presets: native passthrough, m4a extraction, mp3 conversion."""
 import functools
 import http.server
+import json
+import os
 import shutil
 import subprocess
 import threading
@@ -157,3 +159,123 @@ def test_retry_keeps_the_preset(client, audio_server):
     r2 = client.post(f"/jobs/{job['id']}/retry", headers=AUTH)
     assert r2.status_code == 200
     assert r2.json()["preset"] == "audio-mp3"
+
+
+# -- named user presets: a validated patch the user saves and reuses --------
+#
+# A preset is data (presets.json, 0600) except for the built-in audio intents,
+# which are code. Applying one goes through the same per-job override path, so
+# there is only one thing to get right.
+
+
+@pytest.fixture()
+def pclient(tmp_path):
+    """A client whose settings/presets live under tmp_path (not the user's ~)."""
+    import suravidl_engine.api as api
+
+    app = api.create_app(download_dir=tmp_path / "dl", auth_token="testtoken",
+                         db_path=tmp_path / "jobs.db")
+    with TestClient(app) as c:
+        yield c
+
+
+def _presets(c):
+    return {p["name"]: p for p in c.get("/presets", headers=AUTH).json()["presets"]}
+
+
+def test_builtin_audio_presets_are_listed(pclient):
+    got = _presets(pclient)
+    for name in ("audio-native", "audio-m4a", "audio-mp3"):
+        assert got[name]["builtin"] is True
+    assert got["audio-mp3"]["patch"]["preset"] == "audio-mp3"
+
+
+def test_save_a_user_preset_and_apply_it_to_a_job(pclient):
+    r = pclient.post("/presets", headers=AUTH, json={
+        "name": "subs-en-metadata",
+        "patch": {"subtitles_mode": "sidecar", "subtitles_langs": "en",
+                  "embed_metadata": True},
+    })
+    assert r.status_code == 200, r.text
+    saved = _presets(pclient)["subs-en-metadata"]
+    assert saved["builtin"] is False
+    assert saved["patch"]["embed_metadata"] is True
+
+    j = pclient.post("/jobs", headers=AUTH, json={
+        "url": "http://example.invalid/v.mp4", "preset": "subs-en-metadata",
+    }).json()
+    assert j["overrides"] == {"subtitles_mode": "sidecar",
+                              "subtitles_langs": "en", "embed_metadata": True}
+    assert j["preset"] is None            # this preset has no audio intent
+    pclient.post(f"/jobs/{j['id']}/cancel", headers=AUTH)
+
+
+def test_a_preset_can_carry_an_audio_intent_too(pclient):
+    pclient.post("/presets", headers=AUTH, json={
+        "name": "mp3-with-subs",
+        "patch": {"preset": "audio-mp3", "subtitles_mode": "embed",
+                  "subtitles_langs": "en"},
+    })
+    j = pclient.post("/jobs", headers=AUTH, json={
+        "url": "http://example.invalid/v.mp4", "preset": "mp3-with-subs",
+    }).json()
+    assert j["preset"] == "audio-mp3"
+    assert j["overrides"] == {"subtitles_mode": "embed", "subtitles_langs": "en"}
+    pclient.post(f"/jobs/{j['id']}/cancel", headers=AUTH)
+
+
+def test_preset_patches_are_validated(pclient):
+    for patch in ({"nope": 1}, {"subtitles_mode": "burn"},
+                  {"preset": "audio-ogg"}, {"download_dir": "/tmp/x"}):
+        r = pclient.post("/presets", headers=AUTH,
+                         json={"name": "bad", "patch": patch})
+        assert r.status_code == 400, patch
+    assert "bad" not in _presets(pclient)
+
+
+def test_preset_names_are_sane(pclient):
+    for name in ("", "   ", "x" * 60, "with/slash", "with\\backslash"):
+        r = pclient.post("/presets", headers=AUTH,
+                         json={"name": name, "patch": {"archive": True}})
+        assert r.status_code == 400, name
+
+
+def test_user_presets_survive_a_restart_and_are_private(pclient, tmp_path):
+    pclient.post("/presets", headers=AUTH,
+                 json={"name": "mine", "patch": {"fragments": 4}})
+    presets_file = tmp_path / "presets.json"
+    assert presets_file.is_file()
+    assert json.loads(presets_file.read_text())["mine"] == {"fragments": 4}
+    assert (os.stat(presets_file).st_mode & 0o777) == 0o600
+
+    import suravidl_engine.api as api
+
+    app = api.create_app(download_dir=tmp_path / "dl", auth_token="testtoken",
+                         db_path=tmp_path / "jobs.db")
+    with TestClient(app) as c2:
+        assert "mine" in _presets(c2)
+
+
+def test_updating_a_preset_by_name_overwrites_it(pclient):
+    pclient.post("/presets", headers=AUTH,
+                 json={"name": "p", "patch": {"fragments": 2}})
+    pclient.post("/presets", headers=AUTH,
+                 json={"name": "p", "patch": {"fragments": 6}})
+    assert _presets(pclient)["p"]["patch"] == {"fragments": 6}
+
+
+def test_delete_a_user_preset_but_not_a_builtin(pclient):
+    pclient.post("/presets", headers=AUTH,
+                 json={"name": "temp", "patch": {"archive": True}})
+    assert pclient.delete("/presets/temp", headers=AUTH).status_code == 200
+    assert "temp" not in _presets(pclient)
+    # built-ins are code, not data
+    assert pclient.delete("/presets/audio-mp3", headers=AUTH).status_code == 400
+    assert pclient.delete("/presets/nope", headers=AUTH).status_code == 404
+
+
+def test_unknown_preset_name_on_a_job_is_a_400(pclient):
+    r = pclient.post("/jobs", headers=AUTH, json={
+        "url": "http://example.invalid/v.mp4", "preset": "not-a-preset"})
+    assert r.status_code == 400
+    assert "not-a-preset" in r.json()["detail"]

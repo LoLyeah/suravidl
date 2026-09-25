@@ -85,6 +85,64 @@
         <tbody></tbody>
       </table>
     </section>
+
+    <!-- "This download only": a patch over the saved settings, per job -->
+    <details id="ovBlock" class="card">
+      <summary>This download only <span id="ovCount" class="chip hidden"></span></summary>
+      <div class="field">
+        <label class="lbl" for="ovPreset">Preset
+          <span class="muted">— fills these fields from a saved bundle</span></label>
+        <div class="jrow">
+          <select id="ovPreset"></select>
+          <button id="ovApply" class="btn sm" type="button">Apply</button>
+          <button id="ovClear" class="btn sm" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label class="lbl" for="ovSubs">Subtitles</label>
+          <select id="ovSubs">
+            <option value="">use my settings</option>
+            <option value="off">off</option>
+            <option value="sidecar">write .srt files</option>
+            <option value="embed">embed in the video</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovSubLangs">Subtitle languages</label>
+          <input id="ovSubLangs" type="text" spellcheck="false" placeholder="en, id"/>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovSb">SponsorBlock</label>
+          <select id="ovSb">
+            <option value="">use my settings</option>
+            <option value="off">off</option>
+            <option value="mark">mark as chapters</option>
+            <option value="remove">remove the segments</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="ovMeta">Tags</label>
+          <div class="col">
+            <label class="check"><input id="ovMeta" type="checkbox"/> embed metadata</label>
+            <label class="check"><input id="ovThumb" type="checkbox"/> embed thumbnail</label>
+          </div>
+        </div>
+      </div>
+      <div class="field hidden" id="ovRawRow">
+        <label class="lbl" for="ovRaw">yt-dlp arguments for this download
+          <span class="muted">— raw args are on in Settings → Advanced</span></label>
+        <input id="ovRaw" type="text" spellcheck="false" placeholder="--no-mtime"/>
+      </div>
+      <div class="hint" id="ovHint">These apply to the next download only; your saved
+        settings stay as they are. Manage bundles in Settings → Presets.</div>
+    </details>
+
+    <div class="empty" id="dlEmpty">
+      Paste a link above and hit <b>Probe</b> — the formats, sizes and what each
+      stream contains show up here. The <b>yt-dlp</b> tab holds the option
+      groups, the <b>Settings</b> tab your defaults and presets.
+    </div>
   </section>
 
   <!-- ============================= Queue ============================= -->
@@ -106,6 +164,7 @@
       <div class="subtabs" id="settingsTabs">
         <button class="stab active" data-stab="general" type="button">General</button>
         <button class="stab" data-stab="media" type="button">Media</button>
+        <button class="stab" data-stab="presets" id="stabPresets" type="button">Presets</button>
         <button class="stab" data-stab="network" type="button">Network</button>
         <button class="stab" data-stab="auth" type="button">Authentication</button>
         <button class="stab" data-stab="advanced" type="button">Advanced</button>
@@ -168,6 +227,25 @@
         </label>
       </div>
       </div><!-- /spanel-general -->
+
+      <div class="spanel hidden" id="spanel-presets">
+        <div class="field">
+          <label class="lbl" for="presetName">Save the current settings as a preset
+            <span class="muted">— keeps the download options that differ from
+            the defaults (subtitles, SponsorBlock, embeds, template, network…)</span></label>
+          <div class="jrow">
+            <input id="presetName" type="text" spellcheck="false"
+                   placeholder="e.g. subs-en + metadata"/>
+            <button id="presetSave" class="btn sm prime" type="button">Save preset</button>
+          </div>
+          <div class="msg" id="presetMsg"></div>
+        </div>
+        <div class="field">
+          <label class="lbl">Presets
+            <span class="muted">— pick one on the Download tab → “This download only”</span></label>
+          <div id="presetList" class="optlist"></div>
+        </div>
+      </div><!-- /spanel-presets -->
 
       <div class="spanel hidden" id="spanel-media">
         <div class="field">

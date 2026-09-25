@@ -245,8 +245,26 @@ repo has no pydantic-core.
       component and a regression test keeps them there. Android also lost its
       translucency-without-blur look: where `backdrop-filter` doesn't render, a
       7 %-opaque card is a stain, not glass, so the phone app gets solid panels.
-- [ ] M17+ — what is left: per-job option overrides, presets UI, richer empty
-      states, `libffprobe.so` bundling → `docs/PLAN-full-ytdlp.md`
+- [x] M17 — per-download options and presets. The Download tab grew a
+      collapsed **“This download only”** block: subtitles, SponsorBlock, tag
+      embedding and per-job yt-dlp arguments that apply to the *next* download
+      and leave your saved settings alone (the audio row and playlist items
+      were already per-job). Everything is a **validated patch** — same
+      validators as the settings screen, and a whitelist that keeps app-level
+      keys (download folder, concurrency, theme) out of a job, so the API
+      cannot smuggle `cookiefile`/`outtmpl` into yt-dlp. The patch is stored
+      with the job, which is why a retry re-runs exactly what you asked for,
+      and every row now wears a `⚙ N options` chip (hover = which).
+      **Presets** became real: Settings → Presets lists the built-in audio
+      intents and saves your own bundles ("save the options that differ from
+      the defaults"), validated on the way in, stored in `presets.json`
+      (0600), deletable, and applicable from the Download tab — a preset's
+      audio intent rides along with its patch, so `mp3 + subs + thumbnails`
+      is one pick. Applying one is the same code path as a manual override,
+      so there is one thing to get right. Empty states: the Download tab says
+      what to do, the Queue explains where downloads live and how to open,
+      share or delete them.
+- [ ] M18+ — what is left: richer empty states, `libffprobe.so` bundling → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 

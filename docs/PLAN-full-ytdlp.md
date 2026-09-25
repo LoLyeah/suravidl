@@ -248,5 +248,18 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     scoped `.bar .fill` and `tests/test_ui.py` pins that scoping. Android
     additionally drops the glass illusion (`--glass-bg` → solid where
     `backdrop-filter` can't be trusted).
-  - Next up: per-job option overrides, presets UI, richer empty states, and
-    `libffprobe.so` in the APK.
+  - **v0.18.0 — M17 (per-download overrides + presets + empty states):** a job
+    may now carry `overrides` — a validated patch over the saved settings
+    (`settings.validate_overrides`, whitelist of per-job keys, the app-level
+    ones refused) — persisted with the job so retries repeat it, merged in the
+    engine's `_download_opts` callable. `presets.json` (0600) holds user
+    presets: a name plus a validated patch that may also carry the audio
+    intent, applied through the very same override path
+    (`POST /jobs {"preset": "my-bundle"}` expands it). UI: a collapsed "This
+    download only" block on the Download tab, a Presets sub-tab under
+    Settings (save the options that differ from the defaults), `⚙ N options`
+    chips on the rows, and honest empty states for Download and Queue.
+    Verified live: an applied preset named the file (`ui-ov.mp4`), embedded
+    metadata (ffprobe tags) and wrote the subtitle sidecar, while `/settings`
+    stayed untouched.
+  - Next up: richer empty states, and `libffprobe.so` in the APK.

@@ -102,6 +102,7 @@ function markSwatches(values) {
     b.classList.toggle("on", b.dataset.glass === values.glass));
 }
 let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted" };
+let SETTINGS_SNAPSHOT = null;   // last /settings payload (used by the preset diff)
 
 async function setAppearance(patch, label) {
   try {
@@ -134,6 +135,7 @@ async function doProbe() {
     }
     $("probeMsg").textContent = msg;
     $("probeCard").classList.add("hidden");
+    $("dlEmpty").classList.remove("hidden");
   } finally {
     $("probeBtn").classList.remove("busy");
   }
@@ -219,6 +221,7 @@ function dedupeFormats(list) {
 
 function renderProbe(url, info) {
   $("probeCard").classList.remove("hidden");
+  $("dlEmpty").classList.add("hidden");
   $("probeTitle").textContent = info.title || url;
   const dur = info.duration
     ? " · " + Math.round(info.duration / 60) + " min" : "";
@@ -302,13 +305,134 @@ function playlistMode() {
 
 async function startJob(url, fmt, preset, playlist) {
   try {
-    const body = { url, fmt, preset };
+    const body = { url };
+    if (fmt) body.fmt = fmt;
+    // the audio intent only applies when no explicit format was picked
+    // (yt-dlp refuses fmt + preset together)
+    const audio = fmt ? null : (preset || OV.preset);
+    if (audio) body.preset = audio;
     if (playlist) body.playlist_items = $("playlistItems").value.trim();
+    const overrides = readOv();
+    if (overrides) body.overrides = overrides;
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
     toast(playlist ? "Playlist added to downloads" : "Added to downloads", "info");
     refreshJobs();
   } catch (e) {
     toast("could not start download: " + e.message, "bad");
+  }
+}
+
+/* --- "This download only": a patch over the saved settings ---------------- */
+
+// the audio intent of an applied preset (fmt and preset are exclusive in yt-dlp)
+// plus its full patch: the block only shows a few of the options a preset may
+// carry, so the rest must ride along instead of being lost on apply
+const OV = { preset: null, patch: {}, defaults: null, perJobKeys: null };
+
+/** The block's values as a patch — only what the user actually set. */
+function readOv() {
+  const patch = { ...(OV.patch || {}) };
+  const subs = $("ovSubs").value;
+  if (subs) {
+    patch.subtitles_mode = subs;
+    const langs = $("ovSubLangs").value.trim();
+    delete patch.subtitles_langs;          // no field, no claim
+    if (langs) patch.subtitles_langs = langs;
+  }
+  const sb = $("ovSb").value;
+  if (sb) patch.sponsorblock_mode = sb;
+  if ($("ovMeta").checked) patch.embed_metadata = true;
+  if ($("ovThumb").checked) patch.embed_thumbnail = true;
+  const raw = $("ovRaw").value.trim();
+  if (raw) patch.raw_args = raw;
+  return Object.keys(patch).length ? patch : null;
+}
+
+function clearOv() {
+  OV.preset = null;
+  OV.patch = {};
+  $("ovSubs").value = "";
+  $("ovSubLangs").value = "";
+  $("ovSb").value = "";
+  $("ovMeta").checked = false;
+  $("ovThumb").checked = false;
+  $("ovRaw").value = "";
+  $("ovPreset").value = "";
+  renderOvCount();
+}
+
+/** The little "N options" chip on the collapsed summary. */
+function renderOvCount() {
+  const patch = readOv();
+  const n = (patch ? Object.keys(patch).length : 0) + (OV.preset ? 1 : 0);
+  const chip = $("ovCount");
+  if (!n) {
+    chip.classList.add("hidden");
+    chip.textContent = "";
+    return;
+  }
+  const parts = [];
+  if (OV.preset) parts.push(OV.preset.replace("audio-", ""));
+  if (patch) parts.push(Object.keys(patch).length + " option" +
+    (Object.keys(patch).length === 1 ? "" : "s"));
+  chip.textContent = parts.join(" · ");
+  chip.classList.remove("hidden");
+}
+
+/** Apply a preset's patch to the block (and remember its audio intent). */
+function applyOvPreset() {
+  const name = $("ovPreset").value;
+  if (!name) return;
+  const entry = (PRESETS || []).find((p) => p.name === name);
+  if (!entry) return;
+  clearOv();
+  const patch = entry.patch || {};
+  OV.preset = patch.preset || null;
+  // keep every option the preset carries, even the ones the block cannot show
+  OV.patch = { ...patch };
+  delete OV.patch.preset;
+  if (patch.subtitles_mode) $("ovSubs").value = patch.subtitles_mode;
+  if (patch.subtitles_langs) $("ovSubLangs").value = patch.subtitles_langs;
+  if (patch.sponsorblock_mode) $("ovSb").value = patch.sponsorblock_mode;
+  if (patch.embed_metadata) $("ovMeta").checked = true;
+  if (patch.embed_thumbnail) $("ovThumb").checked = true;
+  if (patch.raw_args) $("ovRaw").value = patch.raw_args;
+  $("ovPreset").value = name;
+  renderOvCount();
+  const n = Object.keys(readOv() || {}).length + (OV.preset ? 1 : 0);
+  toast(`preset “${name}” applied — ${n} option(s) for the next download`);
+}
+
+function renderOvPresets() {
+  const sel = $("ovPreset");
+  const keep = sel.value;
+  sel.innerHTML = "";
+  const blank = el("option", "", "— apply a preset —");
+  blank.value = "";
+  sel.append(blank);
+  const groups = [[true, "built-in"], [false, "saved"]];
+  for (const [builtin, label] of groups) {
+    const items = (PRESETS || []).filter((p) => !!p.builtin === builtin);
+    if (!items.length) continue;
+    const group = document.createElement("optgroup");
+    group.label = label;
+    for (const p of items) {
+      const o = el("option", "", p.name +
+        (p.description ? " — " + p.description : ""));
+      o.value = p.name;
+      group.append(o);
+    }
+    sel.append(group);
+  }
+  sel.value = keep;
+}
+
+function initOverrides() {
+  $("ovApply").onclick = applyOvPreset;
+  $("ovClear").onclick = () => { clearOv(); toast("cleared — using your settings"); };
+  for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw"]) {
+    $(id).addEventListener("input", renderOvCount);
+    $(id).addEventListener("change", renderOvCount);
   }
 }
 
@@ -385,6 +509,19 @@ function jobRow(j) {
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
   top.append(title, el("span", "pill " + j.status, j.status));
+  // what this job actually carries (preset / per-download overrides)
+  const extra = j.overrides ? Object.keys(j.overrides).length : 0;
+  if (j.preset) {
+    const chip = el("span", "chip tag", "⚙ " + j.preset.replace("audio-", ""));
+    chip.title = "audio preset: " + j.preset;
+    top.append(chip);
+  }
+  if (extra) {
+    const chip = el("span", "chip tag",
+      "⚙ " + extra + " option" + (extra === 1 ? "" : "s"));
+    chip.title = Object.keys(j.overrides).join(", ") + " — this download only";
+    top.append(chip);
+  }
   row.append(top);
 
   let trashHost = null;   // the button row the trash belongs to
@@ -496,7 +633,9 @@ async function refreshJobs() {
     if (!list.length) {
       if (!box.querySelector(".empty")) {
         box.innerHTML = "";
-        box.append(el("div", "empty", "Nothing yet — paste a link above and hit Probe."));
+        box.append(el("div", "empty",
+          "Nothing in the queue. Downloads you start land here — finished ones " +
+          "stay put so you can open, share or delete them."));
       }
       return;
     }
@@ -749,6 +888,7 @@ window.onCookiesPicked = (path) => {
 async function loadSettings() {
   try {
     const s = await api("/settings");
+    SETTINGS_SNAPSHOT = s;
     CURRENT = { theme: s.theme, glass: s.glass };
     $("setDir").value = s.download_dir || "";
     $("setConc").value = s.max_concurrent;
@@ -886,6 +1026,100 @@ function renderOptions(query) {
 function renderRawAccess(enabled) {
   $("rawEditor").classList.toggle("hidden", !enabled);
   $("rawOffHint").classList.toggle("hidden", !!enabled);
+  $("ovRawRow").classList.toggle("hidden", !enabled);
+}
+
+/* --- presets: named bundles the user saves and reuses --------------------- */
+
+let PRESETS = [];          // [{name, patch, builtin, description}]
+
+async function loadPresets() {
+  try {
+    const data = await api("/presets");
+    PRESETS = data.presets || [];
+    OV.defaults = data.defaults || {};
+    OV.perJobKeys = data.per_job_keys || [];
+  } catch (e) {
+    PRESETS = [];
+  }
+  renderOvPresets();
+  renderPresetList();
+}
+
+function renderPresetList() {
+  const box = $("presetList");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!PRESETS.length) {
+    box.append(el("div", "empty", "No presets yet — save one from your settings above."));
+    return;
+  }
+  for (const p of PRESETS) {
+    const row = el("div", "optrow");
+    const left = el("div", "col");
+    left.append(el("span", "optname", p.name + (p.builtin ? " (built-in)" : "")));
+    const keys = Object.keys(p.patch || {});
+    left.append(el("span", "optsum small muted",
+      (p.description || keys.map((k) => `${k}=${p.patch[k]}`).join(" · ")).slice(0, 140)));
+    row.append(left);
+    if (!p.builtin) {
+      const del = el("button", "ghost-sm del", "🗑 Delete");
+      del.onclick = async () => {
+        if (!(await askConfirm(`Delete the preset “${p.name}”? Downloads already
+started keep their options.`, { okText: "Delete" }))) return;
+        try {
+          await api(`/presets/${encodeURIComponent(p.name)}`, { method: "DELETE" });
+          toast("preset deleted");
+          loadPresets();
+        } catch (e) {
+          toast("could not delete: " + e.message, "bad");
+        }
+      };
+      row.append(del);
+    }
+    box.append(row);
+  }
+}
+
+/** The patch "save my current settings" should store: what differs from the
+ *  defaults, limited to the keys a single download may override. */
+function presetPatchFromSettings() {
+  const patch = {};
+  const keys = OV.perJobKeys || [];
+  const defaults = OV.defaults || {};
+  for (const k of keys) {
+    const v = SETTINGS_SNAPSHOT ? SETTINGS_SNAPSHOT[k] : undefined;
+    if (v === undefined || v === null) continue;
+    const d = defaults[k];
+    const isDefault = Array.isArray(v) || typeof v === "object"
+      ? JSON.stringify(v) === JSON.stringify(d)
+      : v === d;
+    if (!isDefault && v !== "") patch[k] = v;
+  }
+  return patch;
+}
+
+async function saveCurrentAsPreset() {
+  const name = $("presetName").value.trim();
+  const msg = $("presetMsg");
+  const patch = presetPatchFromSettings();
+  if (!Object.keys(patch).length) {
+    msg.textContent = "Nothing to save yet — change a download option first " +
+      "(Settings → Media / Network).";
+    msg.className = "msg warn";
+    return;
+  }
+  try {
+    await api("/presets", { method: "POST", body: JSON.stringify({ name, patch }) });
+    msg.textContent = `saved “${name}” with ${Object.keys(patch).length} option(s): ` +
+      Object.keys(patch).join(", ");
+    msg.className = "msg ok";
+    $("presetName").value = "";
+    loadPresets();
+  } catch (e) {
+    msg.textContent = "could not save: " + e.message;
+    msg.className = "msg bad";
+  }
 }
 
 $("optionsBtn").onclick = openOptionsBrowser;
@@ -951,6 +1185,7 @@ function saveSettings() {
       extractor_args: $("setExtractorArgs").value.trim(),
     }),
   }).then((s) => {
+    SETTINGS_SNAPSHOT = s;   // the preset diff reads this
     renderWhere(s.download_dir);
     $("setConc").value = s.max_concurrent;
     renderRawAccess(!!s.raw_args_enabled);
@@ -988,7 +1223,10 @@ applyTheme(CURRENT.theme, CURRENT.glass);
 if (ANDROID()) document.documentElement.dataset.host = "android";
 renderWhere(CFG.downloadDir);
 wireCopyPath();
+initOverrides();
+$("presetSave").onclick = saveCurrentAsPreset;
 loadVersions();
+loadPresets();
 checkAppUpdate();
 loadSettings();
 initAppControls();
