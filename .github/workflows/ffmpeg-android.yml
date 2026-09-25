@@ -1,0 +1,75 @@
+name: ffmpeg-android
+
+# Builds the static ffmpeg CLI that the Android app bundles for
+# audio extraction / merging, and attaches it to the `ffmpeg-bin` release so
+# android.yml can download it at build time.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/build_ffmpeg_android.sh
+      - .github/workflows/ffmpeg-android.yml
+
+permissions:
+  contents: write
+
+env:
+  FFMPEG_VERSION: "8.1.3"
+  LAME_VERSION: "3.100"
+  NDK_VERSION: "r27c"
+
+jobs:
+  build:
+    name: ffmpeg ${{ matrix.abi }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { abi: arm64-v8a, target: aarch64-linux-android }
+          - { abi: x86_64,    target: x86_64-linux-android }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NDK
+        run: |
+          curl -fsSLo ndk.zip "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+          unzip -q ndk.zip
+          echo "NDK=$PWD/android-ndk-${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build static ffmpeg
+        run: |
+          chmod +x scripts/build_ffmpeg_android.sh
+          scripts/build_ffmpeg_android.sh "${{ matrix.abi }}" "${{ matrix.target }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-${{ matrix.abi }}
+          path: build/out/${{ matrix.abi }}/ffmpeg
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+
+      - name: Attach binaries to the ffmpeg-bin release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          cp dl/ffmpeg-arm64-v8a/ffmpeg libffmpeg-arm64-v8a.so
+          cp dl/ffmpeg-x86_64/ffmpeg    libffmpeg-x86_64.so
+          sha256sum libffmpeg-arm64-v8a.so libffmpeg-x86_64.so > SHA256SUMS.txt
+          gh release view ffmpeg-bin --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create ffmpeg-bin --repo "$GITHUB_REPOSITORY" \
+              --title "Bundled ffmpeg binaries" \
+              --notes "Static ffmpeg ${FFMPEG_VERSION} CLI for Android (arm64-v8a, x86_64, 16 KB-page aligned), bundled into the app for audio extraction and merging. LGPL build from unmodified sources; build script: scripts/build_ffmpeg_android.sh" \
+              --latest=false
+          gh release upload ffmpeg-bin --repo "$GITHUB_REPOSITORY" \
+            libffmpeg-arm64-v8a.so libffmpeg-x86_64.so SHA256SUMS.txt --clobber

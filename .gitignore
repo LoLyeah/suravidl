@@ -8,3 +8,6 @@ build/
 downloads/
 .pytest_cache/
 .DS_Store
+
+# bundled at CI build time from the ffmpeg-bin release (see ffmpeg-android.yml)
+android/app/src/main/jniLibs/
