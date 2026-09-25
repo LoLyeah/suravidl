@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
+from .auth import cookie_session
 from .jobs import JobManager
 from .probe import probe
 
@@ -62,6 +63,7 @@ def create_app(download_dir, auth_token: str | None = None,
         db_path=db_path,
         max_concurrent=settings.get()["max_concurrent"],
         auto_resume=settings.get()["auto_resume"],
+        cookie_session=lambda: cookie_session(settings.get()),
     )
     acts = desktop_actions or {}
 
@@ -135,7 +137,8 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.get("/app/info")
     def app_info(_mgr: JobManager = Depends(require_auth)):
         return {"desktop": bool(acts.get("quit") or acts.get("minimize")),
-                "can_minimize": bool(acts.get("minimize"))}
+                "can_minimize": bool(acts.get("minimize")),
+                "can_pick_file": bool(acts.get("pick_file"))}
 
     def _window_action(name: str):
         fn = acts.get(name)
@@ -153,10 +156,24 @@ def create_app(download_dir, auth_token: str | None = None,
     def app_quit(_mgr: JobManager = Depends(require_auth)):
         return _window_action("quit")
 
+    @app.post("/app/pick-file")
+    def app_pick_file(_mgr: JobManager = Depends(require_auth)):
+        """Native file picker (desktop app only). Returns {"path": str|None}."""
+        fn = acts.get("pick_file")
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="file picking is only available in the desktop app")
+        try:
+            return {"path": fn()}
+        except Exception:  # noqa: BLE001 - a cancelled/broken dialog is not an error
+            return {"path": None}
+
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
         try:
-            return probe(body.url, extra_headers=body.headers)
+            with cookie_session(settings.get()) as cookie_opts:
+                return probe(body.url, extra_headers=body.headers,
+                             cookie_opts=cookie_opts)
         except Exception as e:  # noqa: BLE001 - error goes to the client
             raise HTTPException(status_code=400, detail=str(e)) from e
 

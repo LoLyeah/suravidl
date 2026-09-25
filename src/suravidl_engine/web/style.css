@@ -417,6 +417,14 @@ html[data-theme="light"] body.scrolled header { box-shadow: 0 8px 22px rgba(30, 
 /* theme switches ease instead of snapping (flat colours; gradients can't tween) */
 body, header, .card, .modal { transition: background-color .35s ease, color .35s ease, border-color .35s ease; }
 .field .col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.field .col.fill { align-items: stretch; }
+.jrow input[type="text"] { flex: 1; min-width: 0; }
+select {
+  width: 100%; font: inherit; font-size: 13px; padding: 9px 10px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--input-bg); color: var(--text);
+}
+select:focus-visible { outline: 0; border-color: var(--accent-line); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 640px) {

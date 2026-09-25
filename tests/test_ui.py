@@ -27,7 +27,9 @@ def test_index_has_new_controls(tmp_path):
     with TestClient(app) as c:
         html = c.get("/").text
     for elem_id in ("setResume", "androidSection", "batteryBtn", "quitAppBtn",
-                    "quitBtn", "minBtn", "settingsModal"):
+                    "quitBtn", "minBtn", "settingsModal",
+                    "setCookies", "setCookiesBrowser", "browseCookies",
+                    "importCookies", "browserRow"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

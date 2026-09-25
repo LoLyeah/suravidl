@@ -5,6 +5,7 @@ import json
 import sqlite3
 import threading
 import uuid
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -44,7 +45,7 @@ def _safe_headers(h: dict | None) -> dict | None:
 
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
-                 auto_resume: bool = False):
+                 auto_resume: bool = False, cookie_session=None):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path) if db_path else ":memory:"
@@ -61,6 +62,8 @@ class JobManager:
         self._capacity = max(1, int(max_concurrent))
         self._active = 0
         self.on_complete = None  # optional callable(job) run after success
+        # optional callable -> context manager yielding yt-dlp cookie opts
+        self._cookie_session = cookie_session
         self._init_db()
         if auto_resume:
             self.resume_interrupted()
@@ -261,9 +264,13 @@ class JobManager:
         if extra_headers:
             opts["http_headers"] = extra_headers
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(job["url"], download=True)
-                info = ydl.sanitize_info(info)
+            with (self._cookie_session() if self._cookie_session
+                  else nullcontext()) as cookie_opts:
+                if cookie_opts:
+                    opts.update(cookie_opts)
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(job["url"], download=True)
+                    info = ydl.sanitize_info(info)
             req = (info.get("requested_downloads") or [{}])[0]
             job["title"] = info.get("title")
             job["filepath"] = req.get("filepath") or info.get("filepath")

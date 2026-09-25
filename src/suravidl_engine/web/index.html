@@ -127,6 +127,33 @@
       </label>
     </div>
 
+    <div class="field">
+      <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
+      <div class="col fill">
+        <div class="jrow">
+          <input id="setCookies" type="text" spellcheck="false"
+                 placeholder="path to cookies.txt (Netscape format)"/>
+          <button id="browseCookies" class="btn sm hidden" type="button">Browse…</button>
+          <button id="importCookies" class="btn sm hidden" type="button">Import…</button>
+        </div>
+        <div class="jrow" id="browserRow">
+          <select id="setCookiesBrowser">
+            <option value="">Browser cookies: off</option>
+            <option value="chrome">Use cookies from Chrome</option>
+            <option value="chromium">Use cookies from Chromium</option>
+            <option value="firefox">Use cookies from Firefox</option>
+            <option value="edge">Use cookies from Edge</option>
+            <option value="brave">Use cookies from Brave</option>
+            <option value="opera">Use cookies from Opera</option>
+            <option value="vivaldi">Use cookies from Vivaldi</option>
+            <option value="safari">Use cookies from Safari</option>
+          </select>
+        </div>
+        <span class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
+          or read the cookies straight from a browser (close it first). On Android, use Import.</span>
+      </div>
+    </div>
+
     <div id="androidSection" class="field hidden">
       <label class="lbl">Android</label>
       <div class="col">

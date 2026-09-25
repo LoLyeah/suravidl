@@ -118,7 +118,11 @@ async function doProbe() {
     renderProbe(url, info);
     $("probeMsg").textContent = "";
   } catch (e) {
-    $("probeMsg").textContent = "probe failed: " + e.message;
+    let msg = "probe failed: " + e.message;
+    if (/sign in|age|not a bot|private video|members-only|cookies/i.test(e.message)) {
+      msg += " — this video needs your account: add cookies in ⚙ Settings → Authentication.";
+    }
+    $("probeMsg").textContent = msg;
     $("probeCard").classList.add("hidden");
   } finally {
     $("probeBtn").classList.remove("busy");
@@ -373,6 +377,11 @@ async function initAppControls() {
     $("androidSection").classList.remove("hidden");
     $("batteryBtn").onclick = () => window.AndroidHost.openBatterySettings();
     $("quitAppBtn").onclick = () => $("quitBtn").onclick();
+    // browser cookie DBs aren't readable on Android — offer file import instead
+    $("browserRow").classList.add("hidden");
+    const imp = $("importCookies");
+    imp.classList.remove("hidden");
+    imp.onclick = () => window.AndroidHost.pickCookiesFile();
     return;
   }
   try {
@@ -384,9 +393,35 @@ async function initAppControls() {
       min.classList.remove("hidden");
       min.onclick = () => api("/app/minimize", { method: "POST" });
     }
+    if (info.can_pick_file) {
+      const browse = $("browseCookies");
+      browse.classList.remove("hidden");
+      browse.onclick = async () => {
+        try {
+          const { path } = await api("/app/pick-file", { method: "POST" });
+          if (path) {
+            $("setCookies").value = path;
+            toast("selected — press Save");
+          }
+        } catch (e) {
+          toast("file picker unavailable: " + e.message, "bad");
+        }
+      };
+    }
     wireQuitButton();
   } catch (_) { /* browser mode */ }
 }
+
+/* called back by the Android host after the cookies file is imported */
+window.onCookiesPicked = (path) => {
+  if (!path) {
+    toast("cookies import failed", "bad");
+    return;
+  }
+  $("setCookies").value = path;
+  saveSettings().then(() => toast("cookies imported")).catch((e) =>
+    toast("could not save: " + e.message, "bad"));
+};
 
 /* ---------- settings ---------- */
 async function loadSettings() {
@@ -397,6 +432,8 @@ async function loadSettings() {
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
     $("setResume").checked = !!s.auto_resume;
+    $("setCookies").value = s.cookies_file || "";
+    $("setCookiesBrowser").value = s.cookies_from_browser || "";
     $("dlDir").textContent = s.download_dir || "";
     markSwatches(CURRENT);
   } catch (e) {
@@ -432,20 +469,28 @@ document.querySelectorAll("#glassSwatches .swatch").forEach((b) => {
     "Glass: " + b.querySelector(".sw-label").textContent);
 });
 
+function saveSettings() {
+  return api("/settings", {
+    method: "POST",
+    body: JSON.stringify({
+      download_dir: $("setDir").value.trim(),
+      max_concurrent: Number($("setConc").value),
+      open_dir_on_complete: $("setReveal").checked,
+      auto_resume: $("setResume").checked,
+      cookies_file: $("setCookies").value.trim(),
+      cookies_from_browser: $("setCookiesBrowser").value,
+    }),
+  }).then((s) => {
+    $("dlDir").textContent = s.download_dir;
+    $("setConc").value = s.max_concurrent;
+    return s;
+  });
+}
+
 $("setSave").onclick = async () => {
   $("setMsg").textContent = "saving…";
   try {
-    const s = await api("/settings", {
-      method: "POST",
-      body: JSON.stringify({
-        download_dir: $("setDir").value.trim(),
-        max_concurrent: Number($("setConc").value),
-        open_dir_on_complete: $("setReveal").checked,
-        auto_resume: $("setResume").checked,
-      }),
-    });
-    $("dlDir").textContent = s.download_dir;
-    $("setConc").value = s.max_concurrent;
+    await saveSettings();
     $("setMsg").textContent = "";
     toast("Settings saved");
   } catch (e) {

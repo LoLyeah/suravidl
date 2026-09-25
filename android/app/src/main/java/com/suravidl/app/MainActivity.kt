@@ -1,6 +1,7 @@
 package com.suravidl.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -19,6 +20,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -126,7 +128,7 @@ class MainActivity : AppCompatActivity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
-    /** JS bridge: window.AndroidHost.{quit,openBatterySettings} in the page. */
+    /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile}. */
     inner class HostBridge {
         @JavascriptInterface
         fun quit() {
@@ -136,6 +138,53 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun openBatterySettings() {
             runOnUiThread { openBatterySettingsScreen() }
+        }
+
+        @JavascriptInterface
+        fun pickCookiesFile() {
+            runOnUiThread { openCookiePicker() }
+        }
+    }
+
+    /** SAF picker: copy the chosen cookies.txt into the app dir, hand the path to the UI. */
+    private fun openCookiePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+        }
+        try {
+            startActivityForResult(intent, REQUEST_COOKIES)
+        } catch (_: Throwable) {
+            notifyCookiesPicked(null)
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_COOKIES) return
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            notifyCookiesPicked(null)
+            return
+        }
+        try {
+            val target = File(filesDir, "cookies.txt")
+            contentResolver.openInputStream(uri)!!.use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            notifyCookiesPicked(target.absolutePath)
+        } catch (e: Throwable) {
+            LogStore.write("cookie import failed: ${e.message}")
+            notifyCookiesPicked(null)
+        }
+    }
+
+    private fun notifyCookiesPicked(path: String?) {
+        val arg = if (path == null) "null" else JSONObject.quote(path)
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.onCookiesPicked && window.onCookiesPicked($arg)", null)
         }
     }
 
@@ -168,5 +217,6 @@ class MainActivity : AppCompatActivity() {
         const val BG_DARK = 0xFF06080F.toInt()
         const val BG_LIGHT = 0xFFEEF1F7.toInt()
         const val BG_AMOLED = 0xFF000000.toInt()
+        private const val REQUEST_COOKIES = 4101
     }
 }

@@ -137,6 +137,11 @@ repo has no pydantic-core.
       drift aurora, smooth in-place progress, scroll-shadow header;
       Android: background downloads (wake lock + auto-resume of interrupted
       jobs on restart) and "Quit completely" to free memory
+- [x] M9 — authentication for age-restricted / private / bot-gated videos:
+      cookies.txt file (desktop Browse…, on Android Import via the system
+      picker) and "use cookies from <browser>" (desktop); cookies are copied
+      per run so yt-dlp's refresh can never corrupt or race your export;
+      sign-in errors in the UI now point at Settings → Authentication
 
 ## API (v0.1)
 

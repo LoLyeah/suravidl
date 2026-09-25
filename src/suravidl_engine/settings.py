@@ -9,6 +9,8 @@ DEFAULTS = {
     "auto_resume": True,   # re-queue jobs cut off by an engine restart
     "theme": "dark",       # light | dark | amoled
     "glass": "frosted",    # frosted | liquid
+    "cookies_file": "",          # Netscape cookies.txt for age-gated videos
+    "cookies_from_browser": "",  # e.g. chrome / firefox / edge
 }
 
 THEMES = ("light", "dark", "amoled")
@@ -61,6 +63,21 @@ class Settings:
             return bool(value)
         if key == "auto_resume":
             return bool(value)
+        if key == "cookies_file":
+            value = str(value or "").strip()
+            if value:
+                p = Path(value).expanduser()
+                if not p.is_file():
+                    raise ValueError(f"cookies file not found: {p}")
+                value = str(p)
+            return value
+        if key == "cookies_from_browser":
+            value = str(value or "").strip()
+            if value:
+                from .auth import parse_browser
+
+                parse_browser(value)  # raises ValueError with the known list
+            return value
         if key == "theme":
             value = str(value)
             if value not in THEMES:

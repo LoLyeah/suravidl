@@ -192,8 +192,15 @@ def main() -> None:
     window = _try_window(webview, url) if webview else None
     actions = {}
     if window is not None:
+        def _pick_file():
+            try:
+                picked = window.create_file_dialog(webview.OPEN_DIALOG)
+            except Exception:  # noqa: BLE001 - dialog cancelled or unsupported
+                return None
+            return picked[0] if picked else None
+
         actions = {"minimize": window.minimize, "quit": window.destroy,
-                   "reveal": _open_folder}
+                   "reveal": _open_folder, "pick_file": _pick_file}
 
     server = start_server(download_dir=args.download_dir, token=token, port=port,
                           db_path=args.db, desktop_actions=actions or None)

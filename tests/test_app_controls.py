@@ -28,7 +28,9 @@ def make_app(tmp_path, **kw):
 def test_app_info_no_desktop(tmp_path):
     c = TestClient(make_app(tmp_path))
     info = c.get("/app/info", headers=AUTH).json()
-    assert info == {"desktop": False, "can_minimize": False}
+    assert info["desktop"] is False
+    assert info["can_minimize"] is False
+    assert info["can_pick_file"] is False
 
 
 def test_window_actions_501_without_desktop(tmp_path):
@@ -43,7 +45,9 @@ def test_window_actions_invoke_hooks(tmp_path):
                "quit": lambda: calls.append("quit")}
     c = TestClient(make_app(tmp_path, desktop_actions=actions))
     info = c.get("/app/info", headers=AUTH).json()
-    assert info == {"desktop": True, "can_minimize": True}
+    assert info["desktop"] is True
+    assert info["can_minimize"] is True
+    assert info["can_pick_file"] is False
     assert c.post("/app/minimize", headers=AUTH).status_code == 200
     assert c.post("/app/quit", headers=AUTH).status_code == 200
     assert calls == ["min", "quit"]
