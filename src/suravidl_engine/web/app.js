@@ -145,6 +145,78 @@ function fmtQuality(f) {
   return f.format_note || f.resolution || "";
 }
 
+/* ---------- format rows: read the codec soup, and never hand out silence --- */
+const CODEC_NAMES = {
+  avc1: "H.264", avc3: "H.264", hev1: "HEVC", hvc1: "HEVC", vp09: "VP9",
+  vp9: "VP9", vp8: "VP8", av01: "AV1", mp4a: "AAC", opus: "Opus",
+  vorbis: "Vorbis", ac3: "AC-3", ec3: "E-AC-3", flac: "FLAC",
+};
+
+const codecName = (c) => {
+  if (!c || c === "none") return null;
+  const base = String(c).split(".")[0].toLowerCase();
+  return CODEC_NAMES[base] || c;
+};
+
+const hasVideo = (f) => !!f.vcodec && f.vcodec !== "none";
+const hasAudio = (f) => !!f.acodec && f.acodec !== "none";
+
+function fmtCodecs(f) {
+  const parts = [f.ext];
+  const v = codecName(f.vcodec), a = codecName(f.acodec);
+  if (v) parts.push("video " + v);
+  if (a) parts.push("audio " + a);
+  return parts.join(" · ");
+}
+
+/** What the stream contains — the thing the old table made you guess. */
+function fmtKind(f) {
+  const v = hasVideo(f), a = hasAudio(f);
+  if (v && a) return { label: "video + audio", cls: "k-both" };
+  if (v) return { label: "video only — sound is added on download", cls: "k-video" };
+  if (a) return { label: "audio only", cls: "k-audio" };
+  // a plain file (direct link): the site told us nothing about its tracks
+  return { label: "single file", cls: "k-audio" };
+}
+
+/** Picking a video-only stream must not produce a silent file: pair it with
+ *  the site's separate audio track when one exists (yt-dlp merges both with
+ *  ffmpeg). Direct-link files have no separate audio, so they stay as-is. */
+function fmtSpec(f, hasSeparateAudio) {
+  return hasSeparateAudio && hasVideo(f) && !hasAudio(f)
+    ? `${f.format_id}+bestaudio/best`
+    : f.format_id;
+}
+
+function sizeCell(f) {
+  const td = el("td", "fmt-s");
+  const b = f.filesize || f.filesize_approx;
+  if (b) {
+    td.textContent = humanBytes(b);
+  } else {
+    td.textContent = "unknown";
+    td.classList.add("muted");
+    td.title = "the site does not advertise a size for this stream — " +
+               "the real size shows once the download starts";
+  }
+  return td;
+}
+
+/** Sites announce the same stream twice (DASH + HLS, one without a size).
+ *  Keep one row per real choice, preferring the copy that knows its size. */
+function dedupeFormats(list) {
+  const best = new Map();
+  for (const f of list) {
+    const key = [f.height || f.abr || 0, f.ext, f.vcodec, f.acodec,
+                 f.fps || 0, f.format_note || ""].join("|");
+    const prev = best.get(key);
+    if (!prev) { best.set(key, f); continue; }
+    const size = (x) => x.filesize || x.filesize_approx || 0;
+    if (size(f) > 0 && size(prev) === 0) best.set(key, f);
+  }
+  return [...best.values()];
+}
+
 function renderProbe(url, info) {
   $("probeCard").classList.remove("hidden");
   $("probeTitle").textContent = info.title || url;
@@ -180,23 +252,28 @@ function renderProbe(url, info) {
   }
 
   $("playlistRow").classList.add("hidden");
-  const fmts = [...(info.formats || [])]
-    .filter((f) => f.ext && f.format_id)
+  const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
+  // a video-only pick only makes sense to pair with audio when the site
+  // actually publishes a separate audio stream (YouTube does, a plain .mp4 doesn't)
+  const separateAudio = usable.some((f) => !hasVideo(f) && hasAudio(f));
+  const fmts = dedupeFormats(usable)
     .sort((a, b) => (b.height || b.abr || 0) - (a.height || a.abr || 0));
 
   for (const [i, f] of fmts.entries()) {
     const tr = el("tr", "enter");
     tr.style.animationDelay = Math.min(i * 30, 240) + "ms";
+    const kind = fmtKind(f);
+    const cell = el("td", "fmt-c");
+    cell.append(el("div", "", fmtCodecs(f) || "—"));
+    cell.append(el("div", "fmt-kind " + kind.cls, kind.label));
     tr.append(
       el("td", "fmt-q", fmtQuality(f) || "—"),
-      el("td", "fmt-c",
-        [f.ext, f.vcodec !== "none" ? f.vcodec : null, f.acodec !== "none" ? f.acodec : null]
-          .filter(Boolean).join(" · ") || "—"),
-      el("td", "fmt-s", humanBytes(f.filesize || f.filesize_approx)),
+      cell,
+      sizeCell(f),
     );
     const td = el("td");
     const btn = el("button", "get", "Get");
-    btn.onclick = () => startJob(url, f.format_id);
+    btn.onclick = () => startJob(url, fmtSpec(f, separateAudio));
     td.append(btn);
     tr.append(td);
     tb.append(tr);
@@ -497,6 +574,7 @@ async function initAppControls() {
     imp.classList.remove("hidden");
     imp.onclick = () => window.AndroidHost.pickCookiesFile();
     initVaultSection();
+    initStorageSection();
     return;
   }
   try {
@@ -545,6 +623,46 @@ function initVaultSection() {
       .catch(() => { });
     toast("stored cookies deleted");
     show();
+  };
+}
+
+/** Android: storage row in Settings → Device — how much is downloaded, and a
+ *  way to delete it, because the folder (Android/data/…) is unreachable. */
+async function initStorageSection() {
+  const sec = $("storageSection");
+  if (!sec) return;
+  sec.classList.remove("hidden");
+  const show = async () => {
+    try {
+      const s = await api("/files/summary");
+      $("storageInfo").textContent = s.files
+        ? `${s.files} file${s.files === 1 ? "" : "s"} · ${humanBytes(s.bytes)}`
+        : "no downloaded files";
+    } catch (_) {
+      $("storageInfo").textContent = "size unavailable";
+    }
+  };
+  await show();
+  $("clearDownloadsBtn").onclick = async () => {
+    const s = await api("/files/summary").catch(() => ({ files: 0, bytes: 0 }));
+    const one = s.files === 1;
+    const ok = await askConfirm(
+      `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
+      (ANDROID() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
+      "? This cannot be undone.", { okText: "Delete" });
+    if (!ok) return;
+    try {
+      const r = await api("/files/clear", { method: "POST" });
+      if (ANDROID() && window.AndroidHost.deleteMediaCopies) {
+        try { window.AndroidHost.deleteMediaCopies(); } catch (_) { }
+      }
+      toast(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
+            `freed ${humanBytes(r.freed_bytes)}`);
+      refreshJobs();
+      show();
+    } catch (e) {
+      toast("could not delete: " + e.message, "bad");
+    }
   };
 }
 

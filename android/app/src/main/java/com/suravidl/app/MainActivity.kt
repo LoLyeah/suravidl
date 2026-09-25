@@ -180,6 +180,11 @@ class MainActivity : AppCompatActivity() {
         fun deleteCookies() {
             CookieVault.delete(this@MainActivity)
         }
+
+        /** Gallery/Music copies of finished downloads (Settings → storage wipe). */
+        @JavascriptInterface
+        fun deleteMediaCopies(): Int =
+            MediaLibrary.deleteOwnCopies(this@MainActivity)
     }
 
     private fun toast(msg: String) {

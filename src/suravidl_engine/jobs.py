@@ -321,6 +321,22 @@ class JobManager:
                            playlist_items=src.get("playlist_items"),
                            raw_args=src.get("raw_args"))
 
+    def clear_completed(self) -> int:
+        """Forget completed jobs (their files are gone after /files/clear).
+
+        Errored/cancelled rows stay so they can still be retried.
+        """
+        with self._lock:
+            gone = [jid for jid, j in self._jobs.items()
+                    if j["status"] == "completed"]
+            for jid in gone:
+                self._jobs.pop(jid, None)
+            if gone:
+                self._con.execute(
+                    "DELETE FROM jobs WHERE status = 'completed'")
+                self._con.commit()
+        return len(gone)
+
     def resume_interrupted(self) -> list[str]:
         """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
 

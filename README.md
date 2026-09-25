@@ -202,7 +202,24 @@ repo has no pydantic-core.
       serve from its heuristic cache — asset URLs are now version-stamped
       and served `no-store`, so a mixture of two releases cannot happen
       again.
-- [ ] M14+ — what is left: curated option groups (verbosity/workarounds/geo),
+- [x] M14 — the format table finally answers "what am I getting?", and
+      downloads can be cleaned up where they live: every row now says what
+      the stream **contains** — *video + audio*, *video only (sound is added
+      on download)*, *audio only*, or *single file* for a direct link whose
+      tracks the site never described — with codec names in human form
+      (H.264 / VP9 / AV1 / AAC…) and the duplicate rows sites publish for the
+      same stream (DASH + HLS, one without a size) collapsed to one, keeping
+      the copy that knows its size. Picking a video-only stream pairs it with
+      the site's audio track automatically, so a quality pick can no longer
+      quietly produce a silent file. Sizes the site doesn't advertise now
+      read *unknown* (with the reason on hover) instead of a bare `?`.
+      Settings → Device gained **Downloaded files**: it shows how much is in
+      the app's folder and wipes it (sidecars included, plus the Gallery/Music
+      copies this app made) — the folder is app-private on Android, so the app
+      has to offer that cleanup itself. `GET /files/summary` +
+      `POST /files/clear` (completed job rows go with their files) and an
+      emulator test that an imported copy is really removable.
+- [ ] M15+ — what is left: curated option groups (verbosity/workarounds/geo),
       the full four-tab shell (Download · Queue · Settings · yt-dlp) →
       `docs/PLAN-full-ytdlp.md`
 

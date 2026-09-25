@@ -202,6 +202,20 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
   `tests/test_assets.py`.
 - **M10b done** (was: Keystore-encrypted imported cookies + one-tap delete +
   threat model) — shipped in v0.14.0 above.
+- **v0.15.0 — M14 (format honesty + storage cleanup):** the probe table says
+  what each stream contains (video+audio / video only / audio only / single
+  file), codecs get human names, duplicate announcements of the same stream
+  collapse (keeping the copy with a known size), unadvertised sizes read
+  "unknown" instead of "?", and picking a video-only stream auto-pairs it
+  with the site's audio (`<id>+bestaudio/best`) so quality picks can't yield
+  silent files. New `GET /files/summary` + `POST /files/clear` back a
+  Settings → Device "Delete downloaded files" row (app folder + the
+  Gallery/Music copies we contributed, completed jobs pruned) — needed
+  because Android/data is not user-browsable.
+  **Format-labelling rule:** never guess a stream's tracks from missing
+  fields — a direct link reports `vcodec: null, acodec: null`, which is
+  "unknown", not "audio only"; only pair with `bestaudio` when the site
+  publishes a separate audio-only format.
 - Next up: curated option groups (verbosity/workarounds/geo) and the full
   four-tab shell (Download · Queue · Settings · yt-dlp) — the settings
   sub-tabs (General · Media · Network · Authentication · Advanced · Device)

@@ -265,6 +265,43 @@ def create_app(download_dir, auth_token: str | None = None,
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    @app.get("/files/summary")
+    def files_summary(_mgr: JobManager = Depends(require_auth)):
+        """How much lives in the download folder (the UI shows this before a wipe)."""
+        d = Path(manager.download_dir)
+        files = [p for p in d.rglob("*") if p.is_file()] if d.exists() else []
+        return {"dir": str(d), "files": len(files),
+                "bytes": sum(p.stat().st_size for p in files)}
+
+    @app.post("/files/clear")
+    def files_clear(mgr: JobManager = Depends(require_auth)):
+        """Delete every downloaded file (sidecars included).
+
+        This exists because on Android the download folder is app-private —
+        a file manager cannot open Android/data, so the app has to offer the
+        cleanup itself. Completed job rows go with their files; errored jobs
+        stay so they can be retried.
+        """
+        d = Path(manager.download_dir)
+        deleted = freed = 0
+        if d.exists():
+            for p in sorted(d.rglob("*"), key=lambda q: len(q.parts), reverse=True):
+                if p.is_file():
+                    try:
+                        freed += p.stat().st_size
+                        p.unlink()
+                        deleted += 1
+                    except OSError:
+                        pass
+                elif p.is_dir():
+                    try:
+                        p.rmdir()
+                    except OSError:
+                        pass
+        pruned = mgr.clear_completed()
+        return {"deleted": deleted, "freed_bytes": freed,
+                "cleared_jobs": pruned, "dir": str(d)}
+
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):
         return {"jobs": [redact_job(j) for j in mgr.list()]}
@@ -309,6 +346,7 @@ def create_app(download_dir, auth_token: str | None = None,
         acts["reveal"](job["filepath"])
         return {"ok": True}
 
+    app.state.manager = manager
     return app
 
 

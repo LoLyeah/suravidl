@@ -60,6 +60,35 @@ class FileHandoffTest {
         }
     }
 
+    @Test(timeout = 240_000)
+    fun deleting_downloads_takes_the_gallery_copies_with_them() {
+        val f = File(ctx.cacheDir, "wipe-test.mp4")
+        f.writeBytes(ByteArray(2048) { 0x55 })
+        var uri: android.net.Uri? = null
+        try {
+            uri = MediaImporter.importToGallery(ctx, f)
+            assertNotNull("nothing was imported", uri)
+
+            val removed = MediaLibrary.deleteOwnCopies(ctx)
+            assertTrue("expected at least our own copy to go, removed=$removed",
+                       removed >= 1)
+
+            val resolver = ctx.contentResolver
+            resolver.query(
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                arrayOf(MediaStore.Video.Media._ID),
+                "${MediaStore.Video.Media.DISPLAY_NAME} = ?", arrayOf(f.name), null
+            )!!.use { c ->
+                assertEquals("row should be gone after deleteOwnCopies",
+                             false, c.moveToFirst())
+            }
+            uri = null
+        } finally {
+            f.delete()
+            uri?.let { ctx.contentResolver.delete(it, null, null) }
+        }
+    }
+
     @Test(timeout = 120_000)
     fun sidecars_are_not_imported_as_media() {
         val f = File(ctx.cacheDir, "tiny-test.info.json")
