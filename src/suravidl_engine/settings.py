@@ -21,6 +21,8 @@ DEFAULTS = {
     "embed_thumbnail": False,
     "rate_limit": "",            # e.g. "2M" (bytes/s)
     "fragments": 1,              # concurrent fragment downloads (1-16)
+    "retries": 10,               # yt-dlp retries per download (0-30)
+    "max_downloads": 0,          # stop after N downloads in a playlist (0 = all)
     "proxy": "",                 # http(s)/socks URL
     "archive": False,            # skip URLs already in the download archive
     "sponsorblock_mode": "off",  # off | mark | remove
@@ -191,6 +193,10 @@ class Settings:
             return str(value or "").strip()
         if key == "fragments":
             return max(1, min(16, int(value)))
+        if key == "retries":
+            return max(0, min(30, int(value)))
+        if key == "max_downloads":
+            return max(0, min(1000, int(value)))
         if key == "proxy":
             from .download_opts import validate_proxy
 

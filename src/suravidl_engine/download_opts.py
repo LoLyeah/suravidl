@@ -27,6 +27,20 @@ IP_VERSIONS = ("auto", "ipv4", "ipv6")
 _SOURCE_ADDRESS = {"ipv4": "0.0.0.0", "ipv6": "::"}   # yt-dlp's own mapping
 SLEEP_REQUESTS_MAX = 30.0
 
+# One-click quality picks, expressed the way yt-dlp recommends: a capped
+# video stream paired with the best audio when the site serves them apart
+# (`bv*` + `ba`), falling back to the best single file (`b`). The engine owns
+# these strings so every shell gets the same presets — and so a test can prove
+# yt-dlp itself accepts each one.
+QUALITY_PRESETS = (
+    {"key": "best", "label": "Best", "fmt": "bv*+ba/b"},
+    {"key": "2160", "label": "2160p", "fmt": "bv*[height<=2160]+ba/b[height<=2160]/b"},
+    {"key": "1440", "label": "1440p", "fmt": "bv*[height<=1440]+ba/b[height<=1440]/b"},
+    {"key": "1080", "label": "1080p", "fmt": "bv*[height<=1080]+ba/b[height<=1080]/b"},
+    {"key": "720", "label": "720p", "fmt": "bv*[height<=720]+ba/b[height<=720]/b"},
+    {"key": "480", "label": "480p", "fmt": "bv*[height<=480]+ba/b[height<=480]/b"},
+)
+
 # The curated groups the yt-dlp tab exposes as named controls (as opposed to
 # raw arguments). Kept here so the UI, the engine and the tests share one list.
 CURATED_KEYS = (
@@ -94,6 +108,19 @@ def curated_settings_opts(settings: dict) -> dict:
     country = str(settings.get("geo_bypass_country") or "").strip().upper()
     if len(country) == 2 and country.isalpha():
         opts["geo_bypass_country"] = country
+    # retries / how much of a playlist to take: inert at the yt-dlp defaults
+    try:
+        retries = int(settings.get("retries", 10))
+    except (TypeError, ValueError):
+        retries = 10
+    if retries != 10:
+        opts["retries"] = retries
+    try:
+        max_downloads = int(settings.get("max_downloads", 0) or 0)
+    except (TypeError, ValueError):
+        max_downloads = 0
+    if max_downloads > 0:
+        opts["max_downloads"] = max_downloads
     extractor_args = parse_extractor_args(settings.get("extractor_args"))
     if extractor_args:
         opts["extractor_args"] = extractor_args

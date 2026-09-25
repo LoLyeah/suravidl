@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# Build a static, single-file ffmpeg CLI for Android (post-processing only).
+# Build static, single-file ffmpeg + ffprobe CLIs for Android.
 #
 # Usage: scripts/build_ffmpeg_android.sh <abi> <target-triple>
 #   e.g. scripts/build_ffmpeg_android.sh arm64-v8a aarch64-linux-android
 #        scripts/build_ffmpeg_android.sh x86_64 x86_64-linux-android
 #
 # Env: NDK=/path/to/android-ndk  (work dir = CWD)
-# Output: out/<abi>/ffmpeg
+# Output: out/<abi>/ffmpeg, out/<abi>/ffprobe
 #
 # Why static: the APK ships jniLibs entries that must be a single executable
 # file (Android 10+ forbids exec from the app data dir; files extracted from
 # jniLibs into nativeLibraryDir are executable). No shared libs => no SONAME
 # juggling, no LD_LIBRARY_PATH.
 #
+# Why two builds: ffmpeg writes (muxers, encoders, filters), ffprobe only
+# reads. Its own configure keeps the write-path code out of the APK. yt-dlp
+# finds ffprobe next to the ffmpeg it is handed (it substitutes the program
+# name in that path, so libffprobe.so beside libffmpeg.so just works).
+#
 # Scope: local post-processing (audio extraction, remux/merge, thumbnails,
-# subtitle/metadata embedding). Network protocols are deliberately excluded —
-# yt-dlp downloads natively; ffmpeg here never talks to the network.
+# subtitle/metadata embedding) and stream inspection. Network protocols are
+# deliberately excluded — yt-dlp downloads natively; these never open a socket.
 set -euo pipefail
 
 ABI="$1"
@@ -51,53 +56,93 @@ fi
     CC="$CC" CXX="$CXX" AR="$TC/llvm-ar" RANLIB="$TC/llvm-ranlib"
   make -j"$(nproc)"
   make install
-)
+) 2>&1 | tail -5
 
-# ---- ffmpeg ----------------------------------------------------------------
+# ---- source ----------------------------------------------------------------
 if [ ! -f ffmpeg-$FFMPEG_VERSION/configure ]; then
   curl -fsSLo ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
   tar xf ffmpeg.tar.xz
 fi
 cd ffmpeg-$FFMPEG_VERSION
-./configure \
-  --target-os=android --arch="$ARCH" --cpu="$CPU" \
-  --enable-cross-compile --sysroot="$SYSROOT" \
-  --cc="$CC" --cxx="$CXX" --ar="$TC/llvm-ar" --ranlib="$TC/llvm-ranlib" \
-  --nm="$TC/llvm-nm" --strip="$TC/llvm-strip" --pkg-config=false \
-  --enable-static --disable-shared --enable-pic \
-  --disable-doc --disable-htmlpages --disable-manpages \
-  --disable-podpages --disable-txtpages \
-  --disable-debug \
-  --disable-ffplay --enable-ffprobe \
-  --disable-everything \
-  --enable-avfilter --enable-swresample --enable-swscale \
-  --enable-protocol=file,pipe,data \
-  --enable-demuxer=mov,matroska,webm,ogg,mp3,aac,flac,wav,mpegts,image2,concat,webvtt,srt \
-  --enable-muxer=ipod,mov,mp4,matroska,webm,ogg,opus,mp3,adts,flac,wav,mpegts,image2,mjpeg,webvtt,srt \
-  --enable-decoder=aac,aac_latm,mp3,flac,alac,vorbis,opus,pcm_s16le,pcm_s16be,pcm_s24le,pcm_u8,\
-h264,hevc,vp8,vp9,av1,mjpeg,png,webvtt,srt,subrip \
-  --enable-encoder=aac,alac,flac,libmp3lame,mjpeg,png,webvtt,srt,mov_text \
-  --enable-parser=aac,ac3,flac,mpegaudio,opus,vorbis,h264,hevc,vp8,vp9,av1,mjpeg,png \
-  --enable-filter=aresample,anull,anullsrc,atrim,format,copy,null,scale,concat \
-  --enable-bsf=aac_adtstoasc,h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe \
-  --enable-libmp3lame \
-  --extra-cflags="-O2 -I$PWD/../lame-out/include" \
-  --extra-ldflags="-L$PWD/../lame-out/lib -Wl,-z,max-page-size=16384" \
-  --extra-libs="-lm"
+OUT="$(cd ../../out/$ABI && pwd)"
+LAME="$(cd ../lame-out && pwd)"
 
-make -j"$(nproc)"
-"$TC/llvm-strip" ffmpeg
-"$TC/llvm-strip" ffprobe
-cp ffmpeg "../../out/$ABI/ffmpeg"
-cp ffprobe "../../out/$ABI/ffprobe"
+# Every crossing flag both builds share. Each build gets its own directory so
+# the two configurations never share a config.h.
+common_flags=(
+  "--target-os=android" "--arch=$ARCH" "--cpu=$CPU"
+  "--enable-cross-compile" "--sysroot=$SYSROOT"
+  "--cc=$CC" "--cxx=$CXX" "--ar=$TC/llvm-ar" "--ranlib=$TC/llvm-ranlib"
+  "--nm=$TC/llvm-nm" "--strip=$TC/llvm-strip" "--pkg-config=false"
+  "--enable-static" "--disable-shared" "--enable-pic"
+  "--disable-doc" "--disable-htmlpages" "--disable-manpages"
+  "--disable-podpages" "--disable-txtpages" "--disable-debug"
+  "--disable-everything" "--enable-protocol=file,pipe,data"
+)
+
+# The containers/parsers the downloader meets: what sites serve (mov/mp4,
+# matroska/webm, ogg/opus, mp3, aac, flac, wav, mpegts, HLS pieces, images,
+# webvtt/srt subtitles).
+formats=(
+  "--enable-demuxer=mov,matroska,webm,ogg,mp3,aac,flac,wav,mpegts,image2,concat,webvtt,srt"
+  "--enable-parser=aac,ac3,flac,mpegaudio,opus,vorbis,h264,hevc,vp8,vp9,av1,mjpeg,png"
+)
+
+# ---- ffmpeg: the read + write half ----------------------------------------
+mkdir -p b-ffmpeg
+(
+  cd b-ffmpeg
+  ../configure "${common_flags[@]}" "${formats[@]}" \
+    --disable-ffplay --disable-ffprobe \
+    --enable-avfilter --enable-swresample --enable-swscale \
+    --enable-muxer=ipod,mov,mp4,matroska,webm,ogg,opus,mp3,adts,flac,wav,mpegts,image2,mjpeg,webvtt,srt \
+    --enable-decoder=aac,aac_latm,mp3,flac,alac,vorbis,opus,pcm_s16le,pcm_s16be,pcm_s24le,pcm_u8,h264,hevc,vp8,vp9,av1,mjpeg,png,webvtt,srt,subrip \
+    --enable-encoder=aac,alac,flac,libmp3lame,mjpeg,png,webvtt,srt,mov_text \
+    --enable-filter=aresample,anull,anullsrc,atrim,format,copy,null,scale,concat \
+    --enable-bsf=aac_adtstoasc,h264_mp4toannexb,hevc_mp4toannexb,vp9_superframe \
+    --enable-libmp3lame \
+    --extra-cflags="-O2 -I$LAME/include" \
+    --extra-ldflags="-L$LAME/lib -Wl,-z,max-page-size=16384" \
+    --extra-libs="-lm"
+  make -j"$(nproc)" ffmpeg
+  "$TC/llvm-strip" ffmpeg
+  cp ffmpeg "$OUT/ffmpeg"
+)
+
+# ---- ffprobe: the read-only half ------------------------------------------
+mkdir -p b-ffprobe
+(
+  cd b-ffprobe
+  ../configure "${common_flags[@]}" "${formats[@]}" \
+    --disable-ffmpeg --disable-ffplay --enable-ffprobe \
+    --extra-cflags="-O2" \
+    --extra-ldflags="-Wl,-z,max-page-size=16384" \
+    --extra-libs="-lm"
+  make -j"$(nproc)" ffprobe
+  "$TC/llvm-strip" ffprobe
+  cp ffprobe "$OUT/ffprobe"
+)
 
 echo "--- built:"
-file "../../out/$ABI/ffmpeg" "../../out/$ABI/ffprobe"
+file "$OUT/ffmpeg" "$OUT/ffprobe"
+ls -l "$OUT/ffmpeg" "$OUT/ffprobe"
 echo "--- 16 KB LOAD alignment (must be 0x4000):"
-readelf -lW ffmpeg | awk '/LOAD/{print $NF}' | sort -u
-readelf -lW ffprobe | awk '/LOAD/{print $NF}' | sort -u
-echo "--- ffmpeg can still see ffprobe next to it:"
-../../out/$ABI/ffprobe -version 2>&1 | head -1 || true
-echo "--- version (from configure):"
-grep -m1 "version" config.log 2>/dev/null | head -1 || true
-strings -a ffmpeg 2>/dev/null | grep -m1 "ffmpeg version" || echo "(version string not greppable, fine)"
+readelf -lW "$OUT/ffmpeg" | awk '/LOAD/{print $NF}' | sort -u
+readelf -lW "$OUT/ffprobe" | awk '/LOAD/{print $NF}' | sort -u
+
+# ---- smoke test: only the x86_64 binaries run on the CI runner -------------
+if [ "$ABI" = "x86_64" ]; then
+  echo "--- smoke: write a file with ffmpeg, read it back with ffprobe"
+  cd "$OUT"
+  ./ffmpeg -v error -y -f lavfi -i anullsrc=r=8000:cl=mono -t 1 -c:a aac _smoke.m4a
+  ./ffprobe -v error -show_entries format=duration:stream=codec_name -of json _smoke.m4a
+  codec=$(./ffprobe -v error -show_entries stream=codec_name -of default=nw=1:nk=1 _smoke.m4a)
+  [ "$codec" = "aac" ] || { echo "ffprobe read the wrong codec: '$codec'" >&2; exit 1; }
+  ./ffprobe -v error -show_entries format=duration -of default=nw=1 _smoke.m4a
+  rm -f _smoke.m4a
+  ./ffprobe -version | head -1
+  echo "--- smoke OK: ffprobe read codec_name=$codec back"
+fi
+
+strings -a "$OUT/ffprobe" 2>/dev/null | grep -m1 "ffprobe version" || true
+strings -a "$OUT/ffmpeg" 2>/dev/null | grep -m1 "ffmpeg version" || true

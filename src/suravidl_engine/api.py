@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
-from .auth import cookie_session
+from .auth import check_auth, cookie_session
 from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
@@ -37,7 +37,11 @@ class OpenUrlRequest(BaseModel):
 
 class ProbeRequest(BaseModel):
     url: str
-    headers: dict | None = None
+    headers: dict[str, str] | None = None
+
+
+class AuthCheckRequest(BaseModel):
+    url: str | None = None
 
 
 def _web_dir() -> Path:
@@ -256,6 +260,15 @@ def create_app(download_dir, auth_token: str | None = None,
         except Exception as e:  # noqa: BLE001 - error goes to the client
             raise HTTPException(status_code=400, detail=str(e)) from e
 
+    @app.post("/auth/check")
+    def auth_check(body: AuthCheckRequest, mgr: JobManager = Depends(require_auth)):
+        """Test cookies: is anything configured, and does it actually work?
+
+        With a URL the answer is proven by a real extraction; without one only
+        the cookies file itself can be read (values never leave the engine).
+        """
+        return check_auth(settings.get(), (body.url or "").strip() or None)
+
     @app.post("/jobs")
     def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
         s = settings.get()
@@ -295,10 +308,12 @@ def create_app(download_dir, auth_token: str | None = None,
     def list_presets(_mgr: JobManager = Depends(require_auth)):
         # defaults + the per-job key list ride along so the UI can offer
         # "save the settings that differ from the defaults as a preset"
+        from .download_opts import QUALITY_PRESETS
         from .settings import DEFAULTS, PER_JOB_KEYS
 
         return {"presets": presets.list(),
                 "per_job_keys": list(PER_JOB_KEYS),
+                "qualities": list(QUALITY_PRESETS),
                 "defaults": {k: DEFAULTS[k] for k in PER_JOB_KEYS}}
 
     @app.post("/presets")

@@ -222,3 +222,73 @@ def test_probe_extra_opts_cannot_steal_engine_keys(monkeypatch):
                                 "outtmpl": "/etc/x", "quiet": False})
     assert seen["skip_download"] is True      # probe never downloads
     assert "paths" not in seen and seen.get("outtmpl") is None
+
+
+# ---------------------------------------------------------------- M18 additions
+def test_retries_and_max_downloads_are_clamped_and_inert_by_default():
+    """New tier-1 knobs: validated like every other setting, and a no-op at
+    the yt-dlp defaults so they cannot change an existing download."""
+    from suravidl_engine.download_opts import curated_settings_opts
+    from suravidl_engine.settings import DEFAULTS, Settings
+
+    base = curated_settings_opts(dict(DEFAULTS))
+    assert "retries" not in base and "max_downloads" not in base
+
+    picked = curated_settings_opts({**DEFAULTS, "retries": 3, "max_downloads": 5})
+    assert picked["retries"] == 3 and picked["max_downloads"] == 5
+    assert "retries" not in curated_settings_opts({**DEFAULTS, "retries": 10})
+
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        Settings._validate("max_downloads", "lots")     # junk is refused
+    # numbers are clamped, not refused — the house style for numeric fields
+    assert Settings._validate("retries", -1) == 0
+    assert Settings._validate("retries", 99) == 30
+    assert Settings._validate("max_downloads", 9999) == 1000
+    assert Settings._validate("max_downloads", 0) == 0
+
+
+def test_a_job_may_override_retries_but_never_the_engine_keys():
+    """Per-job overrides stay a settings patch: retries yes, cookiefile no."""
+    from suravidl_engine.settings import validate_overrides
+
+    assert validate_overrides({"retries": 2, "max_downloads": 3}) == {
+        "retries": 2, "max_downloads": 3}
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        validate_overrides({"cookiefile": "/etc/passwd"})
+    # an out-of-range number is clamped by the same validator the settings
+    # screen uses, so a job cannot ask for 999 retries either
+    assert validate_overrides({"retries": 999}) == {"retries": 30}
+
+
+def test_every_quality_preset_is_a_format_yt_dlp_accepts():
+    """The one-click quality buttons must not be able to produce a spec that
+    yt-dlp rejects at download time — proven with yt-dlp's own parser."""
+    import yt_dlp
+
+    from suravidl_engine.download_opts import QUALITY_PRESETS
+
+    keys = [q["key"] for q in QUALITY_PRESETS]
+    assert keys[0] == "best" and "1080" in keys
+    for q in QUALITY_PRESETS:
+        parsed = yt_dlp.parse_options(["-f", q["fmt"]]).ydl_opts
+        assert parsed["format"] == q["fmt"], q
+        # each cap must also keep the audio-pairing fallback
+        if q["key"] != "best":
+            assert "+ba" in q["fmt"] and q["fmt"].endswith("/b")
+
+
+def test_the_quality_list_is_served_to_the_shells(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from suravidl_engine.api import create_app
+
+    app = create_app(download_dir=tmp_path / "dl", auth_token="t",
+                     db_path=tmp_path / "jobs.db")
+    body = TestClient(app).get("/presets", headers={"Authorization": "Bearer t"}).json()
+    served = body["qualities"]
+    assert [q["key"] for q in served][:2] == ["best", "2160"]
+    assert all({"key", "label", "fmt"} <= set(q) for q in served)
