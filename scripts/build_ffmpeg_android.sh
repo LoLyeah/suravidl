@@ -68,7 +68,7 @@ cd ffmpeg-$FFMPEG_VERSION
   --disable-doc --disable-htmlpages --disable-manpages \
   --disable-podpages --disable-txtpages \
   --disable-debug \
-  --disable-ffplay --disable-ffprobe \
+  --disable-ffplay --enable-ffprobe \
   --disable-everything \
   --enable-avfilter --enable-swresample --enable-swscale \
   --enable-protocol=file,pipe,data \
@@ -87,12 +87,17 @@ h264,hevc,vp8,vp9,av1,mjpeg,png,webvtt,srt,subrip \
 
 make -j"$(nproc)"
 "$TC/llvm-strip" ffmpeg
+"$TC/llvm-strip" ffprobe
 cp ffmpeg "../../out/$ABI/ffmpeg"
+cp ffprobe "../../out/$ABI/ffprobe"
 
 echo "--- built:"
-file "../../out/$ABI/ffmpeg"
+file "../../out/$ABI/ffmpeg" "../../out/$ABI/ffprobe"
 echo "--- 16 KB LOAD alignment (must be 0x4000):"
 readelf -lW ffmpeg | awk '/LOAD/{print $NF}' | sort -u
+readelf -lW ffprobe | awk '/LOAD/{print $NF}' | sort -u
+echo "--- ffmpeg can still see ffprobe next to it:"
+../../out/$ABI/ffprobe -version 2>&1 | head -1 || true
 echo "--- version (from configure):"
 grep -m1 "version" config.log 2>/dev/null | head -1 || true
 strings -a ffmpeg 2>/dev/null | grep -m1 "ffmpeg version" || echo "(version string not greppable, fine)"

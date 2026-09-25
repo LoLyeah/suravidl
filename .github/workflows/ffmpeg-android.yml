@@ -50,7 +50,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-${{ matrix.abi }}
-          path: out/${{ matrix.abi }}/ffmpeg
+          path: |
+            out/${{ matrix.abi }}/ffmpeg
+            out/${{ matrix.abi }}/ffprobe
           if-no-files-found: error
           retention-days: 14
 
@@ -67,13 +69,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          cp dl/ffmpeg-arm64-v8a/ffmpeg libffmpeg-arm64-v8a.so
-          cp dl/ffmpeg-x86_64/ffmpeg    libffmpeg-x86_64.so
-          sha256sum libffmpeg-arm64-v8a.so libffmpeg-x86_64.so > SHA256SUMS.txt
+          cp dl/ffmpeg-arm64-v8a/ffmpeg  libffmpeg-arm64-v8a.so
+          cp dl/ffmpeg-x86_64/ffmpeg     libffmpeg-x86_64.so
+          cp dl/ffmpeg-arm64-v8a/ffprobe libffprobe-arm64-v8a.so
+          cp dl/ffmpeg-x86_64/ffprobe    libffprobe-x86_64.so
+          sha256sum libffmpeg-arm64-v8a.so libffmpeg-x86_64.so \
+                    libffprobe-arm64-v8a.so libffprobe-x86_64.so > SHA256SUMS.txt
           gh release view ffmpeg-bin --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create ffmpeg-bin --repo "$GITHUB_REPOSITORY" \
               --title "Bundled ffmpeg binaries" \
-              --notes "Static ffmpeg ${FFMPEG_VERSION} CLI for Android (arm64-v8a, x86_64, 16 KB-page aligned), bundled into the app for audio extraction and merging. LGPL build from unmodified sources; build script: scripts/build_ffmpeg_android.sh" \
+              --notes "Static ffmpeg ${FFMPEG_VERSION} CLI + ffprobe for Android (arm64-v8a, x86_64, 16 KB-page aligned), bundled into the app for audio extraction, merging and stream inspection. LGPL build from unmodified sources; build script: scripts/build_ffmpeg_android.sh" \
               --latest=false
           gh release upload ffmpeg-bin --repo "$GITHUB_REPOSITORY" \
-            libffmpeg-arm64-v8a.so libffmpeg-x86_64.so SHA256SUMS.txt --clobber
+            libffmpeg-arm64-v8a.so libffmpeg-x86_64.so \
+            libffprobe-arm64-v8a.so libffprobe-x86_64.so \
+            SHA256SUMS.txt --clobber
