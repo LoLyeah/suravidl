@@ -118,8 +118,12 @@ desktop a left rail.
 5. **M13 — Advanced tab** — `/options` catalogue, curated groups, raw arguments
 6. **M14 — Android ffmpeg decision** — bundle a community ffmpeg build
    (~+20–25 MB APK) → enables merging + conversion on Android, or keep the
-   documented gap (merge is desktop-only today)
+   documented gap (merge is desktop-only today) — *done in M11a: own 8.1.3
+   build, 8.0 MB arm64; ffprobe followed in M18 at +2 MB via a read-only
+   configure*
 7. **M15 — polish** — per-job option overrides, presets, better empty states
+   — *done in M17; M18 closed the tier-1 table (retries, playlist limit,
+   quality picks, Test cookies)*
 
 Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
 (incl. the 16 KB Android 16 run), README + release notes updated.
@@ -262,4 +266,16 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     Verified live: an applied preset named the file (`ui-ov.mp4`), embedded
     metadata (ffprobe tags) and wrote the subtitle sidecar, while `/settings`
     stayed untouched.
-  - Next up: richer empty states, and `libffprobe.so` in the APK.
+  - **v0.19.0 — M18 (ffprobe + the last tier-1 gaps):** ffprobe is bundled for
+    Android from its own read-only build (demuxers + parsers only; 2.4 MB
+    against ffmpeg's 10.7 MB on x86_64) and `.github/actions/fetch-ffmpeg`
+    places `libffprobe.so` beside `libffmpeg.so`, which is exactly where
+    yt-dlp looks (`_determine_executables` substitutes the program name in
+    the given path). Engine: `retries` (0-30) and `max_downloads` (0-1000)
+    settings + per-job keys; `QUALITY_PRESETS` (engine-owned format
+    expressions, each asserted against `yt_dlp.parse_options`) served via
+    `/presets`; `POST /auth/check` (settings + a URL → static cookie report
+    plus a real extraction as proof, values never leave the engine).
+    UI: quality picks under the probe box, Retries/Playlist-limit fields,
+    Test-cookies button with an inline verdict.
+  - Next up: M19 — Android share-target (share a link into suravidl).

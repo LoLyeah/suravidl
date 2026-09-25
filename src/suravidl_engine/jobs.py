@@ -137,6 +137,9 @@ class JobManager:
                 pass
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
+        # ids deleted by the user: a worker finishing (or writing progress) a
+        # moment later must not write the row back
+        self._deleted: set[str] = set()
         # adaptive concurrency gate: capacity can change at runtime
         self._cap_cv = threading.Condition(threading.Lock())
         self._capacity = max(1, int(max_concurrent))
@@ -230,6 +233,10 @@ class JobManager:
 
     def _save(self, job: dict):
         with self._db_lock, self._con:
+            # a deleted job must stay deleted: a late write from the worker
+            # thread (progress, completion) must not resurrect the row
+            if job["id"] in self._deleted:
+                return
             self._con.execute(
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, status, title,"
@@ -424,6 +431,7 @@ class JobManager:
                 pass
         with self._lock:
             self._jobs.pop(job_id, None)
+            self._deleted.add(job_id)
             with self._con:
                 self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         return {"deleted": deleted, "freed_bytes": freed,

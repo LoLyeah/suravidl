@@ -147,6 +147,9 @@ echo "ffprobe $pp_size bytes"
   echo "the probe-only configure lose its --disable flags?" >&2
   exit 1
 }
-"$TC/llvm-strings" "$OUT/ffprobe" | grep -m1 -q "ffprobe version" \
-  || { echo "no ffprobe version string in the binary" >&2; exit 1; }
-"$TC/llvm-strings" "$OUT/ffmpeg" | grep -m1 "ffmpeg version" || true
+"$TC/llvm-strings" "$OUT/ffprobe" | grep -m1 -q -- "-show_streams" || {
+  echo "no -show_streams in the ffprobe binary" >&2; exit 1; }
+if "$TC/llvm-strings" "$OUT/ffmpeg" | grep -q -- "-show_streams"; then
+  echo "ffmpeg carries ffprobe's own options — wrong build?" >&2; exit 1
+fi
+echo "--- ok: slim ffprobe, right ISA, 16 KB aligned"

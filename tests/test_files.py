@@ -200,3 +200,22 @@ def test_delete_of_a_job_without_a_file_still_forgets_the_row(tmp_path):
         assert r["deleted"] == 0
         ids = {j["id"] for j in c.get("/jobs", headers=AUTH).json()["jobs"]}
         assert job["id"] not in ids
+
+
+def test_a_late_worker_write_cannot_resurrect_a_deleted_download(tmp_path):
+    """Deleting is final. A worker thread writing one last time (progress, or
+    the completion it was racing) must not bring the row back to the queue."""
+    with _client(tmp_path) as c:
+        job, path = _settled_job(c, "http://example.invalid/one.mp4")
+        mgr = c.app.state.manager
+        c.post(f"/jobs/{job['id']}/delete", headers=AUTH)
+
+        late = dict(job)                     # what a worker still holds
+        late["status"] = "completed"
+        late["progress"] = dict(job.get("progress") or {}, downloaded_bytes=1)
+        mgr._save(late)                      # noqa: SLF001
+
+        assert mgr._con.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
+        ids = {j["id"] for j in c.get("/jobs", headers=AUTH).json()["jobs"]}
+        assert job["id"] not in ids
+        assert not path.exists()

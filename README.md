@@ -264,7 +264,19 @@ repo has no pydantic-core.
       so there is one thing to get right. Empty states: the Download tab says
       what to do, the Queue explains where downloads live and how to open,
       share or delete them.
-- [ ] M18+ — what is left: richer empty states, `libffprobe.so` bundling → `docs/PLAN-full-ytdlp.md`
+- [x] M18 — the bundled toolchain got its missing half and the last tier-1
+      gaps closed. **ffprobe** now ships with the app (its own read-only
+      build: no muxers, encoders, filters or video decoders — 2.4 MB instead
+      of 7.8 MB), and `FfmpegBinaryTest` proves on the emulator that it runs
+      *and* that yt-dlp resolves it from the ffmpeg path it is handed.
+      Settings gained **retries** and a **playlist limit**, the probe card
+      gained one-click **quality picks** (Best…480p, format expressions owned
+      by the engine and validated against yt-dlp's own parser), and
+      Authentication gained **Test cookies** — which reads the cookies file
+      (count, domains, expiry, never a value) and, with a URL, proves it with
+      a real extraction instead of guessing.
+- [ ] M19 — Android share-target: share a link from any app straight into
+      suravidl, so a phone download starts without copy-paste.
 
 ## API (v0.1)
 

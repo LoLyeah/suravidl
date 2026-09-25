@@ -272,6 +272,52 @@ def main():
         assert req("GET", "http://127.0.0.1:8799/settings")["archive"] is True
         assert req("DELETE", "http://127.0.0.1:8799/presets/smoke%20bundle")["ok"]
 
+        # --- test cookies: static report, and a real extraction as proof ---
+        none = req("POST", "http://127.0.0.1:8799/auth/check", {})
+        assert none["ok"] is False and none["source"] == "none", none
+        assert "Settings" in none["message"], none
+        ck = home / "cookies.txt"
+        ck.write_text("# Netscape HTTP Cookie File\n"
+                      f"127.0.0.1\tFALSE\t/\tFALSE\t2000000000\tsuravidl_smoke\thi\n")
+        req("POST", "http://127.0.0.1:8799/settings", {"cookies_file": str(ck)})
+        static = req("POST", "http://127.0.0.1:8799/auth/check", {})
+        assert static["ok"] is True and static["cookies"]["count"] == 1, static
+        assert "hi" not in json.dumps(static), "a cookie value leaked"
+        live = req("POST", "http://127.0.0.1:8799/auth/check",
+                   {"url": f"{base}/tiny.mp4"})
+        assert live["ok"] is True and "worked" in live["message"], live
+        tested = {"cookies_static": static["message"], "cookies_live": live["message"]}
+
+        # --- tier-1 knobs: they reach yt-dlp, and stay per-job overridable ---
+        req("POST", "http://127.0.0.1:8799/settings", {"retries": 3,
+                                                       "max_downloads": 2})
+        st = req("GET", "http://127.0.0.1:8799/settings")
+        assert st["retries"] == 3 and st["max_downloads"] == 2, st
+        knobs = req("POST", "http://127.0.0.1:8799/jobs", {
+            "url": f"{base}/tiny2.mp4",
+            "overrides": {"retries": 0, "max_downloads": 1}})
+        assert knobs["overrides"] == {"retries": 0, "max_downloads": 1}, knobs
+
+        # --- quality picks are engine-owned and yt-dlp accepts every one ---
+        q = req("GET", "http://127.0.0.1:8799/presets")["qualities"]
+        assert [x["key"] for x in q][:2] == ["best", "2160"], q
+        spec = next(x for x in q if x["key"] == "480")["fmt"]
+        cap = req("POST", "http://127.0.0.1:8799/jobs", {
+            "url": f"{base}/tone.m4a", "fmt": spec,
+            # earlier steps left the archive on and tone.m4a in it: one job can
+            # turn that off for itself — which is also the thing being tested
+            "overrides": {"archive": False}})
+        assert cap["fmt"] == spec, cap
+        for _ in range(200):
+            c = req("GET", f"http://127.0.0.1:8799/jobs/{cap['id']}")
+            if c["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert c["status"] == "completed", c
+        # a capped spec must still fall back to the single file for audio-only
+        assert Path(c["filepath"]).suffix == ".m4a" and Path(c["filepath"]).is_file(), c
+        caps = {"quality_spec": spec, "quality_file": Path(c["filepath"]).name}
+
         print(json.dumps({
             "SMOKE": "OK",
             "engine": h,
@@ -283,6 +329,8 @@ def main():
             "bytes": written_bytes,
             "deleted": gone,
             "retry_of_error_job": j2["status"],
+            "cookies": tested,
+            "quality": caps,
         }, indent=2))
     finally:
         eng.terminate()
