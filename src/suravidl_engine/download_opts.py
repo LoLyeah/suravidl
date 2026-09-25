@@ -23,6 +23,97 @@ SPONSORBLOCK_CATEGORIES = (
     "interaction", "music_offtopic",
 )
 PROXY_SCHEMES = ("http", "https", "socks4", "socks4a", "socks5", "socks5h")
+IP_VERSIONS = ("auto", "ipv4", "ipv6")
+_SOURCE_ADDRESS = {"ipv4": "0.0.0.0", "ipv6": "::"}   # yt-dlp's own mapping
+SLEEP_REQUESTS_MAX = 30.0
+
+# The curated groups the yt-dlp tab exposes as named controls (as opposed to
+# raw arguments). Kept here so the UI, the engine and the tests share one list.
+CURATED_KEYS = (
+    "verbose",             # verbosity
+    "ip_version", "no_check_certificates", "sleep_requests",   # workarounds
+    "geo_bypass", "geo_bypass_country",                        # geo
+    "extractor_args",                                          # extractor
+)
+
+# extractor:key=value[,value][;extractor:key=value…] — yt-dlp's --extractor-args
+# syntax, parsed here so nothing ever reaches a shell.
+_EXTRACTOR_ARG_RE = re.compile(
+    r"^([A-Za-z0-9_.-]+):([A-Za-z0-9_-]+)=([^=;:]+(?:,[^=;:]+)*)$")
+
+
+def parse_extractor_args(value: str | None) -> dict:
+    """'youtube:player_client=web_safari,ios' ->
+    {'youtube': {'player_client': ['web_safari', 'ios']}}
+
+    Same shape yt-dlp's own --extractor-args produces (asserted against its
+    CLI in tests/test_curated.py). Values must be literal: anything that
+    doesn't match `extractor:key=value,values` is refused instead of guessed at.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return {}
+    out: dict[str, dict[str, list[str]]] = {}
+    for chunk in text.split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        m = _EXTRACTOR_ARG_RE.match(chunk)
+        if not m:
+            raise ValueError(
+                "extractor_args must look like 'extractor:key=value' "
+                f"(got {chunk!r})")
+        extractor, key, values = m.group(1), m.group(2), m.group(3)
+        parsed = [v.strip() for v in values.split(",") if v.strip()]
+        if not parsed:
+            raise ValueError(f"extractor_args value is empty in {chunk!r}")
+        out.setdefault(extractor, {})[key] = parsed
+    return out
+
+
+def curated_settings_opts(settings: dict) -> dict:
+    """The curated groups as yt-dlp options (no defaults: inert when unused)."""
+    opts: dict = {}
+    if settings.get("verbose"):
+        opts["verbose"] = True
+        opts["quiet"] = False
+        opts["no_warnings"] = False
+    ip_version = settings.get("ip_version", "auto")
+    if ip_version in _SOURCE_ADDRESS:
+        opts["source_address"] = _SOURCE_ADDRESS[ip_version]
+    if settings.get("no_check_certificates"):
+        opts["nocheckcertificate"] = True
+    try:
+        sleep_requests = float(settings.get("sleep_requests") or 0)
+    except (TypeError, ValueError):
+        sleep_requests = 0.0
+    if sleep_requests > 0:
+        opts["sleep_interval_requests"] = sleep_requests
+    if settings.get("geo_bypass"):
+        opts["geo_bypass"] = True
+    country = str(settings.get("geo_bypass_country") or "").strip().upper()
+    if len(country) == 2 and country.isalpha():
+        opts["geo_bypass_country"] = country
+    extractor_args = parse_extractor_args(settings.get("extractor_args"))
+    if extractor_args:
+        opts["extractor_args"] = extractor_args
+    return opts
+
+
+def probe_extra_opts(settings: dict) -> dict:
+    """Which curated options a *probe* may honour.
+
+    Network/geo only: a region-locked or IPv6-broken video can then at least
+    be listed, while nothing download-shaped leaks into an extraction.
+    """
+    curated = curated_settings_opts(settings)
+    allowed = ("geo_bypass", "geo_bypass_country", "source_address",
+               "nocheckcertificate", "extractor_args")
+    out = {k: curated[k] for k in allowed if k in curated}
+    proxy = str(settings.get("proxy") or "").strip()
+    if proxy:
+        out["proxy"] = proxy
+    return out
 
 # Raw arguments (Advanced tier) may not touch flags the engine owns, nor
 # anything that runs programs or abandons the job model. Checked twice:
@@ -265,6 +356,9 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     # -- archive -----------------------------------------------------------
     if settings.get("archive") and archive_path:
         opts["download_archive"] = str(archive_path)
+
+    # -- curated groups (verbosity · workarounds · geo · extractor args) ---
+    opts.update(curated_settings_opts(settings))
 
     opts["outtmpl"] = outtmpl
     if pps:

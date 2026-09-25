@@ -286,6 +286,16 @@ function renderProbe(url, info) {
 }
 
 /* ---------- jobs ---------- */
+/** How many jobs are in flight — shown on the Queue tab. */
+function renderQueueBadge(jobs) {
+  const badge = $("queueCount");
+  if (!badge) return;
+  const active = (jobs || []).filter((j) =>
+    ["queued", "downloading", "merging"].includes(j.status)).length;
+  badge.textContent = active > 9 ? "9+" : String(active);
+  badge.classList.toggle("hidden", !active);
+}
+
 function playlistMode() {
   return !$("playlistRow").classList.contains("hidden");
 }
@@ -424,6 +434,7 @@ function updateJobRow(row, j) {
 async function refreshJobs() {
   try {
     const { jobs } = await api("/jobs");
+    renderQueueBadge(jobs);
     const box = $("jobs");
     const list = jobs.sort(
       (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
@@ -702,6 +713,15 @@ async function loadSettings() {
     $("setProxy").value = s.proxy || "";
     $("setRawEnabled").checked = !!s.raw_args_enabled;
     $("setRawArgs").value = s.raw_args || "";
+    renderRawAccess(!!s.raw_args_enabled);
+    // curated groups (yt-dlp tab)
+    $("setVerbose").checked = !!s.verbose;
+    $("setIpVersion").value = s.ip_version || "auto";
+    $("setNoCheckCerts").checked = !!s.no_check_certificates;
+    $("setSleepRequests").value = Number(s.sleep_requests || 0);
+    $("setGeoBypass").checked = !!s.geo_bypass;
+    $("setGeoCountry").value = s.geo_bypass_country || "";
+    $("setExtractorArgs").value = s.extractor_args || "";
     renderWhere(s.download_dir);
     markSwatches(CURRENT);
   } catch (e) {
@@ -720,24 +740,54 @@ document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
   b.onclick = () => showSettingsTab(b.dataset.stab);
 });
 
-/* ---------- yt-dlp option browser (Advanced) ---------- */
+/* ---------- the shell: four tabs, hash-routed ---------- */
+const TABS = ("download queue settings ytdlp").split(" ");
+const TAB_KEY = "suravidl.tab";
+
+function showTab(name, opts) {
+  const target = TABS.includes(name) ? name : "download";
+  TABS.forEach((t) => {
+    const panel = $("panel-" + t);
+    if (panel) panel.classList.toggle("hidden", t !== target);
+    document.querySelectorAll(`#tabs .tab[data-tab="${t}"]`).forEach((b) => {
+      b.classList.toggle("active", t === target);
+      b.setAttribute("aria-selected", t === target ? "true" : "false");
+    });
+  });
+  try { localStorage.setItem(TAB_KEY, target); } catch (_) { /* private mode */ }
+  if (location.hash.slice(1) !== target) {
+    history.replaceState(null, "", "#" + target);
+  }
+  if (target === "settings") loadSettings();
+  if (target === "ytdlp") loadOptions(false);
+  if (target === "queue") refreshJobs();
+  if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });
+}
+
+document.querySelectorAll("#tabs .tab").forEach((b) => {
+  b.onclick = () => showTab(b.dataset.tab);
+});
+
+/* ---------- yt-dlp tab: curated groups + option browser ---------- */
 let OPTIONS = null;
 
-async function openOptionsBrowser() {
-  openModal($("optionsModal"));
-  $("optionsSearch").value = "";
-  if (!OPTIONS) {
-    $("optionsList").textContent = "loading…";
-    try {
-      const r = await api("/options");
-      OPTIONS = r.options || [];
-      $("optionsCount").textContent = `${r.count} options`;
-    } catch (e) {
-      $("optionsList").textContent = "could not load options: " + e.message;
-      return;
-    }
+async function loadOptions(force) {
+  if (OPTIONS && !force) { renderOptions($("optionsSearch").value); return; }
+  $("optionsList").textContent = "loading…";
+  try {
+    const r = await api("/options");
+    OPTIONS = r.options || [];
+    $("optionsCount").textContent = `${r.count} options`;
+  } catch (e) {
+    $("optionsList").textContent = "could not load options: " + e.message;
+    return;
   }
-  renderOptions("");
+  renderOptions($("optionsSearch").value);
+}
+
+async function openOptionsBrowser() {
+  showTab("ytdlp");
+  await loadOptions(false);
   $("optionsSearch").focus();
 }
 
@@ -759,8 +809,8 @@ function renderOptions(query) {
       ta.value = (ta.value.trim() + " " +
         (o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name)).trim();
       $("setRawEnabled").checked = true;
-      toast(`added ${o.name}`);
-      closeOptionsBrowser();
+      renderRawAccess(true);
+      toast(`added ${o.name} — save to keep it`);
     };
     box.append(row);
   }
@@ -768,39 +818,30 @@ function renderOptions(query) {
   $("optionsCount").textContent = q ? `${list.length} match` : `${(OPTIONS || []).length} options`;
 }
 
-function closeOptionsBrowser() {
-  closeModal($("optionsModal"));
+/** Raw arguments only matter once enabled in Settings → Advanced. */
+function renderRawAccess(enabled) {
+  $("rawEditor").classList.toggle("hidden", !enabled);
+  $("rawOffHint").classList.toggle("hidden", !!enabled);
 }
 
 $("optionsBtn").onclick = openOptionsBrowser;
-$("optionsClose").onclick = closeOptionsBrowser;
-$("optionsModal").onclick = (e) => {
-  if (e.target === $("optionsModal")) closeOptionsBrowser();
-};
 $("optionsSearch").oninput = (e) => renderOptions(e.target.value);
 
 function openSettings() {
-  openModal($("settingsModal"));
+  showTab("settings");
   showSettingsTab("general");
-  loadSettings();
 }
 function closeSettings() {
-  closeModal($("settingsModal"));
+  showTab("download");
 }
 
 $("settingsBtn").onclick = openSettings;
 $("setClose").onclick = closeSettings;
-$("settingsModal").onclick = (e) => {
-  if (e.target === $("settingsModal")) closeSettings();
-};
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("optionsModal").classList.contains("hidden")) {
-    closeOptionsBrowser();
-    return;
+  if (e.key === "Escape" && !$("confirmModal").classList.contains("hidden")) {
+    return;   // the confirm dialog handles its own Escape
   }
-  if (e.key === "Escape" && !$("settingsModal").classList.contains("hidden")) {
-    closeSettings();
-  }
+  if (e.key === "Escape") closeSettings();
 });
 
 document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
@@ -836,24 +877,39 @@ function saveSettings() {
       proxy: $("setProxy").value.trim(),
       raw_args_enabled: $("setRawEnabled").checked,
       raw_args: $("setRawArgs").value.trim(),
+      // curated groups (yt-dlp tab)
+      verbose: $("setVerbose").checked,
+      ip_version: $("setIpVersion").value,
+      no_check_certificates: $("setNoCheckCerts").checked,
+      sleep_requests: Number($("setSleepRequests").value || 0),
+      geo_bypass: $("setGeoBypass").checked,
+      geo_bypass_country: $("setGeoCountry").value.trim().toUpperCase(),
+      extractor_args: $("setExtractorArgs").value.trim(),
     }),
   }).then((s) => {
     renderWhere(s.download_dir);
     $("setConc").value = s.max_concurrent;
+    renderRawAccess(!!s.raw_args_enabled);
     return s;
   });
 }
 
-$("setSave").onclick = async () => {
-  $("setMsg").textContent = "saving…";
+async function saveAndToast(msgEl) {
+  msgEl.textContent = "saving…";
   try {
     await saveSettings();
+    msgEl.textContent = "";
     $("setMsg").textContent = "";
+    $("ytdlpMsg").textContent = "";
     toast("Settings saved");
   } catch (e) {
-    $("setMsg").textContent = "save failed: " + e.message;
+    msgEl.textContent = "save failed: " + e.message;
   }
-};
+}
+
+$("setSave").onclick = () => saveAndToast($("setMsg"));
+$("ytdlpSave").onclick = () => saveAndToast($("ytdlpMsg"));
+$("setRawEnabled").onchange = (e) => renderRawAccess(e.target.checked);
 
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
@@ -871,6 +927,15 @@ loadVersions();
 checkAppUpdate();
 loadSettings();
 initAppControls();
+/* start on the remembered tab, unless the URL names one */
+(function bootTab() {
+  let want = location.hash.slice(1);
+  if (!TABS.includes(want)) {
+    try { want = localStorage.getItem(TAB_KEY) || "download"; }
+    catch (_) { want = "download"; }
+  }
+  showTab(want, { keepScroll: true });
+})();
 refreshJobs();
 setInterval(refreshJobs, 1200);
 addEventListener("scroll", () => {

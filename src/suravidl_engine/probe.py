@@ -6,12 +6,24 @@ import yt_dlp
 MAX_ENTRIES = 100
 
 
+PROTECTED_PROBE_KEYS = (
+    "skip_download", "paths", "outtmpl", "noplaylist", "extract_flat",
+    "playlistend", "quiet", "no_warnings", "download", "download_archive",
+    "postprocessors", "writethumbnail", "writesubtitles", "writeautomaticsub",
+    "progress_hooks", "postprocessor_hooks", "format", "playlist_items",
+)
+
+
 def probe(url: str, extra_headers: dict | None = None,
-          cookie_opts: dict | None = None) -> dict:
+          cookie_opts: dict | None = None,
+          extra_opts: dict | None = None) -> dict:
     """Extract metadata (incl. formats) without downloading.
 
     Playlist URLs return a compact summary with flat entries (fast, no
     per-video extraction); single videos keep the full info dict.
+
+    extra_opts may carry network/geo preferences (proxy, geo_bypass, …) but
+    can never redefine what a probe is: engine-owned keys are dropped.
     """
     opts = {
         "quiet": True,
@@ -25,6 +37,10 @@ def probe(url: str, extra_headers: dict | None = None,
         opts["http_headers"] = extra_headers
     if cookie_opts:
         opts.update(cookie_opts)
+    for key, value in (extra_opts or {}).items():
+        if key in PROTECTED_PROBE_KEYS:
+            continue
+        opts[key] = value
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.sanitize_info(ydl.extract_info(url, download=False)) or {}
 

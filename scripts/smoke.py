@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -101,6 +102,32 @@ def main():
                 break
             time.sleep(0.1)
         assert ejp["status"] == "completed", ejp
+
+        # -- curated groups (yt-dlp tab): validation + round-trip -------------
+        c = req("POST", "http://127.0.0.1:8799/settings",
+                {"ip_version": "ipv4", "sleep_requests": 1.5,
+                 "geo_bypass": True, "geo_bypass_country": "id",
+                 "extractor_args": "youtube:player_client=web_safari",
+                 "verbose": False})
+        assert c["ip_version"] == "ipv4" and c["sleep_requests"] == 1.5, c
+        assert c["geo_bypass_country"] == "ID", c
+        assert c["extractor_args"] == "youtube:player_client=web_safari", c
+        try:
+            req("POST", "http://127.0.0.1:8799/settings", {"ip_version": "ipv5"})
+            raise AssertionError("ip_version accepted ipv5")
+        except urllib.error.HTTPError as e:
+            assert e.code == 400, e.code               # refused, as it must be
+        # and a download still works with the curated groups set
+        cj = req("POST", "http://127.0.0.1:8799/jobs", {"url": f"{base}/tiny2.mp4"})
+        for _ in range(300):
+            cjp = req("GET", f"http://127.0.0.1:8799/jobs/{cj['id']}")
+            if cjp["status"] in ("completed", "error"):
+                break
+            time.sleep(0.1)
+        assert cjp["status"] == "completed", cjp
+        req("POST", "http://127.0.0.1:8799/settings",
+            {"ip_version": "auto", "sleep_requests": 0, "geo_bypass": False,
+             "geo_bypass_country": "", "extractor_args": ""})
 
         # -- archive: enabling it must make the second run a no-op -----------
         req("POST", "http://127.0.0.1:8799/settings", {"archive": True})

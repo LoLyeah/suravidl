@@ -33,44 +33,382 @@
   <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl">✕ Quit</button>
 </header>
 
-<main>
-  <section class="card paste-card">
-    <div class="paste">
-      <input id="url" type="text" spellcheck="false"
-             placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
-      <button id="probeBtn" class="btn prime">Probe</button>
-    </div>
-    <div id="probeMsg" class="msg muted"></div>
+<nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
+  <button class="tab active" data-tab="download" role="tab" type="button">
+    <span class="tab-ico">⬇</span><span class="tab-lbl">Download</span></button>
+  <button class="tab" data-tab="queue" role="tab" type="button">
+    <span class="tab-ico">☰</span><span class="tab-lbl">Queue</span>
+    <span id="queueCount" class="badge hidden"></span></button>
+  <button class="tab" data-tab="settings" role="tab" type="button">
+    <span class="tab-ico">⚙</span><span class="tab-lbl">Settings</span></button>
+  <button class="tab" data-tab="ytdlp" role="tab" type="button">
+    <span class="tab-ico">⌥</span><span class="tab-lbl">yt-dlp</span></button>
+</nav>
+
+<main id="panels">
+
+  <!-- ============================ Download ============================ -->
+  <section class="panel" id="panel-download">
+    <section class="card paste-card">
+      <div class="paste">
+        <input id="url" type="text" spellcheck="false"
+               placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
+        <button id="probeBtn" class="btn prime">Probe</button>
+      </div>
+      <div id="probeMsg" class="msg muted"></div>
+    </section>
+
+    <section id="probeCard" class="card hidden">
+      <div class="probe-head">
+        <span id="probeTitle" class="title"></span>
+        <span id="probeMeta" class="chip"></span>
+        <span class="spacer"></span>
+        <button id="bestBtn" class="btn prime sm">Download best quality</button>
+      </div>
+      <div id="audioRow" class="audioRow">
+        <span class="muted">Audio only:</span>
+        <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed">keep original</button>
+        <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
+        <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
+      </div>
+      <div id="playlistRow" class="audioRow hidden">
+        <span class="muted">Playlist items:</span>
+        <input id="playlistItems" type="text" spellcheck="false"
+               placeholder="blank = all · e.g. 1-10,15"/>
+        <button id="playlistBtn" class="btn prime sm">Download playlist</button>
+      </div>
+      <table id="formats">
+        <thead><tr><th>quality</th><th>format</th><th>size</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
   </section>
 
-  <section id="probeCard" class="card hidden">
-    <div class="probe-head">
-      <span id="probeTitle" class="title"></span>
-      <span id="probeMeta" class="chip"></span>
-      <span class="spacer"></span>
-      <button id="bestBtn" class="btn prime sm">Download best quality</button>
-    </div>
-    <div id="audioRow" class="audioRow">
-      <span class="muted">Audio only:</span>
-      <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed">keep original</button>
-      <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
-      <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
-    </div>
-    <div id="playlistRow" class="audioRow hidden">
-      <span class="muted">Playlist items:</span>
-      <input id="playlistItems" type="text" spellcheck="false"
-             placeholder="blank = all · e.g. 1-10,15"/>
-      <button id="playlistBtn" class="btn prime sm">Download playlist</button>
-    </div>
-    <table id="formats">
-      <thead><tr><th>quality</th><th>format</th><th>size</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
+  <!-- ============================= Queue ============================= -->
+  <section class="panel hidden" id="panel-queue">
+    <section class="card">
+      <h2>Downloads</h2>
+      <div id="jobs"></div>
+    </section>
   </section>
 
-  <section class="card">
-    <h2>Downloads</h2>
-    <div id="jobs"></div>
+  <!-- ============================ Settings =========================== -->
+  <section class="panel hidden" id="panel-settings">
+    <section class="card">
+      <div class="modal-head">
+        <h2>Settings</h2>
+        <button id="setClose" class="btn sm" title="Back to downloads">✕</button>
+      </div>
+
+      <div class="subtabs" id="settingsTabs">
+        <button class="stab active" data-stab="general" type="button">General</button>
+        <button class="stab" data-stab="media" type="button">Media</button>
+        <button class="stab" data-stab="network" type="button">Network</button>
+        <button class="stab" data-stab="auth" type="button">Authentication</button>
+        <button class="stab" data-stab="advanced" type="button">Advanced</button>
+        <button class="stab hidden" data-stab="device" id="tabDevice" type="button">Device</button>
+      </div>
+
+      <div class="subwrap" id="subwrap">
+      <div class="spanel" id="spanel-general">
+      <div class="field">
+        <label class="lbl">Appearance</label>
+        <div class="swatches" id="themeSwatches">
+          <button class="swatch" data-theme="light" type="button">
+            <span class="sw-preview sw-light"></span><span class="sw-label">Light</span>
+          </button>
+          <button class="swatch" data-theme="dark" type="button">
+            <span class="sw-preview sw-dark"></span><span class="sw-label">Dark</span>
+          </button>
+          <button class="swatch" data-theme="amoled" type="button">
+            <span class="sw-preview sw-amoled"></span><span class="sw-label">AMOLED</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="lbl">Glass style</label>
+        <div class="swatches" id="glassSwatches">
+          <button class="swatch" data-glass="frosted" type="button">
+            <span class="sw-preview g-frosted"></span><span class="sw-label">Frosted</span>
+            <span class="sw-hint">matte · cheapest</span>
+          </button>
+          <button class="swatch" data-glass="liquid" type="button">
+            <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
+            <span class="sw-hint">glossy · heavier blur</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="lbl" for="setDir">Download folder</label>
+        <input id="setDir" type="text" spellcheck="false"/>
+      </div>
+
+      <div class="field row">
+        <label class="lbl" for="setConc">Concurrent downloads</label>
+        <input id="setConc" type="number" min="1" max="4"/>
+        <span class="muted small">1–4 · applied live</span>
+      </div>
+
+      <div class="field">
+        <label class="check small" for="setReveal">
+          <input id="setReveal" type="checkbox"/>
+          Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
+        </label>
+      </div>
+
+      <div class="field">
+        <label class="check small" for="setResume">
+          <input id="setResume" type="checkbox"/>
+          Resume interrupted downloads after a restart
+        </label>
+      </div>
+      </div><!-- /spanel-general -->
+
+      <div class="spanel hidden" id="spanel-media">
+        <div class="field">
+          <label class="lbl" for="setTemplate">Filename template</label>
+          <input id="setTemplate" type="text" spellcheck="false"
+                 placeholder="%(title).100B.%(ext)s"/>
+          <span class="muted small">must contain %(ext)s · example:
+            <code>%(uploader)s - %(title)s.%(ext)s</code></span>
+        </div>
+
+        <div class="field">
+          <label class="check small" for="setEmbMeta">
+            <input id="setEmbMeta" type="checkbox"/>
+            Embed metadata (title, artist, description)
+          </label>
+          <label class="check small" for="setEmbThumb">
+            <input id="setEmbThumb" type="checkbox"/>
+            Embed thumbnail <span class="muted">(keeps the .jpg too)</span>
+          </label>
+        </div>
+
+        <div class="field row">
+          <label class="lbl" for="setSubMode">Subtitles</label>
+          <select id="setSubMode">
+            <option value="off">Off</option>
+            <option value="sidecar">Download as files (.vtt)</option>
+            <option value="embed">Embed into the video</option>
+          </select>
+          <input id="setSubLangs" type="text" spellcheck="false"
+                 placeholder="languages, e.g. en, id" />
+        </div>
+        <div class="field">
+          <label class="check small" for="setSubAuto">
+            <input id="setSubAuto" type="checkbox"/>
+            Include auto-generated captions
+          </label>
+        </div>
+
+        <div class="field row">
+          <label class="lbl" for="setSbMode">SponsorBlock</label>
+          <select id="setSbMode">
+            <option value="off">Off</option>
+            <option value="mark">Mark segments as chapters</option>
+            <option value="remove">Remove segments (re-encodes cuts)</option>
+          </select>
+          <input id="setSbCats" type="text" spellcheck="false"
+                 placeholder="sponsor, selfpromo"/>
+        </div>
+
+        <div class="field">
+          <label class="check small" for="setArchive">
+            <input id="setArchive" type="checkbox"/>
+            Skip videos already downloaded before (archive)
+          </label>
+        </div>
+      </div><!-- /spanel-media -->
+
+      <div class="spanel hidden" id="spanel-network">
+        <div class="field row">
+          <label class="lbl" for="setFragments">Parallel fragments</label>
+          <input id="setFragments" type="number" min="1" max="16"/>
+          <span class="muted small">1–16 · faster HLS/DASH downloads</span>
+        </div>
+        <div class="field row">
+          <label class="lbl" for="setRateLimit">Speed limit</label>
+          <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
+        </div>
+        <div class="field">
+          <label class="lbl" for="setProxy">Proxy</label>
+          <input id="setProxy" type="text" spellcheck="false"
+                 placeholder="socks5://127.0.0.1:1080 (blank = direct)"/>
+        </div>
+      </div><!-- /spanel-network -->
+
+      <div class="spanel hidden" id="spanel-auth">
+      <div class="field">
+        <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
+        <div class="col fill">
+          <div class="jrow">
+            <input id="setCookies" type="text" spellcheck="false"
+                   placeholder="path to cookies.txt (Netscape format)"/>
+            <button id="browseCookies" class="btn sm hidden" type="button">Browse…</button>
+            <button id="importCookies" class="btn sm hidden" type="button">Import…</button>
+          </div>
+          <div class="jrow" id="browserRow">
+            <select id="setCookiesBrowser">
+              <option value="">Browser cookies: off</option>
+              <option value="chrome">Use cookies from Chrome</option>
+              <option value="chromium">Use cookies from Chromium</option>
+              <option value="firefox">Use cookies from Firefox</option>
+              <option value="edge">Use cookies from Edge</option>
+              <option value="brave">Use cookies from Brave</option>
+              <option value="opera">Use cookies from Opera</option>
+              <option value="vivaldi">Use cookies from Vivaldi</option>
+              <option value="safari">Use cookies from Safari</option>
+            </select>
+          </div>
+          <span class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
+            or read the cookies straight from a browser (close it first). On Android, use Import.</span>
+        </div>
+      </div>
+
+      </div><!-- /spanel-auth -->
+
+      <div class="spanel hidden" id="spanel-advanced">
+        <div class="field">
+          <label class="check small" for="setRawEnabled">
+            <input id="setRawEnabled" type="checkbox"/>
+            Enable raw yt-dlp arguments <span class="muted">(power users — off by default)</span>
+          </label>
+          <span class="muted small">The literal “every feature” switch. Once it is on,
+            the arguments field in the <button id="optionsBtn" class="linkbtn" type="button">yt-dlp tab →</button>
+            becomes editable, and every option yt-dlp supports can be browsed there.</span>
+        </div>
+      </div><!-- /spanel-advanced -->
+
+      <div class="spanel hidden" id="spanel-device">
+      <div id="androidSection" class="field hidden">
+        <label class="lbl">Android</label>
+        <div class="col">
+          <button id="batteryBtn" class="btn sm" type="button">🔋 Battery settings — allow background downloads</button>
+          <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
+        </div>
+      </div>
+      <div id="vaultSection" class="field hidden">
+        <label class="lbl">Cookies on this device</label>
+        <div class="col">
+          <span id="vaultStatus" class="muted small">checking…</span>
+          <button id="deleteCookiesBtn" class="btn sm danger" type="button">🗑 Delete stored cookies</button>
+        </div>
+        <span class="muted small">Imported cookies are encrypted with a key that only this
+          device holds (Android Keystore). A readable copy exists only while the app is
+          running, and is removed when you quit or delete them.</span>
+      </div>
+      <div id="storageSection" class="field hidden">
+        <label class="lbl">Downloaded files</label>
+        <div class="col">
+          <span id="storageInfo" class="muted small">checking…</span>
+          <button id="clearDownloadsBtn" class="btn sm danger" type="button">🗑 Delete downloaded files</button>
+        </div>
+        <span class="muted small">Deletes everything in the app's own folder plus the
+          Gallery/Music copies this app made. Android won't let a file manager open
+          those folders, so the cleanup lives here.</span>
+      </div>
+      </div><!-- /spanel-device -->
+      </div><!-- /subwrap -->
+
+      <div class="modal-foot">
+        <button id="setSave" class="btn prime">Save</button>
+        <span id="setMsg" class="muted small"></span>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============================= yt-dlp ============================ -->
+  <section class="panel hidden" id="panel-ytdlp">
+    <section class="card">
+      <h2>Curated options</h2>
+      <p class="muted small">Named switches for the options that come up most —
+        no syntax to remember. They apply to downloads, and the network ones to
+        probing too, so a restricted video can still be listed.</p>
+
+      <div class="grid2">
+        <div class="field">
+          <label class="lbl">Verbosity</label>
+          <label class="check small" for="setVerbose">
+            <input id="setVerbose" type="checkbox"/>
+            Verbose log <span class="muted">(yt-dlp's full log — debugging)</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="lbl" for="setIpVersion">Workaround: IP version</label>
+          <select id="setIpVersion">
+            <option value="auto">Automatic</option>
+            <option value="ipv4">IPv4 only</option>
+            <option value="ipv6">IPv6 only</option>
+          </select>
+          <span class="muted small">IPv4-only fixes downloads that stall or reset
+            on a network with broken IPv6.</span>
+        </div>
+
+        <div class="field">
+          <label class="check small" for="setNoCheckCerts">
+            <input id="setNoCheckCerts" type="checkbox"/>
+            Skip TLS certificate checks <span class="muted">(for a TLS-inspecting proxy)</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="lbl" for="setSleepRequests">Workaround: pause between requests</label>
+          <input id="setSleepRequests" type="number" min="0" max="30" step="0.5"/>
+          <span class="muted small">seconds (0–30) · gentler on sites that rate-limit</span>
+        </div>
+
+        <div class="field">
+          <label class="lbl">Geo</label>
+          <label class="check small" for="setGeoBypass">
+            <input id="setGeoBypass" type="checkbox"/>
+            Bypass “not available in your country”
+          </label>
+          <input id="setGeoCountry" type="text" maxlength="2" spellcheck="false"
+                 placeholder="country code, e.g. ID (blank = auto)"/>
+        </div>
+
+        <div class="field">
+          <label class="lbl" for="setExtractorArgs">Extractor arguments</label>
+          <input id="setExtractorArgs" type="text" spellcheck="false"
+                 placeholder="youtube:player_client=web_safari"/>
+          <span class="muted small">per-site tweaks as <code>extractor:key=value</code>,
+            several separated by <code>;</code></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="rawSection">
+      <h2>Raw yt-dlp arguments</h2>
+      <div id="rawOffHint" class="field hidden">
+        <span class="muted small">Off — enable “raw yt-dlp arguments” in
+          Settings → Advanced to edit them.</span>
+      </div>
+      <div id="rawEditor" class="field">
+        <label class="lbl" for="setRawArgs">Arguments</label>
+        <textarea id="setRawArgs" rows="3" spellcheck="false"
+          placeholder='--no-mtime --embed-chapters'></textarea>
+        <span class="muted small">Applied to every download. Flags the engine owns are
+          refused (playlists, cookies, archive, <code>--exec</code>…). Click an option
+          below to add it.</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>All yt-dlp options <span id="optionsCount" class="muted small"></span></h2>
+      <input id="optionsSearch" type="text" spellcheck="false"
+             placeholder="search — e.g. proxy, subtitle, metadata, sleep"/>
+      <div id="optionsList" class="optlist"></div>
+      <span class="muted small">Read from the yt-dlp actually installed, so the list
+        can never go stale. Click an option to add it to the raw arguments above.</span>
+    </section>
+
+    <div class="foot-row">
+      <button id="ytdlpSave" class="btn prime">Save</button>
+      <span id="ytdlpMsg" class="muted small"></span>
+    </div>
   </section>
 </main>
 
@@ -81,255 +419,6 @@
 
 <!-- toasts -->
 <div id="toasts" aria-live="polite"></div>
-
-<!-- settings modal -->
-<div id="settingsModal" class="overlay hidden">
-  <div class="modal glass">
-    <div class="modal-head">
-      <h2>Settings</h2>
-      <button id="setClose" class="btn sm" title="Close">✕</button>
-    </div>
-
-    <div class="subtabs" id="settingsTabs">
-      <button class="stab active" data-stab="general" type="button">General</button>
-      <button class="stab" data-stab="media" type="button">Media</button>
-      <button class="stab" data-stab="network" type="button">Network</button>
-      <button class="stab" data-stab="auth" type="button">Authentication</button>
-      <button class="stab" data-stab="advanced" type="button">Advanced</button>
-      <button class="stab hidden" data-stab="device" id="tabDevice" type="button">Device</button>
-    </div>
-
-    <div class="subwrap" id="subwrap">
-    <div class="spanel" id="spanel-general">
-    <div class="field">
-      <label class="lbl">Appearance</label>
-      <div class="swatches" id="themeSwatches">
-        <button class="swatch" data-theme="light" type="button">
-          <span class="sw-preview sw-light"></span><span class="sw-label">Light</span>
-        </button>
-        <button class="swatch" data-theme="dark" type="button">
-          <span class="sw-preview sw-dark"></span><span class="sw-label">Dark</span>
-        </button>
-        <button class="swatch" data-theme="amoled" type="button">
-          <span class="sw-preview sw-amoled"></span><span class="sw-label">AMOLED</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="lbl">Glass style</label>
-      <div class="swatches" id="glassSwatches">
-        <button class="swatch" data-glass="frosted" type="button">
-          <span class="sw-preview g-frosted"></span><span class="sw-label">Frosted</span>
-          <span class="sw-hint">matte · cheapest</span>
-        </button>
-        <button class="swatch" data-glass="liquid" type="button">
-          <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
-          <span class="sw-hint">glossy · heavier blur</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="lbl" for="setDir">Download folder</label>
-      <input id="setDir" type="text" spellcheck="false"/>
-    </div>
-
-    <div class="field row">
-      <label class="lbl" for="setConc">Concurrent downloads</label>
-      <input id="setConc" type="number" min="1" max="4"/>
-      <span class="muted small">1–4 · applied live</span>
-    </div>
-
-    <div class="field">
-      <label class="check small" for="setReveal">
-        <input id="setReveal" type="checkbox"/>
-        Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
-      </label>
-    </div>
-
-    <div class="field">
-      <label class="check small" for="setResume">
-        <input id="setResume" type="checkbox"/>
-        Resume interrupted downloads after a restart
-      </label>
-    </div>
-    </div><!-- /spanel-general -->
-
-    <div class="spanel hidden" id="spanel-media">
-      <div class="field">
-        <label class="lbl" for="setTemplate">Filename template</label>
-        <input id="setTemplate" type="text" spellcheck="false"
-               placeholder="%(title).100B.%(ext)s"/>
-        <span class="muted small">must contain %(ext)s · example:
-          <code>%(uploader)s - %(title)s.%(ext)s</code></span>
-      </div>
-
-      <div class="field">
-        <label class="check small" for="setEmbMeta">
-          <input id="setEmbMeta" type="checkbox"/>
-          Embed metadata (title, artist, description)
-        </label>
-        <label class="check small" for="setEmbThumb">
-          <input id="setEmbThumb" type="checkbox"/>
-          Embed thumbnail <span class="muted">(keeps the .jpg too)</span>
-        </label>
-      </div>
-
-      <div class="field row">
-        <label class="lbl" for="setSubMode">Subtitles</label>
-        <select id="setSubMode">
-          <option value="off">Off</option>
-          <option value="sidecar">Download as files (.vtt)</option>
-          <option value="embed">Embed into the video</option>
-        </select>
-        <input id="setSubLangs" type="text" spellcheck="false"
-               placeholder="languages, e.g. en, id" />
-      </div>
-      <div class="field">
-        <label class="check small" for="setSubAuto">
-          <input id="setSubAuto" type="checkbox"/>
-          Include auto-generated captions
-        </label>
-      </div>
-
-      <div class="field row">
-        <label class="lbl" for="setSbMode">SponsorBlock</label>
-        <select id="setSbMode">
-          <option value="off">Off</option>
-          <option value="mark">Mark segments as chapters</option>
-          <option value="remove">Remove segments (re-encodes cuts)</option>
-        </select>
-        <input id="setSbCats" type="text" spellcheck="false"
-               placeholder="sponsor, selfpromo"/>
-      </div>
-
-      <div class="field">
-        <label class="check small" for="setArchive">
-          <input id="setArchive" type="checkbox"/>
-          Skip videos already downloaded before (archive)
-        </label>
-      </div>
-    </div><!-- /spanel-media -->
-
-    <div class="spanel hidden" id="spanel-network">
-      <div class="field row">
-        <label class="lbl" for="setFragments">Parallel fragments</label>
-        <input id="setFragments" type="number" min="1" max="16"/>
-        <span class="muted small">1–16 · faster HLS/DASH downloads</span>
-      </div>
-      <div class="field row">
-        <label class="lbl" for="setRateLimit">Speed limit</label>
-        <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
-      </div>
-      <div class="field">
-        <label class="lbl" for="setProxy">Proxy</label>
-        <input id="setProxy" type="text" spellcheck="false"
-               placeholder="socks5://127.0.0.1:1080 (blank = direct)"/>
-      </div>
-    </div><!-- /spanel-network -->
-
-    <div class="spanel hidden" id="spanel-auth">
-    <div class="field">
-      <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
-      <div class="col fill">
-        <div class="jrow">
-          <input id="setCookies" type="text" spellcheck="false"
-                 placeholder="path to cookies.txt (Netscape format)"/>
-          <button id="browseCookies" class="btn sm hidden" type="button">Browse…</button>
-          <button id="importCookies" class="btn sm hidden" type="button">Import…</button>
-        </div>
-        <div class="jrow" id="browserRow">
-          <select id="setCookiesBrowser">
-            <option value="">Browser cookies: off</option>
-            <option value="chrome">Use cookies from Chrome</option>
-            <option value="chromium">Use cookies from Chromium</option>
-            <option value="firefox">Use cookies from Firefox</option>
-            <option value="edge">Use cookies from Edge</option>
-            <option value="brave">Use cookies from Brave</option>
-            <option value="opera">Use cookies from Opera</option>
-            <option value="vivaldi">Use cookies from Vivaldi</option>
-            <option value="safari">Use cookies from Safari</option>
-          </select>
-        </div>
-        <span class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
-          or read the cookies straight from a browser (close it first). On Android, use Import.</span>
-      </div>
-    </div>
-
-    </div><!-- /spanel-auth -->
-
-    <div class="spanel hidden" id="spanel-advanced">
-      <div class="field">
-        <label class="check small" for="setRawEnabled">
-          <input id="setRawEnabled" type="checkbox"/>
-          Enable raw yt-dlp arguments <span class="muted">(power users — off by default)</span>
-        </label>
-      </div>
-      <div class="field">
-        <label class="lbl" for="setRawArgs">Raw arguments</label>
-        <textarea id="setRawArgs" rows="3" spellcheck="false"
-          placeholder='--no-mtime --extractor-args "youtube:player_client=web"'></textarea>
-        <span class="muted small">applied to every download · flags the engine owns are
-          refused (playlists, cookies, archive, <code>--exec</code>…) ·
-          <button id="optionsBtn" class="linkbtn" type="button">browse all yt-dlp options</button></span>
-      </div>
-    </div><!-- /spanel-advanced -->
-
-    <div class="spanel hidden" id="spanel-device">
-    <div id="androidSection" class="field hidden">
-      <label class="lbl">Android</label>
-      <div class="col">
-        <button id="batteryBtn" class="btn sm" type="button">🔋 Battery settings — allow background downloads</button>
-        <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
-      </div>
-    </div>
-    <div id="vaultSection" class="field hidden">
-      <label class="lbl">Cookies on this device</label>
-      <div class="col">
-        <span id="vaultStatus" class="muted small">checking…</span>
-        <button id="deleteCookiesBtn" class="btn sm danger" type="button">🗑 Delete stored cookies</button>
-      </div>
-      <span class="muted small">Imported cookies are encrypted with a key that only this
-        device holds (Android Keystore). A readable copy exists only while the app is
-        running, and is removed when you quit or delete them.</span>
-    </div>
-    <div id="storageSection" class="field hidden">
-      <label class="lbl">Downloaded files</label>
-      <div class="col">
-        <span id="storageInfo" class="muted small">checking…</span>
-        <button id="clearDownloadsBtn" class="btn sm danger" type="button">🗑 Delete downloaded files</button>
-      </div>
-      <span class="muted small">Deletes everything in the app's own folder plus the
-        Gallery/Music copies this app made. Android won't let a file manager open
-        those folders, so the cleanup lives here.</span>
-    </div>
-    </div><!-- /spanel-device -->
-    </div><!-- /subwrap -->
-
-    <div class="modal-foot">
-      <button id="setSave" class="btn prime">Save</button>
-      <span id="setMsg" class="muted small"></span>
-    </div>
-  </div>
-</div>
-
-<!-- yt-dlp option browser -->
-<div id="optionsModal" class="overlay hidden">
-  <div class="modal glass wide">
-    <div class="modal-head">
-      <strong>yt-dlp options</strong>
-      <span id="optionsCount" class="muted small"></span>
-      <button id="optionsClose" class="btn sm" title="Close">✕</button>
-    </div>
-    <input id="optionsSearch" type="text" spellcheck="false"
-           placeholder="search — e.g. proxy, subtitle, metadata, sleep"/>
-    <div id="optionsList" class="optlist"></div>
-    <div class="modal-foot">
-      <span class="muted small">click an option to add it to the raw arguments field</span>
-    </div>
-  </div>
-</div>
 
 <!-- confirm modal -->
 <div id="confirmModal" class="overlay hidden">

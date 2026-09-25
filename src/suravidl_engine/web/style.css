@@ -183,6 +183,74 @@ footer { max-width: 980px; margin: 0 auto; padding: 0 20px 30px; overflow-wrap: 
 footer .linkbtn { margin-left: 8px; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
+
+/* ---------- top-level tabs (the shell) ---------- */
+.tabs { display: flex; gap: 6px; align-items: center; }
+.tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-size: 13px; color: var(--muted);
+  background: transparent; border: 1px solid transparent;
+  border-radius: 12px; padding: 8px 12px; cursor: pointer;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease;
+}
+.tab:hover { color: var(--text); background: var(--glass-bg-strong); }
+.tab.active {
+  color: var(--text); background: var(--glass-bg-strong);
+  border-color: var(--accent-line);
+}
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab-ico { font-size: 15px; line-height: 1; opacity: .95; }
+.badge {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.panel { display: block; }
+.panel > .card + .card { margin-top: 16px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+.foot-row { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; }
+#optionsList.optlist { max-height: 44vh; }
+#panel-settings .subtabs { margin-bottom: 14px; }
+
+/* desktop: a left rail (the same markup, laid out as a column) */
+@media (min-width: 900px) {
+  body {
+    display: grid; min-height: 100dvh;
+    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto;
+  }
+  header { grid-column: 1 / -1; }
+  #tabs {
+    grid-column: 1; grid-row: 2 / 4; align-self: start;
+    flex-direction: column; align-items: stretch; gap: 4px;
+    padding: 14px 10px; position: sticky; top: 64px;
+  }
+  #tabs .tab { justify-content: flex-start; border-radius: 12px; }
+  #tabs .tab.active { background: var(--accent-soft); border-color: var(--accent-line); }
+  main { grid-column: 2; grid-row: 2; width: 100%; }
+  footer { grid-column: 2; grid-row: 3; width: 100%; }
+}
+
+/* phones/tablets: a segmented bar along the bottom (thumb reach) */
+@media (max-width: 899px) {
+  #tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    justify-content: space-around; gap: 0;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    background: var(--glass-bg-strong); border-top: 1px solid var(--line);
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  }
+  #tabs .tab {
+    flex: 1 1 0; flex-direction: column; gap: 2px;
+    padding: 6px 4px; border: 0; border-radius: 10px;
+  }
+  .tab-ico { font-size: 17px; }
+  .tab-lbl { font-size: 10px; letter-spacing: .02em; }
+  main { padding-bottom: 92px; }
+  footer { padding-bottom: 96px; }
+  .grid2 { grid-template-columns: 1fr; }
+}
 .small { font-size: 12px; }
 .err { color: var(--err); }
 .row { display: flex; gap: 10px; align-items: center; }
@@ -495,4 +563,19 @@ select:focus-visible { outline: 0; border-color: var(--accent-line); }
     padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line); background: var(--glass-bg-strong); }
   .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
+
+  /* settings is a page panel now — keep its head and Save in reach */
+  #panel-settings .card { padding: 14px; }
+  #panel-settings .modal-head {
+    position: sticky; top: 52px; z-index: 3;
+    margin: -14px -14px 10px; padding: 12px 14px 10px;
+    background: var(--glass-bg-strong); border-bottom: 1px solid var(--line);
+  }
+  #panel-settings .subwrap { margin: 0; padding: 0; overflow: visible; }
+  #panel-settings .modal-foot {
+    position: sticky; z-index: 3; bottom: calc(66px + env(safe-area-inset-bottom));
+    margin: 14px -14px -14px; padding: 12px 14px;
+    border-top: 1px solid var(--line); background: var(--glass-bg-strong);
+  }
+  #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
 }

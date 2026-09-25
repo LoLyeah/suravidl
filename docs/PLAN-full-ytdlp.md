@@ -91,10 +91,9 @@ warning** — it's your machine, but it's the one option that runs programs.
   cloud backups, other apps on Android, token theft on loopback) — and what is
   explicitly out of scope.
 
-## 3. UI: tabs / menu instead of one long page
+## 3. UI: tabs / menu instead of one long page ✅ shipped v0.16.0
 
-Today: single page + one settings modal (it keeps growing). Plan — **four
-top-level tabs** in the existing shell, same design language:
+**Four top-level tabs** in the existing shell, same design language:
 
 - **Download** — paste · probe · formats · presets · per-job options
 - **Queue** — the current downloads card
@@ -111,7 +110,8 @@ desktop a left rail.
 
 1. **M10a — cookie hardening** ✅ shipped v0.10.1
 2. **M10b — encryption & controls** — Android Keystore, delete-cookies, threat model
-3. **M11 — tabbed shell** — no feature changes; every test stays green
+3. **M11 — tabbed shell** ✅ shipped v0.16.0 (as the four-tab shell, together
+   with the tier-2 curated groups; the settings sub-tabs were its first slice)
 4. **M12 — Tier-1 options** — in an order you pick (playlists · subtitles ·
    audio-only · metadata embedding · templates · rate limits · proxy · archive ·
    SponsorBlock), each with tests + docs
@@ -212,11 +212,27 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
   Settings → Device "Delete downloaded files" row (app folder + the
   Gallery/Music copies we contributed, completed jobs pruned) — needed
   because Android/data is not user-browsable.
-  **Format-labelling rule:** never guess a stream's tracks from missing
-  fields — a direct link reports `vcodec: null, acodec: null`, which is
-  "unknown", not "audio only"; only pair with `bestaudio` when the site
-  publishes a separate audio-only format.
-- Next up: curated option groups (verbosity/workarounds/geo) and the full
-  four-tab shell (Download · Queue · Settings · yt-dlp) — the settings
-  sub-tabs (General · Media · Network · Authentication · Advanced · Device)
-  are its first slices.
+  - **v0.16.0 — M15 (four-tab shell + curated groups):** the shell from §3 is
+    real: `#download · #queue · #settings · #ytdlp`, hash-routed, remembered in
+    localStorage, left rail on desktop and a bottom segmented bar on phones
+    (Queue carries the active-downloads badge). Settings and the option
+    catalogue left their modals and became tabs — every element id that the
+    engine tests and the E2E flows rely on is unchanged; only the two modal
+    shells (`settingsModal`, `optionsModal`) are gone. The curated groups from
+    tier 2 (§1) are named settings now — `verbose`, `ip_version`
+    (auto/ipv4/ipv6 → `source_address`, yt-dlp's own mapping), `no_check_certificates`,
+    `sleep_requests` (0–30 s → `sleep_interval_requests`), `geo_bypass` +
+    `geo_bypass_country`, `extractor_args` (`extractor:key=value,…`, parsed
+    locally, never through a shell) — validated in `settings.py`, mapped in
+    `download_opts.curated_settings_opts()`, and proven against yt-dlp's own CLI
+    translation in `tests/test_curated.py`. The network ones also reach the
+    probe (`probe(extra_opts=…)`, engine-owned keys dropped) so a
+    region-locked video can at least be listed; live proof in the engine log:
+    `Using fake IP … (ID) as X-Forwarded-For`. Raw arguments stay default-OFF
+    and the editor only appears once enabled in Settings → Advanced.
+  - **Format honesty note (v0.15.0):** never infer a stream's tracks from
+    missing fields — a direct link reports `vcodec: null, acodec: null`, which
+    is "unknown", not "audio only"; pair with `bestaudio` only when the site
+    publishes a separate audio-only format.
+  - Next up: per-job option overrides, presets UI, richer empty states, and
+    `libffprobe.so` in the APK.

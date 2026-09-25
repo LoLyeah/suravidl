@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from .auth import cookie_session
+from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
 
@@ -240,7 +241,8 @@ def create_app(download_dir, auth_token: str | None = None,
         try:
             with cookie_session(settings.get()) as cookie_opts:
                 return probe(body.url, extra_headers=body.headers,
-                             cookie_opts=cookie_opts)
+                             cookie_opts=cookie_opts,
+                             extra_opts=probe_extra_opts(settings.get()))
         except Exception as e:  # noqa: BLE001 - error goes to the client
             raise HTTPException(status_code=400, detail=str(e)) from e
 

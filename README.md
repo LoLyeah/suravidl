@@ -219,9 +219,19 @@ repo has no pydantic-core.
       has to offer that cleanup itself. `GET /files/summary` +
       `POST /files/clear` (completed job rows go with their files) and an
       emulator test that an imported copy is really removable.
-- [ ] M15+ — what is left: curated option groups (verbosity/workarounds/geo),
-      the full four-tab shell (Download · Queue · Settings · yt-dlp) →
-      `docs/PLAN-full-ytdlp.md`
+- [x] M15 — the four-tab shell + the curated option groups. The one long page
+      is now **Download · Queue · Settings · yt-dlp**, hash-routed
+      (`#download` … `#ytdlp`) and remembered between launches: desktop gets a
+      left rail, phones a bottom segmented bar with the active-downloads badge
+      on Queue. Settings and the option catalogue stopped being modals — they
+      are tabs now, so nothing is buried behind a button. The **yt-dlp tab**
+      carries the curated groups (verbose log · IP version · skip TLS checks ·
+      pause between requests · geo bypass + country · extractor arguments) with
+      validation in the engine, network ones applied to probing too, and a
+      picker that writes into the raw-arguments field. Raw arguments stay
+      default-OFF: the editor only appears once enabled in Settings → Advanced.
+- [ ] M16+ — what is left: per-job option overrides, presets UI, richer empty
+      states, `libffprobe.so` bundling → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 

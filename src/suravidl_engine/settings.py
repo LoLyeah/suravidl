@@ -28,6 +28,14 @@ DEFAULTS = {
     # advanced tier (raw yt-dlp arguments; default-OFF by design)
     "raw_args_enabled": False,
     "raw_args": "",              # e.g. "--no-mtime --extractor-args ..."
+    # --- curated groups (the yt-dlp tab; see CURATED_KEYS) ----------------
+    "verbose": False,            # keep yt-dlp's chatty log (debugging aid)
+    "ip_version": "auto",        # auto | ipv4 | ipv6 (broken-IPv6 workaround)
+    "no_check_certificates": False,
+    "sleep_requests": 0,         # seconds between requests (0-30), be polite
+    "geo_bypass": False,         # "not available in your country" bypass
+    "geo_bypass_country": "",    # two-letter code, e.g. ID
+    "extractor_args": "",        # e.g. youtube:player_client=web_safari
 }
 
 THEMES = ("light", "dark", "amoled")
@@ -155,6 +163,40 @@ class Settings:
             if len(value) > 1000:
                 raise ValueError("raw_args is too long (max 1000 characters)")
             parse_raw_args(value)  # raises ValueError on flags yt-dlp rejects
+            return value
+        # -- curated groups (the yt-dlp tab) ---------------------------------
+        if key in ("verbose", "no_check_certificates", "geo_bypass"):
+            return bool(value)
+        if key == "ip_version":
+            from .download_opts import IP_VERSIONS
+
+            value = str(value)
+            if value not in IP_VERSIONS:
+                raise ValueError(f"ip_version must be one of {IP_VERSIONS}")
+            return value
+        if key == "sleep_requests":
+            from .download_opts import SLEEP_REQUESTS_MAX
+
+            try:
+                seconds = float(value)
+            except (TypeError, ValueError):
+                raise ValueError("sleep_requests must be a number of seconds")
+            if not 0 <= seconds <= SLEEP_REQUESTS_MAX:
+                raise ValueError(
+                    f"sleep_requests must be between 0 and {SLEEP_REQUESTS_MAX:g} seconds")
+            return seconds
+        if key == "geo_bypass_country":
+            value = str(value or "").strip().upper()
+            if value and (len(value) != 2 or not value.isalpha()):
+                raise ValueError("geo_bypass_country must be a two-letter code (e.g. ID)")
+            return value
+        if key == "extractor_args":
+            from .download_opts import parse_extractor_args
+
+            value = str(value or "").strip()
+            if len(value) > 300:
+                raise ValueError("extractor_args is too long (max 300 characters)")
+            parse_extractor_args(value)
             return value
         raise ValueError(f"unknown setting: {key}")
 
