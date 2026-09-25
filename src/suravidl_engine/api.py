@@ -110,7 +110,21 @@ def create_app(download_dir, auth_token: str | None = None,
                           "downloadDir": str(manager.download_dir),
                           "theme": settings.get()["theme"],
                           "glass": settings.get()["glass"]})
+        # Stamp the asset URLs with the version: embedded WebViews (Android,
+        # pywebview) happily keep old styles.css/app.js cached under the same
+        # URL, which showed a v0.13 HTML wearing the v0.11 CSS. A new URL per
+        # release makes a stale copy impossible.
+        for asset in ("style.css", "app.js", "icon.png"):
+            html = html.replace(f"/static/{asset}", f"/static/{asset}?v={__version__}")
         return HTMLResponse(html.replace('"__CFG__"', cfg))
+
+    @app.middleware("http")
+    async def _no_store_ui_assets(request, call_next):
+        """Never let a WebView serve yesterday's UI from its cache."""
+        resp = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     app.mount("/static", StaticFiles(directory=str(_web_dir())), name="static")
 

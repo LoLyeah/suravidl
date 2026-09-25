@@ -23,5 +23,16 @@
             android:exported="false"
             android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
+        <!-- lets the player / share sheet read a finished download even though
+             it lives under Android/data (which file managers refuse to open) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

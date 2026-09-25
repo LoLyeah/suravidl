@@ -182,9 +182,29 @@ repo has no pydantic-core.
       real button, because `target="_blank"` still cannot open a window from
       inside a pywebview or Android shell — it now asks the desktop shell
       (or the Android bridge) to open your actual browser.
-- [ ] M13+ — what is left: curated option groups (verbosity/workarounds/geo),
-      Keystore encryption of imported cookies, the full four-tab shell
-      (Download · Queue · Settings · yt-dlp) → `docs/PLAN-full-ytdlp.md`
+- [x] M13 — phone-shaped, honest about Android's storage rules, and cookies
+      that are unreadable at rest: the **settings dialog is a real sheet**
+      on phones (one scrollable tab row, body scrolls, Save pinned at the
+      bottom — it used to sit below the fold), **Frosted vs Liquid** are now
+      unmistakably different (flat matte vs glossy sheen, with a one-line
+      hint each) instead of two identical swatches, and the download folder
+      line no longer claims you can browse `Android/data` — it says where
+      the files really are *and* gives every finished job **Open** and
+      **Share** buttons (a FileProvider grant, so the player can read a file
+      no file manager may browse). Audio now lands in `Music/suravidl` too,
+      not just video in `Movies/suravidl`. Cookies get a **Keystore vault**:
+      AES-256-GCM under a non-exportable key, decrypted only into an
+      owner-only session file that is deleted on quit/delete/start — plus a
+      "delete stored cookies" button and a written
+      [threat model](docs/THREAT-MODEL.md). And the reason the UI looked
+      v0.11-old on v0.13: `/static/*` came from Starlette with a
+      `Last-Modified` validator, which an Android WebView is allowed to
+      serve from its heuristic cache — asset URLs are now version-stamped
+      and served `no-store`, so a mixture of two releases cannot happen
+      again.
+- [ ] M14+ — what is left: curated option groups (verbosity/workarounds/geo),
+      the full four-tab shell (Download · Queue · Settings · yt-dlp) →
+      `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 

@@ -13,9 +13,11 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -80,6 +82,7 @@ class MainActivity : AppCompatActivity() {
                             webView.setBackgroundColor(color)
                             webView.loadUrl("http://127.0.0.1:${EngineService.ENGINE_PORT}/")
                         }
+                        restoreCookieSession()
                         return@thread
                     }
                 } catch (_: Throwable) {
@@ -157,6 +160,65 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        /** Play a finished download: Android/data is invisible to file
+         *  managers, but a provider grant lets the video player read it. */
+        @JavascriptInterface
+        fun openFile(path: String) {
+            runOnUiThread { handOffFile(path, share = false) }
+        }
+
+        @JavascriptInterface
+        fun shareFile(path: String) {
+            runOnUiThread { handOffFile(path, share = true) }
+        }
+
+        @JavascriptInterface
+        fun cookiesStatus(): String = CookieVault.status(this@MainActivity)
+
+        @JavascriptInterface
+        fun deleteCookies() {
+            CookieVault.delete(this@MainActivity)
+        }
+    }
+
+    private fun toast(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    /** Hand a file to another app (player / share sheet) via our FileProvider. */
+    private fun handOffFile(path: String, share: Boolean) {
+        val f = File(path)
+        if (!f.exists()) {
+            toast("file is gone")
+            return
+        }
+        val mime = when (f.extension.lowercase()) {
+            "mp4", "webm", "mkv", "mov", "3gp" -> "video/*"
+            "m4a", "mp3", "opus", "ogg", "wav", "aac", "flac" -> "audio/*"
+            "srt", "vtt" -> "text/plain"
+            else -> "*/*"
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", f)
+            val intent = if (share) {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = mime
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                }
+            } else {
+                Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mime)
+                }
+            }
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(
+                if (share) Intent.createChooser(intent, "Share") else intent)
+        } catch (e: Throwable) {
+            LogStore.write(this, "open-file.log", "open failed: ${e.message}")
+            toast("no app can open this file")
+        }
     }
 
     /** SAF picker: copy the chosen cookies.txt into the app dir, hand the path to the UI. */
@@ -182,15 +244,43 @@ class MainActivity : AppCompatActivity() {
             return
         }
         try {
-            val target = File(filesDir, "cookies.txt")
-            contentResolver.openInputStream(uri)!!.use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
-            }
-            notifyCookiesPicked(target.absolutePath)
+            val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+            CookieVault.save(this, bytes)          // encrypted; plaintext dropped
+            val session = CookieVault.unlockForSession(this)
+            notifyCookiesPicked(session?.absolutePath)
         } catch (e: Throwable) {
             LogStore.write(this@MainActivity, "cookies-import.log",
                            "cookie import failed: ${e.message}")
             notifyCookiesPicked(null)
+        }
+    }
+
+    /** Point the engine at the decrypted session copy (stable path, recreated
+     *  on every start); with nothing stored, clear any stale setting. */
+    private fun restoreCookieSession() {
+        CookieVault.lockSession(this)               // stale copy from a crash
+        CookieVault.migrateLegacy(this)             // encrypt pre-vault imports
+        val f = CookieVault.unlockForSession(this)
+        pushCookiesSetting(if (f != null) f.absolutePath else "")
+    }
+
+    private fun pushCookiesSetting(path: String) {
+        try {
+            val token = getSharedPreferences("engine", MODE_PRIVATE)
+                .getString("token", "") ?: ""
+            val c = URL("http://127.0.0.1:${EngineService.ENGINE_PORT}/settings")
+                .openConnection() as HttpURLConnection
+            c.requestMethod = "POST"
+            c.setRequestProperty("Authorization", "Bearer $token")
+            c.setRequestProperty("Content-Type", "application/json")
+            c.connectTimeout = 3000
+            c.doOutput = true
+            val body = JSONObject().put("cookies_file", path).toString()
+            c.outputStream.use { it.write(body.toByteArray()) }
+            c.responseCode
+        } catch (e: Throwable) {
+            LogStore.write(this, "cookies-session.log",
+                           "cookie session: ${e.message}")
         }
     }
 
@@ -204,6 +294,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Full shutdown: stop the engine service, remove the task, free the RAM. */
     private fun quitCompletely() {
+        CookieVault.lockSession(this)               // no readable copy at rest
         try {
             stopService(Intent(this, EngineService::class.java))
         } catch (_: Throwable) {

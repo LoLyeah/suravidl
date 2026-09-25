@@ -74,7 +74,10 @@
   </section>
 </main>
 
-<footer class="meta">downloads → <span id="dlDir"></span></footer>
+<footer class="meta">
+  <span id="dlWhere">downloads</span> → <code id="dlDir"></code>
+  <button id="copyDir" class="linkbtn" type="button">copy path</button>
+</footer>
 
 <!-- toasts -->
 <div id="toasts" aria-live="polite"></div>
@@ -96,6 +99,7 @@
       <button class="stab hidden" data-stab="device" id="tabDevice" type="button">Device</button>
     </div>
 
+    <div class="subwrap" id="subwrap">
     <div class="spanel" id="spanel-general">
     <div class="field">
       <label class="lbl">Appearance</label>
@@ -117,9 +121,11 @@
       <div class="swatches" id="glassSwatches">
         <button class="swatch" data-glass="frosted" type="button">
           <span class="sw-preview g-frosted"></span><span class="sw-label">Frosted</span>
+          <span class="sw-hint">matte · cheapest</span>
         </button>
         <button class="swatch" data-glass="liquid" type="button">
           <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
+          <span class="sw-hint">glossy · heavier blur</span>
         </button>
       </div>
     </div>
@@ -278,7 +284,18 @@
         <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
       </div>
     </div>
+    <div id="vaultSection" class="field hidden">
+      <label class="lbl">Cookies on this device</label>
+      <div class="col">
+        <span id="vaultStatus" class="muted small">checking…</span>
+        <button id="deleteCookiesBtn" class="btn sm danger" type="button">🗑 Delete stored cookies</button>
+      </div>
+      <span class="muted small">Imported cookies are encrypted with a key that only this
+        device holds (Android Keystore). A readable copy exists only while the app is
+        running, and is removed when you quit or delete them.</span>
+    </div>
     </div><!-- /spanel-device -->
+    </div><!-- /subwrap -->
 
     <div class="modal-foot">
       <button id="setSave" class="btn prime">Save</button>

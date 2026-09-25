@@ -184,7 +184,25 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
   browser from pywebview/Android (`target=_blank` is a no-op there) — it is
   a button now that goes host-bridge → desktop `/app/open-url`
   (`webbrowser.open`, `xdg-open`/`open` fallback) → `window.open`.
-- Next up: curated option groups (verbosity/workarounds/geo), M10b Keystore
-  encryption of imported cookies, and the full four-tab shell
-  (Download · Queue · Settings · yt-dlp) — the settings sub-tabs (now
-  including Advanced) are its first slices.
+- **v0.14.0 — M13 (phone UX + Android storage truth + cookie vault):**
+  Settings became a real phone sheet (one scrollable tab row, body scrolls,
+  Save pinned), Frosted/Liquid are visually distinct (flat matte vs glossy
+  sheen) with hints, the footer no longer advertises an unopenable
+  `Android/data` path, finished jobs get **Open/Share** (FileProvider grant —
+  a file manager may not browse Android/data, but a grant lets the player
+  read it), audio now also imports to `Music/suravidl`, and cookies live in
+  a **Keystore vault** (AES-256-GCM, non-exportable key; owner-only session
+  copy deleted on quit/delete/start; legacy plaintext migrated + deleted) with
+  a delete button and `docs/THREAT-MODEL.md`.
+  **Asset caching rule (applies to every embedded shell):** static files must
+  be version-stamped (`?v=<engine>`) *and* served `no-store` — a
+  `Last-Modified` validator alone lets an Android WebView serve an old
+  `style.css` under a fresh `index.html`, which is exactly how a release
+  ended up wearing the CSS of two versions earlier. Tested in
+  `tests/test_assets.py`.
+- **M10b done** (was: Keystore-encrypted imported cookies + one-tap delete +
+  threat model) — shipped in v0.14.0 above.
+- Next up: curated option groups (verbosity/workarounds/geo) and the full
+  four-tab shell (Download · Queue · Settings · yt-dlp) — the settings
+  sub-tabs (General · Media · Network · Authentication · Advanced · Device)
+  are its first slices.

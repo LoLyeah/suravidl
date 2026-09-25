@@ -285,6 +285,21 @@ function jobRow(j) {
         .catch((e) => toast("could not open: " + e.message, "bad"));
       r.append(open);
     }
+    if (ANDROID()) {
+      // Android/data is off-limits to file managers, so hand the file itself
+      // to another app (a provider grant) — play it or share it right here.
+      const open = el("button", "ghost-sm", "Open");
+      open.onclick = () => {
+        try { window.AndroidHost.openFile(j.filepath); }
+        catch (e) { toast("could not open: " + e.message, "bad"); }
+      };
+      const share = el("button", "ghost-sm", "Share");
+      share.onclick = () => {
+        try { window.AndroidHost.shareFile(j.filepath); }
+        catch (e) { toast("could not share: " + e.message, "bad"); }
+      };
+      r.append(open, share);
+    }
     row.append(r);
     if (j.note) row.append(el("div", "jobhint", j.note));
   }
@@ -436,6 +451,38 @@ function wireQuitButton() {
   };
 }
 
+/* ---------- host-aware download location ---------- */
+const ANDROID = () => !!window.AndroidHost;
+
+/** Android's app folder lives under Android/data/, which no file manager will
+ *  open — so say where the user can actually find their files (the gallery /
+ *  music copies the app adds), and keep the raw path one tap away. */
+function renderWhere(dir) {
+  const d = dir || "";
+  $("dlDir").textContent = d;
+  if (ANDROID()) {
+    $("dlWhere").textContent =
+      "saved where you can open it — Gallery → suravidl (audio: Music → suravidl)";
+    $("dlDir").title = "the app's own folder (not browsable): " + d;
+  } else {
+    $("dlWhere").textContent = "downloads";
+  }
+}
+
+function wireCopyPath() {
+  const b = $("copyDir");
+  if (!b) return;
+  b.onclick = () => {
+    const t = $("dlDir").textContent || "";
+    const done = () => toast("path copied");
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(t).then(done).catch(() => toast("copy failed", "bad"));
+    } else {
+      toast("copy not supported here", "bad");
+    }
+  };
+}
+
 async function initAppControls() {
   if (window.AndroidHost) {
     // inside the Android app: quit + battery settings, no minimize
@@ -449,6 +496,7 @@ async function initAppControls() {
     const imp = $("importCookies");
     imp.classList.remove("hidden");
     imp.onclick = () => window.AndroidHost.pickCookiesFile();
+    initVaultSection();
     return;
   }
   try {
@@ -478,6 +526,26 @@ async function initAppControls() {
     }
     wireQuitButton();
   } catch (_) { /* browser mode */ }
+}
+
+/** Android: the "cookies on this device" row (encrypted vault status + wipe). */
+function initVaultSection() {
+  const sec = $("vaultSection");
+  if (!sec || !window.AndroidHost || !window.AndroidHost.cookiesStatus) return;
+  sec.classList.remove("hidden");
+  const show = () => {
+    try { $("vaultStatus").textContent = window.AndroidHost.cookiesStatus(); }
+    catch (_) { $("vaultStatus").textContent = "status unavailable"; }
+  };
+  show();
+  $("deleteCookiesBtn").onclick = () => {
+    try { window.AndroidHost.deleteCookies(); } catch (_) { }
+    $("setCookies").value = "";
+    api("/settings", { method: "POST", body: JSON.stringify({ cookies_file: "" }) })
+      .catch(() => { });
+    toast("stored cookies deleted");
+    show();
+  };
 }
 
 /* called back by the Android host after the cookies file is imported */
@@ -516,7 +584,7 @@ async function loadSettings() {
     $("setProxy").value = s.proxy || "";
     $("setRawEnabled").checked = !!s.raw_args_enabled;
     $("setRawArgs").value = s.raw_args || "";
-    $("dlDir").textContent = s.download_dir || "";
+    renderWhere(s.download_dir);
     markSwatches(CURRENT);
   } catch (e) {
     toast("could not load settings: " + e.message, "bad");
@@ -652,7 +720,7 @@ function saveSettings() {
       raw_args: $("setRawArgs").value.trim(),
     }),
   }).then((s) => {
-    $("dlDir").textContent = s.download_dir;
+    renderWhere(s.download_dir);
     $("setConc").value = s.max_concurrent;
     return s;
   });
@@ -679,7 +747,8 @@ $("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp
 $("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
 
 applyTheme(CURRENT.theme, CURRENT.glass);
-$("dlDir").textContent = CFG.downloadDir || "";
+renderWhere(CFG.downloadDir);
+wireCopyPath();
 loadVersions();
 checkAppUpdate();
 loadSettings();
