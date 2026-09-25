@@ -331,6 +331,54 @@ function metaParts(j) {
   return [...(pl ? [pl] : []), pct + "%", ...(spd ? [spd] : []), ...(eta ? [eta] : []), size];
 }
 
+/** Stop a still-running job (cancel + wait for the worker), then delete it. */
+async function settleThenDelete(job) {
+  if (ACTIVE.has(job.status)) {
+    await api(`/jobs/${job.id}/cancel`, { method: "POST" });
+    for (let i = 0; i < 12; i++) {
+      const { jobs } = await api("/jobs");
+      const cur = jobs.find((x) => x.id === job.id);
+      if (!cur || !ACTIVE.has(cur.status)) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  return api(`/jobs/${job.id}/delete`, { method: "POST" });
+}
+
+/** The trash button — one download gone, file and all, after a confirm. */
+function deleteButton(j) {
+  const running = ACTIVE.has(j.status);
+  const b = el("button", "ghost-sm del", "🗑 Delete");
+  b.title = "Delete this download — the file on disk goes with it";
+  b.onclick = async () => {
+    const name = j.filepath ? j.filepath.split("/").pop()
+      : String(j.title || j.url).slice(0, 60);
+    const msg = (running ? `Stop “${name}” and delete the partial file?`
+      : j.filepath ? `Delete “${name}”?`
+        : `Remove “${name}” from the list?`)
+      + (j.filepath && ANDROID() ? " Its Gallery/Music copy goes too." : "")
+      + " This cannot be undone.";
+    if (!(await askConfirm(msg, { okText: running ? "Stop and delete" : "Delete" }))) {
+      return;
+    }
+    try {
+      const r = await settleThenDelete(j);
+      if (j.filepath && ANDROID() && window.AndroidHost.deleteMediaNamed) {
+        try { window.AndroidHost.deleteMediaNamed(j.filepath.split("/").pop()); }
+        catch (_) { /* the row is gone either way */ }
+      }
+      toast(r.deleted
+        ? `deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
+          `freed ${humanBytes(r.freed_bytes)}`
+        : "removed from the list");
+      refreshJobs();
+    } catch (e) {
+      toast("could not delete: " + e.message, "bad");
+    }
+  };
+  return b;
+}
+
 function jobRow(j) {
   const row = el("div", "job");
   const top = el("div", "jobtop");
@@ -338,6 +386,8 @@ function jobRow(j) {
   title.title = j.url;
   top.append(title, el("span", "pill " + j.status, j.status));
   row.append(top);
+
+  let trashHost = null;   // the button row the trash belongs to
 
   if (ACTIVE.has(j.status)) {
     if (j.status === "downloading") {
@@ -357,6 +407,7 @@ function jobRow(j) {
     retry.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     r.append(retry);
+    trashHost = r;
     row.append(r);
     if (j.error && /ffmpeg/i.test(j.error) &&
         /not found|not installed|No such file/i.test(j.error)) {
@@ -387,6 +438,7 @@ function jobRow(j) {
       };
       r.append(open, share);
     }
+    trashHost = r;
     row.append(r);
     if (j.note) row.append(el("div", "jobhint", j.note));
   }
@@ -407,6 +459,9 @@ function jobRow(j) {
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
     actions.append(r);
   }
+  // every row can be deleted (a running one is stopped first, after a confirm)
+  if (!trashHost) trashHost = actions;
+  trashHost.append(deleteButton(j));
   if (actions.children.length) row.append(actions);
   row.dataset.sig = jobSig(j);
   return row;
@@ -574,6 +629,8 @@ function wireCopyPath() {
 async function initAppControls() {
   if (window.AndroidHost) {
     // inside the Android app: quit + battery settings, no minimize
+    // (re-applied here too: the bridge may only appear after first paint)
+    document.documentElement.dataset.host = "android";
     wireQuitButton();
     $("androidSection").classList.remove("hidden");
     $("tabDevice").classList.remove("hidden");
@@ -731,8 +788,15 @@ async function loadSettings() {
 
 /* ---------- settings sub-tabs ---------- */
 function showSettingsTab(name) {
-  document.querySelectorAll("#settingsTabs .stab").forEach((b) =>
-    b.classList.toggle("active", b.dataset.stab === name));
+  document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
+    const on = b.dataset.stab === name;
+    b.classList.toggle("active", on);
+    // the row scrolls on phones: keep the active sub-tab in view
+    if (on && b.scrollIntoView) {
+      try { b.scrollIntoView({ inline: "center", block: "nearest" }); }
+      catch (_) { /* older WebView */ }
+    }
+  });
   document.querySelectorAll(".spanel").forEach((p) =>
     p.classList.toggle("hidden", p.id !== "spanel-" + name));
 }
@@ -921,6 +985,7 @@ $("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp
 $("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true);
 
 applyTheme(CURRENT.theme, CURRENT.glass);
+if (ANDROID()) document.documentElement.dataset.host = "android";
 renderWhere(CFG.downloadDir);
 wireCopyPath();
 loadVersions();

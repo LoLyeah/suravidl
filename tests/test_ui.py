@@ -1,4 +1,6 @@
 """Engine serves the web UI on / with the API token injected."""
+import re
+
 from fastapi.testclient import TestClient
 
 
@@ -87,3 +89,30 @@ def test_unknown_static_path_404s(tmp_path):
     app = _app(tmp_path)
     with TestClient(app) as c:
         assert c.get("/static/../../etc/passwd").status_code == 404
+
+
+def test_app_js_wires_the_trash_button_and_the_android_flags(tmp_path):
+    """The per-download delete is JS-side: pin the call and the confirm."""
+    app = _app(tmp_path)
+    with TestClient(app) as c:
+        js = c.get("/static/app.js").text
+    assert "function deleteButton" in js
+    assert "/delete`" in js or "/delete" in js
+    assert "askConfirm" in js                 # never delete without asking
+    assert "deleteMediaNamed" in js           # Android library copy goes too
+    assert "settleThenDelete" in js           # a running job is stopped first
+    # Android's WebView gets the no-blur flag (it smears backdrop-filter)
+    assert 'dataset.host = "android"' in js
+
+
+def test_progress_bar_styles_stay_scoped(tmp_path):
+    """Regression: a bare `.fill` also hit the settings layout helper
+    <div class="col fill"> and painted a giant gradient capsule over the
+    fields. Component styles must not be bare single-word class selectors."""
+    app = _app(tmp_path)
+    with TestClient(app) as c:
+        css = c.get("/static/style.css").text
+        html = c.get("/").text
+    assert ".bar .fill {" in css and ".bar .fill.active::after {" in css
+    assert re.search(r"(?m)^\.fill\s*\{", css) is None
+    assert 'class="col fill"' not in html

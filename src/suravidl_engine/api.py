@@ -348,7 +348,18 @@ def create_app(download_dir, auth_token: str | None = None,
         acts["reveal"](job["filepath"])
         return {"ok": True}
 
+    @app.post("/jobs/{job_id}/delete")
+    def delete_job_endpoint(job_id: str, mgr: JobManager = Depends(require_auth)):
+        """The trash button: delete one download's file(s) and forget its row."""
+        try:
+            return mgr.delete_job(job_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        except (ValueError, PermissionError) as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
+
     app.state.manager = manager
+    app.state.download_dir = Path(manager.download_dir)
     return app
 
 

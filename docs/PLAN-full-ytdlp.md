@@ -234,5 +234,19 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     missing fields — a direct link reports `vcodec: null, acodec: null`, which
     is "unknown", not "audio only"; pair with `bestaudio` only when the site
     publishes a separate audio-only format.
+  - **v0.17.0 — M16 (per-download delete + the phone blob):** the trash button
+    the user asked for: `POST /jobs/{id}/delete` removes one download's files
+    (main file + same-stem sidecars), its row, and on Android the MediaStore
+    copy this app contributed (`MediaLibrary.deleteOwnCopiesNamed`, matched by
+    display name) — refusing while the job still runs and refusing any path
+    outside the download folder. The UI asks first (`askConfirm`, file name in
+    the message, "Stop and delete" for a running job via `settleThenDelete`)
+    and reports `deleted`/`freed_bytes`. The blue capsule that covered the
+    Authentication fields was a **CSS class collision**: `class="col fill"` (a
+    settings layout helper) also matched the bare `.fill` progress-bar rule, so
+    a 339×114 gradient was painted over the panel — progress-bar styles are now
+    scoped `.bar .fill` and `tests/test_ui.py` pins that scoping. Android
+    additionally drops the glass illusion (`--glass-bg` → solid where
+    `backdrop-filter` can't be trusted).
   - Next up: per-job option overrides, presets UI, richer empty states, and
     `libffprobe.so` in the APK.

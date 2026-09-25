@@ -17,7 +17,13 @@ import android.provider.MediaStore
 object MediaLibrary {
     private const val FOLDER = "suravidl"
 
-    fun deleteOwnCopies(context: Context): Int {
+    fun deleteOwnCopies(context: Context): Int = deleteOwnCopiesNamed(context, null)
+
+    /**
+     * Delete the library copies this app made. `name` limits it to one
+     * download (the trash button on a single row); null wipes them all.
+     */
+    fun deleteOwnCopiesNamed(context: Context, name: String?): Int {
         if (Build.VERSION.SDK_INT < 29) return 0
         val resolver = context.contentResolver
         val collections = listOf(
@@ -30,13 +36,15 @@ object MediaLibrary {
                 resolver.query(
                     collection,
                     arrayOf(MediaStore.MediaColumns._ID,
-                            MediaStore.MediaColumns.RELATIVE_PATH),
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            MediaStore.MediaColumns.DISPLAY_NAME),
                     "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
                     arrayOf(context.packageName), null
                 )?.use { cursor ->
                     while (cursor.moveToNext()) {
                         val path = cursor.getString(1) ?: ""
                         if (!path.contains(FOLDER)) continue
+                        if (name != null && cursor.getString(2) != name) continue
                         val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
                         try {
                             if (resolver.delete(uri, null, null) > 0) removed++

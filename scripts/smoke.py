@@ -209,6 +209,26 @@ def main():
             time.sleep(0.1)
         assert j2["status"] == "error", j2
 
+        # --- per-download delete (the trash button) ---
+        # a finished job with a real file goes away, file included
+        wrote = Path(j["filepath"])
+        written_bytes = wrote.stat().st_size
+        wrote.with_suffix(".info.json").write_text("{}")   # a sidecar
+        gone = req("POST", f"http://127.0.0.1:8799/jobs/{j['id']}/delete")
+        assert gone["deleted"] >= 2 and gone["freed_bytes"] > 0, gone
+        assert not wrote.exists() and not wrote.with_suffix(".info.json").exists()
+        try:
+            req("GET", f"http://127.0.0.1:8799/jobs/{j['id']}")
+            raise AssertionError("the row should be gone")
+        except urllib.error.HTTPError as e:
+            assert e.code == 404, e.code
+        # an unknown job is a 404, not a 500
+        try:
+            req("POST", "http://127.0.0.1:8799/jobs/nope/delete")
+            raise AssertionError("unknown id should 404")
+        except urllib.error.HTTPError as e:
+            assert e.code == 404, e.code
+
         print(json.dumps({
             "SMOKE": "OK",
             "engine": h,
@@ -217,7 +237,8 @@ def main():
             "probe_formats": len(info["formats"]),
             "job_status": j["status"],
             "file": j["filepath"],
-            "bytes": Path(j["filepath"]).stat().st_size,
+            "bytes": written_bytes,
+            "deleted": gone,
             "retry_of_error_job": j2["status"],
         }, indent=2))
     finally:

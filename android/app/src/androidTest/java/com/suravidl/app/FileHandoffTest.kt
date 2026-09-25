@@ -89,6 +89,40 @@ class FileHandoffTest {
         }
     }
 
+    @Test(timeout = 240_000)
+    fun deleting_one_download_takes_only_its_own_gallery_copy() {
+        val keep = File(ctx.cacheDir, "keep-test.mp4")
+        val drop = File(ctx.cacheDir, "drop-test.mp4")
+        keep.writeBytes(ByteArray(1024) { 0x66 })
+        drop.writeBytes(ByteArray(1024) { 0x77 })
+        var keepUri: android.net.Uri? = null
+        var dropUri: android.net.Uri? = null
+        try {
+            keepUri = MediaImporter.importToGallery(ctx, keep)
+            dropUri = MediaImporter.importToGallery(ctx, drop)
+            assertNotNull("nothing was imported", dropUri)
+
+            val removed = MediaLibrary.deleteOwnCopiesNamed(ctx, drop.name)
+            assertTrue("expected the named copy to go, removed=$removed", removed >= 1)
+
+            val resolver = ctx.contentResolver
+            fun rows(name: String): Int = resolver.query(
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                arrayOf(MediaStore.Video.Media._ID),
+                "${MediaStore.Video.Media.DISPLAY_NAME} = ?", arrayOf(name), null
+            )!!.use { c -> if (c.moveToFirst()) 1 else 0 }
+
+            assertEquals("the deleted download's copy should be gone", 0, rows(drop.name))
+            assertEquals("an untouched download's copy must stay", 1, rows(keep.name))
+            dropUri = null
+        } finally {
+            keep.delete()
+            drop.delete()
+            keepUri?.let { ctx.contentResolver.delete(it, null, null) }
+            dropUri?.let { ctx.contentResolver.delete(it, null, null) }
+        }
+    }
+
     @Test(timeout = 120_000)
     fun sidecars_are_not_imported_as_media() {
         val f = File(ctx.cacheDir, "tiny-test.info.json")

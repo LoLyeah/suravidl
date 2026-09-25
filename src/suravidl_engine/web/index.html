@@ -16,6 +16,9 @@
       document.documentElement.dataset.theme = c.theme || "dark";
       document.documentElement.dataset.glass = c.glass || "frosted";
     }
+    /* The Android WebView mis-composites backdrop-filter and is slow at it,
+       so the shell drops blurring there (keeps translucency + gloss). */
+    if (window.AndroidHost) document.documentElement.dataset.host = "android";
   } catch (e) { /* keep defaults */ }
 })();
 </script>
@@ -242,7 +245,7 @@
       <div class="spanel hidden" id="spanel-auth">
       <div class="field">
         <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
-        <div class="col fill">
+        <div class="col grow">
           <div class="jrow">
             <input id="setCookies" type="text" spellcheck="false"
                    placeholder="path to cookies.txt (Netscape format)"/>

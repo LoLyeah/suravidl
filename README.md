@@ -230,7 +230,22 @@ repo has no pydantic-core.
       validation in the engine, network ones applied to probing too, and a
       picker that writes into the raw-arguments field. Raw arguments stay
       default-OFF: the editor only appears once enabled in Settings → Advanced.
-- [ ] M16+ — what is left: per-job option overrides, presets UI, richer empty
+- [x] M16 — one download, one trash button, and the phone's mystery blob:
+      every finished row (and every error/cancelled one) now carries **Delete**,
+      which asks first, names the file, and takes the file, its sidecars
+      (`.info.json`, thumbnail, subtitles) and the row with it — on Android the
+      Gallery/Music copy this app made goes too. A still-running download is
+      stopped first, after its own confirm. `POST /jobs/{id}/delete` refuses to
+      delete while the download is running, refuses paths outside the download
+      folder, and reports what it actually removed (`deleted`, `freed_bytes`).
+      The blob those settings fields wore was not the WebView and not the blur:
+      a bare `.fill` selector (the progress bar) was also matching the settings
+      layout helper `<div class="col fill">`, painting a 339×114 progress-bar
+      gradient over the panel — component styles are now scoped to their
+      component and a regression test keeps them there. Android also lost its
+      translucency-without-blur look: where `backdrop-filter` doesn't render, a
+      7 %-opaque card is a stain, not glass, so the phone app gets solid panels.
+- [ ] M17+ — what is left: per-job option overrides, presets UI, richer empty
       states, `libffprobe.so` bundling → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)

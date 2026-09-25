@@ -340,12 +340,14 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 }
 .pill.cancelled { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line); }
 .bar { height: 8px; border-radius: 999px; background: var(--bar-bg); margin: 11px 0 7px; overflow: hidden; position: relative; }
-.fill {
+/* scoped to the bar: a bare `.fill` also matched the settings layout helper
+   <div class="col fill">, painting a big gradient capsule over the fields */
+.bar .fill {
   height: 100%; border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
   transition: width .3s ease;
 }
-.fill.active::after {
+.bar .fill.active::after {
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(100deg, transparent 20%, var(--sheen) 50%, transparent 80%);
   animation: shimmer 1.6s linear infinite;
@@ -405,11 +407,10 @@ textarea { width: 100%; resize: vertical; font: 12.5px/1.5 ui-monospace, SFMono-
 .toast {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 16px; border-radius: 14px; font-size: 13px;
-  background: var(--glass-bg-strong);
-  background-image: var(--glass-gloss);
+  /* a toast is a message: it must be readable at a glance, so it sits on a
+     near-opaque plate instead of blurring whatever is behind it */
+  background: var(--panel-solid);
   border: 1px solid var(--line);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
   animation: rise .35s ease both;
   max-width: 420px;
@@ -485,6 +486,8 @@ input[type="number"] { width: 80px; }
 .g-frosted { background: #3b4066; }
 .g-liquid  { background: linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,0) 45%,rgba(255,255,255,.35)), linear-gradient(135deg,#4f46e5,#0891b2); box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
 .sw-hint { font-size: 11px; color: var(--muted); text-align: center; }
+.ghost-sm.del { color: var(--err); }
+.ghost-sm.del:hover { background: var(--err-bg); border-color: var(--err-line); }
 .fmt-kind { font-size: 11px; margin-top: 3px; }
 .k-both { color: var(--ok); }
 .k-video { color: var(--warn); }
@@ -526,7 +529,7 @@ html[data-theme="light"] body.scrolled header { box-shadow: 0 8px 22px rgba(30, 
 /* theme switches ease instead of snapping (flat colours; gradients can't tween) */
 body, header, .card, .modal { transition: background-color .35s ease, color .35s ease, border-color .35s ease; }
 .field .col { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-.field .col.fill { align-items: stretch; }
+.field .col.grow { align-items: stretch; }
 .jrow input[type="text"] { flex: 1; min-width: 0; }
 select {
   width: 100%; font: inherit; font-size: 13px; padding: 9px 10px;
@@ -561,21 +564,45 @@ select:focus-visible { outline: 0; border-color: var(--accent-line); }
   .stab { flex: 0 0 auto; }
   .modal-foot { position: sticky; bottom: 0; z-index: 3; margin: 10px -14px 0;
     padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line); background: var(--glass-bg-strong); }
+    border-top: 1px solid var(--line); background: var(--panel-solid);
+    backdrop-filter: none; -webkit-backdrop-filter: none; }
   .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
 
-  /* settings is a page panel now — keep its head and Save in reach */
+  /* settings is a page panel now — keep its head and Save in reach.
+     Both are sticky, and a sticky element with backdrop-filter makes Android's
+     WebView smear its backdrop over the content beside it (a text-free
+     blurred blob). Sticky bars get a solid plate instead. */
   #panel-settings .card { padding: 14px; }
   #panel-settings .modal-head {
     position: sticky; top: 52px; z-index: 3;
     margin: -14px -14px 10px; padding: 12px 14px 10px;
-    background: var(--glass-bg-strong); border-bottom: 1px solid var(--line);
+    background: var(--panel-solid); border-bottom: 1px solid var(--line);
   }
   #panel-settings .subwrap { margin: 0; padding: 0; overflow: visible; }
   #panel-settings .modal-foot {
     position: sticky; z-index: 3; bottom: calc(66px + env(safe-area-inset-bottom));
     margin: 14px -14px -14px; padding: 12px 14px;
-    border-top: 1px solid var(--line); background: var(--glass-bg-strong);
+    border-top: 1px solid var(--line); background: var(--panel-solid);
+    backdrop-filter: none; -webkit-backdrop-filter: none;
   }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
+}
+
+/* Android's WebView: backdrop-filter is unreliable there (some devices just
+   don't blur, and a 7%-opaque "glass" card then lets the aurora background
+   show through as a colour blob over the content). Android therefore gets
+   solid panels — translucency without a blur is not glass, it is a stain —
+   and no blur to pay for. Desktop and browsers keep the full glass. */
+html[data-host="android"] {
+  --glass-blur: none;
+  --glass-bg: var(--panel-solid);
+  --glass-bg-strong: var(--panel-solid);
+  --glass-gloss: none;
+}
+html[data-host="android"] .overlay {
+  backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(3,5,12,.72);
+}
+html[data-host="android"] .modal-foot {
+  background: var(--panel-solid);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
 }

@@ -337,6 +337,75 @@ class JobManager:
                 self._con.commit()
         return len(gone)
 
+    # -- deleting one download (the trash button) -------------------------
+    SIDECAR_SUFFIXES = (".info.json", ".description", ".annotations.xml",
+                        ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt",
+                        ".ass", ".lrc", ".json", ".live_chat.json")
+
+    def _job_file_targets(self, job: dict) -> list[Path]:
+        """The files a job owns: its path plus sidecars sharing its stem.
+
+        Anything outside the download dir is refused — a job row is not a
+        licence to delete arbitrary paths.
+        """
+        raw = job.get("filepath")
+        if not raw:
+            return []
+        path = Path(str(raw))
+        root = Path(self.download_dir).resolve()
+        try:
+            inside = path.resolve().is_relative_to(root)
+        except OSError:
+            inside = False
+        if not inside:
+            raise PermissionError(
+                f"refusing to delete {path}: it is outside the download folder")
+        if not path.exists():
+            return []
+        if path.is_dir():
+            return [p for p in sorted(path.rglob("*"),
+                                      key=lambda q: len(q.parts), reverse=True)
+                    if p.is_file() or p.is_dir()]
+        targets = [path]
+        for suffix in self.SIDECAR_SUFFIXES:
+            sidecar = path.with_name(path.stem + suffix)
+            if sidecar.exists() and sidecar.is_file() and sidecar != path:
+                targets.append(sidecar)
+        return targets
+
+    def delete_job(self, job_id: str) -> dict:
+        """Delete one download: its file, its sidecars, and its row.
+
+        Refuses while the job is still running (cancel first) and for files
+        that live outside the download folder — deleting is one-way, so the
+        refusal is the feature.
+        """
+        try:
+            job = self.get(job_id)
+        except KeyError:
+            raise KeyError(job_id) from None
+        status = job.get("status")
+        if status in ("queued", "downloading", "merging"):
+            raise ValueError("cancel this download before deleting it")
+        targets = self._job_file_targets(job)
+        deleted = freed = 0
+        for p in targets:
+            try:
+                if p.is_dir():
+                    p.rmdir()
+                else:
+                    freed += p.stat().st_size
+                    p.unlink()
+                    deleted += 1
+            except OSError:
+                pass
+        with self._lock:
+            self._jobs.pop(job_id, None)
+            with self._con:
+                self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        return {"deleted": deleted, "freed_bytes": freed,
+                "filepath": job.get("filepath")}
+
     def resume_interrupted(self) -> list[str]:
         """Re-queue jobs marked 'interrupted' (e.g. killed mid-download).
 

@@ -131,7 +131,8 @@ class MainActivity : AppCompatActivity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
-    /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl}. */
+    /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl,
+     *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed}. */
     inner class HostBridge {
         @JavascriptInterface
         fun quit() {
@@ -185,6 +186,11 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun deleteMediaCopies(): Int =
             MediaLibrary.deleteOwnCopies(this@MainActivity)
+
+        /** The trash button on one row: only that download's library copy. */
+        @JavascriptInterface
+        fun deleteMediaNamed(name: String?): Int =
+            MediaLibrary.deleteOwnCopiesNamed(this@MainActivity, name)
     }
 
     private fun toast(msg: String) {
