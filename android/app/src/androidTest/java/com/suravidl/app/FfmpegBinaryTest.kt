@@ -111,9 +111,13 @@ class FfmpegBinaryTest {
         if (!Python.isStarted()) Python.start(AndroidPlatform(ctx))
         val py = Python.getInstance()
         val ydlClass = py.getModule("yt_dlp").get("YoutubeDL")!!
-        val ydl = ydlClass.call(mapOf(
-            "ffmpeg_location" to System.getenv("SURAVIDL_FFMPEG"),
-            "quiet" to true))
+        // a Kotlin Map crosses into Python as a java.util.LinkedHashMap, and
+        // yt-dlp calls params.get(key, default) — which Java maps refuse. Let
+        // Python build the dict from JSON instead.
+        val loc = System.getenv("SURAVIDL_FFMPEG").replace("\\", "\\\\")
+        val opts = py.getModule("json").callAttr(
+            "loads", """{"ffmpeg_location": "$loc", "quiet": true}""")
+        val ydl = ydlClass.call(opts)
         val versions = py.getModule("yt_dlp.postprocessor.ffmpeg")
             .get("FFmpegPostProcessor")!!
             .callAttr("get_versions_and_features", ydl).asList()[0].asMap()
