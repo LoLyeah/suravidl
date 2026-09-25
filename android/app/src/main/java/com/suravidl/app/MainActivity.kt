@@ -31,6 +31,13 @@ import kotlin.concurrent.thread
 class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
 
+    /** Set once the engine's UI is on screen: a shared link can only be handed
+     *  to a page that exists yet. */
+    private var pageLoaded = false
+
+    /** A link shared from another app, waiting for the UI to be ready. */
+    private var pendingSharedUrl: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Android 15+ always draws edge-to-edge. Apply the system bar insets
@@ -40,9 +47,15 @@ class MainActivity : AppCompatActivity() {
         webView = WebView(this)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
-        webView.webViewClient = WebViewClient()
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                pageLoaded = true
+                deliverSharedUrl()      // a link shared while the UI was loading
+            }
+        }
         webView.setBackgroundColor(BG_DARK)
         webView.addJavascriptInterface(HostBridge(), "AndroidHost")
+        pendingSharedUrl = sharedUrlFrom(intent)
 
         val root = FrameLayout(this)
         root.setBackgroundColor(BG_DARK)
@@ -129,6 +142,38 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    }
+
+    /**
+     * A second share while the app already runs arrives here (the activity is
+     * singleTask: sharing brings the existing window forward instead of
+     * starting a second engine).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val shared = sharedUrlFrom(intent) ?: return
+        pendingSharedUrl = shared
+        deliverSharedUrl()
+    }
+
+    /**
+     * Hand a shared link to the UI, which prefills the URL box and probes it —
+     * the user still picks the format, exactly as with a pasted link. Waits
+     * for the page: giving the URL to a WebView that has no page would drop
+     * it on the floor.
+     */
+    private fun deliverSharedUrl() {
+        val url = pendingSharedUrl ?: return
+        if (!pageLoaded) return
+        pendingSharedUrl = null
+        // a real event worth a line in the log: "why didn't my share arrive?"
+        LogStore.write(this, "share.log", "shared link: $url")
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.suravidlShared && window.suravidlShared(${JSONObject.quote(url)})",
+                null)
+        }
     }
 
     /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl,
@@ -334,5 +379,60 @@ class MainActivity : AppCompatActivity() {
         const val BG_LIGHT = 0xFFEEF1F7.toInt()
         const val BG_AMOLED = 0xFF000000.toInt()
         private const val REQUEST_COOKIES = 4101
+
+        /** "https://…" / "http://…", the leading scheme is optional. */
+        private val URL_RE = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE)
+
+        /** A bare host with a TLD, e.g. youtu.be/x or www.example.com/a?b=c —
+         *  the trailing label may carry digits so "clip.mp4" is matched WHOLE
+         *  and can then be rejected as a file name rather than a host. */
+        private val BARE_HOST_RE = Regex(
+            """(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z](?:[a-z0-9-]*[a-z0-9])?(?::\d+)?(?:/[^\s<>"']*)?""",
+            RegexOption.IGNORE_CASE)
+
+        /** Trailing punctuation that belongs to the sentence, not the URL. */
+        private const val TRAILING = ".,;:!?)]}\u00bb\"'"
+
+        /** File extensions that look like a TLD but are not one ("clip.mp4"). */
+        private val FILE_EXT = setOf(
+            "mp4", "mp3", "m4a", "m4v", "webm", "mkv", "mov", "avi", "pdf", "jpg",
+            "jpeg", "png", "gif", "webp", "txt", "zip", "rar", "apk", "csv",
+        )
+
+        /**
+         * The link inside a text shared from another app, or null.
+         *
+         * Shares arrive wrapped: "Title – https://…", "Try this https://… !",
+         * sometimes just "youtu.be/xyz". Pure on purpose, so a test can point
+         * every shape at it without an engine or a UI.
+         */
+        fun sharedUrlFrom(intent: Intent?): String? {
+            if (intent == null || intent.action != Intent.ACTION_SEND) return null
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+            if (text.isEmpty()) return null
+            return firstUrlIn(text)
+        }
+
+        fun firstUrlIn(text: String): String? {
+            URL_RE.find(text)?.let { return clean(it.value) }
+            // No scheme: accept a bare host, but only a plausible one — not a
+            // word inside an e-mail address or a file name.
+            for (match in BARE_HOST_RE.findAll(text)) {
+                val before = text.getOrNull(match.range.first - 1)
+                if (before != null &&
+                    (before == '@' || before.isLetterOrDigit() || before == '-' ||
+                     before == '.')) continue
+                val candidate = clean(match.value)
+                val host = candidate.substringBefore('/').substringBefore(':')
+                val tld = host.substringAfterLast('.').lowercase()
+                if (!host.contains('.') || host.startsWith('.') || host.endsWith('.')) continue
+                if (tld in FILE_EXT) continue
+                return "https://$candidate"
+            }
+            return null
+        }
+
+        private fun clean(raw: String): String =
+            raw.trimEnd { it in TRAILING }
     }
 }

@@ -1270,6 +1270,17 @@ async function testCookies() {
 }
 $("testCookies").onclick = testCookies;
 
+/* ---------- share target (Android): a link from another app --------------- */
+/** MainActivity hands a shared link here once the UI is on screen: prefill the
+ *  box and probe it. The format stays the user's choice, exactly like a paste. */
+window.suravidlShared = (url) => {
+  if (!url || typeof url !== "string") return;
+  showTab("download");
+  $("url").value = url.trim();
+  doProbe();
+  toast("shared link ready — pick a format");
+};
+
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });

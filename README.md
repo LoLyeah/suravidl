@@ -100,6 +100,8 @@ Build with `gradle -p android assembleDebug` (needs the Android SDK; CI does
 it in `android.yml`). The emulator instrumentation test proves the real
 engine downloads over HTTP on-device (`EngineDownloadTest`) and that the full
 app boot path works (`AppStartupTest`: MainActivity → EngineService → /health).
+Sharing a link from another app lands in the download box (`ShareTargetTest`):
+prefilled and probed, format picking unchanged.
 
 - **16 KB page size devices** (Android 15+): native libs ship 16 KB-aligned
   (Chaquopy 17); CI verifies ELF alignment in the release APK and runs the
@@ -275,8 +277,11 @@ repo has no pydantic-core.
       Authentication gained **Test cookies** — which reads the cookies file
       (count, domains, expiry, never a value) and, with a URL, proves it with
       a real extraction instead of guessing.
-- [ ] M19 — Android share-target: share a link from any app straight into
-      suravidl, so a phone download starts without copy-paste.
+- [x] **M19 — Android share-target**: share a link from any app straight into
+      suravidl. The activity is `singleTask`, so a share raises the running
+      window instead of starting a second engine, and the link is handed to
+      the UI (`window.suravidlShared`) only once the page is up — prefilled
+      and probed, never downloaded behind the user's back.
 
 ## API (v0.1)
 

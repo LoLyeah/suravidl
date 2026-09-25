@@ -278,4 +278,15 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     plus a real extraction as proof, values never leave the engine).
     UI: quality picks under the probe box, Retries/Playlist-limit fields,
     Test-cookies button with an inline verdict.
-  - Next up: M19 — Android share-target (share a link into suravidl).
+  - **v0.20.0 — M19 (Android share-target):** "Share → suravidl" from any app
+    that shares a link (YouTube, Chrome, a browser). The activity is
+    `singleTask`: a share raises the existing window — no second engine, no
+    second WebView — and a share that arrives before the UI is up waits for
+    `onPageFinished` instead of being dropped. The link is extracted from
+    whatever the share sheet sends (`Title — https://…`, a bare `youtu.be/x`,
+    punctuation trimmed; an address or a `clip.mp4` is not a link) and handed
+    to the UI by `window.suravidlShared(url)`, which switches to Download,
+    prefills the box, probes and says so — the format stays the user's choice,
+    exactly like a paste. Delivery writes one line to `share.log` so a share
+    that "did nothing" is diagnosable from the phone.
+  - Next up: M20 — (open) playlist browsing UI, per-site format memory.

@@ -144,3 +144,16 @@ def test_app_js_wires_the_minimal_inline_ids():
     # the list must come from the engine, never hard-coded here
     assert "height<=1080" not in js
     assert "setRetries" in js and "setMaxDownloads" in js
+
+
+def test_app_js_accepts_a_shared_link_from_android():
+    """M19: MainActivity calls window.suravidlShared(url) once the page is up.
+    The hook must prefill and probe — never auto-download (the format is the
+    user's choice, same as a paste)."""
+    js = _app_js()
+    assert "window.suravidlShared" in js
+    hook = js.split("window.suravidlShared", 1)[1].split("/* ---------- boot", 1)[0]
+    assert 'showTab("download")' in hook
+    assert "$(\"url\").value" in hook and "doProbe()" in hook
+    # no job is started behind the user's back
+    assert "startJob" not in hook and 'api("/jobs"' not in hook
