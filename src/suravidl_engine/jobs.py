@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import uuid
@@ -36,6 +37,25 @@ ACTIVE_STATUSES = ("queued", "downloading", "merging")
 ALLOWED_HEADER_KEYS = {"cookie", "user-agent", "referer", "origin",
                        "accept", "accept-language"}
 
+# Cookie values are never written to disk: the live value stays in memory for
+# the running job (and in-session retries); anything persisted is redacted.
+REDACTED = "<redacted>"
+
+
+def _redacted_headers(h: dict | None) -> dict | None:
+    if not h:
+        return None
+    return {k: (REDACTED if str(k).lower() == "cookie" else v)
+            for k, v in h.items()}
+
+
+def redact_job(job: dict) -> dict:
+    """Copy of a job safe to send to clients / store: cookie values removed."""
+    out = dict(job)
+    if out.get("headers"):
+        out["headers"] = _redacted_headers(out["headers"])
+    return out
+
 
 def _safe_headers(h: dict | None) -> dict | None:
     if not h:
@@ -54,7 +74,13 @@ class JobManager:
         # one shared connection: with :memory: each connect() would be a fresh db
         self._db_lock = threading.Lock()
         self._con = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._con.execute("PRAGMA secure_delete=ON")  # scrubbed rows leave no bytes
         self._con.row_factory = sqlite3.Row
+        if self.db_path != ":memory:":
+            try:
+                os.chmod(self.db_path, 0o600)  # job history is private
+            except OSError:
+                pass
         self._jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
         # adaptive concurrency gate: capacity can change at runtime
@@ -70,25 +96,56 @@ class JobManager:
 
     # -- persistence -------------------------------------------------------
     def _init_db(self):
-        with self._db_lock, self._con:
-            self._con.executescript(_SCHEMA)
-            # lightweight migration for dbs created before the headers column
-            cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
-            if "headers" not in cols:
-                self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
-            # crash recovery: anything active when we died is interrupted
-            self._con.execute(
-                "UPDATE jobs SET status='interrupted', "
-                "error='engine restarted before job finished' "
-                "WHERE status IN (?, ?, ?)", ACTIVE_STATUSES,
-            )
+        with self._db_lock:
+            with self._con:
+                self._con.executescript(_SCHEMA)
+                # lightweight migration for dbs created before the headers column
+                cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
+                if "headers" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
+                # scrub cookie values persisted by earlier versions
+                scrubbed = self._scrub_persisted_cookies()
+                # crash recovery: anything active when we died is interrupted
+                self._con.execute(
+                    "UPDATE jobs SET status='interrupted', "
+                    "error='engine restarted before job finished' "
+                    "WHERE status IN (?, ?, ?)", ACTIVE_STATUSES,
+                )
+            if scrubbed:
+                # rewrite the file so the old bytes are gone, not just the row
+                self._con.execute("VACUUM")
             for row in self._con.execute("SELECT * FROM jobs"):
                 self._jobs[row["id"]] = self._row_to_job(row)
+
+    def _scrub_persisted_cookies(self) -> bool:
+        """Redact cookie values already in old rows. True if anything changed."""
+        changed = False
+        for row in self._con.execute(
+                "SELECT id, headers FROM jobs WHERE headers IS NOT NULL"):
+            try:
+                h = json.loads(row["headers"])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(h, dict):
+                continue
+            if any(str(k).lower() == "cookie" and v != REDACTED
+                   for k, v in h.items()):
+                self._con.execute("UPDATE jobs SET headers=? WHERE id=?",
+                                  (json.dumps(_redacted_headers(h)), row["id"]))
+                changed = True
+        return changed
 
     @staticmethod
     def _row_to_job(row: dict) -> dict:
         job = dict(row)
-        job["headers"] = json.loads(job["headers"]) if job.get("headers") else None
+        h = json.loads(job["headers"]) if job.get("headers") else None
+        if h:
+            # a redacted cookie on disk is no cookie at all — never send the
+            # placeholder to yt-dlp
+            h = {k: v for k, v in h.items()
+                 if not (str(k).lower() == "cookie" and v == REDACTED)}
+            h = h or None
+        job["headers"] = h
         job["progress"] = {
             "downloaded_bytes": job.get("downloaded_bytes") or 0,
             "total_bytes": job.get("total_bytes"),
@@ -111,7 +168,8 @@ class JobManager:
                 " eta=excluded.eta, completed_at=excluded.completed_at",
                 (
                     job["id"], job["url"], job.get("fmt"),
-                    json.dumps(job["headers"]) if job.get("headers") else None,
+                    json.dumps(_redacted_headers(job["headers"]))
+                    if job.get("headers") else None,
                     job["status"], job.get("title"), job.get("filepath"),
                     job.get("error"),
                     job["progress"]["downloaded_bytes"],

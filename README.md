@@ -142,6 +142,12 @@ repo has no pydantic-core.
       picker) and "use cookies from <browser>" (desktop); cookies are copied
       per run so yt-dlp's refresh can never corrupt or race your export;
       sign-in errors in the UI now point at Settings → Authentication
+- [x] M10a — cookie safety: cookie values are never persisted (redacted at
+      rest and in API payloads; live value is memory-only), private file modes
+      (jobs.db / settings / token 0600, dirs 0700, per-run copies 0600 and
+      deleted), rows from older versions scrubbed on start
+- [ ] M10b+ — plan for the rest: full yt-dlp coverage (361 options, three
+      tiers), Keystore encryption, tabbed UI → `docs/PLAN-full-ytdlp.md`
 
 ## API (v0.1)
 

@@ -1,5 +1,6 @@
 """User-tunable settings, persisted as JSON next to the jobs db."""
 import json
+import os
 from pathlib import Path
 
 DEFAULTS = {
@@ -96,3 +97,7 @@ class Settings:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self._data, indent=2),
                              encoding="utf-8")
+        try:
+            os.chmod(self.path, 0o600)  # holds cookie paths & prefs, not public
+        except OSError:
+            pass

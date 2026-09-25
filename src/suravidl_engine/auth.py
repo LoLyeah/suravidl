@@ -11,6 +11,7 @@ downloads would race (or a crash could truncate the user's export).
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -44,6 +45,7 @@ def cookie_session(settings: dict):
             workdir = Path(tempfile.mkdtemp(prefix="suravidl-ck-"))
             copy = workdir / "cookies.txt"
             shutil.copyfile(src, copy)
+            os.chmod(copy, 0o600)  # nobody but us reads the cookies
             opts["cookiefile"] = str(copy)
         browser = str(settings.get("cookies_from_browser") or "").strip()
         if browser:

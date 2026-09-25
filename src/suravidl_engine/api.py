@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from . import __version__
 from .auth import cookie_session
-from .jobs import JobManager
+from .jobs import JobManager, redact_job
 from .probe import probe
 
 
@@ -179,23 +179,23 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.post("/jobs")
     def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
-        return mgr.create(body.url, fmt=body.fmt, extra_headers=body.headers)
+        return redact_job(mgr.create(body.url, fmt=body.fmt, extra_headers=body.headers))
 
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):
-        return {"jobs": mgr.list()}
+        return {"jobs": [redact_job(j) for j in mgr.list()]}
 
     @app.get("/jobs/{job_id}")
     def get_job(job_id: str, mgr: JobManager = Depends(require_auth)):
         try:
-            return mgr.get(job_id)
+            return redact_job(mgr.get(job_id))
         except KeyError:
             raise HTTPException(status_code=404, detail="job not found") from None
 
     @app.post("/jobs/{job_id}/cancel")
     def cancel_job(job_id: str, mgr: JobManager = Depends(require_auth)):
         try:
-            return mgr.cancel(job_id)
+            return redact_job(mgr.cancel(job_id))
         except KeyError:
             raise HTTPException(status_code=404, detail="job not found") from None
         except ValueError as e:
@@ -204,7 +204,7 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.post("/jobs/{job_id}/retry")
     def retry_job(job_id: str, mgr: JobManager = Depends(require_auth)):
         try:
-            return mgr.retry(job_id)
+            return redact_job(mgr.retry(job_id))
         except KeyError:
             raise HTTPException(status_code=404, detail="job not found") from None
         except ValueError as e:

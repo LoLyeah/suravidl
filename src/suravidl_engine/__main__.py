@@ -5,6 +5,7 @@ headless server, or a Linux frozen build without GTK bindings).
 Runnable as `python -m suravidl_engine` or as a PyInstaller-frozen binary.
 """
 import argparse
+import os
 import secrets
 import socket
 import sys
@@ -38,14 +39,25 @@ def token_path() -> Path:
 
 def load_or_create_token() -> str:
     p = token_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    _harden(p.parent, 0o700)
     if p.exists():
         t = p.read_text(encoding="utf-8").strip()
         if t:
+            _harden(p, 0o600)
             return t
     t = secrets.token_hex(16)
-    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(t, encoding="utf-8")
+    _harden(p, 0o600)
     return t
+
+
+def _harden(path: Path, mode: int) -> None:
+    """Best-effort chmod: the token and its directory are for us only."""
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
 
 
 def start_server(download_dir, token: str, port: int, db_path=None,
