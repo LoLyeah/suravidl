@@ -228,3 +228,8 @@ node --check src/suravidl_engine/web/app.js
   other way in: sign in *there* and its cookies are the ones handed to the
   engine. It borrows the phone's Android System WebView, so nothing
   Chromium-sized ships in the APK.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). The privacy policy and the store details are in
+[docs/PRIVACY.md](docs/PRIVACY.md) and [docs/AMO-SUBMISSION.md](docs/AMO-SUBMISSION.md).
