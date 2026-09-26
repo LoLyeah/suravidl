@@ -572,3 +572,19 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     directly above a Settings tab — one entry point now — and "Update yt-dlp"
     moved into the yt-dlp tab, which shows the installed version beside it and
     refreshes the label after an update. Suite: **366 passed**.
+
+- **v0.23.5 — the phone stops behaving like a web page.**
+    "When clicking any button on android, there's always ugly blue square
+    opacity, and I can copy every text." Both were WebView defaults we had
+    never overridden. The flash is the WebView's own highlight plate
+    (`-webkit-tap-highlight-color`): it ignores border-radius and our colours
+    and lands on whatever is tapped — now transparent, with the app's own
+    `:active` press states (extended to tabs, sub-tabs and option rows) doing
+    the feedback instead. Selection: `user-select: none` on the chrome and
+    `text` on inputs/textareas/selects, with a `.selectable` hook plus `.msg`
+    (an error line is worth copying). `touch-action: manipulation` on controls
+    so the first tap is never spent as a double-tap-zoom probe. And the
+    "always" part: `:hover` styles latch on a touch screen, leaving a faint
+    blue tint stuck on the last-tapped button — all ten hover rules now live
+    inside `@media (hover: hover)`, so they exist only where a real pointer
+    does. Suite: **370 passed**.
