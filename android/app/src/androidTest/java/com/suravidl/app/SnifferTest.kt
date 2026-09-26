@@ -203,6 +203,7 @@ class SnifferTest {
         val server = FixtureServer().start()
         SniffLog.clear()
         try {
+            wakeScreen()
             ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
                 .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -215,7 +216,8 @@ class SnifferTest {
                        SniffLog.snapshot().any { it.url.endsWith("/bare.mp4") })
 
             // Exactly what "Open in the browser ↗" does for a second link — the
-            // activity is singleTask, so this is delivered as onNewIntent.
+            // activity is singleTask, so this arrives as onNewIntent.
+            wakeScreen()
             ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
                 .putExtra(BrowserActivity.EXTRA_URL, server.url("/second.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -227,11 +229,57 @@ class SnifferTest {
             }
             assertTrue("a second link never reached the browser that was already open — " +
                        "singleTask without onNewIntent drops it silently, so the user keeps " +
-                       "scanning the previous page: " + dump(SniffLog.snapshot()),
+                       "scanning the previous page. Browser: " + browserState() + " | finds: " +
+                       dump(SniffLog.snapshot()),
                        SniffLog.snapshot().any { it.url.endsWith("/second.mp4") })
         } finally {
             server.stop()
         }
+    }
+
+    /**
+     * A stopped activity is only handed a new intent when it comes back to the
+     * foreground, and an emulator with its screen off resumes nothing: this test
+     * failed on API 30 while the 16 KB API 36 image passed, and the difference
+     * was the screen, not the fix. A user looking at the phone is awake.
+     */
+    private fun wakeScreen() {
+        val inst = InstrumentationRegistry.getInstrumentation()
+        for (cmd in listOf("input keyevent KEYCODE_WAKEUP", "wm dismiss-keyguard")) {
+            try {
+                inst.uiAutomation.executeShellCommand(cmd).close()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** lifecycle stage + the page the live browser is showing — without this a
+     *  failure says only "nothing arrived", not whether it was delivered. */
+    private fun browserState(): String {
+        val inst = InstrumentationRegistry.getInstrumentation()
+        var out = "no BrowserActivity"
+        inst.runOnMainSync {
+            for (stage in listOf(Stage.RESUMED, Stage.STARTED, Stage.PAUSED)) {
+                val acts = ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(stage).filterIsInstance<BrowserActivity>()
+                if (acts.isNotEmpty()) {
+                    out = "$stage url=" + (findWebView(acts.first().window.decorView)?.url
+                                           ?: "(no webview)")
+                    break
+                }
+            }
+        }
+        return out
+    }
+
+    private fun findWebView(v: View): android.webkit.WebView? {
+        if (v is android.webkit.WebView) return v
+        if (v is android.view.ViewGroup) {
+            for (i in 0 until v.childCount) {
+                findWebView(v.getChildAt(i))?.let { return it }
+            }
+        }
+        return null
     }
 
     /** Looks the tag up in the running BrowserActivity's view tree, on main. */
