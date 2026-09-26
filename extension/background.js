@@ -29,8 +29,24 @@ function prune(reqHeaders) {
   return Object.fromEntries(entries);
 }
 
+// Storage is read-modify-write, and three media requests can land in the same
+// tick — a player asks for its manifest and its first fragments together. So
+// every write is chained: without it the last writer wins and finds disappear
+// (found the hard way, by the Node harness in extension/test_harness.mjs).
+let storageChain = Promise.resolve();
+function update(mutate) {
+  storageChain = storageChain
+    .then(() => new Promise((resolve) => {
+      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, (data) => {
+        chrome.storage.local.set(mutate(data) || {}, resolve);
+      });
+    }))
+    .catch(() => {});
+  return storageChain;
+}
+
 function remember(tabId, url) {
-  chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, ({ tabMedia, reqHeaders }) => {
+  update(({ tabMedia, reqHeaders }) => {
     const list = tabMedia[tabId] || [];
     let added = false;
     if (!list.some((m) => m.url === url)) {
@@ -38,13 +54,10 @@ function remember(tabId, url) {
       tabMedia[tabId] = list.slice(-KEEP_PER_TAB);
       added = true;
     }
-    const write = { tabMedia };
-    if (added) write.reqHeaders = prune(reqHeaders);
-    chrome.storage.local.set(write, () => {
-      if (added && action && action.setBadgeText) {
-        action.setBadgeText({ tabId, text: String(tabMedia[tabId].length) });
-      }
-    });
+    if (added && action && action.setBadgeText) {
+      action.setBadgeText({ tabId, text: String(tabMedia[tabId].length) });
+    }
+    return added ? { tabMedia, reqHeaders: prune(reqHeaders) } : { tabMedia };
   });
 }
 
@@ -80,9 +93,9 @@ function captureHeaders(url, reqHeaders) {
     }
   }
   if (!Object.keys(pick).length) return;
-  chrome.storage.local.get({ reqHeaders: {} }, ({ reqHeaders: store }) => {
+  update(({ reqHeaders: store }) => {
     store[url] = { headers: pick, at: Date.now() };
-    chrome.storage.local.set({ reqHeaders: prune(store) });
+    return { reqHeaders: prune(store) };
   });
 }
 

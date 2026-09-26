@@ -679,3 +679,19 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     row (masked, with Copy): the extension needs that token, and a phone cannot
     read `~/.suravidl/token` — which is exactly the gap the row closes.
     Suite: **417 passed**; the extension is at its own version 0.5.0.
+
+- **v0.24.4 — the extension harness, and the race it caught on its first run.**
+    M4 shipped with the extension's new logic asserted *statically* (string
+    checks in pytest), which is thin for the one shell no emulator can host. So
+    `extension/test_harness.mjs` loads the real `background.js` into Node with
+    just enough `chrome` to be honest — storage, three webRequest listeners, a
+    badge — fires it with realistic requests, and asserts what gets remembered,
+    what gets captured, and what the engine is asked. `tests/test_extension_runtime.py`
+    runs it, and it is part of the suite.
+    Its first run found a real bug: `remember()` and `captureHeaders()` were
+    read-modify-write against `chrome.storage.local`, and a player that asks for
+    its manifest and its first fragments *in the same tick* lost finds — the last
+    writer won. Writes are now chained (`update()`), the badge follows every
+    find, and the harness keeps three same-tick finds as a regression test.
+    Verified: extension runtime checks ✅, suite **418 passed**, CI ✅.
+    Extension: 0.5.1.
