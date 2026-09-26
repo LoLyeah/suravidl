@@ -50,7 +50,8 @@ def test_index_has_new_controls(tmp_path):
                     "setSubLangs", "setSubAuto", "setSbMode", "setSbCats",
                     "setArchive", "setFragments", "setRateLimit", "setProxy",
                     "setRawEnabled", "setRawArgs", "optionsBtn",
-                    "optionsSearch", "optionsList", "optionsCount"):
+                    "optionsSearch", "optionsList", "optionsCount",
+                    "sniffRow", "sniffBtn"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

@@ -30,6 +30,13 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- the in-app browser: a plain WebView with a sniffer attached, for
+             pages whose player yt-dlp cannot extract. Not exported: it is
+             opened from inside the app (and by its own tests). -->
+        <activity android:name=".BrowserActivity" android:exported="false"
+            android:label="suravidl — find a video"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
         <service
             android:name=".EngineService"
             android:exported="false"

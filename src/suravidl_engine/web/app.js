@@ -1470,6 +1470,15 @@ async function initAppControls() {
     const imp = $("importCookies");
     imp.classList.remove("hidden");
     imp.onclick = () => window.AndroidHost.pickCookiesFile();
+    // a page yt-dlp has no extractor for still has a player: this opens our own
+    // browser with a sniffer attached (Android has no extensions — the browser
+    // *is* the extension). Hidden on any host that cannot do it.
+    if (window.AndroidHost.openBrowser) {
+      $("sniffRow").classList.remove("hidden");
+      $("sniffBtn").onclick = () => {
+        try { window.AndroidHost.openBrowser(($("url").value || "").trim()); } catch (_) { }
+      };
+    }
     initVaultSection();
     initStorageSection();
     return;

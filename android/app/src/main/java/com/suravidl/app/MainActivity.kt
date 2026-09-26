@@ -381,6 +381,30 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        /**
+         * Open the in-app browser on a page, so its streams can be sniffed.
+         *
+         * The entry point for "this site has no extractor but it does have a
+         * player" (v0.24.1, M2 of the capture plan). An empty address is fine:
+         * the browser shows its own "type an address" start page.
+         */
+        @JavascriptInterface
+        fun openBrowser(url: String?) {
+            val target = url?.trim().orEmpty()
+            if (target.isNotEmpty() && !target.startsWith("http://") &&
+                !target.startsWith("https://")) return
+            runOnUiThread {
+                try {
+                    startActivity(Intent(this@MainActivity, BrowserActivity::class.java)
+                        .putExtra(BrowserActivity.EXTRA_URL, target))
+                } catch (t: Throwable) {
+                    LogStore.write(this@MainActivity, "browser-open.log",
+                                   "browser failed to open: ${t.message}")
+                    toast("could not open the browser")
+                }
+            }
+        }
+
         /** Play a finished download: Android/data is invisible to file
          *  managers, but a provider grant lets the video player read it. */
         @JavascriptInterface
