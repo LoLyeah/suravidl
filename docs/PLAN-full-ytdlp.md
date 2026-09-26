@@ -699,7 +699,7 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
 - **v0.24.5 — an independent audit, confirmed finding by finding.** The whole
     capture arc (engine `/classify` + `/sniff/rank`, the extension, the Android
     in-app browser, their tests) was handed to Google Antigravity, read-only,
-    which returned 15 findings in 21 KB. Nothing was taken on trust: each was
+    which returned 15 findings in 20 KB. Nothing was taken on trust: each was
     reproduced against the real code path before anything changed, two were
     **downgraded with reasons** (the "hostile page evals JS" finding reaches no
     privilege the page didn't already have; the "/classify SSRF" has no

@@ -3,7 +3,7 @@
 **What this is.** The v0.24.4 tree was handed to an independent agent (Google
 Antigravity CLI, `agy 1.2.11`, headless, read-only brief) covering the whole
 sniffing arc — engine `classify`/`rank`, the MV3 extension, the Android
-in-app browser, and their tests. It wrote a 21 KB report, 15 findings.
+in-app browser, and their tests. It wrote a 20 KB report, 15 findings.
 
 **What was done with it.** Nothing was taken on trust, and two findings were
 **downgraded with reasons** (1 and 3) rather than fixed as reported. Each
