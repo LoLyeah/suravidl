@@ -96,12 +96,15 @@ jobs:
           mv extension.crx suravidl-extension-chrome.crx
           # Firefox build dir: MV2 manifest + shared files
           rm -rf /tmp/ffext && cp -r extension /tmp/ffext
-          rm -rf /tmp/ffext/firefox
+          # the shop window is not the workshop: the test harness and the
+          # other browser's manifest stay out of both submitted packages
+          rm -rf /tmp/ffext/firefox /tmp/ffext/test_harness.mjs
           cp extension/firefox/manifest.json /tmp/ffext/manifest.json
           # unsigned xpi (stable Firefox needs an AMO-signed build to install)
           (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox.xpi" .)
           # load-unpacked convenience zips
-          (cd extension && zip -qr "$OLDPWD/suravidl-extension-chrome.zip" . -x "firefox/*")
+          (cd extension && zip -qr "$OLDPWD/suravidl-extension-chrome.zip" . \
+              -x "firefox/*" -x "test_harness.mjs")
           (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox-src.zip" .)
           # sanity: crx3 magic
           head -c 4 suravidl-extension-chrome.crx | grep -q "Cr24"

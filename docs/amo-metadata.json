@@ -1,0 +1,22 @@
+{
+  "summary": {
+    "en-US": "Send videos from any page to your own suravidl engine — a self-hosted downloader that runs on your computer."
+  },
+  "description": {
+    "en-US": "suravidl watches the pages you are on, finds the video or audio playing there, and hands the one you pick to the suravidl engine running on your own machine.\n\nThere is no suravidl service. The engine is a small self-hosted app (desktop app, pip package or Android app — all free and open source) that does the actual downloading with yt-dlp: 1000+ supported sites, playlists, audio-only, subtitles, quality selection, a queue, and a history you can retry or delete.\n\nHow to use it:\n1. Install and start the suravidl engine on your computer. It listens on http://127.0.0.1:8787 and prints an access token.\n2. Paste that token into this extension's options page (the engine address too, if you changed it).\n3. Play a video, click the toolbar icon, and pick it from the list. streams the page keeps hidden behind a JavaScript player are found too — including ones with no file extension, on another host.\n\nWhat it does not do: DRM. Widevine, FairPlay and Netflix-style encrypted streams are detected and reported as such, and never downloaded. That is a deliberate limit, not an oversight.\n\nPrivacy: the extension talks only to the engine address you configure. No analytics, no accounts, nothing sent to the project or anyone else."
+  },
+  "categories": [
+    "download-management",
+    "photos-music-videos"
+  ],
+  "homepage": "https://github.com/LoLyeah/suravidl",
+  "support_url": "https://github.com/LoLyeah/suravidl/issues",
+  "privacy_policy": {
+    "en-US": "https://github.com/LoLyeah/suravidl/blob/main/docs/PRIVACY.md"
+  },
+  "version": {
+    "license": "MIT",
+    "compatibility": ["firefox"],
+    "approval_notes": "This extension is the companion to a self-hosted downloader; it has no server of its own and no accounts.\n\nHOW TO TEST: install and run the suravidl engine from https://github.com/LoLyeah/suravidl (release binaries for Linux/Windows/macOS, a pip package, or the Android app). The engine listens on http://127.0.0.1:8787 and writes an access token to ~/.suravidl/token — the app's Settings page shows the same token. Paste it into the extension's Options page (right-click the toolbar icon, or the link in the popup). Then open any page with a video, click the toolbar icon, and the media detected on the current tab is listed; \"Send\" passes the URL, cookies, user agent and the referer of the frame that carried it to the local engine, which downloads it. Without the engine running the popup says the engine is offline; that is expected and there is nothing to configure to make it work online.\n\nPERMISSIONS: webRequest/webRequestBlocking are used to observe media responses (never to modify or block anything) so that a stream the page keeps behind a JavaScript player — an HLS/DASH manifest, or a file with no extension on another host — can be reported next to plain video files. <all_urls> is required because a video can be on any site; the extension only reads request URLs and media elements, and sends them to the user's own localhost engine when the user clicks Send.\n\nSOURCE: the repository is public and the shipped package is unmodified source (no build step, no bundler, no remote code): https://github.com/LoLyeah/suravidl — extension/ directory; the Firefox package is extension/* plus extension/firefox/manifest.json.\n\nDATA: no analytics, no telemetry, no third-party endpoints. Storage is limited to the engine address, token and preferences."
+  }
+}

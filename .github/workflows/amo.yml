@@ -1,0 +1,89 @@
+name: amo
+
+# Submits the Firefox package to addons.mozilla.org through web-ext.
+#
+# It needs two repository secrets — AMO_JWT_ISSUER and AMO_JWT_SECRET — from
+# the AMO Developer Hub (see docs/AMO-SUBMISSION.md). Without them the job
+# says so and stops before touching anything.
+#
+# Runs on every v* tag (an update of a listed add-on is submitted for review
+# the same way the first version is) and on demand from the Actions tab.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Do we have AMO credentials?
+        run: |
+          if [ -z "$AMO_JWT_ISSUER" ]; then
+            echo "::warning title=AMO credentials missing::Add AMO_JWT_ISSUER and AMO_JWT_SECRET as repository secrets (Settings -> Secrets and variables -> Actions) to submit the Firefox add-on. See docs/AMO-SUBMISSION.md."
+          else
+            echo "credentials present — this run will submit the add-on to AMO"
+          fi
+
+      - name: Assemble the Firefox package
+        run: |
+          rm -rf /tmp/ffext && mkdir -p /tmp/ffext
+          cp -r extension/* /tmp/ffext/
+          # the shop window is not the workshop (same rule as the release job)
+          rm -rf /tmp/ffext/firefox /tmp/ffext/test_harness.mjs
+          cp extension/firefox/manifest.json /tmp/ffext/manifest.json
+          python3 - <<'PY'
+          import json
+          m = json.load(open("/tmp/ffext/manifest.json"))
+          g = m["browser_specific_settings"]["gecko"]
+          print(f"submitting {m['name']} {m['version']} as {g['id']} "
+                f"(min Firefox {g['strict_min_version']})")
+          PY
+
+      - name: Lint it the way Mozilla will
+        run: npx --yes web-ext@latest lint --source-dir /tmp/ffext --warnings-as-errors=false
+
+      - name: Submit to AMO
+        if: env.AMO_JWT_ISSUER != ''
+        run: |
+          set +e
+          npx --yes web-ext@latest sign \
+            --source-dir /tmp/ffext \
+            --channel listed \
+            --amo-metadata docs/amo-metadata.json \
+            --api-key "$AMO_JWT_ISSUER" \
+            --api-secret "$AMO_JWT_SECRET" \
+            --timeout 600000 \
+            --artifacts-dir /tmp/amo-artifacts 2>&1 | tee /tmp/amo-sign.log
+          status=${PIPESTATUS[0]}
+          echo "web-ext exit: $status"
+          # A listed submission ends up "awaiting review", and web-ext keeps
+          # polling for a signed file — so a first listing is expected to time
+          # out *after* the upload. The upload is what matters here; only fail
+          # on something that is neither a timeout-after-upload nor a success.
+          if [ "$status" -ne 0 ] && grep -qiE "uploaded|awaiting review|validation|submitted" /tmp/amo-sign.log; then
+            echo "::notice title=Submitted to AMO::The upload reached Mozilla; the CLI stopped waiting for a signature, which is normal while a listing is in review."
+            exit 0
+          fi
+          exit "$status"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amo-submission-log
+          path: |
+            /tmp/amo-sign.log
+            /tmp/amo-artifacts
+          if-no-files-found: warn
