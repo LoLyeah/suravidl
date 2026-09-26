@@ -63,6 +63,17 @@ class BrowserActivity : AppCompatActivity() {
     private var lastVersion = -1
     private var bg = MainActivity.BG_DARK
 
+    /**
+     * The page the captures belong to.
+     *
+     * A plain field, not `webView.url`: layer 1 runs on a WebView background
+     * thread, and *any* WebView method called off the main thread throws
+     * ("All WebView methods must be called on the same thread") — which is
+     * exactly how this bug reached CI the first time.
+     */
+    @Volatile
+    private var currentPage: String = ""
+
     private val ticker = object : Runnable {
         override fun run() {
             refreshIfChanged()
@@ -188,8 +199,9 @@ class BrowserActivity : AppCompatActivity() {
                 }
             }
             webViewClient = SnifferWebViewClient(
-                pageUrl = { this.url ?: "" },
+                pageUrl = { currentPage },
                 onPageStart = { url ->
+                    currentPage = url
                     if (!urlField.hasFocus()) urlField.setText(url)
                     SniffLog.clear()                    // a new page, new finds
                     refreshIfChanged()
@@ -258,6 +270,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private fun load(url: String) {
+        currentPage = url
         SniffLog.clear()
         refreshIfChanged()
         urlField.setText(url)
