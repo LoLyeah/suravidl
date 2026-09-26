@@ -2106,6 +2106,34 @@ renderWhere(CFG.downloadDir);
 wireCopyPath();
 initOverrides();
 $("presetSave").onclick = saveCurrentAsPreset;
+
+/* The token the extension needs. It is already in this page's source — the
+   engine inlines it so the UI can call its own API — so showing a masked copy
+   costs nothing and saves a trip to ~/.suravidl/token, which the phone cannot
+   make at all. Masked, because screenshots happen. */
+function wireToken() {
+  const el = $("apiToken");
+  if (!el) return;
+  const t = (CFG && CFG.token) || "";
+  el.textContent = t ? t.slice(0, 6) + "…" + t.slice(-4) : "not set";
+  const btn = $("copyToken");
+  if (btn) {
+    btn.onclick = () => {
+      const done = (ok) => {
+        btn.textContent = ok ? "Copied ✓" : "Select it above";
+        setTimeout(() => (btn.textContent = "Copy"), 1800);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(t).then(() => done(true), () => done(false));
+      } else {
+        done(false);
+      }
+    };
+  }
+  el.title = "send it as: Authorization: Bearer <token>";
+}
+
+wireToken();
 loadVersions();
 loadPresets();
 wireUpdateRow();

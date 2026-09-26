@@ -460,10 +460,16 @@
           <label class="lbl" for="setRateLimit">Speed limit</label>
           <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
         </div>
-        <div class="field">
+        <div class="field row">
           <label class="lbl" for="setProxy">Proxy</label>
           <input id="setProxy" type="text" spellcheck="false"
                  placeholder="socks5://127.0.0.1:1080 (blank = direct)"/>
+        </div>
+        <div class="field row">
+          <label class="lbl">API token</label>
+          <span id="apiToken" class="muted small mono">…</span>
+          <button id="copyToken" class="btn sm" type="button">Copy</button>
+          <span class="muted small">what the browser extension sends</span>
         </div>
       </div><!-- /spanel-network -->
 

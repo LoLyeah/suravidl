@@ -26,6 +26,10 @@ reviews: [docs/audits/](docs/audits/)
 - **Editable retries**: a failed job's settings load back into the form.
 - **Play it here**: finished downloads play in the page, no file hunting.
 - **Signed-in sites**: import a `cookies.txt`, or read cookies from a desktop browser.
+- **Pages yt-dlp cannot read**: the extension (desktop) and the in-app browser
+  (Android) watch a page as it plays, then hand the stream to the engine with the
+  page's own cookies — see [docs/SNIFFING.md](docs/SNIFFING.md) for what that
+  catches and what it deliberately does not.
 - Also: SponsorBlock, metadata/thumbnail embedding, speed limits, retries,
   per-download overrides and saved presets, auto-resume after a restart,
   Light/Dark/AMOLED themes, and a storage view with a guarded wipe.
@@ -67,7 +71,12 @@ badge shows how many videos were detected.
   *Load unpacked*, or pin the signed ID `habomdhpjdcddccplapkncnfokpknfle`.
   Firefox stable refuses unsigned `.xpi`; the release one works on Developer
   Edition/Nightly, or after signing on addons.mozilla.org.
-- Paste the engine token once in the extension's options page.
+- Paste the engine token once in the extension's options page — the engine's
+  **Settings → Network** shows it (masked, with a Copy button) if you don't want
+  to open `~/.suravidl/token`.
+- The media list it watches for comes from the engine (`GET /sniff/patterns`),
+  so a new format is an engine update, not an extension update; a response that
+  says `video/*` is picked up even when its URL looks like nothing.
 
 ## Desktop app
 
@@ -109,8 +118,33 @@ the active-download count) and the activity is a WebView kiosk of the engine UI.
   an older one gets a "update WebView" note instead of a blank page, since the
   UI's JavaScript needs Chrome 80.
 - Build: `gradle -p android assembleDebug` (needs the Android SDK; CI does it).
-  Emulator tests cover the on-device engine download, the full boot path, and
-  the share target.
+  Emulator tests cover the on-device engine download, the full boot path, the
+  share target, the sniffer browser, and the handoff.
+- **🔍 Find a video on a page** (Download tab) opens an in-app browser: play the
+  video for a second, tap **Scan**, then **Download** on what it found. It uses
+  the phone's own Android System WebView — nothing browser-sized ships in the
+  APK (~+17 KB) — and the finds come back with the page's cookies, its
+  User-Agent and the frame they came from, so guarded streams still work.
+
+## Pages yt-dlp cannot read
+
+Not every site is a yt-dlp site. Some hand the video to the player as a
+`blob:`/MSE stream, some only after a click, some behind a session or a
+same-origin iframe. For those, suravidl *watches the page* instead of parsing
+it — and the judgement about what it found stays in the engine, so every shell
+agrees on it:
+
+| where the video is | desktop | Android | CLI |
+| --- | --- | --- | --- |
+| a direct media URL (`.mp4`, `.m3u8`, `.mpd`) | paste it | paste or share it | `suravidl <url>` |
+| a site yt-dlp knows (1000+) | paste it | share it | `suravidl <url>` |
+| a plain `<video>` tag | paste it (generic extractor) | paste it | `suravidl <url>` |
+| a player that fetches its own stream (often JS-only, `blob:`/MSE) | extension: play, then *Download with suravidl* | **🔍 Find a video on a page** → play → **Scan** → **Download** | — |
+| DRM (Widevine, PlayReady, SAMPLE-AES) | detected and refused | detected and refused | detected and refused |
+| a `blob:` inside a *cross-origin* frame | extension sees the network request | network layer only | — |
+
+What all of that means in practice — including the parts that are deliberately
+not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 
 ## Updates
 
@@ -178,5 +212,12 @@ node --check src/suravidl_engine/web/app.js
   works only while the site still has it.
 - **MKV/WebM playback** depends on the device: Android and browsers vary, which
   is why remuxing to MP4 exists.
-- **Android logins** are cookie imports — there is no in-app browser to sign in
-  with (that would mean a 100 MB Chromium and constant anti-bot breakage).
+- **Capturing a JS-only player is not always possible.** A stream the browser
+  never sees as a URL (segment-only MSE, a `blob:` inside a cross-origin frame
+  on Android, live and growing HLS) cannot be handed over, however hard anything
+  looks. The app says so instead of producing a broken file — the details are in
+  [docs/SNIFFING.md](docs/SNIFFING.md).
+- **Android logins** are still cookie imports, and the in-app browser is the
+  other way in: sign in *there* and its cookies are the ones handed to the
+  engine. It borrows the phone's Android System WebView, so nothing
+  Chromium-sized ships in the APK.

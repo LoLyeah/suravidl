@@ -51,7 +51,8 @@ def test_index_has_new_controls(tmp_path):
                     "setArchive", "setFragments", "setRateLimit", "setProxy",
                     "setRawEnabled", "setRawArgs", "optionsBtn",
                     "optionsSearch", "optionsList", "optionsCount",
-                    "sniffRow", "sniffBtn", "browserOffer", "browserOfferBtn"):
+                    "sniffRow", "sniffBtn", "browserOffer", "browserOfferBtn",
+                    "apiToken", "copyToken"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

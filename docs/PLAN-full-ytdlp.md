@@ -657,3 +657,25 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     browser's cookie *and* a referer from the page that embedded it — so a green
     run is proof that the captured headers genuinely reached yt-dlp. Suite:
     **402 passed**.
+
+- **v0.24.3 — M4 of the capture plan: desktop parity + docs.**
+    The last milestone of the arc, and mostly about *one place* to decide things.
+    The extension no longer hard-codes the media-pattern list: it fetches
+    `GET /sniff/patterns` (once a day, cached; a subset-checked fallback stands
+    when the engine is not answering), and a response that *says* `video/*` is
+    now a find even when its URL looks like nothing — which is the whole reason
+    to sniff rather than guess. Both shells ask the engine the new
+    `POST /sniff/rank` question — *which of these is worth showing?* — so a
+    playlist hides its own fragments on the desktop and on the phone for the same
+    reason, and both *count* what they hid ("3 fragments belong to a playlist
+    above") instead of making rows disappear. Same rule in one test file, two
+    shells.
+    The docs half is the honest half: the README gains a capture matrix (what
+    each platform can get, row by row, including the cells that say "—"), and
+    `docs/SNIFFING.md` states what is promised, what is *deliberately* not
+    (DRM, ad gates, anti-bot, cross-origin `blob:` on Android, segment-only MSE,
+    live HLS, sniffed subtitles), how the Firefox-for-Android stopgap works, and
+    the device-only manual checklist. Settings → Network also grew the API-token
+    row (masked, with Copy): the extension needs that token, and a phone cannot
+    read `~/.suravidl/token` — which is exactly the gap the row closes.
+    Suite: **417 passed**; the extension is at its own version 0.5.0.

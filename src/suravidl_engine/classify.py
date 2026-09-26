@@ -29,9 +29,10 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36")
 HEADER_DEFAULTS = {"User-Agent": DEFAULT_UA, "Accept": "*/*"}
 
-# The canonical prefilter list. The extension still hard-codes a copy
-# (extension/background.js); a test keeps that copy a subset of this one until
-# M4 moves it to /sniff/patterns.
+# The canonical prefilter list. The extension fetches it (with a baked-in
+# fallback for when the engine is not answering yet); a test keeps that fallback
+# a subset of this one, so a shell can only ever look at *fewer* URLs than the
+# engine can name.
 MEDIA_EXT = ("mp4", "m4v", "webm", "mov", "mkv", "avi", "flv", "wmv", "ogv",
              "m3u8", "mpd", "ts", "m4s",
              "mp3", "m4a", "aac", "ogg", "opus", "wav", "flac")
@@ -285,3 +286,63 @@ def classify(url: str, headers: dict | None = None, fetch=None) -> dict:
             note = "stream segment — the manifest is the better pick"
     return {"kind": kind, "mime": mime or None, "size": size,
             "final_url": final, "drm": kind == "drm", "note": note}
+
+
+# -- which of these should a shell *show*? (M4) -----------------------------
+
+def _ext_of(url: str) -> str:
+    last = urlsplit(url).path.rsplit("/", 1)[-1].lower()
+    return last.rsplit(".", 1)[-1] if "." in last else ""
+
+
+def _is_manifest(url: str) -> bool:
+    """A playlist or a DASH manifest.
+
+    By extension, or by a hint that cannot be a fragment's name — a `.ts`/`.m4s`
+    URL is never a manifest, even when it lives under `/hls/`.
+    """
+    ext = _ext_of(url)
+    if ext in SEGMENT_EXT:
+        return False
+    if ext in ("m3u8", "mpd"):
+        return True
+    low = url.lower()
+    return any(h in low for h in ("manifest", "master.m3u8", "playlist"))
+
+
+def _origin_of(url: str) -> str:
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def rank(urls: list) -> dict:
+    """Hide what is not a stream: fragments whose playlist was also seen.
+
+    A manifest and the fragments it names are *one* stream, and a lone fragment
+    is not a download anyone wants. So a `.ts`/`.m4s` URL is hidden whenever a
+    manifest from the same origin is in the same list — and told *why*, so a
+    shell can say "3 fragments hidden" instead of making rows vanish.
+
+    Same origin, not same folder: an ad's segment list is usually served from
+    the same host as the real stream's, and hiding one fragment costs nothing
+    while showing forty of them costs the user everything.
+    """
+    manifests = {}
+    for u in urls:
+        if _is_manifest(u):
+            manifests[_origin_of(u)] = u
+    items = []
+    for u in urls:
+        if _is_manifest(u):
+            items.append({"url": u, "kind": "manifest", "hidden": False, "reason": ""})
+        elif _ext_of(u) in SEGMENT_EXT:
+            big = manifests.get(_origin_of(u))
+            if big:
+                items.append({"url": u, "kind": "segment", "hidden": True,
+                              "reason": "part of " + big.rsplit("/", 1)[-1].split("?")[0]})
+            else:
+                items.append({"url": u, "kind": "segment", "hidden": False,
+                              "reason": "no playlist seen for this fragment"})
+        else:
+            items.append({"url": u, "kind": "media", "hidden": False, "reason": ""})
+    return {"items": items, "hidden": sum(1 for i in items if i["hidden"])}

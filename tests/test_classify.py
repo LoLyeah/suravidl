@@ -168,13 +168,17 @@ def test_the_real_fetch_asks_like_a_browser_and_lets_callers_override():
     assert list(got).count("User-Agent") == 0, "and are not duplicated"
 
 
-def test_the_prefilter_matches_the_extension_until_the_extension_moves():
-    """One owner: the engine's list. The extension still hard-codes its copy
-    (M4 moves it to /sniff/patterns), so keep the copy honest."""
+def test_the_prefilter_list_has_one_owner():
+    """M4: the extension fetches the engine's list (`/sniff/patterns`). The
+    baked-in fallback exists only for "the engine is not up yet", so keep it a
+    subset — a shell may look at fewer URLs than the engine, never at more."""
     js = (ROOT / "extension/background.js").read_text()
-    m = re.search(r"MEDIA_RE = /\\\.\(([^)]+)\)", js)
-    assert m, "extension MEDIA_RE not found — did it move?"
-    assert set(m.group(1).split("|")) <= set(patterns()["ext"])
+    assert '"/sniff/patterns"' in js, "the extension must fetch the engine's list"
+    m = re.search(r"FALLBACK_EXT = \[([^\]]+)\]", js)
+    assert m, "extension fallback list not found — did it move?"
+    fallback = set(re.findall(r'"([a-z0-9]+)"', m.group(1)))
+    assert fallback, "no extensions found in the fallback list"
+    assert fallback <= set(patterns()["ext"])
 
 
 def test_patterns_are_usable_by_a_shell():

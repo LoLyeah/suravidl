@@ -1,5 +1,6 @@
 package com.suravidl.app
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -53,6 +54,19 @@ object Handoff {
     ): String? = post(base, token, "/jobs",
                       JSONObject().put("url", url).put("headers", JSONObject(headers)))
         ?.optString("id")?.ifEmpty { null }
+
+    /**
+     * Which of these finds is worth showing? The engine's shape rule — a
+     * playlist over its fragments — asked once for each new list, so the phone
+     * and the desktop hide the same rows for the same reason. Null when it
+     * cannot answer, and the browser then shows everything: a shell never hides
+     * something on a guess.
+     */
+    fun rank(base: String, token: String, urls: List<String>): JSONObject? {
+        val arr = JSONArray()
+        for (u in urls) arr.put(u)
+        return post(base, token, "/sniff/rank", JSONObject().put("urls", arr))
+    }
 
     private fun post(
         base: String, token: String, path: String, body: JSONObject

@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from . import __version__
 from .auth import (check_auth, cookie_session, explain_download_error,
                    unsupported_error)
-from .classify import classify, patterns
+from .classify import classify, patterns, rank
 from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
@@ -47,6 +47,10 @@ class ProbeRequest(BaseModel):
 class ClassifyRequest(BaseModel):
     url: str
     headers: dict | None = None
+
+
+class RankRequest(BaseModel):
+    urls: list[str] = []
 
 
 class AuthCheckRequest(BaseModel):
@@ -428,6 +432,16 @@ def create_app(download_dir, auth_token: str | None = None,
     def sniff_patterns(mgr: JobManager = Depends(require_auth)):
         """The one media-pattern list: shells prefilter, the engine decides."""
         return patterns()
+
+    @app.post("/sniff/rank")
+    def sniff_rank(body: RankRequest, mgr: JobManager = Depends(require_auth)):
+        """Which of these finds is worth showing? (manifest over fragments)
+
+        Every shell asks the same question, so the answer lives here: fragments
+        whose playlist was among the finds are hidden, with a reason, and
+        nothing else is touched.
+        """
+        return rank(body.urls[:200])
 
     @app.post("/auth/check")
     def auth_check(body: AuthCheckRequest, mgr: JobManager = Depends(require_auth)):

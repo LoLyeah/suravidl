@@ -94,3 +94,22 @@ def test_an_ordinary_probe_error_stays_a_plain_string(client, monkeypatch):
     r = client.post("/probe", json={"url": "https://x/gone"}, headers=AUTH)
     assert r.status_code == 400
     assert isinstance(r.json()["detail"], str)
+
+
+def test_rank_is_the_engines_answer_and_asks_for_the_token(client):
+    body = {"urls": ["https://cdn.example/hls/master.m3u8",
+                     "https://cdn.example/hls/seg-1.ts"]}
+    r = client.post("/sniff/rank", json=body, headers=AUTH)
+    assert r.status_code == 200
+    out = r.json()
+    assert out["hidden"] == 1
+    assert {i["kind"] for i in out["items"]} == {"manifest", "segment"}
+    # one judgement for every shell: no token, no answer
+    assert client.post("/sniff/rank", json=body).status_code in (401, 403)
+
+
+def test_rank_is_bounded(client):
+    r = client.post("/sniff/rank", json={"urls": ["https://x/a.mp4"] * 500},
+                    headers=AUTH)
+    assert r.status_code == 200
+    assert len(r.json()["items"]) == 200

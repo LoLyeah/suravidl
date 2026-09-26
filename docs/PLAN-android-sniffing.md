@@ -1,9 +1,10 @@
 # PLAN — "Capture anything": unsupported URLs on Android (+ better everywhere)
 
 Status: **revised v2**, 2026-09-26 — after testing a real JS-only player live
-(see §3). **M1 shipped (v0.24.0), M2 shipped (v0.24.1), M3 shipped (v0.24.2)** —
-the browser finds streams *and* hands them to the engine with its own cookies,
-User-Agent and referer. M4 (desktop parity + docs) is next.
+(see §3). **M1–M4 all shipped** (v0.24.0 → v0.24.3): the engine classifies and
+ranks, the phone's browser sniffs *and* hands over, the extension does the same
+on the desktop, and `docs/SNIFFING.md` states plainly what is and is not
+promised. What is left needs a real phone — see §5.
 
 ## 1. The question
 
@@ -194,10 +195,13 @@ Each its own version + tagged release; TDD as usual; offline fixtures only.
   referer — so a green run means the captured headers reached yt-dlp.
   `androidx.webkit` still not taken: the cross-origin-frame gap stays open, on
   purpose.
-- **M4 — desktop parity + docs** (v0.24.3): `onHeadersReceived`,
-  manifest-over-segments, README capture matrix, Firefox-Android stopgap +
-  engine-token row, and a short `docs/SNIFFING.md` stating what is and is not
-  promised.
+- **M4 — desktop parity + docs** (v0.24.3, **shipped**): `onHeadersReceived` (a
+  response that says `video/*` is a find even when its URL looks like nothing),
+  the pattern list fetched from `GET /sniff/patterns` with a subset-checked
+  fallback, **manifest-over-fragments** as *one* engine rule (`POST /sniff/rank`)
+  that both shells hide by — and both *count*, so nothing vanishes silently, the
+  README capture matrix, the Firefox-for-Android stopgap, the API-token row in
+  Settings → Network, and `docs/SNIFFING.md`.
 - **Manual checklist on the phone** (not CI): (1) the §3 site — press play,
   tap Found; (2) an ordinary `<video>` page; (3) a plain `.mp4` link; (4) an
   HLS demo stream; (5) a DRM sample (must say "can't do that").

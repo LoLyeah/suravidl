@@ -37,6 +37,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -89,6 +90,11 @@ class BrowserActivity : AppCompatActivity() {
     private val queued = HashSet<String>()
     private val classifyQueue = LinkedHashSet<String>()
     private val worker = Executors.newSingleThreadExecutor()
+
+    /** Finds the engine called fragments of a playlist that is also here — url
+     *  to reason. The count is shown, so nothing vanishes unexplained. */
+    private var hidden: Map<String, String> = emptyMap()
+    private var rankedFor: Int = -1
 
     private val ticker = object : Runnable {
         override fun run() {
@@ -317,15 +323,21 @@ class BrowserActivity : AppCompatActivity() {
      *  a background classify or handoff just finished doing. */
     private fun render() {
         lastVersion = SniffLog.version
-        val items = SniffLog.snapshot().asReversed()      // newest first
+        rankIfNeeded()                                    // the engine's shape rule
+        val all = SniffLog.snapshot().asReversed()        // newest first
+        val items = all.filter { !hidden.containsKey(it.url) }
         listBox.removeAllViews()
-        if (items.isEmpty()) {
+        if (all.isEmpty()) {
             listBox.addView(empty)
         } else {
-            if (items.size >= SniffLog.MAX) {
+            if (all.size >= SniffLog.MAX) {
                 listBox.addView(note("kept the newest ${SniffLog.MAX}"))
             }
             for (c in items) listBox.addView(row(c))
+            if (hidden.isNotEmpty()) {
+                listBox.addView(note(
+                    "${hidden.size} fragments belong to a playlist above — hidden"))
+            }
         }
         // ask the engine what each new find is — it owns that judgement, and it
         // gets the headers a guarded URL needs to be looked at at all
@@ -335,9 +347,39 @@ class BrowserActivity : AppCompatActivity() {
             classifyOne(c)
         }
         status.text = when {
-            items.isEmpty() -> "nothing found — press play, then Scan"
-            queued.isNotEmpty() -> "${items.size} found · ${queued.size} queued"
-            else -> "${items.size} found · press play, then Scan"
+            all.isEmpty() -> "nothing found — press play, then Scan"
+            queued.isNotEmpty() -> "${all.size} found · ${queued.size} queued"
+            else -> "${all.size} found · press play, then Scan"
+        }
+    }
+
+    /**
+     * Ask the engine which of these finds is worth showing — a playlist over its
+     * fragments, the same rule the desktop popup uses — once for each new list.
+     * Until it answers, and if it never does, everything is shown.
+     */
+    private fun rankIfNeeded() {
+        val urls = SniffLog.snapshot().map { it.url }
+        if (urls.size < 2 || rankedFor == SniffLog.version) return
+        val token = prefs().getString("token", "") ?: ""
+        if (token.isEmpty()) return
+        rankedFor = SniffLog.version
+        worker.execute {
+            val out = Handoff.rank(engineOrigin(), token, urls)
+            val hide = HashMap<String, String>()
+            val arr = out?.optJSONArray("items")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val one = arr.optJSONObject(i) ?: continue
+                    if (one.optBoolean("hidden")) {
+                        hide[one.optString("url")] = one.optString("reason")
+                    }
+                }
+            }
+            ui.post {
+                hidden = hide
+                if (!isFinishing && !isDestroyed) render()
+            }
         }
     }
 

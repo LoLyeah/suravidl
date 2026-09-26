@@ -68,6 +68,18 @@ def test_an_unsupported_probe_offers_the_browser_only_where_there_is_one():
     assert "fun openBrowser" in MAIN.read_text()
 
 
+def test_the_token_can_be_read_where_it_is_needed():
+    """M4: the extension needs the token and a phone cannot read
+    ~/.suravidl/token — so Settings shows a masked copy, with a way to take it.
+    Masked because it is a secret and screenshots happen."""
+    html = HTML.read_text()
+    js = JS.read_text()
+    assert 'id="apiToken"' in html and 'id="copyToken"' in html
+    assert "function wireToken" in js and "wireToken();" in js
+    assert "slice(0, 6)" in js, "the row shows a mask, not the secret"
+    assert "navigator.clipboard" in js, "and the copy button is the way out"
+
+
 def test_the_guarded_fixture_keeps_the_handoff_test_honest():
     """The end-to-end handoff test is only worth something if the fixture would
     have said no without the browser's own headers."""

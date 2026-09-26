@@ -1,11 +1,13 @@
 """Each shell prefilters with a copy of the engine's media-pattern list.
 
-The list deliberately exists three times: the engine's `/sniff/patterns` (the
-source of truth), the extension's copy (until M4 moves it), and the Android
-browser's baked-in fallback. The rule that keeps that honest is a *subset*
-relation: a shell may look at fewer URLs than the engine can name, never at
-URLs the engine does not know — a miss costs a candidate, a wrong shape costs
-trust. The extension half is pinned in test_classify.py; this is the browser's.
+The list deliberately exists more than once: the engine's `/sniff/patterns` (the
+source of truth), the extension's fallback (it fetches the engine's list; the
+copy only stands when the engine is not answering), and the Android browser's
+baked-in fallback. The rule that keeps that honest is a *subset* relation: a
+shell may look at fewer URLs than the engine can name, never at URLs the engine
+does not know — a miss costs a candidate, a wrong shape costs trust. The
+extension half is pinned in test_classify.py and test_extension_sniff.py; this
+is the browser's.
 """
 import re
 from pathlib import Path
@@ -56,3 +58,15 @@ def test_the_browser_entry_point_exists_and_asks_the_host():
     assert 'android:name=".BrowserActivity" android:exported="false"' in manifest
     assert "SnifferWebViewClient" in browser
     assert "addJavascriptInterface" in browser and "SuravidlSniff" in browser
+
+
+def test_the_browser_hides_fragments_only_on_the_engines_word():
+    """M4: the shape rule is the engine's, so the phone and the extension hide
+    the same rows — and a shell that cannot get an answer hides nothing."""
+    browser = BROWSER.read_text()
+    handoff = (ROOT / "android/app/src/main/java/com/suravidl/app/Handoff.kt").read_text()
+    assert '"/sniff/rank"' in handoff, "the browser must ask the engine"
+    assert "Handoff.rank(" in browser
+    assert "!hidden.containsKey(it.url)" in browser, "hidden means hidden"
+    assert "fragments belong to a playlist above" in browser, \
+        "hiding must be visible, not silent"
