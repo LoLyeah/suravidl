@@ -126,6 +126,26 @@ def explain_download_error(text: str) -> str:
     return text
 
 
+UNSUPPORTED_HINT = (
+    "yt-dlp has no extractor for this page — open it in the browser, press "
+    "play for a second, and pick the stream suravidl finds (on desktop the "
+    "extension does the same)."
+)
+
+
+def unsupported_error(text: str) -> dict | None:
+    """Is yt-dlp simply refusing to guess this site?
+
+    "Unsupported URL" is not a failure to explain away — it is the signal that
+    a sniffer is the way to this video, so the UI must be able to tell it
+    apart from a real error (which stays a plain string).
+    """
+    if "unsupported url" not in text.lower():
+        return None
+    return {"message": f"{text} — {UNSUPPORTED_HINT}",
+            "unsupported": True, "hint": UNSUPPORTED_HINT}
+
+
 def check_auth(settings: dict, url: str | None = None) -> dict:
     """Answer "are my cookies actually working?" — statically and, if a URL is
     given, by proving it with a real yt-dlp extraction.

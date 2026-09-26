@@ -15,7 +15,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
-from .auth import check_auth, cookie_session, explain_download_error
+from .auth import (check_auth, cookie_session, explain_download_error,
+                   unsupported_error)
+from .classify import classify, patterns
 from .download_opts import probe_extra_opts
 from .jobs import JobManager, redact_job
 from .probe import probe
@@ -40,6 +42,11 @@ class OpenUrlRequest(BaseModel):
 class ProbeRequest(BaseModel):
     url: str
     headers: dict[str, str] | None = None
+
+
+class ClassifyRequest(BaseModel):
+    url: str
+    headers: dict | None = None
 
 
 class AuthCheckRequest(BaseModel):
@@ -397,7 +404,8 @@ def create_app(download_dir, auth_token: str | None = None,
             # one explanation for every shell: the engine owns the "this looks
             # like a sign-in wall" judgement, the UI does not guess
             raise HTTPException(status_code=400,
-                                detail=explain_download_error(str(e))) from e
+                                detail=(unsupported_error(str(e))
+                                        or explain_download_error(str(e)))) from e
         # the site's remembered quality rides along as an offer (M20): the UI
         # marks that chip, the user still decides
         site = site_memory.host_of(body.url)
@@ -406,6 +414,20 @@ def create_app(download_dir, auth_token: str | None = None,
             info["site_quality"] = site_memory.clean(
                 settings.get().get("site_quality") or {}).get(site)
         return info
+
+    @app.post("/classify")
+    def classify_endpoint(body: ClassifyRequest,
+                          mgr: JobManager = Depends(require_auth)):
+        """What is this URL? A sniffer asks before it shows anything."""
+        try:
+            return classify(body.url, headers=body.headers)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @app.get("/sniff/patterns")
+    def sniff_patterns(mgr: JobManager = Depends(require_auth)):
+        """The one media-pattern list: shells prefilter, the engine decides."""
+        return patterns()
 
     @app.post("/auth/check")
     def auth_check(body: AuthCheckRequest, mgr: JobManager = Depends(require_auth)):

@@ -1,7 +1,7 @@
 # PLAN — "Capture anything": unsupported URLs on Android (+ better everywhere)
 
 Status: **revised v2**, 2026-09-26 — after testing a real JS-only player live
-(see §3). Needs a go/no-go before M2.
+(see §3). **M1 is shipped (v0.24.0).** Needs a go/no-go before M2.
 
 ## 1. The question
 
@@ -166,7 +166,7 @@ Android Settings → Device). Worth a README paragraph; not a substitute for B.
 
 Each its own version + tagged release; TDD as usual; offline fixtures only.
 
-- **M1 — engine brain** (v0.24.0): `/classify`, `/sniff/patterns`,
+- **M1 — engine brain** (v0.24.0, **shipped**): `/classify`, `/sniff/patterns`,
   `unsupported:true` probe errors; `tests/test_classify.py` + HLS/DASH/DRM head
   fixtures; and a regression test built on §3: a page yt-dlp refuses must come
   back as `unsupported` **with the browser hint**. Hours, no Android

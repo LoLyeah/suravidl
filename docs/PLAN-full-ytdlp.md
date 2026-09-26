@@ -588,3 +588,25 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     blue tint stuck on the last-tapped button — all ten hover rules now live
     inside `@media (hover: hover)`, so they exist only where a real pointer
     does. Suite: **370 passed**.
+
+- **v0.24.0 — M1 of the capture plan: the engine gets a brain.**
+    `POST /classify` names a URL before any shell shows it: kind (video / hls /
+    dash / drm / audio / image / page / unknown), mime, size, and the final URL
+    after redirects. HEAD first, then a bounded 4 KB ranged GET when HEAD is
+    refused — the size comes from `Content-Range`, never from the peek. The DRM
+    line is drawn where it belongs: an ordinary `METHOD=AES-128` HLS is *not*
+    DRM (yt-dlp fetches the key with our cookies), while `SAMPLE-AES`, `skd://`
+    and DASH `<ContentProtection>` are — those answer `drm`.
+    `GET /sniff/patterns` becomes the one media-pattern list every shell
+    prefilters with (the extension's hard-coded copy stays a subset, enforced
+    by a test, until M4 moves it). `POST /probe` now answers a site yt-dlp
+    cannot extract with a *structured* error — `{message, hint,
+    unsupported: true}` — instead of a bare string, and the UI keeps that
+    detail on the Error while showing the human message.
+    Live-verified: mp4 → `video` (size 2 848 208), the mux HLS demo → `hls`, a
+    SAMPLE-AES manifest → `drm`, an AES-128 one → `hls`, w3schools and the
+    tested JS-only player → `page`, and a real probe of that player returns the
+    browser hint in the UI. The live pass also caught a real defect: the
+    classifier's default User-Agent was urllib's "Python-urllib/…", which is
+    bot-blocked on sight — pages answered 403 until it asked like a browser.
+    Suite: **395 passed**.

@@ -8,13 +8,22 @@ async function api(path, opts = {}) {
   const r = await fetch(path, { ...opts, headers: H() });
   if (!r.ok) {
     let msg = `${r.status}`;
+    let detail = null;
     try {
       const body = await r.json();
-      msg = body.detail ? String(body.detail) : JSON.stringify(body);
+      detail = body && body.detail != null ? body.detail : body;
+      // the engine can answer with a structured error ("unsupported url"
+      // carries a hint for the user and a flag for the browser offer), so the
+      // whole detail rides along on the Error instead of being flattened
+      msg = (typeof detail === "object" && detail !== null)
+        ? (detail.message || JSON.stringify(detail))
+        : String(detail);
     } catch (_) {
       msg += " " + (await r.text().catch(() => ""));
     }
-    throw new Error(msg);
+    const err = new Error(msg);
+    err.detail = detail;
+    throw err;
   }
   return r.json();
 }
