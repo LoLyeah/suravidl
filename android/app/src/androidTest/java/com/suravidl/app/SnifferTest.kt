@@ -8,17 +8,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import kotlin.concurrent.thread
 
 /**
  * The sniffer's real path: a real WebView loading a real page over real HTTP.
  *
- * The fixture server runs inside this test process, on loopback, so the test
+ * The fixture server (`FixtureServer`, loopback, in this process) means the test
  * needs nothing but the emulator itself — no host server, no network. What it
  * pins is the reason the four capture layers exist: a plain `<video src>`, a
  * file fetched by script, and a stream fed by JavaScript (which the network
@@ -37,8 +31,7 @@ class SnifferTest {
         SniffLog.clear()
         try {
             ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL,
-                          "http://127.0.0.1:${server.port}/page.html")
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
             val deadline = System.currentTimeMillis() + 120_000
@@ -110,121 +103,4 @@ class SnifferTest {
 
     private fun dump(items: List<Sniffed>): String =
         items.joinToString(" | ") { "${it.via}:${it.url}@${it.frame}" }
-}
-
-/**
- * A tiny HTTP/1.1 server for one test: a page whose player behaves like the
- * real thing — an element `src`, a `fetch`, an iframe, and a MediaSource fed
- * over JavaScript — plus the files it asks for. Loopback only, closed in a
- * `finally`.
- */
-private class FixtureServer {
-    private val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
-    private var running = true
-
-    val port: Int get() = server.localPort
-
-    fun start(): FixtureServer {
-        thread(name = "fixture-server") {
-            while (running) {
-                try {
-                    val sock = server.accept()
-                    thread { serve(sock) }
-                } catch (_: Throwable) {
-                    // socket closed by stop(): the loop ends here
-                }
-            }
-        }
-        return this
-    }
-
-    fun stop() {
-        running = false
-        try {
-            server.close()
-        } catch (_: Throwable) {
-        }
-    }
-
-    private fun serve(sock: Socket) {
-        try {
-            sock.use {
-                val reader = BufferedReader(InputStreamReader(sock.getInputStream()))
-                val request = reader.readLine() ?: return
-                // drain the headers; a client that still has unread bytes in
-                // flight can see a reset instead of our response
-                var lines = 0
-                while (lines < 50) {
-                    val line = reader.readLine() ?: break
-                    if (line.isEmpty()) break
-                    lines++
-                }
-                val path = request.split(" ").getOrNull(1)?.substringBefore('?') ?: "/"
-                val hit = bodyFor(path)
-                val out = sock.getOutputStream()
-                if (hit == null) {
-                    out.write(("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n" +
-                        "Connection: close\r\n\r\n").toByteArray())
-                } else {
-                    val (type, body) = hit
-                    out.write(("HTTP/1.1 200 OK\r\nContent-Type: $type\r\n" +
-                        "Content-Length: ${body.size}\r\nConnection: close\r\n\r\n")
-                        .toByteArray())
-                    out.write(body)
-                }
-                out.flush()
-            }
-        } catch (_: Throwable) {
-        }
-    }
-
-    private fun bodyFor(path: String): Pair<String, ByteArray>? = when (path) {
-        "/page.html", "/" -> "text/html" to PAGE.toByteArray()
-        "/inner.html" -> "text/html" to INNER.toByteArray()
-        "/fixture.m3u8" -> "application/vnd.apple.mpegurl" to MANIFEST.toByteArray()
-        "/bare.mp4", "/inner.mp4" -> "video/mp4" to ByteArray(4096)
-        else -> null
-    }
-
-    companion object {
-        /** The same three shapes the live test met in the wild: an element
-         *  source, a script fetch, and an MSE player — plus a child frame.
-         *
-         *  The player starts on a short delay on purpose: that is how a real
-         *  page behaves (nothing is requested until the user presses play), and
-         *  it is the shape the plan's UX assumes — "press play for a second,
-         *  then tap Scan". An immediate `fetch` at parse time would be
-         *  measuring the one race the script layers cannot win by design. */
-        private val PAGE = """
-            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
-            <body style="margin:0;background:#000">
-            <video id="v" src="/bare.mp4" muted></video>
-            <iframe src="/inner.html" style="width:320px;height:180px"></iframe>
-            <script>
-              setTimeout(function () {
-                fetch('/fixture.m3u8').then(function (r) { return r.text(); });
-                try {
-                  var ms = new MediaSource();
-                  ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
-                  document.getElementById('v').src = URL.createObjectURL(ms);
-                } catch (e) {}
-              }, 1500);
-            </script>
-            </body>
-        """.trimIndent()
-
-        private val INNER = """
-            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
-            <body style="margin:0;background:#111"><video src="/inner.mp4" muted></video></body>
-        """.trimIndent()
-
-        private val MANIFEST = """
-            #EXTM3U
-            #EXT-X-VERSION:3
-            #EXT-X-TARGETDURATION:2
-            #EXTINF:2.0,
-            seg1.ts
-            #EXT-X-ENDLIST
-        """.trimIndent()
-    }
 }

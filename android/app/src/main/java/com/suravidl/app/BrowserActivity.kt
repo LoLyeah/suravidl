@@ -19,9 +19,11 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -30,6 +32,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -37,6 +40,8 @@ import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 /**
@@ -74,6 +79,17 @@ class BrowserActivity : AppCompatActivity() {
     @Volatile
     private var currentPage: String = ""
 
+    /** This WebView's own User-Agent, read once on the UI thread: a WebView may
+     *  only be asked anything from there, and the handoff needs it later. */
+    private var ua: String = ""
+
+    /** What the engine says each find *is* — kind, size, drm. Filled off the UI
+     *  thread, one URL at a time, by [classifyOne]. */
+    private val info = HashMap<String, JSONObject>()
+    private val queued = HashSet<String>()
+    private val classifyQueue = LinkedHashSet<String>()
+    private val worker = Executors.newSingleThreadExecutor()
+
     private val ticker = object : Runnable {
         override fun run() {
             refreshIfChanged()
@@ -108,6 +124,7 @@ class BrowserActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         ui.removeCallbacks(ticker)
+        worker.shutdownNow()
         super.onDestroy()
     }
 
@@ -164,10 +181,11 @@ class BrowserActivity : AppCompatActivity() {
         }
         row.addView(status, LinearLayout.LayoutParams(0, WRAP, 1f))
         row.addView(chip("Scan") { scanAgain() })
-        row.addView(chip("Clear") {
+        row.addView(chip("Clear list") {
             SniffLog.clear()
-            refreshIfChanged()
+            render()
         })
+        row.addView(chip("Clear data") { clearBrowsingData() })
         root.addView(row)
 
         webView = WebView(this).apply {
@@ -206,6 +224,11 @@ class BrowserActivity : AppCompatActivity() {
                     SniffLog.clear()                    // a new page, new finds
                     refreshIfChanged()
                 })
+        }
+        ua = try {
+            webView.settings.userAgentString.orEmpty()
+        } catch (_: Throwable) {
+            ""
         }
         root.addView(webView, LinearLayout.LayoutParams(MATCH, 0, 1f))
 
@@ -287,6 +310,13 @@ class BrowserActivity : AppCompatActivity() {
     private fun refreshIfChanged() {
         if (SniffLog.version == lastVersion) return
         lastVersion = SniffLog.version
+        render()
+    }
+
+    /** Draw the list. UI thread only: the poller calls it, and so does whatever
+     *  a background classify or handoff just finished doing. */
+    private fun render() {
+        lastVersion = SniffLog.version
         val items = SniffLog.snapshot().asReversed()      // newest first
         listBox.removeAllViews()
         if (items.isEmpty()) {
@@ -297,8 +327,16 @@ class BrowserActivity : AppCompatActivity() {
             }
             for (c in items) listBox.addView(row(c))
         }
+        // ask the engine what each new find is — it owns that judgement, and it
+        // gets the headers a guarded URL needs to be looked at at all
+        for (c in items) {
+            if (!Handoff.isHandoffable(c.url)) continue
+            if (info.containsKey(c.url) || !classifyQueue.add(c.url)) continue
+            classifyOne(c)
+        }
         status.text = when {
             items.isEmpty() -> "nothing found — press play, then Scan"
+            queued.isNotEmpty() -> "${items.size} found · ${queued.size} queued"
             else -> "${items.size} found · press play, then Scan"
         }
     }
@@ -321,6 +359,16 @@ class BrowserActivity : AppCompatActivity() {
             background = rounded(0x33818CF8, 99f)
             setPadding(dp(7), dp(3), dp(7), dp(3))
         })
+        val verdict = verify(c)
+        if (verdict != null) {
+            head.addView(TextView(this).apply {
+                text = "  $verdict"
+                textSize = 10.5f
+                setTextColor(if (isDrm(c.url)) 0xFFF2B8B8.toInt() else 0xFFBFE6C8.toInt())
+                background = rounded(if (isDrm(c.url)) 0x40C0504E else 0x2E66C98A, 99f)
+                setPadding(dp(7), dp(3), dp(7), dp(3))
+            })
+        }
         val where = frameLabel(c.frame)
         if (c.via != "mse" && where.isNotEmpty()) {
             head.addView(TextView(this).apply {
@@ -343,7 +391,12 @@ class BrowserActivity : AppCompatActivity() {
         if (c.via == "mse") {
             acts.addView(note("a blob: stream — look for the manifest above"))
         } else {
-            acts.addView(chip("Copy URL") { copy(c.url) })
+            if (queued.contains(c.url)) {
+                acts.addView(chip("queued ✓") { toast("it downloads in the app's Queue tab") })
+            } else if (Handoff.isHandoffable(c.url) && !isDrm(c.url)) {
+                acts.addView(chip("Download") { queue(c) })
+            }
+            acts.addView(chip("Copy") { copy(c.url) })
             if (c.url.startsWith("http")) acts.addView(chip("Open") { openOutside(c.url) })
         }
         box.addView(acts)
@@ -362,6 +415,127 @@ class BrowserActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             Toast.makeText(this, "no app can open this", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // -- the handoff: classify what we found, then hand it to the engine ------
+
+    /** The engine's one-line verdict on a find, e.g. "HLS · 42 MB". */
+    private fun verify(c: Sniffed): String? {
+        val v = info[c.url] ?: return if (classifyQueue.contains(c.url)) "checking…" else null
+        if (v.optBoolean("drm")) return "DRM — not downloadable"
+        val kind = when (v.optString("kind")) {
+            "hls" -> "HLS"
+            "dash" -> "DASH"
+            "video" -> "video"
+            "audio" -> "audio"
+            "image" -> "image"
+            "page" -> "page"
+            else -> ""
+        }
+        val size = v.optLong("size", 0)
+        return when {
+            kind.isEmpty() -> null
+            size > 0 -> "$kind · ${humanSize(size)}"
+            else -> kind
+        }
+    }
+
+    private fun isDrm(url: String): Boolean = info[url]?.optBoolean("drm") ?: false
+
+    private fun humanSize(bytes: Long): String = when {
+        bytes >= 1_048_576 -> String.format(Locale.US, "%.1f MB", bytes / 1048576.0)
+        bytes >= 1024 -> "${bytes / 1024} KB"
+        else -> "$bytes B"
+    }
+
+    /**
+     * The headers this find needs to be looked at or fetched: this WebView's own
+     * cookie jar, its own User-Agent, and the frame it came from as the referer.
+     * UI thread only — [ua] was read there, and a WebView is never touched from
+     * anywhere else.
+     */
+    private fun headersFor(c: Sniffed): Map<String, String> {
+        val cookie = try {
+            CookieManager.getInstance().getCookie(c.url).orEmpty()
+        } catch (_: Throwable) {
+            ""
+        }
+        return Handoff.headersFor(c.frame.ifEmpty { currentPage }, ua, cookie)
+    }
+
+    private fun classifyOne(c: Sniffed) {
+        val token = prefs().getString("token", "") ?: ""
+        if (token.isEmpty()) return
+        val headers = headersFor(c)
+        worker.execute {
+            val verdict = Handoff.classify(engineOrigin(), token, c.url, headers)
+            ui.post {
+                classifyQueue.remove(c.url)
+                if (verdict != null) info[c.url] = verdict
+                if (!isFinishing && !isDestroyed) render()
+            }
+        }
+    }
+
+    /** Hand a find to the engine — the whole point of this browser. */
+    private fun queue(c: Sniffed) {
+        if (!Handoff.isHandoffable(c.url)) return
+        val token = prefs().getString("token", "") ?: ""
+        if (token.isEmpty()) {
+            toast("the engine is not ready — try again in a moment")
+            return
+        }
+        val headers = headersFor(c)
+        toast("queueing…")
+        worker.execute {
+            val id = Handoff.download(engineOrigin(), token, c.url, headers)
+            ui.post {
+                if (id == null) {
+                    toast("the engine refused it — is it still running?")
+                } else {
+                    queued.add(c.url)
+                    toast("queued — it downloads in the app's Queue tab")
+                    render()
+                }
+            }
+        }
+    }
+
+    /**
+     * The data *this* browser collected: cookies, site storage, the cache.
+     * Deliberately not the imported cookie file, the vault, or any download —
+     * and the confirm says so, because "clear browsing data" inside a downloader
+     * could reasonably be read as something much worse.
+     */
+    private fun clearBrowsingData() {
+        AlertDialog.Builder(this)
+            .setTitle("Clear browsing data?")
+            .setMessage("Cookies, site storage and the cache collected by this " +
+                "browser. Your downloads and your imported cookie file are not " +
+                "touched.")
+            .setPositiveButton("Clear") { _, _ ->
+                try {
+                    CookieManager.getInstance().removeAllCookies(null)
+                    CookieManager.getInstance().flush()
+                } catch (_: Throwable) {
+                }
+                try {
+                    WebStorage.getInstance().deleteAllData()
+                } catch (_: Throwable) {
+                }
+                try {
+                    webView.clearCache(true)
+                    webView.clearHistory()
+                } catch (_: Throwable) {
+                }
+                toast("browser data cleared")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun toast(msg: String) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
     // -- plumbing -------------------------------------------------------------

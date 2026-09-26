@@ -175,11 +175,13 @@ async function doProbe() {
     if (seq !== PROBE_SEQ) return;
     renderProbe(url, info);
     $("probeMsg").textContent = "";
+    $("browserOffer").classList.add("hidden");   // it probed fine: no browser needed
   } catch (e) {
     if (seq !== PROBE_SEQ) return;
     // the engine explains a failure (it owns the "sign-in wall" judgement and
     // says so in its own words) — the UI does not second-guess it
     $("probeMsg").textContent = "probe failed: " + e.message;
+    offerBrowser(e, url);
     $("probeCard").classList.add("hidden");
     $("dlEmpty").classList.remove("hidden");
     // chips from the *previous* probe still carry its URL: leaving them armed
@@ -192,6 +194,26 @@ async function doProbe() {
   } finally {
     if (seq === PROBE_SEQ) $("probeBtn").classList.remove("busy");
   }
+}
+
+/* "No extractor for this page" is not a dead end on a host that has the in-app
+   browser: the engine's structured answer carries `unsupported`, and that
+   browser is exactly what it was built for (v0.24.2, M3). The offer is hidden
+   again on the next probe — never left pointing at a URL the user replaced. */
+function offerBrowser(err, url) {
+  const row = $("browserOffer");
+  if (!row) return;
+  const detail = (err && err.detail) || {};
+  const asked = detail.unsupported === true ||
+    /unsupported url/i.test((err && err.message) || "");
+  if (!asked || !window.AndroidHost || !window.AndroidHost.openBrowser) {
+    row.classList.add("hidden");
+    return;
+  }
+  row.classList.remove("hidden");
+  $("browserOfferBtn").onclick = () => {
+    try { window.AndroidHost.openBrowser(url); } catch (_) { }
+  };
 }
 
 function fmtQuality(f) {
