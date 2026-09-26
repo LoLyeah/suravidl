@@ -22,6 +22,8 @@ const listeners = { beforeRequest: [], beforeSendHeaders: [], headersReceived: [
 const store = {};
 const badge = {};
 const fetchCalls = [];
+let onRemoved = [];
+let onMessage = null;
 
 globalThis.chrome = {
   action: { setBadgeText: ({ tabId, text }) => (badge[tabId] = text) },
@@ -52,8 +54,8 @@ globalThis.chrome = {
     onBeforeSendHeaders: { addListener: (fn) => listeners.beforeSendHeaders.push(fn) },
     onHeadersReceived: { addListener: (fn) => listeners.headersReceived.push(fn) },
   },
-  tabs: { onRemoved: { addListener() {} }, query() {} },
-  runtime: { onMessage: { addListener: (fn) => (listeners.onMessage = fn) } },
+  tabs: { onRemoved: { addListener: (fn) => onRemoved.push(fn) }, query() {} },
+  runtime: { onMessage: { addListener: (fn) => (onMessage = fn) } },
 };
 
 globalThis.fetch = async (url, opts = {}) => {
@@ -76,7 +78,13 @@ globalThis.fetch = async (url, opts = {}) => {
 };
 
 // -- load the extension source as a plain script -----------------------------
-new Function(src)();
+// Loading twice is also how a worker restart is simulated: MV3 workers are
+// ephemeral, so `new Function(src)()` against the same storage is exactly what
+// Chrome does when it wakes the worker up again.
+function load() {
+  new Function(src)();
+}
+load();
 
 const settle = () => new Promise((r) => setTimeout(r, 25));
 const req = (type, url, extra = {}) => ({ tabId: 7, type, url, ...extra });
@@ -141,7 +149,7 @@ ok(found().includes("https://cdn/thing.xyz?t=1"),
 
 // 3. ranking: the popup asks the engine and gets its answer back
 const ranked = await new Promise((resolve) => {
-  const keep = listeners.onMessage({ type: "rank", items: [{ url: "https://cdn/x.m3u8" }] }, {}, resolve);
+  const keep = onMessage({ type: "rank", items: [{ url: "https://cdn/x.m3u8" }] }, {}, resolve);
   ok(keep === true, "the message handler answers asynchronously");
 });
 const rankCall = fetchCalls.find((c) => c.url.endsWith("/sniff/rank"));
@@ -152,6 +160,56 @@ ok(rankCall && String(rankCall.opts.headers.Authorization).startsWith("Bearer"),
    "and the engine token");
 ok(ranked && ranked.items && ranked.items[0].kind === "manifest",
    "the engine's answer reaches the popup");
+
+// 4. a restart must not lose the engine's list: the day-long cache timer must
+// not outlive the regex it cached (MV3 workers die constantly)
+store.patterns = ["mp4", "m3u8", "ts", "xyz"];
+store.patternsAt = Date.now();          // fresh — so no re-fetch is due
+fetchCalls.length = 0;
+listeners.beforeRequest.length = 0;
+listeners.beforeSendHeaders.length = 0;
+listeners.headersReceived.length = 0;
+onRemoved = [];
+load();                                  // a fresh service-worker generation
+await settle();
+ok(!fetchCalls.some((c) => c.url.endsWith("/sniff/patterns")),
+   "a restarted worker does not re-fetch a fresh pattern list");
+listeners.beforeRequest[0](req("xmlhttprequest", "https://cdn/after-restart.xyz"));
+await settle();
+ok(found().includes("https://cdn/after-restart.xyz"),
+   "…and still knows the engine's extensions after the restart");
+
+// 5. headers for a URL only its *response* proves is media: held in memory,
+// committed on proof — a guarded stream 403s without them
+listeners.beforeSendHeaders[0](req("xmlhttprequest", "https://cdn/liar",
+  { requestHeaders: sent }));
+ok(!(store.reqHeaders || {})["https://cdn/liar"],
+   "nothing is stored before the response proves it is media");
+listeners.headersReceived[0](req("xmlhttprequest", "https://cdn/liar", {
+  responseHeaders: [{ name: "Content-Type", value: "video/mp4" }],
+}));
+await settle();
+const liar = (store.reqHeaders || {})["https://cdn/liar"];
+ok(liar && liar.headers.cookie === "sid=1",
+   "the held headers are committed once the response is media");
+listeners.beforeSendHeaders[0](req("xmlhttprequest", "https://cdn/json",
+  { requestHeaders: sent }));
+listeners.headersReceived[0](req("xmlhttprequest", "https://cdn/json", {
+  responseHeaders: [{ name: "Content-Type", value: "application/json" }],
+}));
+await settle();
+ok(!(store.reqHeaders || {})["https://cdn/json"],
+   "and a non-media response leaves nothing behind");
+
+// 6. closing a tab must not resurrect its finds, nor wipe another tab's
+const tab8 = { tabId: 8, type: "media", url: "https://cdn/tab8" };
+listeners.beforeRequest[0](tab8);
+await settle();
+onRemoved[0](7);
+await settle();
+ok(found().length === 0, "a closed tab's finds are gone");
+ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
+   "another tab's finds survive it");
 
 if (failures.length) {
   console.error("extension runtime: FAILED");

@@ -96,6 +96,9 @@ class BrowserActivity : AppCompatActivity() {
     private var hidden: Map<String, String> = emptyMap()
     private var rankedFor: Int = -1
 
+    /** A `target=_blank` window exists only long enough to hand its URL over. */
+    private var popup: WebView? = null
+
     private val ticker = object : Runnable {
         override fun run() {
             refreshIfChanged()
@@ -131,7 +134,19 @@ class BrowserActivity : AppCompatActivity() {
     override fun onDestroy() {
         ui.removeCallbacks(ticker)
         worker.shutdownNow()
+        destroyPopup()
         super.onDestroy()
+    }
+
+    /** The `target=_blank` scratch WebView, if a page made one — destroyed the
+     *  moment its URL is handed over, and again here in case it never was. */
+    private fun destroyPopup() {
+        val tmp = popup ?: return
+        popup = null
+        try {
+            tmp.destroy()
+        } catch (_: Throwable) {
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -209,11 +224,13 @@ class BrowserActivity : AppCompatActivity() {
                     view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?
                 ): Boolean {
                     val tmp = WebView(this@BrowserActivity)
+                    popup = tmp
                     tmp.webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
                             v: WebView?, r: WebResourceRequest?
                         ): Boolean {
                             r?.url?.toString()?.let { load(it) }
+                            destroyPopup()   // a whole Chromium until it is destroyed
                             return true
                         }
                     }
@@ -436,7 +453,7 @@ class BrowserActivity : AppCompatActivity() {
             if (queued.contains(c.url)) {
                 acts.addView(chip("queued ✓") { toast("it downloads in the app's Queue tab") })
             } else if (Handoff.isHandoffable(c.url) && !isDrm(c.url)) {
-                acts.addView(chip("Download") { queue(c) })
+                acts.addView(chip("Download", "download:" + c.url) { queue(c) })
             }
             acts.addView(chip("Copy") { copy(c.url) })
             if (c.url.startsWith("http")) acts.addView(chip("Open") { openOutside(c.url) })
@@ -513,7 +530,11 @@ class BrowserActivity : AppCompatActivity() {
             val verdict = Handoff.classify(engineOrigin(), token, c.url, headers)
             ui.post {
                 classifyQueue.remove(c.url)
-                if (verdict != null) info[c.url] = verdict
+                // A verdict that never arrives must not be retried forever: the
+                // engine saying no is an answer too. (Without this, render()
+                // re-queued the URL on every pass and the worker hammered
+                // /classify until the app was stopped — caught by the audit.)
+                info[c.url] = verdict ?: JSONObject().put("error", true)
                 if (!isFinishing && !isDestroyed) render()
             }
         }
@@ -544,17 +565,18 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     /**
-     * The data *this* browser collected: cookies, site storage, the cache.
-     * Deliberately not the imported cookie file, the vault, or any download —
-     * and the confirm says so, because "clear browsing data" inside a downloader
-     * could reasonably be read as something much worse.
+     * The data *this* browser collected: cookies, site storage, the cache — and
+     * the list of finds on screen, which is a record of what was watched. Not
+     * the imported cookie file, the vault, or any download, and the confirm says
+     * so, because "clear browsing data" in a downloader could reasonably mean
+     * something much worse.
      */
     private fun clearBrowsingData() {
         AlertDialog.Builder(this)
             .setTitle("Clear browsing data?")
             .setMessage("Cookies, site storage and the cache collected by this " +
-                "browser. Your downloads and your imported cookie file are not " +
-                "touched.")
+                "browser, plus the list of finds above. Your downloads and your " +
+                "imported cookie file are not touched.")
             .setPositiveButton("Clear") { _, _ ->
                 try {
                     CookieManager.getInstance().removeAllCookies(null)
@@ -570,6 +592,15 @@ class BrowserActivity : AppCompatActivity() {
                     webView.clearHistory()
                 } catch (_: Throwable) {
                 }
+                // The finds are part of "what this browser collected": leaving
+                // the URLs of a sensitive session on screen would defeat the
+                // whole gesture (audit finding).
+                SniffLog.clear()
+                info.clear()
+                classifyQueue.clear()
+                hidden = emptyMap()
+                rankedFor = -1
+                render()
                 toast("browser data cleared")
             }
             .setNegativeButton("Cancel", null)
@@ -625,9 +656,10 @@ class BrowserActivity : AppCompatActivity() {
             cornerRadius = radiusDp * resources.displayMetrics.density
         }
 
-    private fun chip(label: String, onClick: () -> Unit): Button =
+    private fun chip(label: String, tag: String? = null, onClick: () -> Unit): Button =
         Button(this).apply {
             text = label
+            if (tag != null) this.tag = tag
             isAllCaps = false
             textSize = 13f
             minWidth = 0

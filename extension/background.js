@@ -17,6 +17,7 @@ const MEDIA_TYPES =
   /^(video\/|audio\/|application\/vnd\.apple\.mpegurl|application\/x-mpegurl|application\/mpegurl|application\/dash\+xml)/i;
 const KEEP_PER_TAB = 20;
 const HEADER_KEEP = 100;
+const PENDING_KEEP = 200;
 const action = chrome.action || chrome.browserAction; // MV3 vs Firefox MV2
 
 function buildRe(ext) {
@@ -63,8 +64,15 @@ function remember(tabId, url) {
 
 function loadPatterns() {
   chrome.storage.local.get(
-    { engineUrl: "http://127.0.0.1:8787", engineToken: "", patternsAt: 0 },
+    { engineUrl: "http://127.0.0.1:8787", engineToken: "", patternsAt: 0, patterns: null },
     async (stored) => {
+      // MV3 workers are ephemeral: the in-memory regex dies with every restart,
+      // so the cached list has to come back out of storage *before* the day-long
+      // timer is trusted. Without this, every wake-up silently fell back to the
+      // baked-in list for 24 h (found by the Antigravity audit).
+      if (Array.isArray(stored.patterns) && stored.patterns.length) {
+        MEDIA_RE = buildRe(stored.patterns);
+      }
       if (Date.now() - stored.patternsAt < 24 * 3600 * 1000) return;
       try {
         const res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/sniff/patterns", {
@@ -74,7 +82,7 @@ function loadPatterns() {
         const body = await res.json();
         if (Array.isArray(body.ext) && body.ext.length) {
           MEDIA_RE = buildRe(body.ext);
-          chrome.storage.local.set({ patternsAt: Date.now() });
+          chrome.storage.local.set({ patternsAt: Date.now(), patterns: body.ext });
         }
       } catch (e) {
         /* the engine is not up yet — the fallback list stands */
@@ -83,8 +91,9 @@ function loadPatterns() {
   );
 }
 
-// capture the headers yt-dlp needs for auth'd sites (Cookie/UA/Referer/Origin)
-function captureHeaders(url, reqHeaders) {
+// The headers yt-dlp needs for auth'd sites (Cookie/UA/Referer/Origin), picked
+// from a request and nothing else.
+function pickHeaders(reqHeaders) {
   const pick = {};
   for (const h of reqHeaders || []) {
     const k = (h.name || "").toLowerCase();
@@ -92,7 +101,25 @@ function captureHeaders(url, reqHeaders) {
       pick[k] = h.value;
     }
   }
-  if (!Object.keys(pick).length) return;
+  return Object.keys(pick).length ? pick : null;
+}
+
+// Headers for requests that have not proved themselves yet. A stream whose URL
+// says nothing is only recognised from its *response*, which arrives after its
+// request headers went out — so those are held here, in memory only, and
+// committed only if the response turns out to be media. Nothing but media
+// headers ever reaches storage or the engine (the v0.21.2 rule, still), and
+// nothing is held for more than a couple of hundred requests.
+const pending = new Map();
+
+function holdHeaders(url, pick) {
+  pending.set(url, pick);
+  while (pending.size > PENDING_KEEP) {
+    pending.delete(pending.keys().next().value);
+  }
+}
+
+function commitHeaders(url, pick) {
   update(({ reqHeaders: store }) => {
     store[url] = { headers: pick, at: Date.now() };
     return { reqHeaders: prune(store) };
@@ -112,15 +139,19 @@ chrome.webRequest.onBeforeRequest.addListener(
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
     if (details.tabId < 0) return;
-    // Capture only media-ish requests. Listening to every request in the tab
-    // put cookies for ordinary browsing into extension storage, and only
-    // media headers are ever handed to the engine (v0.21.2 audit).
-    const isMedia =
-      details.type === "media" ||
-      (["xmlhttprequest", "other", "media"].includes(details.type) &&
-        MEDIA_RE.test(details.url));
-    if (!isMedia) return;
-    captureHeaders(details.url, details.requestHeaders);
+    // Only media-ish requests are ever inspected: listening to every request in
+    // the tab put cookies for ordinary browsing into extension storage, and only
+    // media headers are ever handed to the engine (v0.21.2 audit). A request
+    // that merely *might* be media is held in memory (see holdHeaders) and
+    // dropped unless its response proves it — storage stays media-only.
+    if (!["media", "xmlhttprequest", "other"].includes(details.type)) return;
+    const pick = pickHeaders(details.requestHeaders);
+    if (!pick) return;
+    if (details.type === "media" || MEDIA_RE.test(details.url)) {
+      commitHeaders(details.url, pick);
+    } else {
+      holdHeaders(details.url, pick);
+    }
   },
   { urls: ["<all_urls>"] },
   ["requestHeaders", "extraHeaders"]
@@ -137,18 +168,28 @@ chrome.webRequest.onHeadersReceived.addListener(
     for (const h of details.responseHeaders || []) {
       if ((h.name || "").toLowerCase() === "content-type" && MEDIA_TYPES.test(h.value || "")) {
         remember(details.tabId, details.url);
+        // The request headers for this URL were held because its name said
+        // nothing; now that the response proved it is media, they are worth
+        // keeping — a guarded stream needs them to download.
+        const held = pending.get(details.url);
+        if (held) commitHeaders(details.url, held);
+        pending.delete(details.url);
         return;
       }
     }
+    pending.delete(details.url); // the name did not lie after all
   },
   { urls: ["<all_urls>"] },
   ["responseHeaders"]
 );
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  chrome.storage.local.get({ tabMedia: {} }, ({ tabMedia }) => {
+  // Through the same chain as every other write: a tab closing mid-stream is
+  // exactly when an un-chained read-modify-write would resurrect its finds, or
+  // drop another tab's.
+  update(({ tabMedia }) => {
     delete tabMedia[tabId];
-    chrome.storage.local.set({ tabMedia });
+    return { tabMedia };
   });
 });
 

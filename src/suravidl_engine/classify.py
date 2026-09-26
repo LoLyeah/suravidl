@@ -29,6 +29,26 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36")
 HEADER_DEFAULTS = {"User-Agent": DEFAULT_UA, "Accept": "*/*"}
 
+# A local tool may reach the LAN — a NAS is a fine place to keep films — and
+# loopback, which is where the engine lives. Link-local is different: that is
+# where cloud metadata services sit, and a page that smuggles a URL into the
+# pipeline must not be able to make the engine poke one. Host *literals* only:
+# guessing at DNS would break the LAN case for no real gain.
+BLOCKED_HOSTS = ("metadata.google.internal", "metadata.goog")
+BLOCKED_PREFIXES = ("169.254.", "fd00:ec2")
+
+
+def blocked_reason(url: str) -> str:
+    """Why this URL must not be fetched, or '' when it is fine to fetch."""
+    host = (urlsplit(url).hostname or "").lower().strip("[]")
+    if not host:
+        return ""
+    if host in BLOCKED_HOSTS:
+        return "cloud metadata address"
+    if host.startswith(BLOCKED_PREFIXES):
+        return "link-local address"
+    return ""
+
 # The canonical prefilter list. The extension fetches it (with a baked-in
 # fallback for when the engine is not answering yet); a test keeps that fallback
 # a subset of this one, so a shell can only ever look at *fewer* URLs than the
@@ -220,6 +240,11 @@ def _drm_in(body: bytes, kind: str) -> tuple[bool, str]:
                 return True, "sample-aes"
             if "SKD://" in upper or "WIDEVINE" in upper or "URN:UUID:" in upper:
                 return True, "key-delivery"
+            # FairPlay usually arrives as SAMPLE-AES (caught above), but a playlist
+            # can name the key system with an ordinary METHOD — and the docs
+            # promise FairPlay is detected, so the KEYFORMAT decides, not luck.
+            if "STREAMINGKEYDELIVERY" in upper or "FAIRPLAY" in upper:
+                return True, "key-delivery"
         return False, ""
     if kind == "dash":
         for scheme, name in DRM_SCHEMES.items():
@@ -246,6 +271,9 @@ def classify(url: str, headers: dict | None = None, fetch=None) -> dict:
     scheme = (urlsplit(url).scheme or "").lower()
     if scheme not in ("http", "https"):
         raise ValueError(f"classify needs an http(s) url, got {scheme or 'none'!r}")
+    why = blocked_reason(url)
+    if why:
+        return _unknown(url, url, f"{why} — not fetched")
     fetch = fetch or _http_fetch
 
     head = fetch(url, headers, "HEAD", None)
@@ -298,16 +326,28 @@ def _ext_of(url: str) -> str:
 def _is_manifest(url: str) -> bool:
     """A playlist or a DASH manifest.
 
-    By extension, or by a hint that cannot be a fragment's name — a `.ts`/`.m4s`
-    URL is never a manifest, even when it lives under `/hls/`.
+    By extension, or by a hint in the *path* — a `.ts`/`.m4s` URL is never a
+    manifest, even under `/hls/`, and a query string is not a name: an honest
+    `.mp4?origin=playlist` is a video, not a playlist. (The shells' *prefilter*
+    still reads the whole URL — a hit there only costs one /classify call. Here
+    it decides what is hidden and how a row is labelled, so it has to be exact.)
     """
     ext = _ext_of(url)
     if ext in SEGMENT_EXT:
         return False
     if ext in ("m3u8", "mpd"):
         return True
-    low = url.lower()
-    return any(h in low for h in ("manifest", "master.m3u8", "playlist"))
+    path = urlsplit(url).path.lower()
+    return any(h in path for h in ("manifest", "master.m3u8", "playlist"))
+
+
+def _common_prefix_len(a: str, b: str) -> int:
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
 
 
 def _origin_of(url: str) -> str:
@@ -326,20 +366,24 @@ def rank(urls: list) -> dict:
     Same origin, not same folder: an ad's segment list is usually served from
     the same host as the real stream's, and hiding one fragment costs nothing
     while showing forty of them costs the user everything.
+
+    When two manifests share an origin, a fragment is attributed to the one it
+    actually sits next to (longest common path prefix) — the reason should name
+    a playlist the user can find, not whichever was seen last.
     """
-    manifests = {}
-    for u in urls:
-        if _is_manifest(u):
-            manifests[_origin_of(u)] = u
+    manifests = [u for u in urls if _is_manifest(u)]
     items = []
     for u in urls:
         if _is_manifest(u):
             items.append({"url": u, "kind": "manifest", "hidden": False, "reason": ""})
         elif _ext_of(u) in SEGMENT_EXT:
-            big = manifests.get(_origin_of(u))
-            if big:
+            path = urlsplit(u).path
+            here = [m for m in manifests if _origin_of(m) == _origin_of(u)]
+            best = max(here, key=lambda m: _common_prefix_len(urlsplit(m).path, path),
+                       default="")
+            if best:
                 items.append({"url": u, "kind": "segment", "hidden": True,
-                              "reason": "part of " + big.rsplit("/", 1)[-1].split("?")[0]})
+                              "reason": "part of " + best.rsplit("/", 1)[-1].split("?")[0]})
             else:
                 items.append({"url": u, "kind": "segment", "hidden": False,
                               "reason": "no playlist seen for this fragment"})

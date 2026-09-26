@@ -60,6 +60,7 @@ def test_an_unsupported_probe_offers_the_browser_only_where_there_is_one():
     js = JS.read_text()
     assert 'id="browserOffer"' in html and 'id="browserOfferBtn"' in html
     assert "function offerBrowser" in js
+    assert "offerBrowser(e, url);" in js, "a definition that is never reached is decoration"
     assert "detail.unsupported" in js, "the engine's own flag is the trigger"
     assert "AndroidHost.openBrowser" in js, "the offer must ask the host"
     # hidden again the moment a probe works

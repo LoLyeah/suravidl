@@ -6,6 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * One media URL the in-app browser saw, how it was seen, and where it lived.
@@ -39,10 +40,15 @@ object SniffLog {
 
     private val items = CopyOnWriteArrayList<Sniffed>()
 
+    /** `add` is called from three threads at once — the WebView handler thread,
+     *  the JS bridge, the UI thread — so its read-modify-write is one critical
+     *  section, and the counter is atomic: a lost tick means the list on screen
+     *  quietly misses a find. (Both were audit findings.) */
+    private val lock = Any()
+    private val ticks = AtomicInteger()
+
     /** Bumped on every change so a poller (or a test) can skip the cheap case. */
-    @Volatile
-    var version: Int = 0
-        private set
+    val version: Int get() = ticks.get()
 
     /**
      * Strongest signal wins. A player's own `src`, or an MSE stream, explains
@@ -57,26 +63,30 @@ object SniffLog {
     fun add(url: String, via: String, frame: String, mainFrame: Boolean): Boolean {
         val clean = url.trim()
         if (!acceptable(clean)) return false
-        val index = items.indexOfFirst { it.url == clean }
-        if (index >= 0) {
-            val old = items[index]
-            if ((RANK[via] ?: 0) <= (RANK[old.via] ?: 0)) return false
-            items[index] = old.copy(via = via, frame = frame.ifEmpty { old.frame })
-            version++
+        synchronized(lock) {
+            val index = items.indexOfFirst { it.url == clean }
+            if (index >= 0) {
+                val old = items[index]
+                if ((RANK[via] ?: 0) <= (RANK[old.via] ?: 0)) return false
+                items[index] = old.copy(via = via, frame = frame.ifEmpty { old.frame })
+                ticks.incrementAndGet()
+                return true
+            }
+            if (items.size >= MAX) items.removeAt(0)
+            items.add(Sniffed(clean, via, frame, mainFrame, System.currentTimeMillis()))
+            ticks.incrementAndGet()
             return true
         }
-        if (items.size >= MAX) items.removeAt(0)
-        items.add(Sniffed(clean, via, frame, mainFrame, System.currentTimeMillis()))
-        version++
-        return true
     }
 
     fun snapshot(): List<Sniffed> = items.toList()
 
     fun clear() {
-        if (items.isEmpty()) return
-        items.clear()
-        version++
+        synchronized(lock) {
+            if (items.isEmpty()) return
+            items.clear()
+            ticks.incrementAndGet()
+        }
     }
 
     /**
@@ -96,12 +106,12 @@ object SniffLog {
 /**
  * The media-pattern list: baked in, but the engine owns the truth.
  *
- * The same list exists three times by design — the engine's `/sniff/patterns`
- * (source of truth), the extension's copy (until M4 moves it), and this one.
- * A test keeps both shells' lists a *subset* of the engine's, so a shell can
- * only ever prefilter fewer URLs than the engine can name: a miss costs a
- * candidate, never a wrong one. The engine's list is fetched at browser start
- * and the copy below stands in whenever it is not answering.
+ * The same list exists more than once by design — the engine's `/sniff/patterns`
+ * (source of truth), the extension's fetched copy with its own fallback, and
+ * this one. A test keeps both shells' lists a *subset* of the engine's, so a
+ * shell can only ever prefilter fewer URLs than the engine can name: a miss
+ * costs a candidate, never a wrong one. The engine's list is fetched at browser
+ * start and the copy below stands in whenever it is not answering.
  */
 object SniffPatterns {
     val FALLBACK_EXT = listOf(

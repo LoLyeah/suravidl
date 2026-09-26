@@ -59,3 +59,23 @@ def test_an_extension_less_manifest_still_counts_as_one():
 
 def test_an_empty_list_is_an_empty_answer():
     assert rank([]) == {"items": [], "hidden": 0}
+
+
+def test_a_query_string_is_not_a_name():
+    """An honest `.mp4` whose query mentions a playlist is a video — and it must
+    not hide a fragment on its host by pretending to be a playlist."""
+    odd = "https://cdn.example/clip.mp4?origin=playlist"
+    out = rank([odd, "https://cdn.example/seg-9.ts"])
+    by = {i["url"]: i for i in out["items"]}
+    assert by[odd]["kind"] == "media"
+    assert out["hidden"] == 0
+
+
+def test_two_playlists_on_one_host_attribute_fragments_to_the_nearer_one():
+    """An ad's playlist and the film's share a host; the reason must name the
+    playlist the fragment actually belongs to, not whichever came last."""
+    out = rank(["https://cdn.example/ads/spots.m3u8",
+                "https://cdn.example/film/master.m3u8",
+                "https://cdn.example/film/seg-1.ts"])
+    by = {i["url"]: i for i in out["items"]}
+    assert by["https://cdn.example/film/seg-1.ts"]["reason"] == "part of master.m3u8"

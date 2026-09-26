@@ -157,6 +157,36 @@ def test_a_refusal_is_explained_not_just_named():
     assert "403" in out["note"] and "cookie" in out["note"]
 
 
+def test_fairplay_is_detected_even_under_an_ordinary_method():
+    """The docs promise FairPlay is refused. A playlist can name the key system
+    in KEYFORMAT while using METHOD=AES-128, so the KEYFORMAT has to decide."""
+    body = (b"#EXTM3U\n"
+            b'#EXT-X-KEY:METHOD=AES-128,URI="https://keys.example/k",'
+            b'KEYFORMAT="com.apple.streamingkeydelivery"\n'
+            b"#EXTINF:4.0,\nseg.ts\n")
+    out = classify("https://cdn.example/film.m3u8",
+                   fetch=served("application/vnd.apple.mpegurl", body))
+    assert out["kind"] == "drm" and out["drm"] is True
+
+
+def test_a_metadata_address_is_not_fetched():
+    """A page can smuggle a URL into the pipeline; the engine must not poke the
+    cloud metadata service on its behalf."""
+    def must_not_run(*a, **k):
+        raise AssertionError("the engine reached for a link-local address")
+
+    out = classify("http://169.254.169.254/latest/meta-data/", fetch=must_not_run)
+    assert out["kind"] == "unknown" and "link-local" in out["note"]
+
+
+def test_a_lan_address_is_still_fetched():
+    """The boundary is deliberate and narrow: a NAS is a fine place to keep
+    films, so private ranges stay reachable."""
+    f = served("video/mp4", b"\x00\x00\x00\x18ftypisom")
+    out = classify("http://192.168.1.50/film.mp4", fetch=f)
+    assert out["kind"] == "video" and f.calls
+
+
 def test_the_real_fetch_asks_like_a_browser_and_lets_callers_override():
     from suravidl_engine.classify import DEFAULT_UA, _headers_with_defaults
 

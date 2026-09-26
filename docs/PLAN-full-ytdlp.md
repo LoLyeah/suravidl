@@ -695,3 +695,36 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     find, and the harness keeps three same-tick finds as a regression test.
     Verified: extension runtime checks ✅, suite **418 passed**, CI ✅.
     Extension: 0.5.1.
+
+- **v0.24.5 — an independent audit, confirmed finding by finding.** The whole
+    capture arc (engine `/classify` + `/sniff/rank`, the extension, the Android
+    in-app browser, their tests) was handed to Google Antigravity, read-only,
+    which returned 15 findings in 21 KB. Nothing was taken on trust: each was
+    reproduced against the real code path before anything changed, two were
+    **downgraded with reasons** (the "hostile page evals JS" finding reaches no
+    privilege the page didn't already have; the "/classify SSRF" has no
+    exfiltration path — the verdict renders in the local app), and loopback +
+    RFC1918 reachability was kept on purpose (the engine *is* on loopback, and a
+    NAS is a legitimate source).
+    What was real, and is fixed: the **infinite `/classify` retry loop** (a null
+    verdict was never remembered, so `render()` re-queued the URL forever — the
+    worst find of the batch); **the MV3 pattern cache** (only the timestamp was
+    persisted, so after every worker restart the engine's list was silently the
+    baked-in fallback — owned, and mutation-verified); **extension-less media
+    found by its response** now carries the headers that were held for it;
+    `tabs.onRemoved` joined the write chain; `SniffLog` became thread-safe with
+    an on-device test that hammers it from eight threads; `rank()` stopped
+    treating a query string as a playlist name and now attributes a fragment to
+    the manifest it actually lives beside; "Clear browsing data" clears the find
+    list too, and says so in the confirm; FairPlay is detected whatever the
+    `METHOD`; the popup WebView is destroyed; the injected hooks are non-writable
+    so no page can swap them; `/classify` refuses link-local and cloud-metadata
+    targets; the token comparison is constant-time; the README badge is current
+    and its API table lists the new endpoints.
+    The tests half matters most: a decoration found here by mutation (deleting
+    the `offerBrowser()` call still passed) is now an assertion that the wiring
+    is *reached*, and an **on-device** test proves a live row carries its
+    Download button — not merely that the code says so. The tap itself is still
+    not end-to-end, and says so.
+    Suite: **426 passed** (was 418); extension runtime checks ✅; records in
+    `docs/audits/2026-09-26-antigravity-sniffing.md`. Extension: 0.5.2.

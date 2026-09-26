@@ -1,13 +1,18 @@
 package com.suravidl.app
 
 import android.content.Intent
+import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * The sniffer's real path: a real WebView loading a real page over real HTTP.
@@ -20,6 +25,13 @@ import org.junit.runner.RunWith
  *
  * Launches the activity fire-and-forget, like the other tests here: what
  * matters is the capture, not the activity's lifecycle state.
+ *
+ * The download path is covered from here too: this class proves a found row
+ * carries a Download button for its URL, and `HandoffTest` proves a handoff
+ * with the browser's own cookies + referer satisfies a guarded server. What
+ * is *not* covered end-to-end is the click itself (the button's own
+ * listener) — a downloaded job through the tap needs the engine running in
+ * the same process, which the queue tests already exercise directly.
  */
 @RunWith(AndroidJUnit4::class)
 class SnifferTest {
@@ -96,6 +108,78 @@ class SnifferTest {
         }
         assertEquals("the list must stay bounded", SniffLog.MAX, SniffLog.snapshot().size)
         SniffLog.clear()
+    }
+
+    @Test(timeout = 60_000)
+    fun theLogSurvivesThreadsAddingAtOnce() {
+        SniffLog.clear()
+        val same = "https://cdn.example/clip.mp4"
+        val pool = Executors.newFixedThreadPool(8)
+        try {
+            val jobs = (0 until 8).map { i ->
+                pool.submit {
+                    repeat(40) { n ->
+                        SniffLog.add(same, "request", "https://page.example/$i", false)
+                        SniffLog.add("https://cdn.example/seg-$i-$n.ts", "request", "", false)
+                    }
+                }
+            }
+            jobs.forEach { it.get(30, TimeUnit.SECONDS) }
+        } finally {
+            pool.shutdown()
+        }
+        val items = SniffLog.snapshot()
+        // add() is called from the WebView handler thread, the JS bridge and the
+        // UI thread at once; without one critical section the same URL lands
+        // twice and the bounded list can overshoot. Both were audit findings.
+        assertEquals("one URL, one row: " + items.count { it.url == same }, 1,
+                     items.count { it.url == same })
+        assertEquals("the list must stay bounded under concurrency: " + items.size,
+                     SniffLog.MAX, items.size)
+        SniffLog.clear()
+    }
+
+    @Test(timeout = 150_000)
+    fun theFoundRowCarriesADownloadButtonForItsUrl() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        SniffLog.clear()
+        try {
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+            // The static tests prove the chip *code* exists; this proves the row
+            // for a find actually carries one, tagged with that find's URL —
+            // which is the half a mutation can delete without anyone noticing.
+            var tagged: String? = null
+            val deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline && tagged == null) {
+                val found = SniffLog.snapshot().firstOrNull { it.url.endsWith("/fixture.m3u8") }
+                if (found != null && viewWithTag("download:" + found.url) != null) {
+                    tagged = found.url
+                } else {
+                    Thread.sleep(1000)
+                }
+            }
+            assertNotNull("no live row offered a Download button for the find: " +
+                          dump(SniffLog.snapshot()), tagged)
+        } finally {
+            server.stop()
+        }
+    }
+
+    /** Looks the tag up in the running BrowserActivity's view tree, on main. */
+    private fun viewWithTag(tag: String): View? {
+        val inst = InstrumentationRegistry.getInstrumentation()
+        var found: View? = null
+        inst.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<BrowserActivity>()
+                .forEach { act -> found = act.window.decorView.findViewWithTag(tag) }
+        }
+        return found
     }
 
     private fun bySuffix(items: List<Sniffed>, suffix: String) =

@@ -4,7 +4,9 @@ Status: **revised v2**, 2026-09-26 — after testing a real JS-only player live
 (see §3). **M1–M4 all shipped** (v0.24.0 → v0.24.3): the engine classifies and
 ranks, the phone's browser sniffs *and* hands over, the extension does the same
 on the desktop, and `docs/SNIFFING.md` states plainly what is and is not
-promised. What is left needs a real phone — see §5.
+promised. **Independently audited, confirmed and hardened in v0.24.5**
+(`docs/audits/2026-09-26-antigravity-sniffing.md`). What is left needs a real
+phone — see §5.
 
 ## 1. The question
 

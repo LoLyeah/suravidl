@@ -33,7 +33,10 @@ object SniffScript {
      * cannot contain its own final form).
      */
     private val BODY = """
-        if (window.__svSniffDoc === document) return; window.__svSniffDoc = document;
+        if (window.__svSniffDoc === document) return;
+        try { Object.defineProperty(window, '__svSniffDoc',
+          { value: document, writable: false, configurable: false, enumerable: false }); }
+        catch (e) { window.__svSniffDoc = document; }
         var EX = __EX__, HI = __HI__;
         var RE = new RegExp('\\.(' + EX.join('|') + ')(\\?|${'$'})', 'i');
         var B = window.SuravidlSniff;
@@ -140,11 +143,22 @@ object SniffScript {
         })();
     """.trimIndent()
 
-    /** The hooks, ready to inject: source published, then the body runs. */
+    /**
+     * The hooks, ready to inject: source published, then the body runs.
+     *
+     * The source has to live on the window — a script cannot quote its own final
+     * form into child frames — but it is *defined*, not assigned, so a page
+     * cannot swap our hooks for a payload of its own and have this injector
+     * eval that into its same-origin frames. (Such a page could always eval
+     * into its own frames; what it must not be able to do is make us do it.)
+     */
     fun js(): String {
         val wrapped = "(function () {\n" + fill(BODY) + "\n})();"
-        return "try { window.__svSniffSrc = " + JSONObject.quote(wrapped) +
-            "; } catch (e) {}" + wrapped
+        val quoted = JSONObject.quote(wrapped)
+        return "(function () { try { Object.defineProperty(window, '__svSniffSrc', " +
+            "{ value: $quoted, writable: false, configurable: false, enumerable: false }); }" +
+            " catch (e) { try { window.__svSniffSrc = $quoted; } catch (e2) {} } })();" +
+            wrapped
     }
 
     fun scan(): String = fill(SCAN)

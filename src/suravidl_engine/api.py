@@ -237,7 +237,8 @@ def create_app(download_dir, auth_token: str | None = None,
     def require_auth(
         creds: HTTPAuthorizationCredentials | None = Security(HTTPBearer(auto_error=False)),
     ):
-        if auth_token and (creds is None or creds.credentials != auth_token):
+        if auth_token and (creds is None or not secrets.compare_digest(
+                creds.credentials, auth_token)):
             raise HTTPException(status_code=401, detail="unauthorized")
         return manager
 

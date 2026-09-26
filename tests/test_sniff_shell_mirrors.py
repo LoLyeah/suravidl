@@ -67,6 +67,40 @@ def test_the_browser_hides_fragments_only_on_the_engines_word():
     handoff = (ROOT / "android/app/src/main/java/com/suravidl/app/Handoff.kt").read_text()
     assert '"/sniff/rank"' in handoff, "the browser must ask the engine"
     assert "Handoff.rank(" in browser
+    # and it must actually *ask*, on every new list — a defined function that is
+    # never reached is exactly the decoration this project refuses
+    assert browser.count("rankIfNeeded(") >= 2, "the rule must be asked, not only defined"
     assert "!hidden.containsKey(it.url)" in browser, "hidden means hidden"
     assert "fragments belong to a playlist above" in browser, \
         "hiding must be visible, not silent"
+
+
+def test_the_injected_hooks_cannot_be_swapped_by_the_page():
+    """The source has to live on the window (a script cannot quote its own final
+    form into child frames), so it is defined un-swappable instead of assigned —
+    a page must not be able to make our injector eval its payload into its own
+    same-origin frames."""
+    script = (ROOT / "android/app/src/main/java/com/suravidl/app/SniffScript.kt").read_text()
+    assert "Object.defineProperty(window, '__svSniffSrc'" in script
+    assert "writable: false, configurable: false" in script
+    assert "Object.defineProperty(window, '__svSniffDoc'" in script
+
+
+def test_a_download_button_carries_the_url_it_belongs_to():
+    """The row's Download chip is tagged with its URL, so an instrumented test
+    can prove the button exists for a find instead of only that the code does."""
+    browser = BROWSER.read_text()
+    assert 'chip("Download", "download:" + c.url)' in browser
+    test_src = (ROOT / "android/app/src/androidTest/java/com/suravidl/app/"
+                "SnifferTest.kt").read_text()
+    assert '"download:" + ' in test_src, "the tag must be looked for on device"
+
+
+def test_clearing_browsing_data_clears_the_finds_too():
+    """Leaving the URLs of a sensitive session on screen would defeat the whole
+    gesture."""
+    browser = BROWSER.read_text()
+    block = browser.split("private fun clearBrowsingData()")[1].split("private fun")[0]
+    assert "SniffLog.clear()" in block
+    assert "info.clear()" in block
+    assert "list of finds above" in block, "and the confirm must say so"

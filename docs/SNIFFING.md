@@ -26,8 +26,10 @@ and refuse the same DRM for the same reasons. Shells collect; the engine judges.
   fragments are hidden *and counted* ("3 fragments belong to a playlist above"),
   never silently dropped.
 - **Removing data is specific.** "Clear browsing data" in the in-app browser
-  clears cookies, site storage and cache that *this* browser collected, and says
-  that your downloads, the vault and any imported `cookies.txt` are not touched.
+  clears cookies, site storage and cache that *this* browser collected, plus
+  the list of finds on screen — a record of what was watched — and says both
+  of those things, and that your downloads, the vault and any imported
+  `cookies.txt` are not touched.
 
 ## What is deliberately not promised
 
@@ -77,7 +79,8 @@ Download tab → **🔍 Find a video on a page**:
 3. Tap **Scan**. Finds are listed newest-first, each with how it was found
    (`network`, `script`, `player`, `MSE`) and the engine's verdict.
 4. Tap **Download** on the one you want. It joins the app's Queue tab.
-5. **Clear data** in the browser's toolbar wipes what that browser collected;
+5. **Clear data** in the browser's toolbar wipes what that browser collected —
+   cookies, storage, cache *and* the find list above it;
    **Clear list** only empties the find list.
 
 A `blob:`/`MSE` find is shown for context — it is proof the player is streaming,
@@ -117,7 +120,7 @@ of the very session that is playing.
 
 ## Manual checklist (only a real device can show these)
 
-1. the case this whole feature was
+1. The case this whole feature was
    built against: no `<video>`, a same-origin iframe, an obfuscated player. Open
    it in the in-app browser, play, Scan; if the manifest appears, download it.
    If it does not, that is a data point, not a bug: see "what is not promised".
@@ -126,4 +129,4 @@ of the very session that is playing.
 3. An HLS page with many fragments: confirm the list shows the playlist and says
    how many fragments were hidden.
 4. **Clear data**, then reload the page: confirm a site login is gone (that is
-   the point) and the Queue tab's downloads are not.
+   the point), the find list is empty, and the Queue tab's downloads are not.

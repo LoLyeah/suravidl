@@ -7,7 +7,7 @@ as a library, FastAPI on top), one UI, and thin shells around them: browser
 extension, desktop app, Android app. It downloads anything yt-dlp understands
 (1000+ sites) plus raw `.mp4`/`.webm`/`.m3u8`/`.mpd` links, and never touches DRM.
 
-Latest release: [v0.22.0](https://github.com/LoLyeah/suravidl/releases/latest) ·
+Latest release: [v0.24.5](https://github.com/LoLyeah/suravidl/releases/latest) ·
 history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
 reviews: [docs/audits/](docs/audits/)
 
@@ -182,6 +182,9 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 | `GET/POST /settings`, `GET /presets` | ✓ | settings and presets |
 | `GET /files/summary`, `POST /files/clear` | ✓ | storage; the wipe needs `{"confirm": "delete"}` |
 | `POST /update` | ✓ | self-update yt-dlp |
+| `POST /classify` | ✓ | what is this URL? (video/hls/dash/drm/audio/page/unknown) |
+| `GET /sniff/patterns` | ✓ | the one media-pattern list every shell prefilters with |
+| `POST /sniff/rank` | ✓ | which finds are worth showing (hides fragments of a playlist that is also here, and says why) |
 | `GET /app/info`, `POST /app/minimize`, `/app/quit` | ✓ | desktop window controls |
 
 ¹ Also accepts `?token=` because an HTML `<video>` cannot send a header.
