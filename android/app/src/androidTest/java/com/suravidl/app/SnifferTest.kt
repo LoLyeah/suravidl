@@ -169,6 +169,71 @@ class SnifferTest {
         }
     }
 
+    @Test(timeout = 180_000)
+    fun thePlayersOwnSourceIsAFindEvenWithoutAMediaExtension() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        SniffLog.clear()
+        try {
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/noext.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+            var found: Sniffed? = null
+            val deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline) {
+                found = SniffLog.snapshot().firstOrNull { it.url.endsWith("/media/plainid1234") }
+                if (found != null) break
+                Thread.sleep(1000)
+            }
+            assertNotNull("an extension-less stream the player itself points at was missed " +
+                          "— the real site served /1Vvp1Q5ixT-GxZcW4IToe with no extension " +
+                          "at all: " + dump(SniffLog.snapshot()), found)
+            assertEquals("the player's own source is a 'player' find", "player", found!!.via)
+            assertTrue("the frame the stream lives in must be recorded — it becomes the " +
+                       "referer: " + found!!.frame, found!!.frame.contains("/noext-inner.html"))
+        } finally {
+            server.stop()
+        }
+    }
+
+    @Test(timeout = 240_000)
+    fun aSecondLinkReachesTheBrowserThatIsAlreadyOpen() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        SniffLog.clear()
+        try {
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            var deadline = System.currentTimeMillis() + 90_000
+            while (System.currentTimeMillis() < deadline &&
+                   SniffLog.snapshot().none { it.url.endsWith("/bare.mp4") }) {
+                Thread.sleep(1000)
+            }
+            assertTrue("the first page never loaded: " + dump(SniffLog.snapshot()),
+                       SniffLog.snapshot().any { it.url.endsWith("/bare.mp4") })
+
+            // Exactly what "Open in the browser ↗" does for a second link — the
+            // activity is singleTask, so this is delivered as onNewIntent.
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/second.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+            deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline &&
+                   SniffLog.snapshot().none { it.url.endsWith("/second.mp4") }) {
+                Thread.sleep(1000)
+            }
+            assertTrue("a second link never reached the browser that was already open — " +
+                       "singleTask without onNewIntent drops it silently, so the user keeps " +
+                       "scanning the previous page: " + dump(SniffLog.snapshot()),
+                       SniffLog.snapshot().any { it.url.endsWith("/second.mp4") })
+        } finally {
+            server.stop()
+        }
+    }
+
     /** Looks the tag up in the running BrowserActivity's view tree, on main. */
     private fun viewWithTag(tag: String): View? {
         val inst = InstrumentationRegistry.getInstrumentation()

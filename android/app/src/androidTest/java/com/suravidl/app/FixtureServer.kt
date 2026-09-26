@@ -102,9 +102,14 @@ class FixtureServer {
         "/", "/page.html" -> Triple(200, "text/html", PAGE.toByteArray())
         "/inner.html" -> Triple(200, "text/html", INNER.toByteArray())
         "/guarded.html" -> Triple(200, "text/html", GUARDED_PAGE.toByteArray())
+        "/noext.html" -> Triple(200, "text/html", NOEXT_PAGE.toByteArray())
+        "/noext-inner.html" -> Triple(200, "text/html", NOEXT_INNER.toByteArray())
+        "/second.html" -> Triple(200, "text/html", SECOND_PAGE.toByteArray())
         "/fixture.m3u8" -> Triple(200, "application/vnd.apple.mpegurl",
                                   MANIFEST.toByteArray())
         "/bare.mp4", "/inner.mp4" -> Triple(200, "video/mp4", media())
+        "/second.mp4" -> Triple(200, "video/mp4", media())
+        "/media/plainid1234" -> Triple(200, "video/mp4", media())
         "/guarded.mp4" -> if (guardAllows(headers)) {
             Triple(200, "video/mp4", media())
         } else {
@@ -157,6 +162,29 @@ class FixtureServer {
         private val GUARDED_PAGE = """
             <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
             <body style="margin:0;background:#000"><video src="/guarded.mp4" muted></video></body>
+        """.trimIndent()
+
+        /** The shape a real site served (vidmonstr, 2026-09-26): the player sits
+         *  in a *same-origin* child frame and points at a stream with no media
+         *  extension, on another host. No URL pattern can recognise that — a
+         *  miss there costs a real video — so the player's own element is the
+         *  only honest evidence there is. */
+        private val NOEXT_PAGE = """
+            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+            <body style="margin:0;background:#000">
+            <iframe src="/noext-inner.html" style="width:320px;height:180px"></iframe>
+            </body>
+        """.trimIndent()
+
+        private val NOEXT_INNER = """
+            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+            <body style="margin:0;background:#111"><video src="/media/plainid1234" muted></video></body>
+        """.trimIndent()
+
+        /** A second page with one find of its own, for the "another link" test. */
+        private val SECOND_PAGE = """
+            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+            <body style="margin:0;background:#000"><video src="/second.mp4" muted></video></body>
         """.trimIndent()
 
         private val MANIFEST = """
