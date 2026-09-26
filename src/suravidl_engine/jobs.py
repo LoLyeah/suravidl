@@ -477,10 +477,15 @@ class JobManager:
                     if j["status"] == "completed"]
             for jid in gone:
                 self._jobs.pop(jid, None)
-            if gone:
+        if gone:
+            # the same rule as deleting one row: the DB work happens under the
+            # database lock, and the ids join `_deleted` in that same section
+            # so a write that was already in flight cannot bring a cleared row
+            # back (`_save` checks that set under the same lock)
+            with self._db_lock, self._con:
+                self._deleted.update(gone)
                 self._con.execute(
                     "DELETE FROM jobs WHERE status = 'completed'")
-                self._con.commit()
         return len(gone)
 
     # -- deleting one download (the trash button) -------------------------
@@ -609,9 +614,15 @@ class JobManager:
                         "Settings when you want it gone")
         with self._lock:
             self._jobs.pop(job_id, None)
+        # The row goes under the database lock, and `_deleted` is stamped in the
+        # same section: `_save` (the worker thread) checks that set under the
+        # same lock, so a late write can neither commit in the middle of this
+        # transaction — `sqlite3.OperationalError: cannot commit - no
+        # transaction is active`, which is how CI caught this on Python 3.10 —
+        # nor slip past the check and bring the row back.
+        with self._db_lock, self._con:
             self._deleted.add(job_id)
-            with self._con:
-                self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         out = {"deleted": deleted, "freed_bytes": freed,
                "filepath": job.get("filepath")}
         if note:

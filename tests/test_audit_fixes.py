@@ -4,6 +4,7 @@ Every test here failed against the running engine before its fix — they were
 found by probing the live API with hostile input, not by reading code.
 """
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -221,6 +222,106 @@ def test_an_old_playlist_row_keeps_files_it_cannot_name(tmp_path):
         assert "note" in body and "folder" in body["note"]
         assert Path(made[0]).exists() and other.exists()
         assert c.get(f"/jobs/{pid}", headers=AUTH).status_code == 404
+
+
+# -- 7b. two locks, and the write paths that only took one ------------------
+# CI found this on Python 3.10: a playlist delete raised
+# `sqlite3.OperationalError: cannot commit - no transaction is active`.
+# `_lock` guards the in-memory maps, `_db_lock` guards the shared connection,
+# and `_save` — which the worker thread calls for every progress tick — uses
+# the second. The delete path used only the first, so its DELETE could land in
+# the middle of another thread's transaction, and a late write could also slip
+# past the `_deleted` check and commit a removed row straight back.
+
+def _hold_db_lock(mgr):
+    """Take the database lock in another thread and hand back the release."""
+    held, release = threading.Event(), threading.Event()
+
+    def holder():
+        with mgr._db_lock:
+            held.set()
+            release.wait(5)
+
+    threading.Thread(target=holder, daemon=True).start()
+    assert held.wait(2), "the helper thread never took the database lock"
+    return release
+
+
+def _runs_while(release, fn, why):
+    """"fn must wait for the lock" — proved by watching it not finish."""
+    done = threading.Event()
+
+    def run():
+        fn()
+        done.set()
+
+    threading.Thread(target=run, daemon=True).start()
+    assert not done.wait(0.3), why
+    release.set()
+    assert done.wait(5), "it never finished once the lock was free"
+
+
+def test_the_delete_path_waits_for_the_database_lock(tmp_path):
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        pid, _ = _playlist_job(mgr)
+        release = _hold_db_lock(mgr)
+        _runs_while(release, lambda: mgr.delete_job(pid),
+                    "the delete ran without the database lock")
+
+
+def test_clearing_completed_waits_for_the_database_lock(tmp_path):
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        _playlist_job(mgr)
+        release = _hold_db_lock(mgr)
+        _runs_while(release, mgr.clear_completed,
+                    "the clear ran without the database lock")
+
+
+def test_a_late_save_cannot_resurrect_a_cleared_row(tmp_path):
+    """`clear_completed` removed the row but not the id from `_deleted`, so a
+    worker write that was already in flight committed the row back."""
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        pid, _ = _playlist_job(mgr)
+        stale = dict(mgr._jobs[pid])
+        mgr.clear_completed()
+        mgr._save(stale)
+        assert mgr._con.execute("SELECT COUNT(*) FROM jobs WHERE id = ?",
+                                (pid,)).fetchone()[0] == 0
+
+
+def test_deleting_while_a_save_is_in_flight_stays_consistent(tmp_path):
+    """The hammer: the row ends up gone and nothing raises on the way."""
+    app = _app(tmp_path)
+    mgr = app.state.manager
+    with TestClient(app) as c:
+        pid, _ = _playlist_job(mgr)
+        stale = dict(mgr._jobs[pid])
+        errors, stop = [], threading.Event()
+
+        def saver():
+            while not stop.is_set():
+                try:
+                    mgr._save(stale)
+                except Exception as e:      # this is the assertion, recorded
+                    errors.append(repr(e))
+                    return
+
+        t = threading.Thread(target=saver, daemon=True)
+        t.start()
+        try:
+            mgr.delete_job(pid)
+        finally:
+            stop.set()
+            t.join(10)
+        assert not errors, errors
+        assert mgr._con.execute("SELECT COUNT(*) FROM jobs WHERE id = ?",
+                                (pid,)).fetchone()[0] == 0
 
 
 def test_playlist_files_survive_a_restart(tmp_path):
