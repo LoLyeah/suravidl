@@ -74,6 +74,31 @@ def test_a_401_is_never_read_as_a_timeout():
     assert "refused" in out
 
 
+def test_a_version_amo_already_has_is_not_a_failure():
+    """Every release tag submits the extension version, whether or not the
+    extension changed — a version already in the listing answers 400 "already
+    exists", which means an earlier run already did the work."""
+    code, out = _verdict("WebExtError: Submission failed (2): Bad Request\n"
+                         '{"version": ["Version 0.5.2 already exists."]}\n', 1)
+    assert code == 0, out
+    assert "already" in out.lower()
+
+
+def test_the_accepted_submission_is_read_as_submitted():
+    """The log from the run that worked, verbatim: validation passed, the
+    version moved to approval, the CLI stopped waiting, and Mozilla's own line
+    names the version page."""
+    log = ("Building web extension from /tmp/ffext\n"
+           "Waiting for validation...\n"
+           "Waiting for approval...\n\n"
+           "WebExtError: Approval: timeout exceeded. When approved the signed XPI "
+           "file can be downloaded from https://addons.mozilla.org/en-US/"
+           "developers/addon/suravidl/versions/6516441\n")
+    code, out = _verdict(log, 1)
+    assert code == 0, out
+    assert "review" in out
+
+
 def test_the_workflow_uses_the_script_and_not_its_own_grep():
     wf = (ROOT / ".github/workflows/amo.yml").read_text()
     assert "bash .github/scripts/amo_verdict.sh" in wf

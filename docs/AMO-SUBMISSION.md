@@ -1,5 +1,9 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
+**Status:** submitted 2026-09-26 — `suravidl 0.5.2` is in review. The version's
+own page (where the review state shows):
+<https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/6516441>
+
 The Firefox build is Manifest V2, which is fine: Mozilla still supports MV2
 alongside MV3 and has said so repeatedly (their Add-ons Policies update of June
 2025 is explicit — "developers are not required to adopt Manifest V3").
@@ -50,10 +54,20 @@ web-ext sign --channel listed --amo-metadata docs/amo-metadata.json …
 ```
 
 **What that command does, honestly:** it uploads the version, Mozilla runs its
-validator, and the version then sits in **"awaiting review"**. The CLI keeps
-polling for a signed file, so on a first listing it ends in a timeout *after*
-the upload — the workflow reports that as success with a notice, because the
-part that matters (the submission) is done. Watching the process:
+validator, and the version then sits in **"awaiting review"**. The CLI waits a
+few minutes for a signature and then gives up — the upload was already done at
+that point, so the workflow treats that timeout as success-with-a-notice, and
+the log prints the version's own page on AMO:
+
+```
+https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/<id>
+```
+
+That page is where the review state lives. Re-running for a version AMO already
+has is reported as "nothing to do" rather than a failure: every release tag
+submits the extension version whether or not the extension changed.
+
+Watching the process:
 
 - Developer Hub → your add-on → **Manage → Status & Versions** shows the
   version and its review state.

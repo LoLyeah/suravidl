@@ -23,6 +23,17 @@ if [ "$status" -eq 0 ]; then
 fi
 
 # A refusal is a refusal, whatever else the log says.
+#
+# The duplicate case comes first: re-submitting a version AMO already has comes
+# back as a 400 ("Version 0.5.2 already exists"), which is not a failure — it
+# means an earlier run already did the work, and every release tag submits the
+# extension version whether or not the extension changed.
+if grep -qiE "already exists|already been uploaded|version .* already" "$log"; then
+    echo "::notice title=Already on AMO::This version is already in the listing — nothing to submit."
+    echo "submitted: this version is already on AMO"
+    exit 0
+fi
+
 if grep -qiE "submission failed|bad request|unauthorized|forbidden|client error|not acceptable" "$log"; then
     echo "::error title=AMO refused the submission::The WebExtError above is the message to fix."
     echo "refused: AMO rejected the submission"

@@ -65,7 +65,7 @@ jobs:
             --amo-metadata docs/amo-metadata.json \
             --api-key "$AMO_JWT_ISSUER" \
             --api-secret "$AMO_JWT_SECRET" \
-            --timeout 600000 \
+            --timeout 180000 \
             --artifacts-dir /tmp/amo-artifacts 2>&1 | tee /tmp/amo-sign.log
           status=${PIPESTATUS[0]}
           echo "web-ext exit: $status"
