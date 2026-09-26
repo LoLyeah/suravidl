@@ -7,7 +7,11 @@ as a library, FastAPI on top), one UI, and thin shells around them: browser
 extension, desktop app, Android app. It downloads anything yt-dlp understands
 (1000+ sites) plus raw `.mp4`/`.webm`/`.m3u8`/`.mpd` links, and never touches DRM.
 
-Latest release: [v0.24.5](https://github.com/LoLyeah/suravidl/releases/latest) ·
+[![release](https://img.shields.io/github/v/release/LoLyeah/suravidl?style=for-the-badge&label=release&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases/latest)
+[![build](https://img.shields.io/github/actions/workflow/status/LoLyeah/suravidl/ci.yml?style=for-the-badge&label=build&logo=githubactions&logoColor=white)](https://github.com/LoLyeah/suravidl/actions/workflows/ci.yml)
+[![downloads](https://img.shields.io/github/downloads/LoLyeah/suravidl/total?style=for-the-badge&label=downloads&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases)
+
+[releases](https://github.com/LoLyeah/suravidl/releases/latest) ·
 history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
 reviews: [docs/audits/](docs/audits/)
 
