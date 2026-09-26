@@ -1,9 +1,9 @@
 # PLAN — "Capture anything": unsupported URLs on Android (+ better everywhere)
 
 Status: **revised v2**, 2026-09-26 — after testing a real JS-only player live
-(see §3). **M1 shipped (v0.24.0), M2 shipped (v0.24.1)** — the in-app browser
-with all four capture layers is in, verified on emulators by an instrumented
-test. M3 (the handoff) is next.
+(see §3). **M1 shipped (v0.24.0), M2 shipped (v0.24.1), M3 shipped (v0.24.2)** —
+the browser finds streams *and* hands them to the engine with its own cookies,
+User-Agent and referer. M4 (desktop parity + docs) is next.
 
 ## 1. The question
 
@@ -182,11 +182,18 @@ Each its own version + tagged release; TDD as usual; offline fixtures only.
   permission**: the system WebView *is* the browser, and `androidx.webkit` —
   the only thing that would reach a *cross-origin* frame's scripts — is
   deferred to M3 by choice. Measured cost: **+20 KB** on the debug APK.
-- **M3 — the handoff** (v0.24.2): turn a candidate into a download —
-  `POST /classify` before it is shown, cookies/UA/referer (frame-first) handed
-  to the engine, "Download this" on a row, the probe-unsupported prompt from the
-  share path, "Clear browser data", and `addDocumentStartJavaScript` if the
-  cross-origin gap turns out to be worth its ~100 KB.
+- **M3 — the handoff** (v0.24.2, **shipped**): every find carries the engine's
+  verdict (`POST /classify`, sent with the headers a guarded URL needs even to be
+  looked at) and a Download button that posts to `/jobs` with this WebView's
+  cookie jar, its own User-Agent, and the **frame** it came from as the referer
+  — frame-first, per §4. DRM and `blob:`/`mse:` rows explain themselves instead
+  of offering a button that cannot work; "Clear browsing data" takes the word;
+  and an "unsupported URL" probe answer now offers "Open in the browser ↗", the
+  consumer the M1 structured error was built for. Verified by an instrumented
+  test against a **guarded** fixture — 403 without the browser's cookie *and*
+  referer — so a green run means the captured headers reached yt-dlp.
+  `androidx.webkit` still not taken: the cross-origin-frame gap stays open, on
+  purpose.
 - **M4 — desktop parity + docs** (v0.24.3): `onHeadersReceived`,
   manifest-over-segments, README capture matrix, Firefox-Android stopgap +
   engine-token row, and a short `docs/SNIFFING.md` stating what is and is not

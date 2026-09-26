@@ -636,3 +636,24 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     instrumentation ✅ on API 30 **and** the 16 KB-page API 36 emulator (a
     loopback fixture server, a real WebView, real HTTP — nothing but the
     emulator needed), CI ✅, suite **395 passed**.
+
+- **v0.24.2 — M3 of the capture plan: the handoff.**
+    A find is no longer a dead end. Every row carries the engine's own verdict —
+    kind, size, DRM, from `POST /classify`, sent with the headers a guarded URL
+    needs even to be *looked at* — and a Download button that posts to `/jobs`
+    exactly the way the desktop extension always has: this WebView's cookie jar,
+    its own User-Agent, and the **frame** the URL came from as the referer (a
+    signed media URL's referer is the player iframe, not the address bar). All
+    three keys sit inside `jobs.py`'s allow-list, so nothing is dropped silently
+    and a failure never masquerades as "this site needs a login". Markers are not
+    downloads: a `blob:`/`mse:` row says what it is, a DRM row says it cannot be
+    fetched and offers nothing, and "Clear browsing data" arrives with a confirm
+    that names what it does *not* touch — downloads and the imported cookie file.
+    In the app, an "unsupported URL" probe answer finally offers "Open in the
+    browser ↗" (host-gated, hidden again as soon as a probe works): the consumer
+    the M1 structured error was built for.
+    Verified end to end **on a device**: the instrumented test's fixture is
+    *guarded* — `/guarded.mp4` answers 403 unless the request carries the
+    browser's cookie *and* a referer from the page that embedded it — so a green
+    run is proof that the captured headers genuinely reached yt-dlp. Suite:
+    **402 passed**.
