@@ -22,6 +22,16 @@ and refuse the same DRM for the same reasons. Shells collect; the engine judges.
   check) therefore downloads the way it plays.
 - **Your verdict is the engine's**: `HLS · 42 MB`, `video · 3.4 MB`,
   `DRM — not downloadable`. A DMCA'd or geo-blocked stream says so, in one line.
+- **What the player itself asks for is evidence.** A `<video>`/`<source>` URL is
+  reported whatever it looks like — real sites serve streams with no extension
+  at all (`https://mp4-06.overfetch.video/1Vv…`), which no pattern list can
+  recognise. The URL prefilter is there to keep *network noise* out of the list,
+  not to second-guess the player, and the engine still classifies every
+  candidate before a row is drawn.
+- **A new link replaces the page.** "Open in the browser ↗" on a second link
+  loads it even when the browser is already open (the previous find list goes
+  with the previous page). In-page back still walks history, so nothing is lost
+  by browsing around.
 - **Hiding is visible.** When a playlist and its fragments are both seen, the
   fragments are hidden *and counted* ("3 fragments belong to a playlist above"),
   never silently dropped.

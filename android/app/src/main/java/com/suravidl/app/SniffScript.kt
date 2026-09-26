@@ -48,14 +48,22 @@ object SniffScript {
           for (var i = 0; i < HI.length; i++) { if (s.indexOf(HI[i]) >= 0) return true; }
           return false;
         }
-        function rep(u, via) {
+        function rep(u, via, direct) {
           try {
             if (!u) return;
             u = String(u);
             if (u.indexOf('mse:') === 0) { B.report(u, 'mse', location.href); return; }
             u = new URL(u, location.href).href;
             if (!/^(https?:|blob:)/i.test(u)) return;
-            if (!P(u) && via !== 'mse') return;
+            // `direct` = the player itself pointed at this URL (a media
+            // element's own source). The prefilter exists to keep *network
+            // noise* out of the list; it is not evidence. A real site served a
+            // stream with no extension at all — mp4-06.overfetch.video/<id>,
+            // another host — which no pattern can recognise, and a miss there
+            // costs the user a video. What the player asks for is evidence, so
+            // it is reported as it is; the engine still classifies every
+            // candidate before a row is drawn.
+            if (!direct && !P(u) && via !== 'mse') return;
             B.report(u, via, location.href);
           } catch (e) {}
         }
@@ -68,7 +76,7 @@ object SniffScript {
               // A blob: source *is* a JavaScript-fed stream (MediaSource), so it
               // is reported as one even when the hooks that would have watched
               // it being created were installed too late to see that happen.
-              if (String(s).indexOf('blob:') === 0) rep(s, 'mse'); else rep(s, 'player');
+              if (String(s).indexOf('blob:') === 0) rep(s, 'mse', true); else rep(s, 'player', true);
             }
           } catch (e) {}
         }
@@ -97,7 +105,7 @@ object SniffScript {
           var d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
           if (d && d.set) Object.defineProperty(HTMLMediaElement.prototype, 'src', {
             configurable: true, get: d.get,
-            set: function (u) { try { rep(u, 'player'); } catch (e) {} return d.set.call(this, u); }
+            set: function (u) { try { rep(u, 'player', true); } catch (e) {} return d.set.call(this, u); }
           });
         } catch (e) {}
         try {

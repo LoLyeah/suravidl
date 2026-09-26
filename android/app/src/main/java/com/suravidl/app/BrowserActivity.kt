@@ -154,6 +154,30 @@ class BrowserActivity : AppCompatActivity() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
+    /**
+     * The activity is `singleTask`, so a second "Open in the browser ↗" (or a
+     * second share, or a second tap on the browser entry) arrives *here* — not
+     * in `onCreate`. Without this override the new link was dropped silently
+     * and the user kept scanning the previous page: the live report was "it
+     * still won't download" for a link that never got loaded. In-page back
+     * still walks the WebView's history (it never reaches this override), so
+     * only a genuinely new page starts a fresh find list.
+     */
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent == null) return
+        setIntent(intent)
+        val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+        if (url.isEmpty()) return
+        SniffLog.clear()
+        info.clear()
+        classifyQueue.clear()
+        hidden = emptyMap()
+        rankedFor = -1
+        render()
+        load(url)
+    }
+
     // -- chrome ---------------------------------------------------------------
 
     private fun buildUi() {

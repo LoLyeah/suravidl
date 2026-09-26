@@ -728,3 +728,25 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     not end-to-end, and says so.
     Suite: **426 passed** (was 418); extension runtime checks ✅; records in
     `docs/audits/2026-09-26-antigravity-sniffing.md`. Extension: 0.5.2.
+
+- **v0.24.6 — the site that beat the prefilter, and the link that went nowhere.**
+    A live report ("for <link> it still won't download") turned out to be two
+    bugs, and neither was the one the plan expected.
+    **1. The prefilter was deciding for the player.** The site's stream is
+    `https://mp4-06.overfetch.video/1Vvp1Q5ixT-GxZcW4IToe` — no media extension,
+    another host, inside a same-origin player frame. No pattern list can
+    recognise that shape, so every layer dropped it: the player's own `<video>`
+    pointed straight at the video and the app could not see it. The rule was
+    right for *network noise* and wrong here, so `rep()` grew a `direct` flag —
+    a media element's own source (the DOM sweep and the `src` setter) is
+    evidence, not a guess, reported as it is and classified by the engine before
+    a row is drawn. `/classify` on that URL answers `video · 16 MB`, and yt-dlp
+    takes it with the frame's referer, which the handoff already sends.
+    **2. `singleTask` without `onNewIntent`.** A second "Open in the browser ↗"
+    was delivered to an activity that ignored it, so the user kept scanning the
+    *previous* page while believing they were on the new one — exactly what "it
+    still won't download" looks like from the outside. `onNewIntent` now reads
+    the extra, starts a fresh find list, and loads the link.
+    Both are pinned by instrumented tests that failed in CI before the fix: an
+    extension-less player source must be found as a `player` find with its frame
+    recorded, and a second link must reach a browser that is already open.

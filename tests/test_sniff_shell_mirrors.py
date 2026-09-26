@@ -104,3 +104,29 @@ def test_clearing_browsing_data_clears_the_finds_too():
     assert "SniffLog.clear()" in block
     assert "info.clear()" in block
     assert "list of finds above" in block, "and the confirm must say so"
+
+
+def test_the_players_own_source_is_evidence_not_a_guess():
+    """An extension-less stream cannot match any pattern — a real site served
+    one (`mp4-06.overfetch.video/<id>`, no extension, another host, inside a
+    same-origin player frame). The prefilter exists to keep *network noise*
+    out, so a media element's own source is reported as it is and the engine
+    classifies it before a row is drawn. Proven on device in `SnifferTest`;
+    this pins the wiring."""
+    script = (ROOT / "android/app/src/main/java/com/suravidl/app/SniffScript.kt").read_text()
+    assert "function rep(u, via, direct)" in script
+    assert "if (!direct && !P(u) && via !== 'mse') return;" in script
+    assert "rep(s, 'player', true)" in script, "the DOM source must not be filtered"
+    assert "rep(s, 'mse', true)" in script
+    assert "rep(u, 'player', true)" in script, "the src setter must not be filtered"
+
+
+def test_a_second_link_reaches_the_browser_that_is_already_open():
+    """The activity is singleTask: without an onNewIntent override a second
+    "Open in the browser" was dropped on the floor while the user kept scanning
+    the previous page."""
+    browser = BROWSER.read_text()
+    assert "override fun onNewIntent(" in browser
+    body = browser.split("override fun onNewIntent(")[1].split("// -- chrome")[0]
+    assert "getStringExtra(EXTRA_URL)" in body, "the new link must be read there"
+    assert "load(url)" in body, "and loaded"
