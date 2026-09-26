@@ -610,3 +610,29 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     classifier's default User-Agent was urllib's "Python-urllib/…", which is
     bot-blocked on sight — pages answered 403 until it asked like a browser.
     Suite: **395 passed**.
+
+- **v0.24.1 — M2 of the capture plan: the phone gets a browser.**
+    `BrowserActivity` + `SnifferWebViewClient` capture what a page asks for in
+    four layers — network requests in every frame, element loads, JS hooks
+    (fetch/XHR, a media element's own src, `createObjectURL`, `addSourceBuffer`)
+    and a `performance`-timeline sweep. The hooks also ride into *same-origin*
+    child frames, and every find carries the frame it came from, because a
+    signed media URL's referer is usually the player iframe and not the address
+    bar. Candidates land in one thread-safe log — layer 1 runs on a handler
+    thread — with a strongest-signal-wins rule, so a blob-fed player outranks
+    the request that happened to fetch it first. The Download tab grows a
+    host-gated "Find a video on a page" button: Android has no extensions, so
+    here the browser *is* the extension. **No new dependency, no new
+    permission** — the system WebView is the browser — and the measured cost is
+    **+20 KB** on the debug APK. Handing a candidate to the engine (cookies,
+    referer, User-Agent) is M3: this milestone finds and copies, and says so.
+    The instrumented test earned its keep before the release: it caught a
+    WebView method read off the main thread, and a frame guard that latched on
+    the `about:blank` document a frame starts life with — leaving a child
+    frame's *real* document unhooked. Fixing the second one came with an
+    insight worth keeping: a `blob:` source on a media element *is* a
+    JavaScript-fed stream, so a player stays visible even when the hooks that
+    would have watched it being built arrived late. Verified: android
+    instrumentation ✅ on API 30 **and** the 16 KB-page API 36 emulator (a
+    loopback fixture server, a real WebView, real HTTP — nothing but the
+    emulator needed), CI ✅, suite **395 passed**.

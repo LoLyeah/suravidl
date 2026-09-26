@@ -1,7 +1,9 @@
 # PLAN — "Capture anything": unsupported URLs on Android (+ better everywhere)
 
 Status: **revised v2**, 2026-09-26 — after testing a real JS-only player live
-(see §3). **M1 is shipped (v0.24.0).** Needs a go/no-go before M2.
+(see §3). **M1 shipped (v0.24.0), M2 shipped (v0.24.1)** — the in-app browser
+with all four capture layers is in, verified on emulators by an instrumented
+test. M3 (the handoff) is next.
 
 ## 1. The question
 
@@ -171,17 +173,20 @@ Each its own version + tagged release; TDD as usual; offline fixtures only.
   fixtures; and a regression test built on §3: a page yt-dlp refuses must come
   back as `unsupported` **with the browser hint**. Hours, no Android
   dependency — desktop gains value immediately.
-- **M2 — Android browser + sniffer, no handoff** (v0.24.1): `BrowserActivity`,
-  layers 1–2 (+ layer 3 behind a flag), candidate list UI, and an **offline
-  instrumentation test**: a `ServerSocket` fixture server serves a page that
-  (a) fetches `/fixture.m3u8` via `fetch`, (b) builds a MediaSource and appends
-  a `blob:`, (c) writes a bare `<video src>` — assert all three are captured and
-  attributed to the right frame.
-- **M3 — handoff + all-frame hooks + ranking** (v0.24.2): layer 3 across all
-  frames, layer 4 retro scan, `/classify` call, cookies/UA/referer
-  (frame-first) handoff, "N found → Download", the probe-unsupported prompt
-  from the share path, "Clear browser data", and the "press play → tap Found"
-  UX.
+- **M2 — Android sniffer browser** (v0.24.1, **shipped**): `BrowserActivity`
+  with all four layers — `shouldInterceptRequest`, `onLoadResource`, the JS
+  hooks (also injected into *same-origin* child frames, each report carrying
+  the frame's URL) and the `performance`-timeline sweep — plus the candidate
+  list, a host-gated entry point in the Download tab, and the offline
+  instrumentation test this section asked for. **No new dependency and no new
+  permission**: the system WebView *is* the browser, and `androidx.webkit` —
+  the only thing that would reach a *cross-origin* frame's scripts — is
+  deferred to M3 by choice. Measured cost: **+20 KB** on the debug APK.
+- **M3 — the handoff** (v0.24.2): turn a candidate into a download —
+  `POST /classify` before it is shown, cookies/UA/referer (frame-first) handed
+  to the engine, "Download this" on a row, the probe-unsupported prompt from the
+  share path, "Clear browser data", and `addDocumentStartJavaScript` if the
+  cross-origin gap turns out to be worth its ~100 KB.
 - **M4 — desktop parity + docs** (v0.24.3): `onHeadersReceived`,
   manifest-over-segments, README capture matrix, Firefox-Android stopgap +
   engine-token row, and a short `docs/SNIFFING.md` stating what is and is not
