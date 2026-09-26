@@ -196,7 +196,9 @@ Each its own version + tagged release; TDD as usual; offline fixtures only.
   HLS demo stream; (5) a DRM sample (must say "can't do that").
 
 Backlog after that: live/HLS-growing streams; subtitle capture for sniffed
-streams; per-site memory "this site needs the browser".
+streams; per-site memory "this site needs the browser"; and a per-ABI APK split
+(arm64-only release, x86_64 kept for the emulator — that half is 22.8 MB of the
+35.6 MB APK), parked by decision in favour of M2→M4 first.
 
 ## 6. Risks & honest limits
 
