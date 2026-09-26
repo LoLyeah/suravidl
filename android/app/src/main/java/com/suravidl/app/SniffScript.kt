@@ -33,7 +33,7 @@ object SniffScript {
      * cannot contain its own final form).
      */
     private val BODY = """
-        if (window.__svSniff) return; window.__svSniff = true;
+        if (window.__svSniffDoc === document) return; window.__svSniffDoc = document;
         var EX = __EX__, HI = __HI__;
         var RE = new RegExp('\\.(' + EX.join('|') + ')(\\?|${'$'})', 'i');
         var B = window.SuravidlSniff;
@@ -59,14 +59,23 @@ object SniffScript {
         function srcs() {
           try {
             var v = document.querySelectorAll('video, audio, source');
-            for (var i = 0; i < v.length; i++) { var s = v[i].currentSrc || v[i].src; if (s) rep(s, 'player'); }
+            for (var i = 0; i < v.length; i++) {
+              var s = v[i].currentSrc || v[i].src;
+              if (!s) continue;
+              // A blob: source *is* a JavaScript-fed stream (MediaSource), so it
+              // is reported as one even when the hooks that would have watched
+              // it being created were installed too late to see that happen.
+              if (String(s).indexOf('blob:') === 0) rep(s, 'mse'); else rep(s, 'player');
+            }
           } catch (e) {}
         }
         function injectFrame(f) {
           try {
             var w = f.contentWindow; if (!w) return;
-            w.__svSniffSrc = window.__svSniffSrc;
-            w.eval(window.__svSniffSrc);
+            var src = window.__svSniffSrc || '';
+            if (!src) return;
+            w.__svSniffSrc = src;
+            w.eval(src);
           } catch (e) {}
         }
         function injectFrames() {

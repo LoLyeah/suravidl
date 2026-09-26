@@ -52,8 +52,11 @@ class SnifferTest {
             }
 
             val items = SniffLog.snapshot()
+            val manifest = bySuffix(items, "/fixture.m3u8")
             assertNotNull("the manifest the page fetched by script was missed: " + dump(items),
-                          bySuffix(items, "/fixture.m3u8"))
+                          manifest)
+            assertEquals("the fetch hook never fired — only the network layer saw it: " +
+                         dump(items), "fetch", manifest!!.via)
             assertNotNull("the video element in the page was missed: " + dump(items),
                           bySuffix(items, "/bare.mp4"))
             val inner = bySuffix(items, "/inner.mp4")
@@ -185,19 +188,27 @@ private class FixtureServer {
 
     companion object {
         /** The same three shapes the live test met in the wild: an element
-         *  source, a script fetch, and an MSE player — plus a child frame. */
+         *  source, a script fetch, and an MSE player — plus a child frame.
+         *
+         *  The player starts on a short delay on purpose: that is how a real
+         *  page behaves (nothing is requested until the user presses play), and
+         *  it is the shape the plan's UX assumes — "press play for a second,
+         *  then tap Scan". An immediate `fetch` at parse time would be
+         *  measuring the one race the script layers cannot win by design. */
         private val PAGE = """
             <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
             <body style="margin:0;background:#000">
             <video id="v" src="/bare.mp4" muted></video>
             <iframe src="/inner.html" style="width:320px;height:180px"></iframe>
             <script>
-              fetch('/fixture.m3u8').then(function (r) { return r.text(); });
-              try {
-                var ms = new MediaSource();
-                ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
-                document.getElementById('v').src = URL.createObjectURL(ms);
-              } catch (e) {}
+              setTimeout(function () {
+                fetch('/fixture.m3u8').then(function (r) { return r.text(); });
+                try {
+                  var ms = new MediaSource();
+                  ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
+                  document.getElementById('v').src = URL.createObjectURL(ms);
+                } catch (e) {}
+              }, 1500);
             </script>
             </body>
         """.trimIndent()
