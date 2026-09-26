@@ -395,8 +395,18 @@ class MainActivity : AppCompatActivity() {
                 !target.startsWith("https://")) return
             runOnUiThread {
                 try {
+                    // CLEAR_TOP | SINGLE_TOP is not decoration: an identical
+                    // singleTask launch is treated as a no-op on some Android
+                    // versions — API 30 was one, with the same code passing on
+                    // API 36 — so a second "open this in the browser" never
+                    // reached the activity and the user kept scanning the
+                    // previous page. With CLEAR_TOP the existing instance is
+                    // brought forward and the new Intent is delivered to it
+                    // (BrowserActivity.onNewIntent does the rest).
                     startActivity(Intent(this@MainActivity, BrowserActivity::class.java)
-                        .putExtra(BrowserActivity.EXTRA_URL, target))
+                        .putExtra(BrowserActivity.EXTRA_URL, target)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                  Intent.FLAG_ACTIVITY_SINGLE_TOP))
                 } catch (t: Throwable) {
                     LogStore.write(this@MainActivity, "browser-open.log",
                                    "browser failed to open: ${t.message}")

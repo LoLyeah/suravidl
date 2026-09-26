@@ -122,11 +122,21 @@ def test_the_players_own_source_is_evidence_not_a_guess():
 
 
 def test_a_second_link_reaches_the_browser_that_is_already_open():
-    """The activity is singleTask: without an onNewIntent override a second
-    "Open in the browser" was dropped on the floor while the user kept scanning
-    the previous page."""
+    """The activity is singleTask: an identical launch is a no-op on some
+    Android versions (API 30 was one), so the second link never arrived and the
+    user kept scanning the previous page. CLEAR_TOP is what makes the system
+    deliver the new Intent to the running instance — and the instrumented test
+    mirrors those flags on purpose, so the two cannot drift."""
+    main = (ROOT / "android/app/src/main/java/com/suravidl/app/MainActivity.kt").read_text()
+    block = main.split("fun openBrowser(")[1].split("catch (t: Throwable)")[0]
+    assert "FLAG_ACTIVITY_CLEAR_TOP" in block, "the launch must deliver the new link"
+    assert "FLAG_ACTIVITY_SINGLE_TOP" in block
     browser = BROWSER.read_text()
     assert "override fun onNewIntent(" in browser
     body = browser.split("override fun onNewIntent(")[1].split("// -- chrome")[0]
     assert "getStringExtra(EXTRA_URL)" in body, "the new link must be read there"
     assert "load(url)" in body, "and loaded"
+    test_src = (ROOT / "android/app/src/androidTest/java/com/suravidl/app/"
+                "SnifferTest.kt").read_text()
+    second = test_src.split("aSecondLinkReachesTheBrowserThatIsAlreadyOpen")[1]
+    assert "FLAG_ACTIVITY_CLEAR_TOP" in second, "the test must launch the real way"

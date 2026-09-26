@@ -216,11 +216,15 @@ class SnifferTest {
                        SniffLog.snapshot().any { it.url.endsWith("/bare.mp4") })
 
             // Exactly what "Open in the browser ↗" does for a second link — the
-            // activity is singleTask, so this arrives as onNewIntent.
+            // activity is singleTask, so this arrives as onNewIntent. The flags
+            // are mirrored from MainActivity.openBrowser on purpose: an
+            // identical launch without CLEAR_TOP is a no-op on API 30.
             wakeScreen()
             ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
                 .putExtra(BrowserActivity.EXTRA_URL, server.url("/second.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                          Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                          Intent.FLAG_ACTIVITY_SINGLE_TOP))
 
             deadline = System.currentTimeMillis() + 120_000
             while (System.currentTimeMillis() < deadline &&
