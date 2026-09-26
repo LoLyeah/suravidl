@@ -9,8 +9,12 @@
     "download-management",
     "photos-music-videos"
   ],
-  "homepage": "https://github.com/LoLyeah/suravidl",
-  "support_url": "https://github.com/LoLyeah/suravidl/issues",
+  "homepage": {
+    "en-US": "https://github.com/LoLyeah/suravidl"
+  },
+  "support_url": {
+    "en-US": "https://github.com/LoLyeah/suravidl/issues"
+  },
   "privacy_policy": {
     "en-US": "https://github.com/LoLyeah/suravidl/blob/main/docs/PRIVACY.md"
   },

@@ -75,6 +75,22 @@ def test_the_amo_metadata_has_what_a_first_listing_requires():
     assert AMO["privacy_policy"]["en-US"].startswith("https://")
 
 
+def test_the_listing_fields_have_the_shape_amo_asks_for():
+    """AMO answers 400 when a translated field arrives as a plain string —
+    "You must provide an object of {lang-code:value}". homepage and support_url
+    were strings on the first submission and it was refused; the rest of the
+    translated fields were already right, which is why the error named only
+    those two."""
+    for field in ("summary", "description", "homepage", "support_url",
+                  "privacy_policy"):
+        value = AMO[field]
+        assert isinstance(value, dict), f"{field} must be {{lang: value}}"
+        assert value.get("en-US"), f"{field} needs at least one locale"
+    for field in ("license", "approval_notes"):
+        assert isinstance(AMO["version"][field], str), f"{field} is plain text"
+    assert all(isinstance(c, str) for c in AMO["categories"])
+
+
 def test_the_submitted_package_leaves_out_development_files():
     """The shop window is not the workshop: the test harness and the other
     browser's manifest have no business inside a submitted package."""

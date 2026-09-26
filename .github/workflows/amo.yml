@@ -69,15 +69,10 @@ jobs:
             --artifacts-dir /tmp/amo-artifacts 2>&1 | tee /tmp/amo-sign.log
           status=${PIPESTATUS[0]}
           echo "web-ext exit: $status"
-          # A listed submission ends up "awaiting review", and web-ext keeps
-          # polling for a signed file — so a first listing is expected to time
-          # out *after* the upload. The upload is what matters here; only fail
-          # on something that is neither a timeout-after-upload nor a success.
-          if [ "$status" -ne 0 ] && grep -qiE "uploaded|awaiting review|validation|submitted" /tmp/amo-sign.log; then
-            echo "::notice title=Submitted to AMO::The upload reached Mozilla; the CLI stopped waiting for a signature, which is normal while a listing is in review."
-            exit 0
-          fi
-          exit "$status"
+          # The verdict lives in a script with tests, not in this file: the
+          # inline version once read a refused submission as success because
+          # "Waiting for validation…" appears in both outcomes.
+          bash .github/scripts/amo_verdict.sh /tmp/amo-sign.log "$status"
 
       - uses: actions/upload-artifact@v4
         if: always()
