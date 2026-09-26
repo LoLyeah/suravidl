@@ -117,7 +117,7 @@ of the very session that is playing.
 
 ## Manual checklist (only a real device can show these)
 
-1. `https://vidmonstr.com/e/z8d0faiqe0iw` — the case this whole feature was
+1. the case this whole feature was
    built against: no `<video>`, a same-origin iframe, an obfuscated player. Open
    it in the in-app browser, play, Scan; if the manifest appears, download it.
    If it does not, that is a data point, not a bug: see "what is not promised".
