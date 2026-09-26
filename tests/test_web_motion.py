@@ -184,3 +184,39 @@ def test_focus_keeps_the_field_above_the_sticky_bars():
     assert "scrollIntoView" in seg
     assert "getBoundingClientRect" in seg          # only when actually obscured
     assert "prefers-reduced-motion" in seg         # smooth scroll is motion too
+
+
+def test_a_tab_change_fades_through_instead_of_switching_abruptly():
+    """Switching tabs was an instant `display: none` swap: no signal that the
+    screen had changed, so the app read like a page reload rather than a tab."""
+    assert ".tab-out { animation: tabOut var(--t-fast) var(--e-in) both; }" in CSS
+    assert ".tab-in  { animation: tabIn  var(--t-fast) var(--e-out) both; }" in CSS
+    out, into = _block("@keyframes tabOut"), _block("@keyframes tabIn")
+    for seg in (out, into):
+        assert "opacity" in seg
+        assert "transform" not in seg, "a tab is a content swap, not an arrival"
+        assert "height" not in seg and "max-height" not in seg
+
+
+def test_the_tab_fade_cannot_strand_a_blank_screen():
+    """The swap hangs off `animationend`; an event that never fires would leave
+    every panel hidden — a blank app. The row exit learned that the hard way,
+    so this one ships with the backstop."""
+    seg = APP.split("function showTab(")[1].split("TABS.forEach((t) => {")[0]
+    assert '"tab-out"' in seg and '"tab-in"' in seg
+    assert "current !== target" in seg, "never fade on first paint"
+    assert "outgoing.includes(incoming)" in seg, \
+        "a refresh of the visible tab must not restart the fade"
+    assert "animationend" in seg and "setTimeout(swap" in seg
+    assert seg.index("animationend") < seg.index("setTimeout(swap"), \
+        "the event is the primary path; the timer is only the backstop"
+
+
+def test_reduced_motion_reaches_the_tab_fade_without_a_second_path():
+    """The fade must not grow its own reduced-motion branch in JS: the global
+    rule already shortens every animation to .001s / one iteration, and a
+    duplicate check would drift out of step with it."""
+    assert "prefers-reduced-motion" not in APP.split("function showTab(")[1][:2000]
+    block = _block("@media (prefers-reduced-motion: reduce)")
+    assert "animation-duration: .001s !important" in block
+    assert "animation-iteration-count: 1 !important" in block

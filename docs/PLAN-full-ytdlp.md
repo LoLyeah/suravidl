@@ -742,11 +742,31 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     evidence, not a guess, reported as it is and classified by the engine before
     a row is drawn. `/classify` on that URL answers `video · 16 MB`, and yt-dlp
     takes it with the frame's referer, which the handoff already sends.
-    **2. `singleTask` without `onNewIntent`.** A second "Open in the browser ↗"
-    was delivered to an activity that ignored it, so the user kept scanning the
-    *previous* page while believing they were on the new one — exactly what "it
-    still won't download" looks like from the outside. `onNewIntent` now reads
-    the extra, starts a fresh find list, and loads the link.
+    **2. `singleTask`, and a second launch that was a no-op.** A second "Open in
+    the browser ↗" never reached the activity at all: on API 30 an identical
+    singleTask launch is discarded — `Intent.filterEquals` ignores extras, so
+    the two launches *were* "the same", while the same code delivered
+    `onNewIntent` on API 36 — and the user kept scanning the *previous* page
+    while believing they were on the new one, which is exactly what "it still
+    won't download" looks like from the outside. The instrumented test's
+    failure message is what cracked it: the activity was `RESUMED` on the *old*
+    URL. Fixed at both ends — `onNewIntent` reads the extra, starts a fresh
+    find list and loads the link, and the launch site adds
+    `CLEAR_TOP | SINGLE_TOP`, the system's documented way to hand a new Intent
+    to the running instance. (The screen also has to be awake for any of this:
+    a stopped activity is handed a new intent only when it resumes, which is
+    why the same test passed on one emulator and failed on another.)
     Both are pinned by instrumented tests that failed in CI before the fix: an
     extension-less player source must be found as a `player` find with its frame
     recorded, and a second link must reach a browser that is already open.
+
+- **v0.24.7 — the tab fade.** Switching tabs was an instant `display: none`
+    swap with no signal that the screen had changed, so the app read like a
+    page reload rather than a tab. It now fades *through* — the outgoing panel
+    leaves, the incoming one arrives, opacity only, since a transform on every
+    switch reads as a glitch rather than a signature — and both halves ride the
+    existing motion tokens, so the global reduced-motion rule already turns it
+    into the instant switch with no second code path to keep in step. The swap
+    hangs off `animationend` with the same timer backstop the row exit needed,
+    and the per-tab refreshes that call back into `showTab()` cannot restart
+    the fade.

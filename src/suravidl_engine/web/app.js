@@ -1709,12 +1709,42 @@ const TAB_KEY = "suravidl.tab";
 
 function showTab(name, opts) {
   const target = TABS.includes(name) ? name : "download";
+  const current = document.body.dataset.tab;
   // the active tab on the body, so CSS can react to it (the mobile toast lane
   // needs to clear the Settings tab's pinned Save bar — theme review)
   document.body.dataset.tab = target;
+  const panels = TABS.map((t) => $("panel-" + t)).filter(Boolean);
+  const incoming = $("panel-" + target);
+  const outgoing = panels.filter((p) => !p.classList.contains("hidden"));
+  // A switch fades through: out, then in (the CSS owns how long, and a
+  // reduced-motion user gets it instantly). Never on first paint, and never
+  // when the target is already the visible panel — the per-tab refreshes at the
+  // end of this function call back into here and must not restart the fade.
+  let swapped = false;
+  const swap = () => {
+    if (swapped) return;
+    swapped = true;
+    panels.forEach((p) => p.classList.toggle("hidden", p !== incoming));
+    outgoing.forEach((p) => p.classList.remove("tab-out"));
+    if (incoming) {
+      incoming.classList.remove("tab-in");
+      void incoming.offsetWidth;   // restart the fade on a rapid re-switch
+      incoming.classList.add("tab-in");
+    }
+  };
+  if (incoming && outgoing.length && !outgoing.includes(incoming) &&
+      current && current !== target && !(opts && opts.instant)) {
+    const first = outgoing[0];
+    first.classList.remove("tab-in");
+    first.classList.add("tab-out");
+    first.addEventListener("animationend", swap, { once: true });
+    // a swallowed event must not leave every panel hidden: the row exit learned
+    // that the hard way, so the backstop comes with it
+    setTimeout(swap, 300);
+  } else {
+    swap();
+  }
   TABS.forEach((t) => {
-    const panel = $("panel-" + t);
-    if (panel) panel.classList.toggle("hidden", t !== target);
     document.querySelectorAll(`#tabs .tab[data-tab="${t}"]`).forEach((b) => {
       b.classList.toggle("active", t === target);
       b.setAttribute("aria-selected", t === target ? "true" : "false");
