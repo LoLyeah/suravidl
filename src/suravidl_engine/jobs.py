@@ -765,6 +765,17 @@ class JobManager:
             opts["playlist_items"] = "1"
         if fmt:
             opts["format"] = fmt
+        # no_audio (per-download): the shells pair a video-only pick with the
+        # site's audio by default; this override keeps it silent. It applies
+        # to what the app controls — a stream that carries its own audio is
+        # left alone — and a bare "best" pairs nothing at all (2026-09-27).
+        if (job.get("overrides") or {}).get("no_audio"):
+            if "format" not in opts:
+                opts["format"] = "bv/b"
+            else:
+                from .download_opts import strip_audio_pairing
+
+                opts["format"] = strip_audio_pairing(opts["format"])
         if extra_headers:
             opts["http_headers"] = extra_headers
         try:

@@ -439,9 +439,33 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
   transition: var(--t-fast);
 }
 @media (hover: hover) { .ghost-sm:hover { color: var(--text); background: var(--glass-bg-strong); } }
+/* a failed row speaks in full: two lines by default, a tap unfolds the rest
+   (2026-09-27: the message was sliced to "ERROR: Unable to down…") */
 .jerr { color: var(--err); font-size: 12px; font-family: ui-monospace, Menlo, monospace;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  line-height: 1.5; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.jerr.clamp:not(.open) { display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; overflow: hidden; cursor: pointer; }
+.jerr.clamp.open { cursor: pointer; }
 .jobhint { margin: 6px 0 0 4px; font-size: 12px; color: var(--muted); }
+
+/* a playlist row's files: it owns many, so the row shows them on demand,
+   each with the same hand-offs a single-file row has (2026-09-27) */
+.jobfiles { margin: 4px 0 0 4px; }
+.jitem { display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  border-top: 1px solid var(--line-soft); }
+.jitem .jname { flex: 1; min-width: 0; font-size: 12px; color: var(--dim);
+  font-family: ui-monospace, Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fsize { font-size: 11.5px; color: var(--muted); }
+/* the folder sheet: the folder's own files, listed in the app */
+.folderlist { margin-top: 4px; max-height: min(60vh, 480px); overflow: auto; }
+/* the "no sound" choice beside the formats table */
+.chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px;
+  color: var(--text); cursor: pointer; }
+.chk input { width: 16px; height: 16px; accent-color: var(--accent); }
+/* the footer's two actions sit together (copy path, open folder) */
+.footrow { display: flex; gap: 16px; margin-top: 6px; }
+.footrow .linkbtn { margin-left: 0; }
 
 /* ---------- audio-only row ---------- */
 .audioRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -857,4 +881,8 @@ html[data-host="android"] body::before {
      every touch-target guideline. Height only, so the look is unchanged. */
   .btn, .ghost-sm { min-height: 44px; }
   .pill { min-height: 30px; }
+  /* the footer's copy path / open folder were the last undersized targets
+     (2026-09-27: "open folder" joined "copy path" there) */
+  .linkbtn { display: inline-flex; align-items: center; min-height: 44px; }
+  .chk { min-height: 44px; }
 }

@@ -97,6 +97,38 @@ function closeModal(m) {
   }, 170);
 }
 
+/* ---------- clipboard ---------- */
+/** Copy to the clipboard wherever the page runs.
+ *
+ *  navigator.clipboard wants a secure origin and a live user gesture, and
+ *  some WebViews refuse it outright; a throwaway textarea + execCommand
+ *  still works there. One helper, so every copy in the page behaves alike
+ *  (the copy-path button and the Copy button on a failed row). */
+async function copyText(t) {
+  t = String(t == null ? "" : t);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(t);
+      return true;
+    }
+  } catch (_) { /* blocked: try the old way */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 /* ---------- confirm modal ---------- */
 function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
   return new Promise((resolve) => {
@@ -246,21 +278,51 @@ function fmtCodecs(f) {
   return parts.join(" · ");
 }
 
-/** What the stream contains — the thing the old table made you guess. */
-function fmtKind(f) {
+/** What the stream contains — the thing the old table made you guess.
+ *
+ *  A video-only row says what the download will DO with it: by default the
+ *  app pairs the site's separate audio back in, or leaves the video silent
+ *  when the "no sound" choice is ticked — and a site with no separate audio
+ *  is said out loud instead of promising a sound track that does not exist.
+ *  (2026-09-27 report: "'video only - sound added latter' is ambiguous for
+ *  inexperienced user".) */
+function fmtKind(f, hasSeparateAudio) {
   const v = hasVideo(f), a = hasAudio(f);
   if (v && a) return { label: "video + audio", cls: "k-both" };
-  if (v) return { label: "video only — sound is added on download", cls: "k-video" };
+  if (v) {
+    if (!hasSeparateAudio) {
+      return { label: "video only — no sound available", cls: "k-video" };
+    }
+    return { label: soundChoiceLabel(), cls: "k-video", sound: true };
+  }
   if (a) return { label: "audio only", cls: "k-audio" };
   // a plain file (direct link): the site told us nothing about its tracks
   return { label: "single file", cls: "k-audio" };
 }
 
+/** The two states of a video-only row's label, read live from the checkbox
+ *  so ticking it re-labels the whole table (refreshSoundLabels). */
+function soundChoiceLabel() {
+  const off = $("noSound") && $("noSound").checked;
+  return off ? "video only — no sound" : "video only — sound included";
+}
+
+/** The "no sound" tick re-labels the rows it applies to, in place. Which
+ *  rows those are is baked in at render time ([data-sound]): a row that
+ *  never had separate audio says so and must not be re-labelled. */
+function refreshSoundLabels() {
+  for (const cell of document.querySelectorAll("#formats .fmt-kind[data-sound]")) {
+    cell.textContent = soundChoiceLabel();
+  }
+}
+
 /** Picking a video-only stream must not produce a silent file: pair it with
  *  the site's separate audio track when one exists (yt-dlp merges both with
- *  ffmpeg). Direct-link files have no separate audio, so they stay as-is. */
+ *  ffmpeg) — unless the user ticked "no sound", which is exactly the
+ *  instruction not to (2026-09-27). Direct-link files have no separate
+ *  audio, so they stay as-is. */
 function fmtSpec(f, hasSeparateAudio) {
-  return hasSeparateAudio && hasVideo(f) && !hasAudio(f)
+  return hasSeparateAudio && hasVideo(f) && !hasAudio(f) && !$("noSound").checked
     ? `${f.format_id}+bestaudio/best`
     : f.format_id;
 }
@@ -374,6 +436,7 @@ function renderProbe(url, info) {
   if (info.playlist) {
     $("playlistRow").classList.remove("hidden");
     $("qualityRow").classList.add("hidden");
+    $("soundRow").classList.add("hidden");
     $("probeMeta").textContent =
       (info.count ? info.count + " videos" : "playlist") +
       (info.extractor ? " · " + info.extractor : "");
@@ -429,10 +492,14 @@ function renderProbe(url, info) {
     // capped lower than a full stagger: a table that takes a quarter second
     // to finish arriving reads as slow
     tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
-    const kind = fmtKind(f);
+    const kind = fmtKind(f, separateAudio);
     const cell = el("td", "fmt-c");
     cell.append(el("div", "", fmtCodecs(f) || "—"));
-    cell.append(el("div", "fmt-kind " + kind.cls, kind.label));
+    const kindEl = el("div", "fmt-kind " + kind.cls, kind.label);
+    // the rows the "no sound" tick re-labels carry a mark; a row that never
+    // had separate audio says so and must not be re-labelled
+    if (kind.sound) kindEl.dataset.sound = "1";
+    cell.append(kindEl);
     tr.append(
       el("td", "fmt-q", fmtQuality(f) || "—"),
       cell,
@@ -445,6 +512,10 @@ function renderProbe(url, info) {
     tr.append(td);
     tb.append(tr);
   }
+  // the "no sound" choice shows whenever there is a video row to explain
+  // (the playlist branch above hid it again)
+  const anyVideo = fmts.some(hasVideo);
+  $("soundRow").classList.toggle("hidden", !anyVideo);
   if (!fmts.length) {
     const tr = el("tr");
     tr.append(el("td", "muted", "no formats found"));
@@ -639,8 +710,12 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     const audio = fmt ? null : (preset || OV.preset);
     if (audio) body.preset = audio;
     if (playlist) body.playlist_items = playlistFieldText();
-    const overrides = readOv();
-    if (overrides) body.overrides = overrides;
+    let ov = readOv();
+    // the "no sound" tick rides every start from this card — a format chip,
+    // "best quality", or the whole playlist: no_audio is the engine's key
+    // for "do not pair this video with the site's audio" (2026-09-27)
+    if ($("noSound").checked) ov = { ...(ov || {}), no_audio: true };
+    if (ov) body.overrides = ov;
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
     // the block says "this download only" — so it is spent on this download
     // (v0.21.1 audit: it used to stick to every job for the rest of the session)
@@ -1016,11 +1091,31 @@ function jobRow(j) {
     row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
     const r = el("div", "jrow");
-    r.append(el("span", "jerr", (j.error || "").slice(0, 160)));
+    // The whole message. A 160-char slice in a single ellipsised line cut
+    // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
+    // says what to do next was exactly the part that was hidden. Long text
+    // starts clamped to two lines; a tap unfolds it (2026-09-27 report).
+    const errText = j.error || "";
+    const errEl = el("div", "jerr", errText);
+    if (errText.length > 90) {
+      errEl.classList.add("clamp");
+      errEl.title = "tap to show the whole message";
+      errEl.onclick = () => {
+        const open = errEl.classList.toggle("open");
+        errEl.title = open ? "tap to collapse" : "tap to show the whole message";
+      };
+    }
+    r.append(errEl);
+    const copy = el("button", "ghost-sm", "Copy");
+    copy.title = "copy the whole message";
+    copy.onclick = async () => {
+      const ok = await copyText(errText);
+      toast(ok ? "error copied" : "copy failed", ok ? "ok" : "bad");
+    };
     const retry = el("button", "ghost-sm", "Retry");
     retry.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
       .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
-    r.append(retry);
+    r.append(copy, retry);
     trashHost = r;
     row.append(r);
     if (j.error && /ffmpeg/i.test(j.error) &&
@@ -1037,31 +1132,55 @@ function jobRow(j) {
         .catch((e) => toast("could not open: " + e.message, "bad"));
       r.append(open);
     }
-    // Hand off a *file*. A playlist row's filepath is the download folder:
-    // handing that to "open" (or share) does nothing useful, so the buttons
-    // are for single-file rows only (v0.21.2 audit).
-    const oneFile = !(j.files && j.files.length > 1);
-    if (ANDROID() && oneFile && j.filepath) {
-      // Android/data is off-limits to file managers, so hand the file itself
-      // to another app (a provider grant) — play it or share it right here.
-      const open = el("button", "ghost-sm", "Open");
-      open.onclick = () => {
-        try { window.AndroidHost.openFile(j.filepath); }
-        catch (e) { toast("could not open: " + e.message, "bad"); }
+    // A playlist row's filepath is the download folder, so the row-level
+    // hand-offs would ask a player (or another app) to open a directory.
+    // The row still owns real files — `files` — so it offers them, each
+    // with the same Open / Share / Play a single-file row has (2026-09-27
+    // report: "There's no open and share button for the playlist").
+    //
+    // A merged single-file download is NOT a playlist: its `files` also
+    // lists the video/audio fragments it muxed (master.f200.mp4, …), but
+    // its own filepath is among them — a folder is never (2026-09-27,
+    // caught live: a merged row offered "Files (3)" instead of Play).
+    const playlistRow = !!(j.files && j.files.length
+    && j.files[0] !== j.filepath && !j.files.includes(j.filepath));
+    if (playlistRow) {
+      const count = j.files.length;
+      const toggle = el("button", "ghost-sm", "Files (" + count + ")");
+      toggle.title = "show every file this playlist downloaded";
+      const listHost = el("div", "jobfiles hidden");
+      toggle.onclick = () => {
+        const hidden = listHost.classList.toggle("hidden");
+        toggle.textContent = hidden
+          ? "Files (" + count + ")"
+          : "Hide files (" + count + ")";
       };
-      const share = el("button", "ghost-sm", "Share");
-      share.onclick = () => {
-        try { window.AndroidHost.shareFile(j.filepath); }
-        catch (e) { toast("could not share: " + e.message, "bad"); }
-      };
-      r.append(open, share);
-    }
-    // Play it right here (v0.22.0). Works on every platform: the engine
-    // answers Range requests, so the player can seek.
-    if (j.status === "completed" && oneFile && j.filepath) {
-      const play = el("button", "ghost-sm", "Play");
-      play.onclick = () => openPlayer(j);
-      r.append(play);
+      for (const file of j.files) listHost.append(jobFileItem(j, file));
+      r.append(toggle);
+      row.append(listHost);
+    } else {
+      // Hand off a *file*: Android/data is off-limits to file managers, so
+      // hand the file itself to another app (a provider grant).
+      if (ANDROID() && j.filepath) {
+        const open = el("button", "ghost-sm", "Open");
+        open.onclick = () => {
+          try { window.AndroidHost.openFile(j.filepath); }
+          catch (e) { toast("could not open: " + e.message, "bad"); }
+        };
+        const share = el("button", "ghost-sm", "Share");
+        share.onclick = () => {
+          try { window.AndroidHost.shareFile(j.filepath); }
+          catch (e) { toast("could not share: " + e.message, "bad"); }
+        };
+        r.append(open, share);
+      }
+      // Play it right here (v0.22.0). Works on every platform: the engine
+      // answers Range requests, so the player can seek.
+      if (j.status === "completed" && j.filepath) {
+        const play = el("button", "ghost-sm", "Play");
+        play.onclick = () => openPlayer(j);
+        r.append(play);
+      }
     }
     trashHost = r;
     row.append(r);
@@ -1109,6 +1228,35 @@ function jobRow(j) {
   if (actions.children.length) row.append(actions);
   row.dataset.sig = jobSig(j);
   return row;
+}
+
+/** One entry of a playlist's file list: the same hand-offs a single-file
+ *  row has, applied to the entry itself (2026-09-27). */
+function jobFileItem(j, file) {
+  const item = el("div", "jitem");
+  const name = String(file).split("/").pop();
+  const label = el("span", "jname", name);
+  label.title = file;
+  item.append(label);
+  if (ANDROID() && window.AndroidHost) {
+    const open = el("button", "ghost-sm", "Open");
+    open.onclick = () => {
+      try { window.AndroidHost.openFile(file); }
+      catch (e) { toast("could not open: " + e.message, "bad"); }
+    };
+    const share = el("button", "ghost-sm", "Share");
+    share.onclick = () => {
+      try { window.AndroidHost.shareFile(file); }
+      catch (e) { toast("could not share: " + e.message, "bad"); }
+    };
+    item.append(open, share);
+  }
+  if (j.status === "completed") {
+    const play = el("button", "ghost-sm", "Play");
+    play.onclick = () => openPlayer(j, file);
+    item.append(play);
+  }
+  return item;
 }
 
 /** Patch an existing row in place (smooth progress); rebuild on status change. */
@@ -1466,14 +1614,9 @@ function renderWhere(dir) {
 function wireCopyPath() {
   const b = $("copyDir");
   if (!b) return;
-  b.onclick = () => {
-    const t = $("dlDir").textContent || "";
-    const done = () => toast("path copied");
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(t).then(done).catch(() => toast("copy failed", "bad"));
-    } else {
-      toast("copy not supported here", "bad");
-    }
+  b.onclick = async () => {
+    const ok = await copyText($("dlDir").textContent || "");
+    toast(ok ? "path copied" : "copy failed", ok ? "ok" : "bad");
   };
 }
 
@@ -2209,6 +2352,7 @@ checkAppUpdate();
 loadSettings();
 initAppControls();
 initPlayer();
+initFolderSheet();
 initBatch();
 initArchive();
 /* start on the remembered tab, unless the URL names one */
@@ -2227,15 +2371,33 @@ setInterval(refreshJobs, 1200);
  *  "check what you downloaded, before you hunt for the file"). A media element
  *  cannot send an Authorization header, so the stream route also takes the
  *  page's own token in the query string. */
-function openPlayer(job) {
-  const ext = (String(job.filepath || "").split(".").pop() || "").toLowerCase();
+function openPlayer(job, file) {
+  // one entry of a playlist row plays by basename; everything else plays the
+  // job's own filepath (2026-09-27: playlist rows had no Play at all)
+  const stream = `/jobs/${encodeURIComponent(job.id)}/stream?`;
+  if (file) {
+    const name = String(file).split("/").pop();
+    openPlayerSrc(job.title || "download",
+      stream + "name=" + encodeURIComponent(name) +
+      "&token=" + encodeURIComponent(CFG.token), extOf(name));
+    return;
+  }
+  openPlayerSrc(job.title || "download",
+    stream + "token=" + encodeURIComponent(CFG.token), extOf(job.filepath));
+}
+
+/** The file's extension, lowercased ("e1.MP4" → "mp4"). */
+function extOf(p) {
+  return (String(p || "").split(".").pop() || "").toLowerCase();
+}
+
+/** The player modal, driven by whatever URL carries the media. */
+function openPlayerSrc(title, src, ext) {
   const isVideo = ["mp4", "m4v", "webm", "mkv", "mov"].includes(ext);
   const isText = ["srt", "vtt"].includes(ext);
-  $("playTitle").textContent = job.title || "download";
+  $("playTitle").textContent = title || "download";
   const body = $("playBody");
   body.replaceChildren();
-  const src = `/jobs/${encodeURIComponent(job.id)}/stream?token=` +
-    encodeURIComponent(CFG.token);
   let node;
   if (isVideo) {
     node = document.createElement("video");
@@ -2277,6 +2439,83 @@ function initPlayer() {
       closePlayer();
     }
   });
+}
+
+/* ---------- the folder sheet ("open folder") ---------- */
+/** Desktop shells reveal the folder itself in the OS file manager; on
+ *  Android no file manager may open Android/data, so the folder is shown
+ *  inside the app instead — every file with Play, and Open / Share through
+ *  the host bridge (2026-09-27 report: "Add the open folder button too,
+ *  below copy path"). */
+async function openFolderSheet() {
+  const list = $("folderList");
+  list.replaceChildren(el("div", "muted", "loading…"));
+  openModal($("folderModal"));
+  try {
+    const r = await api("/files/list");
+    $("folderTitle").textContent = "downloads · " + r.files.length +
+      (r.files.length === 1 ? " file" : " files");
+    list.replaceChildren();
+    if (!r.files.length) {
+      list.append(el("div", "muted", "the folder is empty"));
+      return;
+    }
+    for (const f of r.files) list.append(folderItem(f));
+  } catch (e) {
+    list.replaceChildren(
+      el("div", "muted", "could not read the folder: " + e.message));
+  }
+}
+
+/** One file line of the folder sheet. */
+function folderItem(f) {
+  const item = el("div", "jitem");
+  const name = el("span", "jname", f.name);
+  name.title = f.path;
+  item.append(name, el("span", "fsize", humanBytes(f.bytes)));
+  if (f.kind === "video" || f.kind === "audio") {
+    const play = el("button", "ghost-sm", "Play");
+    play.onclick = () => openPlayerSrc(f.name,
+      "/files/stream?path=" + encodeURIComponent(f.name) +
+      "&token=" + encodeURIComponent(CFG.token), extOf(f.name));
+    item.append(play);
+  }
+  if (ANDROID() && window.AndroidHost) {
+    const open = el("button", "ghost-sm", "Open");
+    open.onclick = () => {
+      try { window.AndroidHost.openFile(f.path); }
+      catch (e) { toast("could not open: " + e.message, "bad"); }
+    };
+    const share = el("button", "ghost-sm", "Share");
+    share.onclick = () => {
+      try { window.AndroidHost.shareFile(f.path); }
+      catch (e) { toast("could not share: " + e.message, "bad"); }
+    };
+    item.append(open, share);
+  }
+  return item;
+}
+
+function initFolderSheet() {
+  const modal = $("folderModal");
+  if (!modal) return;
+  $("folderClose").onclick = () => closeModal(modal);
+  modal.onclick = (e) => { if (e.target === modal) closeModal(modal); };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modal.classList.contains("hidden")) {
+      closeModal(modal);
+    }
+  });
+  $("openDir").onclick = async () => {
+    if (DESKTOP) {
+      try {
+        await api("/app/reveal-dir", { method: "POST" });
+        return;
+      } catch (_) { /* no file manager on this shell — show the sheet */ }
+    }
+    openFolderSheet();
+  };
+  $("noSound").addEventListener("change", refreshSoundLabels);
 }
 
 /** Several links in the box at once: offer to queue them all (review #5).

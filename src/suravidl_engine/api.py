@@ -136,6 +136,101 @@ def _range_span(size: int, header: str | None) -> tuple[int, int] | None:
     return (start, end)
 
 
+def _stream_file(path: Path, request: Request):
+    """One file, streamed with Range support (v0.22 review #10).
+
+    Range is implemented here rather than handed to `FileResponse`, because
+    the Android build's starlette (0.27, via fastapi 0.99.1) ignores Range
+    and would answer every seek with the whole file. Both the job player and
+    the folder sheet stream through this.
+    """
+    size = path.stat().st_size
+    try:
+        span = _range_span(size, request.headers.get("range"))
+    except ValueError:
+        return Response(status_code=416,
+                        headers={"Content-Range": f"bytes */{size}",
+                                 "Accept-Ranges": "bytes"})
+    if span is None:
+        start, end, status = 0, size - 1, 200
+        headers = {"Accept-Ranges": "bytes"}
+    else:
+        start, end = span
+        status = 206
+        headers = {"Accept-Ranges": "bytes",
+                   "Content-Range": f"bytes {start}-{end}/{size}"}
+    headers["Content-Length"] = str(max(0, end - start + 1))
+    headers["Content-Disposition"] = f'inline; filename="{path.name}"'
+
+    def body():
+        with path.open("rb") as fh:
+            fh.seek(start)
+            left = end - start + 1
+            while left > 0:
+                chunk = fh.read(min(64 * 1024, left))
+                if not chunk:
+                    break
+                left -= len(chunk)
+                yield chunk
+
+    return StreamingResponse(body(), status_code=status, headers=headers,
+                             media_type=_media_type(path))
+
+
+# What the folder sheet calls media, subtitles, and everything else — and
+# what it refuses to call a download at all: work files (a partial download,
+# yt-dlp's control files) and the sidecars it wrote for itself (thumbnails,
+# info json). A subtitle the user asked for IS a download and stays.
+_FILE_KINDS = {
+    "video": {".mp4", ".webm", ".mkv", ".mov", ".m4v", ".3gp", ".avi", ".flv",
+              ".ts"},
+    "audio": {".m4a", ".mp3", ".opus", ".ogg", ".oga", ".wav", ".aac", ".flac",
+              ".weba"},
+    "subtitle": {".srt", ".vtt", ".ass", ".lrc"},
+}
+_FILE_SKIP_SUFFIXES = (".part", ".ytdl", ".temp", ".json", ".description",
+                       ".xml", ".jpg", ".jpeg", ".png", ".webp")
+FILE_LIST_MAX = 400                          # a page of files, not the disk
+
+
+def _file_kind(path: Path) -> str:
+    ext = path.suffix.lower()
+    for kind, exts in _FILE_KINDS.items():
+        if ext in exts:
+            return kind
+    return "other"
+
+
+def _file_entries(root: Path) -> dict:
+    """The download folder's own files, newest first, for the folder sheet.
+
+    Android/data is closed to every file manager on Android 11+, so "open
+    folder" has to show the folder inside the app (2026-09-27 report). The
+    list is capped: an opaque folder with thousands of files is not more
+    useful than its newest page in a phone-sized sheet.
+    """
+    out: list[dict] = []
+    try:
+        for p in root.rglob("*"):
+            if not p.is_file():
+                continue
+            name = p.name
+            if (name.startswith(".") or name.endswith(_FILE_SKIP_SUFFIXES)
+                    or ".part-" in name):
+                continue
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            out.append({"name": p.relative_to(root).as_posix(),
+                        "path": str(p), "bytes": st.st_size,
+                        "mtime": st.st_mtime, "kind": _file_kind(p)})
+    except OSError:
+        pass
+    out.sort(key=lambda f: f["mtime"], reverse=True)
+    return {"total": len(out), "files": out[:FILE_LIST_MAX]}
+
+
 def _looks_like_url(text: str) -> bool:
     """Is this paste item even a link?
 
@@ -392,6 +487,26 @@ def create_app(download_dir, auth_token: str | None = None,
             return {"path": fn()}
         except Exception:  # noqa: BLE001 - a cancelled/broken dialog is not an error
             return {"path": None}
+
+    @app.post("/app/reveal-dir")
+    def app_reveal_dir(_mgr: JobManager = Depends(require_auth)):
+        """Open the download folder in the OS file manager (desktop only).
+
+        Android cannot do this — no file manager may open Android/data — so
+        the UI falls back to the folder sheet there (2026-09-27 report:
+        "Add the open folder button too, below copy path").
+        """
+        fn = acts.get("reveal")
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="no file manager on this shell")
+        try:
+            fn(str(manager.download_dir))
+        except Exception as e:  # noqa: BLE001 - the shell's dialog is best-effort
+            raise HTTPException(
+                status_code=501,
+                detail=f"the file manager could not be opened: {e}") from e
+        return {"ok": True}
 
     @app.post("/app/open-url")
     def app_open_url(body: OpenUrlRequest,
@@ -849,14 +964,48 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=401, detail="unauthorized")
         return manager
 
+    @app.get("/files/list")
+    def files_list(_mgr: JobManager = Depends(require_auth)):
+        """What "open folder" shows: the folder's own files, newest first.
+
+        A file manager can open Downloads on desktop; nothing can open
+        Android/data on Android 11+, so the app lists the folder itself
+        (2026-09-27 report: "Add the open folder button too").
+        """
+        root = Path(manager.download_dir)
+        return {"dir": str(root), **_file_entries(root)}
+
+    @app.get("/files/stream")
+    def files_stream(request: Request, path: str = "",
+                     mgr: JobManager = Depends(require_auth_media)):
+        """Play one file from the download folder (the folder sheet's Play).
+
+        The path is relative to the folder and must resolve inside it — the
+        same guard the delete path uses, so neither the sheet nor a crafted
+        URL becomes a way to read host files.
+        """
+        rel = (path or "").strip()
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+            raise HTTPException(status_code=404, detail="no such file")
+        target = Path(manager.download_dir) / rel
+        try:
+            mgr._require_inside(target, None)       # noqa: SLF001
+        except PermissionError:
+            raise HTTPException(
+                status_code=403,
+                detail="that file is outside the download folder") from None
+        if not target.is_file():
+            raise HTTPException(status_code=404, detail="no such file")
+        return _stream_file(target, request)
+
     @app.get("/jobs/{job_id}/stream")
-    def stream_job(request: Request, job_id: str,
+    def stream_job(request: Request, job_id: str, name: str | None = None,
                    mgr: JobManager = Depends(require_auth_media)):
         """Play a finished download in the page (the v0.22 review's #10).
 
-        Range is implemented here rather than handed to `FileResponse`,
-        because the Android build's starlette (0.27, via fastapi 0.99.1)
-        ignores Range and would answer every seek with the whole file.
+        `name` plays one entry of a playlist row by basename — the list the
+        job recorded is the whitelist, so the parameter can never reach any
+        other file (2026-09-27 report: playlist rows had no Play at all).
         """
         try:
             job = mgr.get(job_id)
@@ -867,6 +1016,16 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail="this download is not finished")
         raw = job.get("filepath")
         path = Path(str(raw)) if raw else None
+        if name:
+            if "/" in name or "\\" in name or name.strip() in ("", ".", ".."):
+                raise HTTPException(status_code=404, detail="no such file")
+            match = next((str(f) for f in (job.get("files") or [])
+                          if Path(str(f)).name == name), None)
+            if not match:
+                raise HTTPException(
+                    status_code=404,
+                    detail="no such file in this download") from None
+            path = Path(match)
         if not path or path.is_dir() or not path.is_file():
             raise HTTPException(status_code=404,
                                 detail="no playable file for this job")
@@ -878,37 +1037,7 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(
                 status_code=403,
                 detail="that file is outside the download folder") from None
-        size = path.stat().st_size
-        try:
-            span = _range_span(size, request.headers.get("range"))
-        except ValueError:
-            return Response(status_code=416,
-                            headers={"Content-Range": f"bytes */{size}",
-                                     "Accept-Ranges": "bytes"})
-        if span is None:
-            start, end, status = 0, size - 1, 200
-            headers = {"Accept-Ranges": "bytes"}
-        else:
-            start, end = span
-            status = 206
-            headers = {"Accept-Ranges": "bytes",
-                       "Content-Range": f"bytes {start}-{end}/{size}"}
-        headers["Content-Length"] = str(max(0, end - start + 1))
-        headers["Content-Disposition"] = f'inline; filename="{path.name}"'
-
-        def body():
-            with path.open("rb") as fh:
-                fh.seek(start)
-                left = end - start + 1
-                while left > 0:
-                    chunk = fh.read(min(64 * 1024, left))
-                    if not chunk:
-                        break
-                    left -= len(chunk)
-                    yield chunk
-
-        return StreamingResponse(body(), status_code=status, headers=headers,
-                                 media_type=_media_type(path))
+        return _stream_file(path, request)
 
     @app.post("/jobs/{job_id}/delete")
     def delete_job_endpoint(job_id: str, mgr: JobManager = Depends(require_auth)):

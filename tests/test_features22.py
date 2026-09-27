@@ -371,8 +371,11 @@ def test_the_range_handler_is_ours_not_the_response_class(tmp_path, server):
     route = next(r for r in app.routes
                  if getattr(r, "path", "") == "/jobs/{job_id}/stream")
     src = inspect.getsource(route.endpoint)
-    assert "_range_span" in src and "Accept-Ranges" in src, \
-        "the stream endpoint must answer Range itself"
+    assert "_stream_file" in src, \
+        "the stream endpoint must stream the file itself"
+    helper = inspect.getsource(api_mod._stream_file)
+    assert "_range_span" in helper and "Accept-Ranges" in helper, \
+        "the shared streamer must answer Range itself"
     assert not hasattr(api_mod, "FileResponse"), \
         "api.py must not hand files to FileResponse: its Range support "\
         "depends on the starlette version, and Android pins an old one"
@@ -515,7 +518,7 @@ def test_the_ui_exposes_every_v22_feature():
                   "playModal", "playBody", "playClose"):
         assert f'id="{ident}"' in html, ident
     # the stream URL carries the page's own token (a <video> cannot send a header)
-    assert "/stream?token=" in js
+    assert "/stream?" in js and '"token=" + encodeURIComponent(CFG.token)' in js
     # batch detection + the two new endpoints are wired
     assert '"/jobs/batch"' in js and '"/archive"' in js and '"/archive/forget"' in js
 

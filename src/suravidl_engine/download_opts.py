@@ -51,6 +51,37 @@ QUALITY_KEYS = tuple(p["key"] for p in QUALITY_PRESETS)
 # the 720p expression" → "720", the per-site memory and the UI both use it).
 QUALITY_BY_FMT = {p["fmt"]: p["key"] for p in QUALITY_PRESETS}
 
+# A concrete stream id ("137", "140-22"): the UI builds "137+bestaudio/best"
+# for these when it pairs the site's audio, and the no-sound choice must be
+# able to name exactly the stream again.
+_CONCRETE_ID = re.compile(r"^\d+$")
+
+
+def strip_audio_pairing(fmt: str) -> str:
+    """`137+bestaudio/best` → `137`: the same expression, audio taken out.
+
+    The shells build "this video stream + the best audio" expressions, and
+    the per-job no_audio override (a user asking for a silent video) must
+    undo exactly that pairing — nothing else:
+
+    - a concrete stream id falls back to nothing, because keeping the
+      `/best` ladder would quietly hand back a file with sound;
+    - a selector keeps its own ladder so a site without video-only streams
+      still yields a file: `bv*+ba/b` → `bv*/b`;
+    - an audio-only expression has nothing to strip and comes back as it is.
+
+    Pure and total: whatever string arrives, something valid goes back
+    (each form is asserted against yt-dlp's own parser in the tests).
+    """
+    raw = str(fmt or "").strip()
+    if not raw:
+        return raw
+    steps = [s.strip() for s in raw.split("/") if s.strip()]
+    heads = [s.split("+", 1)[0].strip() for s in steps]
+    if steps and _CONCRETE_ID.match(heads[0]):
+        return heads[0]
+    return "/".join(h for h in heads if h)
+
 # The curated groups the yt-dlp tab exposes as named controls (as opposed to
 # raw arguments). Kept here so the UI, the engine and the tests share one list.
 CURATED_KEYS = (

@@ -143,3 +143,21 @@ def test_an_override_really_reaches_ytdlp(client, fixture_server, tmp_path):
     # and the global settings were not touched by it
     settings = client.get("/settings", headers=AUTH).json()
     assert settings["filename_template"] != "only-this-job-%(ext)s"
+
+
+def test_no_audio_is_a_per_job_choice_with_sound_as_the_default(client):
+    """The user's checklist: "video only" must be a real choice, and when the
+    choice is not made the app keeps adding the audio (2026-09-27)."""
+    plain = client.get("/settings", headers=AUTH).json()
+    assert plain["no_audio"] is False, "sound stays the default"
+
+    j = client.post("/jobs", headers=AUTH, json={
+        "url": "http://example.invalid/v.mp4",
+        "overrides": {"no_audio": True},
+    }).json()
+    assert j["overrides"] == {"no_audio": True}
+    # it survives into the stored row, so a retry keeps the choice
+    listed = [x for x in client.get("/jobs", headers=AUTH).json()["jobs"]
+              if x["id"] == j["id"]][0]
+    assert listed["overrides"]["no_audio"] is True
+    _settle(client, j["id"])

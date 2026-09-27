@@ -27,6 +27,9 @@ DEFAULTS = {
     "download_sections": "",     # "" or a clip like "00:01:30-00:02:45"
     "subtitles_to_srt": False,   # TVs want .srt, not YouTube's .vtt
     "archive_ignore": False,     # this job only: download even if archived
+    "no_audio": False,           # this job only: a video stream downloads
+                                 # without the audio the app would add; sound
+                                 # is the default (2026-09-27 report)
     "fragments": 1,              # concurrent fragment downloads (1-16)
     "retries": 10,               # yt-dlp retries per download (0-30)
     "max_downloads": 0,          # stop after N downloads in a playlist (0 = all)
@@ -268,7 +271,8 @@ class Settings:
                 raise ValueError("subtitles_langs must be a comma list of language codes")
             return value
         if key in ("subtitles_auto", "embed_metadata", "embed_thumbnail", "archive",
-                   "subtitles_to_srt", "archive_ignore", "live_from_start"):
+                   "subtitles_to_srt", "archive_ignore", "live_from_start",
+                   "no_audio"):
             return bool(value)
         if key == "rate_limit":
             from .download_opts import parse_rate_limit

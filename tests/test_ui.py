@@ -53,7 +53,9 @@ def test_index_has_new_controls(tmp_path):
                     "setRawEnabled", "setRawArgs", "optionsBtn",
                     "optionsSearch", "optionsList", "optionsCount",
                     "sniffRow", "sniffBtn", "browserOffer", "browserOfferBtn",
-                    "apiToken", "copyToken"):
+                    "apiToken", "copyToken",
+                    "soundRow", "noSound", "openDir",
+                    "folderModal", "folderTitle", "folderList", "folderClose"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

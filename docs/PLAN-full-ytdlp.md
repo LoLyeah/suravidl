@@ -801,3 +801,48 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     the newest 10 per folder (pruned on every write, and at first launch so an
     update shrinks an existing pile) with the appended one written through a
     bounded appender.
+
+- **v0.25.0 — everything the screenshots complained about, answered.** Five
+    complaints from one session, each one real:
+
+    1. *"ERROR: Unable to down…"* — every failed row sliced yt-dlp's message
+    to 160 characters in a single ellipsised line, so the explanation the user
+    needed was the part that was hidden. The row now renders the whole
+    message, clamped to two lines and unfoldable by a tap, with a **Copy**
+    button beside **Retry** (clipboard works through a fallback for WebViews
+    that refuse `navigator.clipboard`, and the footer's copy-path uses the
+    same helper).
+
+    2. *"There's no open and share button for the playlist"* — a playlist
+    row's `filepath` is the download folder, which is why the row-level
+    hand-offs were withheld (a player cannot open a directory). But the row
+    owns real files, so it now offers them: **Files (N)** unfolds a list where
+    every entry gets its own Open / Share (Android host) and **Play** — the
+    engine serves one recorded entry through `stream?name=…`, matched against
+    the list the job wrote, so the parameter can never reach any other file.
+    A merged single-file download is *not* a playlist: its `files` also names
+    the fragments it muxed, but the finished file is among them — caught live
+    in testing, when a video+audio row briefly offered "Files (3)" instead of
+    Play.
+
+    3. *"'video only — sound added latter' is ambiguous"* — the label now
+    says what the download will do ("video only — sound included"), the sound
+    choice became an explicit checklist item (**Video only — no sound**), and
+    a site with no separate audio says "no sound available" instead of
+    promising a track that does not exist. Sound stays the default: the tick
+    rides every start from the card (chips, best quality, playlist) as a
+    per-job `no_audio` override, the engine strips the audio pairing
+    (`137+bestaudio/best` → `137`; a bare "best" pairs nothing at all), and
+    the label flip is live, in place. Verified end to end against a local HLS
+    fixture: ticked → `h264` only, unticked → `h264+aac`.
+
+    4. *"Add the open folder button too, below copy path"* — the footer has
+    it. Desktop shells reveal the real folder (`POST /app/reveal-dir`);
+    Android cannot (no file manager may open Android/data), so the same
+    button opens a **folder sheet** inside the app — `GET /files/list` shows
+    the folder's own files, newest first, work files and sidecars excluded —
+    each with Play, and Open / Share through the host bridge where it exists.
+
+    5. *"Multiple inconsistent UI"* — the fix pass itself: one copy helper,
+    one clamp style, one dialog pattern (the sheet announces itself like the
+    other two modals), touch-sized controls.

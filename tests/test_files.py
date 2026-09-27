@@ -1,5 +1,6 @@
 """Clearing downloads: on Android the folder is app-private, so the app has
 to offer the cleanup itself (Settings → Device → Delete downloaded files)."""
+import os
 import time
 from pathlib import Path
 
@@ -327,3 +328,64 @@ def test_default_cache_dir_follows_env_then_xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("SURAVIDL_CACHE_DIR", str(tmp_path / "explicit"))
     assert default_cache_dir() == tmp_path / "explicit", \
         "the shell's explicit choice wins (Android points it at the cache bucket)"
+
+
+# --------------------------------------------------------------------------
+# the folder sheet: "open folder" has to show the folder's files (2026-09-27)
+# --------------------------------------------------------------------------
+
+def test_list_shows_downloads_newest_first_and_hides_work_files(tmp_path):
+    """Android/data is closed to every file manager on Android 11+, so the
+    app lists the folder itself. Work files, sidecars and thumbnails are not
+    downloads and must not clutter it."""
+    with _client(tmp_path) as c:
+        dl = c.app.state.download_dir
+        dl.mkdir(parents=True, exist_ok=True)
+        (dl / "old.mp4").write_bytes(b"x" * 10)
+        (dl / "new.srt").write_bytes(b"y" * 5)
+        os.utime(dl / "old.mp4", (1000, 1000))
+        os.utime(dl / "new.srt", (2000, 2000))
+        (dl / "clip.info.json").write_bytes(b"{}")
+        (dl / "clip.mp4.part").write_bytes(b"z")
+        (dl / "frag.mp4.part-Frag1").write_bytes(b"z")
+        (dl / "thumb.jpg").write_bytes(b"t")
+        (dl / ".hidden.mp4").write_bytes(b"h")
+        sub = dl / "sub"
+        sub.mkdir()
+        (sub / "e1.mp4").write_bytes(b"w" * 3)
+        os.utime(sub / "e1.mp4", (1500, 1500))
+
+        r = c.get("/files/list", headers=AUTH).json()
+        assert [f["name"] for f in r["files"]] == \
+            ["new.srt", "sub/e1.mp4", "old.mp4"]
+        kinds = {f["name"]: f["kind"] for f in r["files"]}
+        assert kinds["old.mp4"] == "video"
+        assert kinds["new.srt"] == "subtitle"
+        assert all(f["path"].startswith(str(dl)) for f in r["files"])
+        assert r["dir"] == str(dl)
+
+
+def test_files_stream_serves_ranges_and_refuses_escapes(tmp_path):
+    with _client(tmp_path) as c:
+        dl = c.app.state.download_dir
+        dl.mkdir(parents=True, exist_ok=True)
+        (dl / "clip.mp4").write_bytes(b"0123456789")
+        (dl / "sub").mkdir()
+        (dl / "sub" / "e1.mp4").write_bytes(b"sub")
+
+        r = c.get("/files/stream", params={"path": "clip.mp4"}, headers=AUTH)
+        assert r.status_code == 200 and r.content == b"0123456789"
+        r = c.get("/files/stream", params={"path": "clip.mp4"},
+                  headers={**AUTH, "Range": "bytes=2-4"})
+        assert r.status_code == 206 and r.content == b"234"
+        assert r.headers["content-range"] == "bytes 2-4/10"
+        r = c.get("/files/stream", params={"path": "sub/e1.mp4"}, headers=AUTH)
+        assert r.status_code == 200 and r.content == b"sub"
+
+        outside = tmp_path / "secret.txt"
+        outside.write_bytes(b"no")
+        for bad in ("../secret.txt", "sub/../../secret.txt", "/etc/hostname", ""):
+            rr = c.get("/files/stream", params={"path": bad}, headers=AUTH)
+            assert rr.status_code in (403, 404), bad
+        rr = c.get("/files/stream", params={"path": "missing.mp4"}, headers=AUTH)
+        assert rr.status_code == 404

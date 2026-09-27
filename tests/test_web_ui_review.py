@@ -117,7 +117,8 @@ def test_settings_inputs_have_names_and_modals_announce_themselves():
                   "setGeoCountry", "optionsSearch"):
         after = HTML.split(f'id="{ident}"')[1][:300]
         assert "aria-label" in after, f"{ident} needs an accessible name"
-    assert HTML.count('role="dialog" aria-modal="true"') == 2
+    # 3 dialogs: the player, the confirm sheet, and the folder sheet (2026-09-27)
+    assert HTML.count('role="dialog" aria-modal="true"') == 3
 
 
 def test_the_deletes_also_clear_the_app_cache():

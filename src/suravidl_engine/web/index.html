@@ -94,6 +94,14 @@
           <option value="audio-opus">Opus (native)</option>
         </select>
       </div>
+      <div id="soundRow" class="audioRow hidden">
+        <label class="chk" for="noSound">
+          <input id="noSound" type="checkbox"/>
+          <span>Video only — no sound</span>
+        </label>
+        <span class="muted small">when unticked, a video download gets the
+          site’s audio added automatically</span>
+      </div>
       <div id="liveRow" class="audioRow hidden">
         <span class="chip">● LIVE</span>
         <span class="muted small">live stream — the download keeps recording until you cancel it</span>
@@ -669,7 +677,10 @@
 
 <footer class="meta">
   <span id="dlWhere">downloads</span> → <code id="dlDir"></code>
-  <button id="copyDir" class="linkbtn" type="button">copy path</button>
+  <div class="footrow">
+    <button id="copyDir" class="linkbtn" type="button">copy path</button>
+    <button id="openDir" class="linkbtn" type="button">open folder</button>
+  </div>
 </footer>
 
 <!-- toasts -->
@@ -684,6 +695,20 @@
       <button id="confirmNo" class="btn">Cancel</button>
       <button id="confirmYes" class="btn danger">Confirm</button>
     </div>
+  </div>
+</div>
+
+<!-- folder sheet: "open folder" where no file manager can go — Android/data
+     is closed to every file manager on Android 11+ (2026-09-27) -->
+<div id="folderModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="folderTitle">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="folderTitle" class="title">downloads</span>
+      <span class="spacer"></span>
+      <button id="folderClose" class="btn ghost-sm">Close</button>
+    </div>
+    <div id="folderList" class="folderlist"></div>
   </div>
 </div>
 
