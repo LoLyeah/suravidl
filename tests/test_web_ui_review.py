@@ -118,3 +118,21 @@ def test_settings_inputs_have_names_and_modals_announce_themselves():
         after = HTML.split(f'id="{ident}"')[1][:300]
         assert "aria-label" in after, f"{ident} needs an accessible name"
     assert HTML.count('role="dialog" aria-modal="true"') == 2
+
+
+def test_the_deletes_also_clear_the_app_cache():
+    """The app cache was the piece with no owner: nothing counted it, nothing
+    cleared it, and on Android yt-dlp kept it in app *data* where the system's
+    own Clear-cache cannot reach (2026-09-27). The Device row now shows it,
+    both deletes free it, and an empty folder with a full cache still gets a
+    dialog instead of "nothing to delete"."""
+    assert 'id="storageCache"' in HTML
+    assert '$("storageCache").textContent' in APP
+    assert "cache_freed_bytes" in APP
+    assert "The app cache is cleared too." in APP
+    # refuses only when folder AND cache are both empty
+    flow = APP.split("const clearFiles = async (keepGallery)")[1]
+    before_dialog = flow.split("askConfirm")[0]
+    assert "s.files === 0 && !cacheBytes" in before_dialog
+    # a cache-only clear still asks, with a verb that fits it
+    assert 'okText: known && s.files === 0 ? "Clear" : "Delete"' in APP

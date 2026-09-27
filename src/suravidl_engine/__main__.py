@@ -73,12 +73,17 @@ def _harden(path: Path, mode: int) -> None:
 
 def start_server(download_dir, token: str, port: int, db_path=None,
                  desktop_actions: dict | None = None,
-                 page_key: str | None = None):
+                 page_key: str | None = None, cache_dir=None):
     """Start uvicorn in a daemon thread; returns the server (for shutdown).
 
     `page_key` gates `GET /` (see create_app): the Android shell sets it so
     the page that carries the API token is not readable by every other app
     that can open a socket to the loopback port (v0.21.1 audit).
+
+    `cache_dir` is where yt-dlp's cache lives; None means the engine's
+    default resolution (the shell's `SURAVIDL_CACHE_DIR`, else the XDG
+    cache home). The Android shell exports the env var before Python starts,
+    so it needs no extra argument here.
     """
     import uvicorn
 
@@ -86,7 +91,8 @@ def start_server(download_dir, token: str, port: int, db_path=None,
 
     config = uvicorn.Config(
         create_app(download_dir=download_dir, auth_token=token, db_path=db_path,
-                   desktop_actions=desktop_actions, page_key=page_key),
+                   desktop_actions=desktop_actions, page_key=page_key,
+                   cache_dir=cache_dir),
         host="127.0.0.1", port=port, log_level="warning",
     )
     server = uvicorn.Server(config)
@@ -200,6 +206,9 @@ def main() -> None:
     p.add_argument("--port", type=int, default=8787)
     p.add_argument("--download-dir", type=Path, default=Path.home() / "Downloads")
     p.add_argument("--db", type=Path, default=Path.home() / ".suravidl" / "jobs.db")
+    p.add_argument("--cache-dir", type=Path, default=None,
+                   help="where yt-dlp's cache lives "
+                        "(default: XDG cache home, ~/.cache/suravidl)")
     p.add_argument("--no-browser", action="store_true",
                    help="don't fall back to opening a browser tab")
     p.add_argument("--no-window", action="store_true",
@@ -244,7 +253,8 @@ def main() -> None:
                    "open_url": _open_url}
 
     server = start_server(download_dir=args.download_dir, token=token, port=port,
-                          db_path=args.db, desktop_actions=actions or None)
+                          db_path=args.db, desktop_actions=actions or None,
+                          cache_dir=args.cache_dir)
     print(f"suravidl running at {url}  (token: {token[:4]}…{token[-4:]})")
 
     if window is not None:

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.os.PowerManager
+import android.system.Os
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -81,6 +82,16 @@ class EngineService : Service() {
 
         thread(name = "engine") {
             try {
+                // yt-dlp's cache belongs in the app's cache bucket: the
+                // system's Clear-cache button governs it, storage pressure
+                // may evict it, and it stops counting as unbrowsable app
+                // "data" (v0.24.9). Export before Python starts — Chaquopy
+                // builds os.environ from the process env.
+                try {
+                    Os.setenv("SURAVIDL_CACHE_DIR", cacheDir.absolutePath, true)
+                } catch (t: Throwable) {
+                    Log.w(SuravidlApp.TAG, "could not export SURAVIDL_CACHE_DIR", t)
+                }
                 if (!Python.isStarted()) Python.start(AndroidPlatform(this))
                 Python.getInstance().getModule("suravidl_engine.__main__")
                     .callAttr("start_server", dl.absolutePath, token, ENGINE_PORT,

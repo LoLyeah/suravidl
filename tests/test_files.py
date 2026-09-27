@@ -1,17 +1,24 @@
 """Clearing downloads: on Android the folder is app-private, so the app has
 to offer the cleanup itself (Settings → Device → Delete downloaded files)."""
 import time
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 AUTH = {"Authorization": "Bearer testtoken"}
 
 
-def _client(tmp_path):
+def _client(tmp_path, cache_dir=None):
+    """A client whose cache dir lives inside tmp_path.
+
+    The engine's cache defaults to a real user directory (~/.cache/suravidl);
+    a test must never clear that one just by exercising /files/clear.
+    """
     import suravidl_engine.api as api
 
     return TestClient(api.create_app(download_dir=tmp_path / "dl",
-                                     auth_token="testtoken"))
+                                     auth_token="testtoken",
+                                     cache_dir=cache_dir or tmp_path / "cache"))
 
 
 def test_summary_counts_files_and_bytes(tmp_path):
@@ -236,3 +243,87 @@ def test_a_late_worker_write_cannot_resurrect_a_deleted_download(tmp_path):
         ids = {j["id"] for j in c.get("/jobs", headers=AUTH).json()["jobs"]}
         assert job["id"] not in ids
         assert not path.exists()
+
+
+# --------------------------------------------------------------------------
+# the app cache: yt-dlp's player/signature data, which it can always re-fetch
+# --------------------------------------------------------------------------
+
+def test_summary_reports_the_app_cache(tmp_path):
+    """The cache had no owner: nothing counted it and nothing cleared it, and
+    on Android it lived in app *data*, out of reach of the system's own
+    Clear-cache. It is counted apart from the downloads."""
+    with _client(tmp_path, cache_dir=tmp_path / "cache") as c:
+        cache = tmp_path / "cache"
+        (cache / "youtube").mkdir(parents=True, exist_ok=True)
+        (cache / "youtube" / "player.js").write_bytes(b"p" * 300)
+        (cache / "sig.bin").write_bytes(b"s" * 40)
+
+        s = c.get("/files/summary", headers=AUTH).json()
+        assert s["files"] == 0, "cache is not a downloaded file"
+        assert s["cache_bytes"] == 340
+        assert s["cache_files"] == 2
+        assert s["cache_dir"].endswith("cache")
+
+
+def test_clear_empties_the_app_cache_and_only_its_own_contents(tmp_path):
+    with _client(tmp_path, cache_dir=tmp_path / "cache") as c:
+        dl = tmp_path / "dl"
+        dl.mkdir(parents=True, exist_ok=True)
+        (dl / "one.mp4").write_bytes(b"x" * 100)
+        cache = tmp_path / "cache"
+        (cache / "youtube").mkdir(parents=True, exist_ok=True)
+        (cache / "youtube" / "player.js").write_bytes(b"p" * 300)
+        keep = tmp_path / "keep.txt"
+        keep.write_bytes(b"k" * 5)          # outside every root
+
+        r = c.post("/files/clear", json={"confirm": "delete"},
+                   headers=AUTH).json()
+        assert r["deleted"] == 1 and r["freed_bytes"] == 100
+        assert r["cache_freed_bytes"] == 300
+        assert cache.exists(), "the cache root itself stays"
+        assert not any(p.is_file() for p in cache.rglob("*"))
+        assert not any(p.is_file() for p in dl.rglob("*"))
+        assert keep.exists(), "files outside both roots must survive"
+        assert c.get("/files/summary", headers=AUTH).json()["cache_bytes"] == 0
+
+
+def test_cache_clear_refuses_when_the_download_folder_sits_inside_it(tmp_path):
+    """A cache dir that contains the download folder is a config mistake and
+    the dangerous direction of overlap: wiping it would treat the user's
+    downloads as cache. The folder sweep owns those — this one stands down."""
+    with _client(tmp_path, cache_dir=tmp_path) as c:
+        dl = tmp_path / "dl"
+        dl.mkdir(parents=True, exist_ok=True)
+        (dl / "one.mp4").write_bytes(b"x" * 100)
+        keep = tmp_path / "keep.txt"
+        keep.write_bytes(b"k" * 5)
+
+        r = c.post("/files/clear", json={"confirm": "delete"},
+                   headers=AUTH).json()
+        assert r["cache_freed_bytes"] == 0
+        assert keep.exists(), "the cache sweep must not walk a dir that owns the downloads"
+
+
+def test_jobs_point_yt_dlp_at_the_engine_cache(tmp_path):
+    from suravidl_engine.download_opts import build_download_opts
+
+    opts = build_download_opts({}, tmp_path / "dl", cache_dir=tmp_path / "cache")
+    assert opts["cachedir"] == str(tmp_path / "cache")
+    plain = build_download_opts({}, tmp_path / "dl")
+    assert "cachedir" not in plain, "unset must leave yt-dlp's own default alone"
+
+
+def test_default_cache_dir_follows_env_then_xdg(monkeypatch, tmp_path):
+    from suravidl_engine.api import default_cache_dir
+
+    monkeypatch.delenv("SURAVIDL_CACHE_DIR", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    assert default_cache_dir() == Path.home() / ".cache" / "suravidl"
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    assert default_cache_dir() == tmp_path / "xdg" / "suravidl"
+
+    monkeypatch.setenv("SURAVIDL_CACHE_DIR", str(tmp_path / "explicit"))
+    assert default_cache_dir() == tmp_path / "explicit", \
+        "the shell's explicit choice wins (Android points it at the cache bucket)"

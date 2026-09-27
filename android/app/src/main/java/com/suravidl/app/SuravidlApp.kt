@@ -14,6 +14,16 @@ import java.io.File
  * with a copy in the app-private external dir for tests.
  */
 object LogStore {
+    /** How many timestamped diagnostic files one logs dir may keep. Every
+     *  crash and engine failure used to add one for good — in the
+     *  user-visible Android/media folder too (v0.24.9). */
+    const val MAX_LOG_FILES = 10
+
+    /** `crash-1727…txt`, `engine-error-…txt`: one per event, so these are the
+     *  ones that pile up. Fixed names (`share.log`) do not match and are
+     *  never pruned. */
+    private val TIMED_NAME = Regex(""".+-\d{6,}\.txt$""")
+
     fun mediaDir(ctx: Context): File? {
         if (Build.VERSION.SDK_INT < 29) return null
         val dir = File(Environment.getExternalStorageDirectory(),
@@ -31,6 +41,47 @@ object LogStore {
             val alt = File(ctx.getExternalFilesDir(null) ?: ctx.filesDir, "logs")
                 .apply { mkdirs() }
             File(alt, name).writeText(text)
+        } catch (_: Throwable) {
+        }
+        prune(ctx)
+    }
+
+    /** Keep only the newest [keep] timestamped logs per dir.
+
+     *  Deletions only: a concurrent writer may prune further, never bring one
+     *  back. Runs on every write (writes are rare by design), so a dir can
+     *  never grow past the cap by one more crash. */
+    fun prune(ctx: Context, keep: Int = MAX_LOG_FILES) {
+        val dirs = listOfNotNull(
+            mediaDir(ctx),
+            ctx.getExternalFilesDir(null)?.let { File(it, "logs") })
+        for (dir in dirs) {
+            try {
+                val timed = (dir.listFiles() ?: emptyArray())
+                    .filter { it.isFile && TIMED_NAME.matches(it.name) }
+                if (timed.size <= keep) continue
+                // timestamped names are fixed-width numbers: name order is
+                // chronological order
+                timed.sortedByDescending { it.name }
+                    .drop(keep)
+                    .forEach { it.delete() }
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** Append a line, keeping the file under [maxBytes] by dropping the
+     *  oldest complete lines. For the one log that appends per event
+     *  (`share-detail.log`), which otherwise grows for ever. */
+    fun appendBounded(file: File, line: String, maxBytes: Int = 256 * 1024) {
+        try {
+            file.parentFile?.mkdirs()
+            file.appendText(line)
+            if (file.length() > maxBytes) {
+                val tail = file.readText().takeLast(maxBytes / 2)
+                val cut = tail.indexOf('\n')
+                file.writeText(if (cut >= 0) tail.substring(cut + 1) else tail)
+            }
         } catch (_: Throwable) {
         }
     }
@@ -65,6 +116,9 @@ class SuravidlApp : Application() {
     override fun onCreate() {
         super.onCreate()
         setupFfmpeg()
+        // an update can arrive on top of a season of crash logs: trim them to
+        // the newest few at first launch, not just on the next write (v0.24.9)
+        LogStore.prune(this)
         val prev = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             Log.e(TAG, "uncaught exception on thread ${t.name}", e)

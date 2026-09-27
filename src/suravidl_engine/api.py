@@ -163,11 +163,28 @@ def _web_dir() -> Path:
     return Path(__file__).parent / "web"
 
 
+def default_cache_dir() -> Path:
+    """Where yt-dlp's own cache belongs.
+
+    The shell decides: Android exports `SURAVIDL_CACHE_DIR` pointing at the
+    app's cache bucket, so the system's Clear-cache button governs it and
+    storage pressure may evict it. Without a shell it is the XDG cache home
+    — the same place yt-dlp would use anyway, except the engine now owns the
+    directory and can count and clear it (v0.24.9).
+    """
+    env = os.environ.get("SURAVIDL_CACHE_DIR", "").strip()
+    if env:
+        return Path(env)
+    xdg = os.environ.get("XDG_CACHE_HOME", "").strip()
+    base = Path(xdg) if xdg else Path.home() / ".cache"
+    return base / "suravidl"
+
+
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
                update_fn=None, update_check_fn=None,
                settings_path=None, desktop_actions: dict | None = None,
-               page_key: str | None = None) -> FastAPI:
+               page_key: str | None = None, cache_dir=None) -> FastAPI:
     from .settings import Settings
     from .presets import PresetStore, split_patch
 
@@ -188,6 +205,10 @@ def create_app(download_dir, auth_token: str | None = None,
     settings = Settings(path=settings_path, default_download_dir=download_dir,
                         default_max_concurrent=max_concurrent)
     archive_path = (Path(db_path).parent / "archive.txt") if db_path else None
+    # The engine's cache directory. Never created here: yt-dlp makes it when
+    # it first caches something, and a test run must not leave a
+    # ~/.cache/suravidl behind just by building an app.
+    cache_dir = Path(cache_dir) if cache_dir else default_cache_dir()
     presets = PresetStore(
         (Path(settings_path).parent / "presets.json") if settings_path else None)
 
@@ -201,7 +222,8 @@ def create_app(download_dir, auth_token: str | None = None,
             effective = {**effective, **overrides}
         return build_download_opts(effective, dl_dir,
                                    archive_path=archive_path,
-                                   raw_args=raw_args)
+                                   raw_args=raw_args,
+                                   cache_dir=cache_dir)
 
     manager = JobManager(
         download_dir=settings.get()["download_dir"],
@@ -576,13 +598,72 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=400, detail=str(e)) from e
         return {"ok": True}
 
+    def _dir_files(root: Path) -> list[Path]:
+        try:
+            return [p for p in root.rglob("*") if p.is_file()] if root.exists() else []
+        except OSError:
+            return []
+
+    def _dir_stats(root: Path) -> tuple[int, int]:
+        """(files, bytes) under a root; a file that vanished mid-walk is just
+        not counted."""
+        files = _dir_files(root)
+        total = 0
+        for p in files:
+            try:
+                total += p.stat().st_size
+            except OSError:
+                pass
+        return len(files), total
+
+    def _wipe_dir(root: Path) -> tuple[int, int]:
+        """Delete every file under `root` (deepest first) and the directories
+        they leave empty. Returns (files, bytes); the root itself stays."""
+        deleted = freed = 0
+        if not root.exists():
+            return deleted, freed
+        try:
+            entries = sorted(root.rglob("*"), key=lambda q: len(q.parts),
+                             reverse=True)
+        except OSError:
+            return deleted, freed
+        for p in entries:
+            if p.is_file():
+                try:
+                    freed += p.stat().st_size
+                    p.unlink()
+                    deleted += 1
+                except OSError:
+                    pass
+            elif p.is_dir():
+                try:
+                    p.rmdir()
+                except OSError:
+                    pass
+        return deleted, freed
+
+    def _cache_owns_downloads() -> bool:
+        """True when the cache root contains (or equals) the download folder.
+
+        The dangerous direction of overlap: wiping such a root would sweep
+        the user's downloads as if they were cache. That is a config mistake,
+        so the cache sweep stands down — the folder sweep owns those files."""
+        try:
+            c = Path(cache_dir).resolve()
+            d = Path(manager.download_dir).resolve()
+        except OSError:
+            return True          # cannot tell: do not touch the cache
+        return d == c or d.is_relative_to(c)
+
     @app.get("/files/summary")
     def files_summary(_mgr: JobManager = Depends(require_auth)):
-        """How much lives in the download folder (the UI shows this before a wipe)."""
-        d = Path(manager.download_dir)
-        files = [p for p in d.rglob("*") if p.is_file()] if d.exists() else []
-        return {"dir": str(d), "files": len(files),
-                "bytes": sum(p.stat().st_size for p in files)}
+        """How much lives in the download folder and in the app cache (the UI
+        shows both before a wipe)."""
+        files, total = _dir_stats(Path(manager.download_dir))
+        cache_files, cache_total = _dir_stats(Path(cache_dir))
+        return {"dir": str(manager.download_dir), "files": files, "bytes": total,
+                "cache_dir": str(cache_dir), "cache_files": cache_files,
+                "cache_bytes": cache_total}
 
     def _archive_lines() -> list[str]:
         if not archive_path or not Path(archive_path).exists():
@@ -640,6 +721,10 @@ def create_app(download_dir, auth_token: str | None = None,
         Destructive enough to need the word, not just a button: the UI already
         asks, and this makes the engine refuse a stray call too (the v0.21.1
         audit found a bare POST wiped the folder).
+
+        The app cache goes with it: yt-dlp's player/signature data is always
+        re-fetchable, and on Android it lives in the cache bucket the system
+        may clear anyway (v0.24.9).
         """
         if (body.confirm if body else "") != "delete":
             raise HTTPException(
@@ -656,24 +741,15 @@ def create_app(download_dir, auth_token: str | None = None,
                 detail=f"{len(active)} download(s) still running — "
                        "cancel them before clearing the folder")
         d = Path(manager.download_dir)
-        deleted = freed = 0
-        if d.exists():
-            for p in sorted(d.rglob("*"), key=lambda q: len(q.parts), reverse=True):
-                if p.is_file():
-                    try:
-                        freed += p.stat().st_size
-                        p.unlink()
-                        deleted += 1
-                    except OSError:
-                        pass
-                elif p.is_dir():
-                    try:
-                        p.rmdir()
-                    except OSError:
-                        pass
+        deleted, freed = _wipe_dir(d)
+        cache_deleted = cache_freed = 0
+        if not _cache_owns_downloads():
+            cache_deleted, cache_freed = _wipe_dir(Path(cache_dir))
         pruned = mgr.clear_completed()
         return {"deleted": deleted, "freed_bytes": freed,
-                "cleared_jobs": pruned, "dir": str(d)}
+                "cleared_jobs": pruned, "dir": str(d),
+                "cache_deleted": cache_deleted,
+                "cache_freed_bytes": cache_freed}
 
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):

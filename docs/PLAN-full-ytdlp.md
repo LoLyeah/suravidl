@@ -781,3 +781,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `/files/clear` never touched the library to begin with. The button starts
     hidden where no gallery copy exists (browser builds), and both the confirm
     and the toast say the copies stay.
+
+- **v0.24.9 — the cache with an owner, and logs that stop piling up.** The
+    deletion machinery was thorough; the *caches* were nobody's job. yt-dlp's
+    own cache (player JS, signature data) was never counted and never cleared
+    — and on Android it landed in app *data*, where even the system's
+    Clear-cache button cannot reach it. The engine now points yt-dlp at a
+    directory it owns: the shell exports `SURAVIDL_CACHE_DIR` (Android answers
+    with the app's cache bucket, so the system button governs it and storage
+    pressure may evict it; desktop falls back to `~/.cache/suravidl`), the
+    Device row reports it beside the downloads ("app cache · 340 B"), and both
+    delete buttons free it — the same confirm and toast say so, an empty
+    folder with a full cache still gets its own "Clear the app cache?"
+    dialog instead of "nothing to delete", and the sweep stands down when the
+    download folder lives *inside* the cache root (a config mistake, not
+    cache). Android's logs were the other slow leak: a timestamped file per
+    crash or engine failure, kept in the user-visible Android/media folder
+    too, plus a `share-detail.log` appended per shared link — now capped at
+    the newest 10 per folder (pruned on every write, and at first launch so an
+    update shrinks an existing pile) with the appended one written through a
+    bounded appender.

@@ -1569,8 +1569,15 @@ async function initStorageSection() {
       $("storageInfo").textContent = s.files
         ? `${s.files} file${s.files === 1 ? "" : "s"} · ${humanBytes(s.bytes)}`
         : "no downloaded files";
+      // the app cache (yt-dlp's player/signature data): counted apart from
+      // the downloads, and freed by the same two buttons (v0.24.9)
+      const cache = typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
+      $("storageCache").textContent = cache
+        ? `app cache · ${humanBytes(cache)}`
+        : "app cache · empty";
     } catch (_) {
       $("storageInfo").textContent = "size unavailable";
+      $("storageCache").textContent = "";
     }
   };
   await show();
@@ -1582,11 +1589,14 @@ async function initStorageSection() {
   const clearFiles = async (keepGallery) => {
     const s = await api("/files/summary").catch(() => null);
     const known = s && typeof s.files === "number";
-    // Nothing on disk: do not offer to delete it. The row above could have
+    const cacheBytes = known && typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
+    // Nothing anywhere: do not offer to delete it. The row above could have
     // read "2 files · 73.2 MB" a minute ago (it is only re-read on tab open)
     // while a delete elsewhere emptied the folder — and "Delete 0 files
     // (0 B)?" against a row that says 2 is the consistency bug this fixes.
-    if (known && s.files === 0) {
+    // A non-empty app cache still earns the dialog: it is the half the
+    // folder row never showed (v0.24.9).
+    if (known && s.files === 0 && !cacheBytes) {
       toast("nothing to delete");
       show();
       return;
@@ -1595,24 +1605,37 @@ async function initStorageSection() {
     const counted = known
       ? `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})`
       : "Delete every downloaded file";
-    const ok = await askConfirm(
-      keepGallery
-        ? counted + " from the app's folder? The Gallery/Music copies stay."
-        : known
-          ? counted +
-            (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
-            "? This cannot be undone."
-          : counted + "? (its size could not be read) This cannot be undone.",
-      { okText: "Delete" });
+    const cacheNote = cacheBytes ? " The app cache is cleared too." : "";
+    let msg;
+    if (known && s.files === 0) {
+      // the folder is already empty — only the cache is left to clear
+      msg = `Clear the app cache (${humanBytes(cacheBytes)})?`;
+    } else if (keepGallery) {
+      msg = counted + " from the app's folder? The Gallery/Music copies stay." + cacheNote;
+    } else if (known) {
+      msg = counted +
+        (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
+        "?" + cacheNote + " This cannot be undone.";
+    } else {
+      msg = counted + "? (its size could not be read) This cannot be undone.";
+    }
+    const ok = await askConfirm(msg, { okText: known && s.files === 0 ? "Clear" : "Delete" });
     if (!ok) return;
     try {
       const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
       if (!keepGallery && ANDROID() && window.AndroidHost.deleteMediaCopies) {
         try { window.AndroidHost.deleteMediaCopies(); } catch (_) { }
       }
-      toast(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
-            `freed ${humanBytes(r.freed_bytes)}` +
-            (keepGallery && GALLERY() ? " · Gallery/Music copies kept" : ""));
+      const parts = [];
+      if (r.deleted > 0) {
+        parts.push(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"}`,
+                   `freed ${humanBytes(r.freed_bytes)}`);
+      }
+      if (r.cache_freed_bytes > 0) {
+        parts.push(`cache cleared (${humanBytes(r.cache_freed_bytes)})`);
+      }
+      if (keepGallery && GALLERY()) parts.push("Gallery/Music copies kept");
+      toast(parts.length ? parts.join(" · ") : "nothing freed");
       refreshJobs();
       show();
     } catch (e) {

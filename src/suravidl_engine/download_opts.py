@@ -412,7 +412,8 @@ def parse_raw_args(raw: str | None) -> dict:
 
 
 def build_download_opts(settings: dict, download_dir, archive_path=None,
-                        raw_args: str | None = None) -> dict:
+                        raw_args: str | None = None,
+                        cache_dir=None) -> dict:
     """yt-dlp options derived from user settings (no per-job overrides here)."""
     opts: dict = {}
     pps: list[dict] = []
@@ -498,6 +499,15 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
         # video is in the archive the user could never download it again
         # (deleted by mistake, or they want a better quality now)
         opts["download_archive"] = str(archive_path)
+
+    # -- cache location (v0.24.9) ------------------------------------------
+    # yt-dlp's own cache (player JS, signature data — always re-fetchable)
+    # had no owner: nothing counted it, nothing cleared it, and on Android
+    # the default landed in app *data*, where even the system's Clear-cache
+    # button cannot reach it. Pointed at a directory the engine owns, so
+    # Settings can show it and the delete buttons can free it.
+    if cache_dir:
+        opts["cachedir"] = str(cache_dir)
 
     # -- curated groups (verbosity · workarounds · geo · extractor args) ---
     opts.update(curated_settings_opts(settings))

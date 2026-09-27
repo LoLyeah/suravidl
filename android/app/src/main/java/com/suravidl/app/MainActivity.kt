@@ -324,13 +324,11 @@ class MainActivity : AppCompatActivity() {
         LogStore.write(this, "share.log", "shared link from: $host")
         // The full link stays useful for "why didn't my share arrive?" — but
         // the media-dir copy of every log is world-readable, so the URL goes to
-        // the app-private dir only (v0.21.1 audit).
-        try {
-            val priv = File(getExternalFilesDir(null) ?: filesDir, "logs")
-                .apply { mkdirs() }
-            File(priv, "share-detail.log").appendText("shared link: $url\n")
-        } catch (_: Throwable) {
-        }
+        // the app-private dir only (v0.21.1 audit). Appended through the
+        // bounded writer: one line per share used to grow this file for ever.
+        LogStore.appendBounded(
+            File(getExternalFilesDir(null) ?: filesDir, "logs/share-detail.log"),
+            "shared link: $url\n")
         runOnUiThread {
             webView.evaluateJavascript(
                 "window.suravidlShared && window.suravidlShared(${JSONObject.quote(url)})",
