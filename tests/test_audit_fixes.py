@@ -164,6 +164,12 @@ def test_probe_errors_come_from_the_engine_with_the_hint(tmp_path):
 # so the trash button on that one row deleted every other job's files too.
 
 def _playlist_job(mgr, names=("a.mp4", "b.mp4"), files_field=True):
+    # The real worker would race this hand-set status: the DNS failure for
+    # example.invalid lands whenever it likes, and whoever writes last wins.
+    # In a deterministic-order suite run the row flipped to `error` before
+    # `clear_completed` looked, and the clear finished without the lock. The
+    # row's fate belongs to the test, so the worker is a no-op.
+    mgr._run = lambda *a, **k: None
     job = mgr.create("http://example.invalid/playlist")
     d = Path(mgr.download_dir)
     d.mkdir(parents=True, exist_ok=True)
@@ -183,6 +189,7 @@ def _playlist_job(mgr, names=("a.mp4", "b.mp4"), files_field=True):
 
 
 def _other_job(mgr):
+    mgr._run = lambda *a, **k: None      # same worker race as _playlist_job
     job = mgr.create("http://example.invalid/other")
     p = Path(mgr.download_dir) / "other.mp4"
     p.write_bytes(b"y" * 5)

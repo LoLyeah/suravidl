@@ -846,3 +846,61 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     5. *"Multiple inconsistent UI"* — the fix pass itself: one copy helper,
     one clamp style, one dialog pattern (the sheet announces itself like the
     other two modals), touch-sized controls.
+
+- **v0.26.0 — the second pass over the same screens, and TikTok's own
+    retry.** Seven reports from the follow-up session:
+
+    1. *"Use highlights for the chosen subtitle language; I can't unclick
+    the one I accidentally click"* — the chips are toggles now: a picked
+    chip stays lit (`aria-pressed` drives the fill, so the paint and the
+    semantics cannot drift), clicking it again takes it out of the wish
+    list, and the row opens with the languages a person is actually after —
+    the device's own, then English — with the rest one tap behind a "+N
+    more" chip. The old list was alphabetical ISO codes: Abkhazian in
+    front, English past the cut.
+
+    2. *"Not all languages are available, depends on the video. The engine
+    refuses to download if the language isn't available"* — the wish list
+    is per-download but the list is per-video, so a pick the new video does
+    not offer is pruned the moment its probe lands (with a toast saying
+    what went). The engine never refused: re-verified against a fixture
+    that a missing subtitle language skips the subtitles and the download
+    still completes — both behaviours pinned by tests now.
+
+    3. *"I don't think you need to put 'video only — sound included'"* —
+    right, it read as noise on every row. A video-only row says **video
+    only**; the "— no sound" suffix appears only while the sound checkbox
+    is ticked. The unchecked default still pairs the site's audio, and the
+    hint under the checkbox still says so.
+
+    4. *"What's the difference between mp4 1920p with size calculated and
+    unknown size?"* — answered in chat: "unknown" is the site not
+    advertising a size (fragmented streams), and the same height repeats
+    because the containers/codecs differ. The cell now explains that on tap,
+    not only on hover.
+
+    5. *"The quality quick download should be below the title right? not
+    above"* — moved: the chips now sit inside the video card, under its
+    title row. (They were already honest: "Best" is the default, and the
+    "✓" marks your pick for that site last time.)
+
+    6. *"TikTok is still broken"* — the exact error ("Unexpected response
+    from webpage request") is ticketed upstream as intermittent
+    rate-limiting/anti-bot flakiness — "the same videos download fine
+    individually, and that's what the repeated passes are for"
+    (yt-dlp/yt-dlp#17604). So the engine now retries: `extract_info` gives
+    TikTok's refusal two more attempts (0.8 s, 2 s) before surfacing it,
+    both probe and download go through that one helper, and the final
+    failure carries the next step (hit Retry, or grab it from the in-app
+    browser instead).
+
+    7. The suite's own finding: two worker races surfaced under
+    random-order runs — a hand-set `completed` status racing a DNS failure
+    (the audit helpers stub the worker now), and a cancel landing when a
+    playlist's next entry had already started: that entry's `.part` was
+    stranded under a name `files` never learns (only finished entries land
+    there) and the delete walked past it. Jobs now record every target
+    yt-dlp names (`partials`, with an ALTER-TABLE migration for existing
+    DBs), the delete sweeps their partials through the same
+    inside-the-folder leash, and the test waits for the second entry and
+    the worker's death instead of hoping.

@@ -353,6 +353,12 @@ button, input, textarea, select, a { touch-action: manipulation; }
   background: var(--accent-soft); color: var(--accent-ink);
   border: 1px solid var(--accent-line);
 }
+/* A picked chip (subtitle languages) reads as picked; a toggle keeps its
+   state in aria-pressed, so the paint and the semantics cannot drift apart
+   (2026-09-27). */
+.chip[aria-pressed="true"] {
+  background: var(--accent); color: #fff; border-color: transparent;
+}
 table#formats { width: 100%; border-collapse: collapse; font-size: 13px; }
 #formats th {
   text-align: left; color: var(--dim); font-weight: 500;

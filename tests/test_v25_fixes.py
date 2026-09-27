@@ -151,7 +151,9 @@ def test_playing_a_playlist_entry_streams_by_name(tmp_path):
 # -- 3. plain wording + an explicit "no sound" choice -----------------------
 
 def test_video_wording_is_plain_and_has_a_no_sound_state():
-    assert "video only — sound included" in APP
+    # 2026-09-27 second report: the suffix lives on the checkbox, not on
+    # every row — "only show 'video only — no sound' when it is checked"
+    assert "sound included" not in APP
     assert "video only — no sound" in APP
     assert "video only — no sound available" in APP, \
         "a site with no separate audio must not promise sound"

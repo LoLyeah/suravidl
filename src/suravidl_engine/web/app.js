@@ -301,10 +301,13 @@ function fmtKind(f, hasSeparateAudio) {
 }
 
 /** The two states of a video-only row's label, read live from the checkbox
- *  so ticking it re-labels the whole table (refreshSoundLabels). */
+ *  so ticking it re-labels the whole table (refreshSoundLabels). The
+ *  unticked state IS the default and stays unannotated: "video only — sound
+ *  included" on every row read as noise (2026-09-27: "only show 'video
+ *  only — no sound' if the checklist is checked"). */
 function soundChoiceLabel() {
   const off = $("noSound") && $("noSound").checked;
-  return off ? "video only — no sound" : "video only — sound included";
+  return off ? "video only — no sound" : "video only";
 }
 
 /** The "no sound" tick re-labels the rows it applies to, in place. Which
@@ -335,8 +338,10 @@ function sizeCell(f) {
   } else {
     td.textContent = "unknown";
     td.classList.add("muted");
-    td.title = "the site does not advertise a size for this stream — " +
-               "the real size shows once the download starts";
+    const why = "the site does not advertise a size for this stream — " +
+                "the real size shows once the download starts";
+    td.title = why;                    // desktops hover
+    td.onclick = () => toast(why);     // phones tap
   }
   return td;
 }
@@ -364,32 +369,96 @@ function clock(seconds) {
   return h ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
 }
 
-/** The subtitle languages the site actually offers — click to add one to the
- *  wish list (typing codes blind was the review's #4 complaint). */
+/** Subtitle chips: the languages THIS site offers for THIS video — click to
+ *  toggle one in or out of the wish list, and every picked one stays lit
+ *  (2026-09-27: "use highlights for the chosen language; I can't unclick the
+ *  one I accidentally click"). The list opens with the languages a person is
+ *  actually after — the device's own, then English — and the rest is one tap
+ *  away; fourteen chips used to be a wall with Abkhazian at the front. */
+let SUBS_EXPANDED = false;
+
+/** The languages picked so far, in the override field's own spelling. */
+function pickedSubs() {
+  const field = $("ovSubLangs");
+  return field
+    ? field.value.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+}
+
 function renderSubsChips(info) {
   const box = $("subsChips");
+  if (!box) return;
   box.replaceChildren();
   const manual = Object.keys(info.subtitles || {});
   const auto = Object.keys(info.automatic_captions || {});
-  const langs = [...new Set([...manual, ...auto])].slice(0, 14);
-  $("subsRow").classList.toggle("hidden", !langs.length);
-  for (const lang of langs) {
+  const all = [...new Set([...manual, ...auto])];
+  const device = String(navigator.language || "").split("-")[0].toLowerCase();
+  const rank = (l) => {
+    const k = String(l).toLowerCase();
+    return k === device ? 0 : (k === "en" || k.startsWith("en-")) ? 1 : 2;
+  };
+  all.sort((a, b) => rank(a) - rank(b));   // stable: the site's order survives
+  $("subsRow").classList.toggle("hidden", !all.length);
+  if (!all.length) return;
+  const CAP = 14;
+
+  const sync = () => {
+    const picked = pickedSubs();
+    for (const chip of box.querySelectorAll("button.chip[data-lang]")) {
+      const on = picked.includes(chip.dataset.lang);
+      chip.classList.toggle("on", on);
+      chip.setAttribute("aria-pressed", on);
+    }
+  };
+  const toggle = (lang) => {
+    const have = pickedSubs();
+    const next = have.includes(lang)
+      ? have.filter((x) => x !== lang)
+      : [...have, lang];
+    $("ovSubLangs").value = next.join(", ");
+    if (next.length && !$("ovSubs").value) $("ovSubs").value = "sidecar";
+    if (typeof renderOvCount === "function") renderOvCount();
+    sync();
+    toast(next.length ? `subtitles: ${next.join(", ")}`
+                       : "subtitles: none picked");
+  };
+
+  for (const lang of (SUBS_EXPANDED ? all : all.slice(0, CAP))) {
     const isAuto = !manual.includes(lang);
     const chip = el("button", "chip", lang + (isAuto ? " (auto)" : ""));
     chip.type = "button";
-    chip.title = "download subtitles in " + lang +
-      (isAuto ? " (auto-generated — pick the site pair for real captions)" : "");
-    chip.onclick = () => {
-      const field = $("ovSubLangs");
-      const have = field.value.split(",").map((s) => s.trim()).filter(Boolean);
-      if (!have.includes(lang)) have.push(lang);
-      field.value = have.join(", ");
-      if (!$("ovSubs").value) $("ovSubs").value = "sidecar";
-      if (typeof renderOvCount === "function") renderOvCount();
-      toast(`subtitles: ${field.value}`);
-    };
+    chip.dataset.lang = lang;
+    chip.title = "subtitles in " + lang + (isAuto ? " (auto-generated)" : "") +
+      " — click again to unpick";
+    chip.onclick = () => toggle(lang);
     box.append(chip);
   }
+  if (all.length > CAP) {
+    const more = el("button", "chip more",
+      SUBS_EXPANDED ? "less" : `+${all.length - CAP} more`);
+    more.type = "button";
+    more.onclick = () => { SUBS_EXPANDED = !SUBS_EXPANDED; renderSubsChips(info); };
+    box.append(more);
+  }
+  sync();
+}
+
+/** The wish list is per-download and the site is per-video: a language picked
+ *  on the last video must not ride into one that does not offer it — the
+ *  leftover pick is how "the engine refuses when the language isn't
+ *  available" happened (2026-09-27). Prune against THIS probe, and say what
+ *  went. A site that reports no subtitles at all is not ours to clear. */
+function syncSubLangsWithProbe(info) {
+  const field = $("ovSubLangs");
+  if (!field || !field.value.trim()) return;
+  const available = [...Object.keys(info.subtitles || {}),
+                     ...Object.keys(info.automatic_captions || {})];
+  if (!available.length) return;
+  const gone = pickedSubs().filter((l) => !available.includes(l));
+  if (!gone.length) return;
+  field.value = pickedSubs().filter((l) => available.includes(l)).join(", ");
+  if (typeof renderOvCount === "function") renderOvCount();
+  toast(`subtitles: ${gone.join(", ")} — not on this video`);
 }
 
 /** Chapters: one click fills the clip start (and end) so a long video can be
@@ -427,7 +496,9 @@ function renderProbe(url, info) {
   // the probe has always carried these three; the UI now shows them
   const live = info.is_live === true || info.live_status === "is_live";
   $("liveRow").classList.toggle("hidden", !live);
+  SUBS_EXPANDED = false;              // every probe starts folded
   renderSubsChips(info);
+  syncSubLangsWithProbe(info);        // a pick this video lacks goes now
   renderChapterChips(info);
 
   const tb = $("formats").querySelector("tbody");

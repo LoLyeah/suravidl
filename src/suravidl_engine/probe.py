@@ -1,7 +1,9 @@
 """Metadata probe via yt-dlp as a module."""
 from __future__ import annotations
 
-import yt_dlp
+import yt_dlp  # tests monkeypatch probe.yt_dlp.YoutubeDL — keep the name
+
+from .extract import extract_info
 
 MAX_ENTRIES = 500
 
@@ -41,8 +43,7 @@ def probe(url: str, extra_headers: dict | None = None,
         if key in PROTECTED_PROBE_KEYS:
             continue
         opts[key] = value
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.sanitize_info(ydl.extract_info(url, download=False)) or {}
+    info = extract_info(opts, url, download=False) or {}
 
     if info.get("_type") == "playlist" or info.get("entries"):
         entries = [e for e in (info.get("entries") or []) if e]

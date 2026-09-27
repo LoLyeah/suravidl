@@ -118,11 +118,27 @@ def looks_like_signin_wall(text: str) -> bool:
     return any(phrase in lowered for phrase in WALL_PHRASES)
 
 
+# TikTok's web front refuses a fraction of fetches on any given network —
+# yt-dlp's own tracker treats it as intermittent ("the same videos download
+# fine individually", yt-dlp/yt-dlp#17604). The engine retries; this is the
+# hint for when it still refused every attempt.
+TIKTOK_FLAKE_HINT = (
+    "TikTok refused this attempt — it answers like that intermittently on "
+    "some networks, and the engine already retried. Hit Retry once more; if "
+    "it keeps refusing, use “Find a video on a page” to grab it from the "
+    "browser instead."
+)
+
+
 def explain_download_error(text: str) -> str:
     """A failure the user reads: yt-dlp's words, plus the one hint we know."""
+    from .extract import is_tiktok_flake
+
     if looks_like_signin_wall(text):
         return (f"{text} — this looks like the site asking for an account: "
                 "add cookies in Settings → Authentication.")
+    if is_tiktok_flake(text):
+        return f"{text} — {TIKTOK_FLAKE_HINT}"
     return text
 
 

@@ -186,24 +186,79 @@ def test_a_finished_download_still_records_its_files(tmp_path):
 
 def test_a_cancelled_playlist_deletes_what_it_had_written(tmp_path, slow_fixture_server):
     """A playlist's `files` was only set on a clean finish, so a cancelled or
-    errored playlist row deleted nothing and left every video behind."""
+    errored playlist row deleted nothing and left every video behind.
+
+    v0.26.0: cancelling mid-entry strands that entry's `.part` under a name
+    `files` never learns — found when a random-order suite run cancelled
+    between entries and `Fixture playlist (1).mp4.part` survived the delete.
+    The test now waits for the SECOND entry before cancelling (the case that
+    matters), and for the worker thread itself to return: cancel only flips
+    the status, and a delete racing a live writer can be undone by it."""
     mgr = JobManager(download_dir=tmp_path / "dl", db_path=str(tmp_path / "jobs.db"))
+    stopped = threading.Event()
+    real_run = mgr._run
+
+    def watched(*a, **k):
+        try:
+            real_run(*a, **k)
+        finally:
+            stopped.set()
+
+    mgr._run = watched
     job = mgr.create(f"{slow_fixture_server}/playlist.html", playlist_items="")
     dl = Path(mgr.download_dir)
-    for _ in range(80):
+    for _ in range(150):
         time.sleep(0.1)
-        if list(dl.glob("*.mp4")) or list(dl.glob("*.part")):
+        if any("(1)" in p.name for p in dl.glob("*")):
             break
     mgr.cancel(job["id"])
-    for _ in range(50):
-        if mgr.get(job["id"])["status"] not in ("queued", "downloading", "merging"):
-            break
-        time.sleep(0.1)
+    assert stopped.wait(20), "the download worker never stopped after the cancel"
     made = [p.name for p in dl.iterdir()]
     assert made, "the test needs at least one file from the playlist"
     mgr.delete_job(job["id"])
     assert not [p for p in dl.iterdir() if p.is_file()], \
         f"playlist leftovers survived the delete: {made}"
+
+
+def test_an_in_flight_playlist_part_is_swept_even_without_a_files_entry(tmp_path):
+    """The exact leftover from that random-order run: `Fixture playlist
+    (1).mp4.part`. Only FINISHED entries land in `files`, so the in-flight
+    one is known only through `partials` — the delete must sweep it."""
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=str(tmp_path / "jobs.db"))
+    mgr._run = lambda *a, **k: None
+    dl = tmp_path / "dl"
+    dl.mkdir(parents=True, exist_ok=True)
+    done = dl / "Fixture playlist.mp4"
+    part = dl / "Fixture playlist (1).mp4.part"
+    done.write_bytes(b"a")
+    part.write_bytes(b"b" * 5)
+    job = mgr.create("http://example.invalid/playlist")
+    with mgr._lock:
+        j = mgr._jobs[job["id"]]
+        j.update(status="cancelled", filepath=str(done), files=[str(done)],
+                 partials=[str(done), str(dl / "Fixture playlist (1).mp4")])
+        mgr._save(j)
+    mgr.delete_job(job["id"])
+    assert not done.exists() and not part.exists(), \
+        "the in-flight entry's .part survived the delete"
+
+
+def test_a_partials_entry_outside_the_folder_is_refused(tmp_path):
+    """`partials` feeds the delete now, so it carries the same leash as
+    `files`: a name pointing outside the download folder is refused."""
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=str(tmp_path / "jobs.db"))
+    mgr._run = lambda *a, **k: None
+    (tmp_path / "dl").mkdir(parents=True, exist_ok=True)
+    secret = tmp_path / "secret.mp4.part"
+    secret.write_bytes(b"x")
+    job = mgr.create("http://example.invalid/playlist")
+    with mgr._lock:
+        j = mgr._jobs[job["id"]]
+        j.update(status="cancelled", partials=[str(tmp_path / "secret.mp4")])
+        mgr._save(j)
+    with pytest.raises(PermissionError):
+        mgr.delete_job(job["id"])
+    assert secret.exists()
 
 
 # -- DEF-06 / DEF-12: the CORS policy must cover both extension families ----

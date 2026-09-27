@@ -14,6 +14,7 @@ from pathlib import Path
 import yt_dlp
 
 from .auth import explain_download_error
+from .extract import extract_info
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     created_at TEXT,
     completed_at TEXT,
     files TEXT,
+    partials TEXT,
     download_dir TEXT
 )
 """
@@ -223,6 +225,13 @@ class JobManager:
                         "ALTER TABLE jobs ADD COLUMN overrides TEXT")
                 if "files" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
+                if "partials" not in cols:
+                    # every target yt-dlp named while downloading (v0.26.0):
+                    # a playlist cancelled between entries strands the
+                    # in-flight one's `.part` under a name `files` never
+                    # learns, and the delete could not find it
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN partials TEXT")
                 if "download_dir" not in cols:
                     # the folder this job downloaded into: a later settings
                     # change must not make its files undeletable (v0.21.2)
@@ -293,6 +302,14 @@ class JobManager:
                 job["files"] = None
         else:
             job["files"] = None
+        parts = job.get("partials")
+        if parts:
+            try:
+                job["partials"] = json.loads(parts)
+            except (json.JSONDecodeError, TypeError):
+                job["partials"] = None
+        else:
+            job["partials"] = None
         return job
 
     def _save(self, job: dict):
@@ -305,14 +322,15 @@ class JobManager:
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
-                " created_at, completed_at, files, download_dir)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " created_at, completed_at, files, partials, download_dir)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
                 " total_bytes=excluded.total_bytes, speed=excluded.speed,"
                 " eta=excluded.eta, completed_at=excluded.completed_at,"
-                " files=excluded.files, download_dir=excluded.download_dir",
+                " files=excluded.files, partials=excluded.partials,"
+                " download_dir=excluded.download_dir",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -327,6 +345,7 @@ class JobManager:
                     job["progress"]["eta"], job.get("created_at"),
                     job.get("completed_at"),
                     json.dumps(job["files"]) if job.get("files") else None,
+                    json.dumps(job["partials"]) if job.get("partials") else None,
                     job.get("download_dir") or str(self.download_dir),
                 ),
             )
@@ -554,7 +573,8 @@ class JobManager:
             path = Path(str(raw))
             if not path.is_dir():
                 listed = [path]
-        if not listed:
+        parts = [Path(str(p)) for p in (job.get("partials") or []) if p]
+        if not listed and not parts:
             return []
         out: list[Path] = []
         for p in listed:
@@ -562,6 +582,12 @@ class JobManager:
             if p.is_file():
                 out.append(p)
                 out.extend(self._sidecars_for(p))
+            out.extend(self._partials_for(p))
+        # the entries `files` never learned: a cancelled playlist's in-flight
+        # target lives only in `partials`, and its `.part` is exactly what a
+        # delete must not leave behind (v0.26.0)
+        for p in parts:
+            self._require_inside(p, job)
             out.extend(self._partials_for(p))
         return out
 
@@ -702,6 +728,14 @@ class JobManager:
             if name:
                 if not job.get("filepath"):
                     job["filepath"] = str(name)
+                if str(name) not in (job.get("partials") or []):
+                    # every target yt-dlp has named this run. A playlist runs
+                    # its entries one at a time, and a cancel can strand the
+                    # current one's `.part` under a name `files` never learns
+                    # (only finished entries land there) — the delete used to
+                    # leave exactly that file behind (v0.26.0, found by a
+                    # random-order suite run).
+                    job["partials"] = [*(job.get("partials") or []), str(name)]
                 if d["status"] == "finished":
                     made = list(job.get("files") or [])
                     if str(name) not in made:
@@ -783,9 +817,7 @@ class JobManager:
                   else nullcontext()) as cookie_opts:
                 if cookie_opts:
                     opts.update(cookie_opts)
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info(job["url"], download=True)
-                    info = ydl.sanitize_info(info) or {}
+                info = extract_info(opts, job["url"], download=True) or {}
             if (info or {}).get("_type") == "playlist":
                 entries = [e for e in (info.get("entries") or []) if e]
                 job["title"] = info.get("title") or "playlist"
