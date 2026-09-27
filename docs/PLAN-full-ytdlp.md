@@ -770,3 +770,14 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     hangs off `animationend` with the same timer backstop the row exit needed,
     and the per-tab refreshes that call back into `showTab()` cannot restart
     the fade.
+
+- **v0.24.8 — the delete that keeps the Gallery/Music copy.** "Delete
+    downloaded files" was all-or-nothing: it emptied the app's own folder *and*
+    removed the Gallery/Music copies, so reclaiming space destroyed the copy the
+    user could actually open. Settings → Device now also offers "Delete app
+    copies — keep Gallery/Music": one flow for both deletes — fresh count, the
+    same confirm discipline, and still no dialog over an empty folder — with the
+    host's MediaStore cleanup simply not made, because the engine's
+    `/files/clear` never touched the library to begin with. The button starts
+    hidden where no gallery copy exists (browser builds), and both the confirm
+    and the toast say the copies stay.

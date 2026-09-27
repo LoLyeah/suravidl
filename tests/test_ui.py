@@ -46,6 +46,7 @@ def test_index_has_new_controls(tmp_path):
                     "spanel-advanced", "subwrap", "dlWhere", "copyDir",
                     "vaultSection", "vaultStatus", "deleteCookiesBtn",
                     "storageSection", "storageInfo", "clearDownloadsBtn",
+                    "clearAppCopiesBtn",
                     "setTemplate", "setEmbMeta", "setEmbThumb", "setSubMode",
                     "setSubLangs", "setSubAuto", "setSbMode", "setSbCats",
                     "setArchive", "setFragments", "setRateLimit", "setProxy",

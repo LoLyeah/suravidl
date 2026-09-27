@@ -71,11 +71,30 @@ def test_the_storage_row_and_the_delete_dialog_cannot_disagree():
     assert 'if (target === "settings" && refreshStorageInfo) refreshStorageInfo();' in APP
     after_delete = APP.split("toast(r.deleted")[1][:400].split("refreshJobs();", 1)[1]
     assert "if (refreshStorageInfo) refreshStorageInfo();" in after_delete
-    # and no destructive dialog over an empty folder
-    clear = APP.split('$("clearDownloadsBtn").onclick')[1]
-    before_dialog = clear.split("askConfirm")[0]
+    # and no destructive dialog over an empty folder — both delete buttons run
+    # the one flow, which re-reads the folder and refuses before asking
+    flow = APP.split("const clearFiles = async (keepGallery)")[1]
+    before_dialog = flow.split("askConfirm")[0]
     assert 'toast("nothing to delete")' in before_dialog
     assert "s.files === 0" in before_dialog
+    assert '$("clearDownloadsBtn").onclick = () => clearFiles(false)' in APP
+    assert '$("clearAppCopiesBtn").onclick = () => clearFiles(true)' in APP
+
+
+def test_app_copies_only_keeps_the_gallery_copy():
+    """"Add a button to delete only the downloaded files in the app's folder
+    but not the copy to the gallery" (2026-09-26). /files/clear only ever
+    empties the app's own folder; the Gallery/Music copies are removed by a
+    separate host call — so this path must not make it, and both the confirm
+    and the toast must say the copies stay."""
+    assert 'id="clearAppCopiesBtn"' in HTML
+    assert "hidden" in HTML.split('id="clearAppCopiesBtn"')[1][:120], \
+        "the button starts hidden: browser builds write no gallery copy"
+    assert 'if (GALLERY()) $("clearAppCopiesBtn").classList.remove("hidden")' in APP
+    assert "if (!keepGallery && ANDROID() && window.AndroidHost.deleteMediaCopies)" in APP, \
+        "only the full delete may touch the Gallery/Music copies"
+    assert "The Gallery/Music copies stay." in APP
+    assert "Gallery/Music copies kept" in APP
 
 
 def test_toasts_sit_above_the_mobile_tab_bar():

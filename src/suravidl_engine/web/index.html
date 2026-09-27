@@ -541,11 +541,12 @@
         <label class="lbl">Downloaded files</label>
         <div class="col">
           <span id="storageInfo" class="muted small">checking…</span>
+          <button id="clearAppCopiesBtn" class="btn sm danger hidden" type="button">🗑 Delete app copies — keep Gallery/Music</button>
           <button id="clearDownloadsBtn" class="btn sm danger" type="button">🗑 Delete downloaded files</button>
         </div>
-        <span class="muted small">Deletes everything in the app's own folder plus the
-          Gallery/Music copies this app made. Android won't let a file manager open
-          those folders, so the cleanup lives here.</span>
+        <span class="muted small">Downloads land in the app's own folder, which a file
+          manager cannot open. "Delete app copies" frees that folder and keeps the
+          Gallery/Music copy you can open; "Delete downloaded files" removes both.</span>
       </div>
       </div><!-- /spanel-device -->
       </div><!-- /subwrap -->

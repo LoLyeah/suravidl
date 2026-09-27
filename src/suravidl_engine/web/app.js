@@ -1575,7 +1575,11 @@ async function initStorageSection() {
   };
   await show();
   refreshStorageInfo = show;
-  $("clearDownloadsBtn").onclick = async () => {
+  // Two deletes, one flow (the 2026-09-26 ask): the app's own folder can be
+  // emptied while the Gallery/Music copy — the one the user can actually
+  // open — stays. That copy is removed by a separate host call, so the
+  // app-copies path simply never makes it.
+  const clearFiles = async (keepGallery) => {
     const s = await api("/files/summary").catch(() => null);
     const known = s && typeof s.files === "number";
     // Nothing on disk: do not offer to delete it. The row above could have
@@ -1588,27 +1592,38 @@ async function initStorageSection() {
       return;
     }
     const one = known && s.files === 1;
+    const counted = known
+      ? `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})`
+      : "Delete every downloaded file";
     const ok = await askConfirm(
-      known ? (`Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})` +
-      (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
-      "? This cannot be undone.")
-        : "Delete every downloaded file? (its size could not be read) " +
-          "This cannot be undone.",
+      keepGallery
+        ? counted + " from the app's folder? The Gallery/Music copies stay."
+        : known
+          ? counted +
+            (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
+            "? This cannot be undone."
+          : counted + "? (its size could not be read) This cannot be undone.",
       { okText: "Delete" });
     if (!ok) return;
     try {
       const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
-      if (ANDROID() && window.AndroidHost.deleteMediaCopies) {
+      if (!keepGallery && ANDROID() && window.AndroidHost.deleteMediaCopies) {
         try { window.AndroidHost.deleteMediaCopies(); } catch (_) { }
       }
       toast(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
-            `freed ${humanBytes(r.freed_bytes)}`);
+            `freed ${humanBytes(r.freed_bytes)}` +
+            (keepGallery && GALLERY() ? " · Gallery/Music copies kept" : ""));
       refreshJobs();
       show();
     } catch (e) {
       toast("could not delete: " + e.message, "bad");
     }
   };
+  $("clearDownloadsBtn").onclick = () => clearFiles(false);
+  $("clearAppCopiesBtn").onclick = () => clearFiles(true);
+  // The distinction — and therefore this button — exists only where the host
+  // actually writes gallery copies (Android 10+; the browser build has none).
+  if (GALLERY()) $("clearAppCopiesBtn").classList.remove("hidden");
 }
 
 /* called back by the Android host after the cookies file is imported */
