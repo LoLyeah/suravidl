@@ -1000,3 +1000,24 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     status line can never eat it, and a real navigation hides it. Proven on
     the emulators: the new instrumented test fires `snssdk1180://` from a
     live page and asserts the browser stays put and speaks.
+
+- **v0.31.0 — the transplant; a size for HLS.** Two ideas from the cobalt
+    read (the ideas — its `api/` is AGPL-3.0 and `web/` is CC-BY-NC, so no
+    code crossed over). **The transplant:** cobalt re-runs its extractor
+    mid-download when a signed CDN link expires under a running transfer;
+    here it falls out of the one retrying extractor — `retry_refresh=True`
+    chains a progress note in front of the caller's hooks, and when a
+    download dies on an HTTP 403/410 *after bytes had arrived*, the
+    extraction is re-run once for fresh links, with yt-dlp's own
+    `continuedl` resuming the `.part` underneath. The gates are the point:
+    no bytes → no retry (a refusal before any progress is the site's
+    answer), one refresh per job, and TikTok's flake keeps its own path
+    untouched. **The size:** an HLS manifest never says how big the stream
+    is, so `/classify` reads the playlist (the highest-BANDWIDTH variant of
+    a master), takes ONE segment's size × the playlist's duration span and
+    marks the verdict `estimated` — the phone now shows "HLS · ~42 MB"
+    instead of a bare "HLS", and a manifest's own byte length is never
+    reported as the stream's size (which used to leak through as the
+    playlist file's own few KB). Unmeasurable stays bare; the estimator
+    reads playlists and probes a single segment, never a stream. DASH gets
+    the honest no-size. 16 new tests, one real-HLS round trip.

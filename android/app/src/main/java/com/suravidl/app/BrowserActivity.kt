@@ -565,7 +565,7 @@ class BrowserActivity : AppCompatActivity() {
 
     // -- the handoff: classify what we found, then hand it to the engine ------
 
-    /** The engine's one-line verdict on a find, e.g. "HLS · 42 MB". */
+    /** The engine's one-line verdict on a find, e.g. "HLS · ~42 MB". */
     private fun verify(c: Sniffed): String? {
         val v = info[c.url] ?: return if (classifyQueue.contains(c.url)) "checking…" else null
         if (v.optBoolean("drm")) return "DRM — not downloadable"
@@ -579,9 +579,10 @@ class BrowserActivity : AppCompatActivity() {
             else -> ""
         }
         val size = v.optLong("size", 0)
+        val about = if (v.optBoolean("estimated")) "~" else ""
         return when {
             kind.isEmpty() -> null
-            size > 0 -> "$kind · ${humanSize(size)}"
+            size > 0 -> "$kind · $about${humanSize(size)}"
             else -> kind
         }
     }

@@ -229,7 +229,8 @@ def test_probe_and_download_both_go_through_the_retrying_extractor():
     assert "from .extract import extract_info" in PROBE_SRC
     assert "extract_info(opts, url, download=False)" in PROBE_SRC
     assert "from .extract import extract_info" in JOBS_SRC
-    assert 'extract_info(opts, job["url"], download=True)' in JOBS_SRC
+    assert ('extract_info(opts, job["url"], download=True, retry_refresh=True)'
+            in JOBS_SRC)
     assert "with yt_dlp.YoutubeDL(" not in PROBE_SRC, \
         "no direct extraction outside the retrying wrapper (probe)"
     seg = JOBS_SRC.split("with yt_dlp.YoutubeDL(")

@@ -17,10 +17,16 @@ import re
 from dataclasses import dataclass, field
 from urllib import error as urlerror
 from urllib import request as urlrequest
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 TIMEOUT = 10
 PEEK_BYTES = 4096
+
+# The estimator reads a playlist, never a segment (one HEAD, or a single
+# ranged byte when the server answers no HEAD at all). A playlist larger than
+# this is measured from its head, not its whole — it is an estimate, and it
+# says so.
+HLS_ESTIMATE_BYTES = 256 * 1024
 
 # A sniffed URL usually arrives with the *browser's* own User-Agent attached by
 # the caller; when nobody attached one, urllib's default ("Python-urllib/…") is
@@ -258,11 +264,110 @@ def _drm_in(body: bytes, kind: str) -> tuple[bool, str]:
 
 def _unknown(url: str, final: str, note: str) -> dict:
     return {"kind": "unknown", "mime": None, "size": None,
-            "final_url": final or url, "drm": False, "note": note}
+            "final_url": final or url, "drm": False, "note": note,
+            "estimated": False}
+
+
+# -- how big is the stream? a manifest never says ---------------------------
+
+def _lines(body: bytes) -> list:
+    return [ln.strip() for ln in body.decode("utf-8", "ignore").splitlines()
+            if ln.strip()]
+
+
+def _resolve(base: str, ref: str) -> str:
+    return urljoin(base, ref.strip())
+
+
+def _best_variant(lines: list, base: str) -> str:
+    """From a master playlist, the highest-BANDWIDTH variant — what a download
+    would pick."""
+    best, best_bw = "", -1
+    for i, line in enumerate(lines):
+        if not line.upper().startswith("#EXT-X-STREAM-INF:"):
+            continue
+        match = re.search(r"BANDWIDTH=(\d+)", line, re.I)
+        bw = int(match.group(1)) if match else 0
+        for nxt in lines[i + 1:]:
+            if not nxt.startswith("#"):
+                if bw > best_bw:
+                    best, best_bw = _resolve(base, nxt), bw
+                break
+    return best
+
+
+def _segments(lines: list, base: str) -> tuple:
+    """A media playlist's segment URLs and their durations."""
+    segs, durs, pending = [], [], None
+    for line in lines:
+        if line.upper().startswith("#EXTINF:"):
+            try:
+                pending = float(line.split(":", 1)[1].split(",")[0])
+            except (IndexError, ValueError):
+                pending = None
+        elif line.startswith("#"):
+            continue
+        else:
+            segs.append(_resolve(base, line))
+            durs.append(pending if pending is not None else 0.0)
+            pending = None
+    return segs, durs
+
+
+def _est_hls_size(url: str, headers: dict | None, fetch, peek: bytes = b""):
+    """One segment's size x the playlist's span — None when it can't be told.
+
+    cobalt's trick, re-implemented: a manifest never says how big the stream
+    is, so read the playlist (the best variant of a master), take ONE
+    segment's size and multiply by the duration span. The classification peek
+    is reused when it already held the whole playlist; a segment is probed
+    (HEAD, or one ranged byte), never read. A master that cannot be resolved
+    is refused, not guessed at.
+    """
+    lines, base = [], url
+    if 0 < len(peek) < PEEK_BYTES:
+        lines = _lines(peek)            # the peek was the complete playlist
+    if not lines or not lines[0].upper().startswith("#EXTM3U"):
+        got = fetch(url, headers, "GET", HLS_ESTIMATE_BYTES)
+        if not got.ok():
+            return None
+        lines = _lines(got.body or b"")
+        base = got.final_url or url
+    if not lines or not lines[0].upper().startswith("#EXTM3U"):
+        return None
+    variant = _best_variant(lines, base)
+    if variant:
+        got = fetch(variant, headers, "GET", HLS_ESTIMATE_BYTES)
+        if not got.ok():
+            return None
+        lines = _lines(got.body or b"")
+        base = got.final_url or variant
+    if any(ln.upper().startswith("#EXT-X-STREAM-INF") for ln in lines):
+        return None                     # a master we could not resolve
+    segs, durs = _segments(lines, base)
+    if not segs:
+        return None
+    head = fetch(segs[0], headers, "HEAD", None)
+    seg_bytes = _size(head.headers) if head.ok() else None
+    if not seg_bytes:
+        one = fetch(segs[0], headers, "GET", 1)
+        if one.ok():
+            seg_bytes = _size(one.headers) or _range_total(one.headers)
+    if not seg_bytes:
+        return None
+    first = durs[0] if durs else 0.0
+    span = sum(durs)
+    if first > 0 and span > 0:
+        return round(seg_bytes * span / first)
+    return seg_bytes * len(segs)
 
 
 def classify(url: str, headers: dict | None = None, fetch=None) -> dict:
     """Name what a URL is: kind, mime, size, DRM — never the whole file.
+
+    An HLS `size` is an *estimate* (one segment × the playlist's span, marked
+    `estimated`) — a manifest never says how big the stream is, and its own
+    byte length is the manifest's, not the download's.
 
     `fetch(url, headers, method, range_bytes) -> Response` is injectable so the
     tests can drive every branch offline, and so a shell could bring its own
@@ -312,8 +417,18 @@ def classify(url: str, headers: dict | None = None, fetch=None) -> dict:
         last = urlsplit(url).path.rsplit("/", 1)[-1].lower()
         if "." in last and last.rsplit(".", 1)[-1] in SEGMENT_EXT:
             note = "stream segment — the manifest is the better pick"
+    estimated = False
+    if kind in ("hls", "dash"):
+        # a manifest's content-length is the manifest's own bytes — never the
+        # stream's size. HLS can be estimated (one segment x the playlist's
+        # span); DASH gets the honest no-size instead.
+        guess = (_est_hls_size(final or url, headers, fetch, body)
+                 if kind == "hls" else None)
+        size = guess if guess else None
+        estimated = bool(guess)
     return {"kind": kind, "mime": mime or None, "size": size,
-            "final_url": final, "drm": kind == "drm", "note": note}
+            "final_url": final, "drm": kind == "drm", "note": note,
+            "estimated": estimated}
 
 
 # -- which of these should a shell *show*? (M4) -----------------------------

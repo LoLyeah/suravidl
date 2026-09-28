@@ -841,7 +841,7 @@ class JobManager:
                   else nullcontext()) as cookie_opts:
                 if cookie_opts:
                     opts.update(cookie_opts)
-                info = extract_info(opts, job["url"], download=True) or {}
+                info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
             if (info or {}).get("_type") == "playlist":
                 entries = [e for e in (info.get("entries") or []) if e]
                 job["title"] = info.get("title") or "playlist"

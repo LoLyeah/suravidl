@@ -93,7 +93,7 @@ What the test found:
 
 ### A. Engine = the shared brain (small, testable offline)
 
-1. `POST /classify` — `{url, headers}` → `{kind: video|hls|dash|audio|image|drm|page|unknown, mime, size, final_url}`.
+1. `POST /classify` — `{url, headers}` → `{kind: video|hls|dash|audio|image|drm|page|unknown, mime, size, final_url, estimated}`. An HLS `size` is an *estimate* — one segment × the playlist's span, `estimated: true`, shown as `~42 MB` — and a manifest's own byte length is never reported as the stream's size.
    `HEAD`, falling back to `GET Range: bytes=0-0`; HLS/DASH/DRM read from the
    first KB (`#EXT-X-KEY:…METHOD=SAMPLE-AES`, `<ContentProtection>`). Used by
    every shell: the Android handoff list, the extension popup, the web UI.
