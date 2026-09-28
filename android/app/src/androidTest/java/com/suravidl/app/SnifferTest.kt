@@ -385,7 +385,7 @@ class SnifferTest {
                 .getActivitiesInStage(Stage.RESUMED)
                 .filterIsInstance<BrowserActivity>()
                 .forEach { act ->
-                    val v = act.window.decorView.findViewWithTag("app-handoff-note")
+                    val v = act.window.decorView.findViewWithTag<View>("app-handoff-note")
                     if (v != null && v.visibility == View.VISIBLE) {
                         out = (v as android.widget.TextView).text.toString()
                     }
