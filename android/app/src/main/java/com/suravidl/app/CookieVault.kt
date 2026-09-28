@@ -142,9 +142,9 @@ object CookieVault {
      *  difference between "it's broken" and "it's three days old". */
     fun status(context: Context): String = when {
         has(context) -> {
-            val when = File(context.filesDir, ENC).lastModified()
-            val date = if (when > 0)
-                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(when))
+            val stamp = File(context.filesDir, ENC).lastModified()
+            val date = if (stamp > 0)
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(stamp))
             else "unknown"
             "stored and encrypted (Android Keystore), imported $date — a " +
                 "readable copy exists only while the app runs"
