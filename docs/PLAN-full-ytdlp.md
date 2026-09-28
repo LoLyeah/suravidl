@@ -1032,9 +1032,13 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     device last ran (localStorage — the same per-device durability as
     skip/snooze), capped at three, and the selection rule is executed in
     Node inside the tests against the real functions. The card waits for
-    "Got it" (until then the next launch asks again) and a fresh install
-    shows nothing — there was no update to explain. Settings → What's new
-    re-opens the current release's notes any time. Verified end-to-end in a
-    real browser: fresh boot quiet, a simulated 0.30.0 → 0.32.0 shows
-    exactly the two unseen releases, dismissing records the version, a
-    reload stays quiet, and the Settings button re-opens the card.
+    "Got it" (until then the next launch asks again) and a device that never
+    saw a card gets the current release's notes — the first card; after that
+    it is strictly what is new to it (the fresh-install rule had to flex:
+    an EXISTING install has no marker either, and would otherwise never see
+    the card for the very update that ships the feature). Settings → What's
+    new re-opens the current release's notes any time. Verified end-to-end
+    in a real browser: a fresh boot with no marker shows the current
+    release, a simulated 0.30.0 → 0.32.0 shows exactly the two unseen
+    releases, dismissing records the version, a reload stays quiet, and the
+    Settings button re-opens the card.

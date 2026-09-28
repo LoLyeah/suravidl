@@ -1638,9 +1638,9 @@ $("updateBtn").onclick = async () => {
  * the notes for recent releases, and the UI shows the entries newer than the
  * last version this device has seen (localStorage — the same per-device
  * durability as the update skip/snooze; the Android WebView origin is fixed,
- * so it survives there). A fresh install shows nothing — there was no update
- * to explain — and the card waits for "Got it": until then, the next launch
- * asks again. */
+ * so it survives there). A device that has never seen a card gets the CURRENT
+ * release's notes — the very first one; after that it is strictly what is new
+ * to it. The card waits for "Got it": until then, the next launch asks again. */
 const WN = {
   seen: "suravidl.whatsnew.seen", // the engine version this device has seen
   MAX: 3,                         // entries shown for one update, newest first
@@ -1710,9 +1710,11 @@ async function maybeShowWhatsNew() {
   let data;
   try { data = await api("/whats-new"); } catch (_) { return; }
   const seen = updStore.get(WN.seen, "");
-  if (!seen) { updStore.set(WN.seen, data.version); return; } // fresh install
   if (seen === data.version) return;
-  const pick = whatsNewFor(seen, data.entries);
+  // never seen a card: the current release introduces itself; afterwards it
+  // is strictly the entries newer than what this device last ran
+  const pick = seen ? whatsNewFor(seen, data.entries)
+                    : (data.entries || []).slice(0, 1);
   if (!pick.length) { updStore.set(WN.seen, data.version); return; }
   showWhatsNew(pick, data.version);
 }

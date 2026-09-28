@@ -83,16 +83,17 @@ def test_the_card_exists_with_the_house_shape():
     assert 'id="wnOpen"' in HTML
 
 
-def test_a_fresh_install_shows_nothing_and_records_the_version():
+def test_a_first_launch_gets_the_current_release_and_later_ones_whats_new():
     assert '"suravidl.whatsnew.seen"' in APP
     assert "MAX: 3," in APP, "one update explains at most three releases"
     maybe = _fn("async function maybeShowWhatsNew",
                 "\nasync function openWhatsNew")
     assert 'await api("/whats-new")' in maybe
     assert 'const seen = updStore.get(WN.seen, "");' in maybe
-    assert "if (!seen) { updStore.set(WN.seen, data.version); return; }" in maybe, \
-        "a fresh install records the version without a card"
-    assert "const pick = whatsNewFor(seen, data.entries);" in maybe
+    assert "const pick = seen ? whatsNewFor(seen, data.entries)" in maybe
+    assert ": (data.entries || []).slice(0, 1);" in maybe, \
+        "a device that never saw a card gets the current release's notes"
+    assert "if (!pick.length) { updStore.set(WN.seen, data.version); return; }" in maybe
     assert "showWhatsNew(pick, data.version);" in maybe
 
 
