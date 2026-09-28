@@ -1704,6 +1704,15 @@ async function initAppControls() {
     // browser cookie DBs aren't readable on Android — offer file import instead
     $("browserRow").classList.add("hidden");
     $("impersonateRow").classList.add("hidden");   // no curl_cffi on the phone
+    // the phone's two routes, said in its own terms: the app browser's session,
+    // or a cookies.txt exported from a desktop browser (the encrypted import)
+    const authHintEl = $("authHint");
+    if (authHintEl) {
+      authHintEl.textContent = "Two routes: sign in to the site in \u201cFind a video on a page\u201d — " +
+        "that session goes with the download — or import a " +
+        "cookies.txt exported from a desktop browser (encrypted on this device). " +
+        "Instagram sessions expire in hours — re-import when a download asks for a sign-in.";
+    }
     const imp = $("importCookies");
     imp.classList.remove("hidden");
     imp.onclick = () => window.AndroidHost.pickCookiesFile();

@@ -934,3 +934,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     may have expired ("Instagram sessions last only hours"), and the
     Android vault's status line reports WHEN the last import happened —
     the difference between "it's broken" and "it's three days old".
+
+- **v0.28.0 — the phone's routes, said out loud; `docs/AUTH.md`.** The
+    second half of the auth-gated plan. The engine could already carry a
+    session; what the phone lacked was saying where its sessions come
+    from. The in-app browser now wears a dismissible one-line hint ("You
+    can sign in here — this browser's session goes with the download"),
+    its empty state — the exact place a login-walled page leaves the user,
+    staring at "nothing found" — repeats the route, and the start page
+    says it before the first scan. The Android Settings hint swaps its
+    text for the phone's two real routes: sign in inside "Find a video on
+    a page", or import a cookies.txt exported from a desktop browser; the
+    hint span gains an id (`#authHint`) so the swap is pinned. One new
+    on-device assertion (`SnifferTest.theBrowserOffersTheSignInRouteOnScreen`)
+    proves the hint is actually on screen — a source-substring check is
+    decoration. And the document the plan promised: `docs/AUTH.md` — the
+    routes per platform, per-site notes (Facebook → cookies AND
+    impersonation; Instagram → hours-long sessions, rate limits, account
+    risk; DRM → never), where cookies live on each platform, and a
+    five-minute verify-it-yourself checklist for desktop and phone. The
+    README's signed-in bullet links it.

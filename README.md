@@ -29,7 +29,9 @@ reviews: [docs/audits/](docs/audits/)
   file opens in QuickTime, iOS Files and Smart TVs — not only in VLC.
 - **Editable retries**: a failed job's settings load back into the form.
 - **Play it here**: finished downloads play in the page, no file hunting.
-- **Signed-in sites**: import a `cookies.txt`, or read cookies from a desktop browser.
+- **Signed-in sites**: import a `cookies.txt`, read cookies from a desktop browser,
+  or sign in inside the phone's in-app browser — [docs/AUTH.md](docs/AUTH.md) has the
+  route that fits each site.
 - **Pages yt-dlp cannot read**: the extension (desktop) and the in-app browser
   (Android) watch a page as it plays, then hand the stream to the engine with the
   page's own cookies — see [docs/SNIFFING.md](docs/SNIFFING.md) for what that

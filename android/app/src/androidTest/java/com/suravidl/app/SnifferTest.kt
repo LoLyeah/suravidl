@@ -241,6 +241,31 @@ class SnifferTest {
         }
     }
 
+    @Test(timeout = 90_000)
+    fun theBrowserOffersTheSignInRouteOnScreen() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        try {
+            wakeScreen()
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            var hint: View? = null
+            val deadline = System.currentTimeMillis() + 60_000
+            while (System.currentTimeMillis() < deadline && hint == null) {
+                hint = viewWithTag("signin-hint")
+                if (hint == null) Thread.sleep(1000)
+            }
+            assertNotNull("the browser no longer offers the sign-in route on screen",
+                          hint)
+            val text = (hint as android.widget.TextView).text.toString()
+            assertTrue("the hint must say the session travels with the download: $text",
+                       text.contains("session goes with the download"))
+        } finally {
+            server.stop()
+        }
+    }
+
     /**
      * A stopped activity is only handed a new intent when it comes back to the
      * foreground, and an emulator with its screen off resumes nothing: this test

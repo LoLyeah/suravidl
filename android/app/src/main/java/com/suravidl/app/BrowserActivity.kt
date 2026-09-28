@@ -233,6 +233,20 @@ class BrowserActivity : AppCompatActivity() {
         row.addView(chip("Clear data") { clearBrowsingData() })
         root.addView(row)
 
+        // The phone's route to a signed-in video (v0.28.0): whatever session
+        // this browser holds is exactly what a handoff sends. Said here, under
+        // the toolbar — a login-walled page finds nothing at all, so the empty
+        // state repeats it below.
+        root.addView(TextView(this).apply {
+            tag = "signin-hint"
+            text = "Need an account for the video? You can sign in here — " +
+                "this browser's session goes with the download.  (tap to hide)"
+            textSize = 12.5f
+            setTextColor(GREY)
+            setPadding(dp(12), 0, dp(12), dp(6))
+            setOnClickListener { visibility = View.GONE }
+        })
+
         webView = WebView(this).apply {
             settings.javaScriptEnabled = true          // the page is JS; so is the sniffer
             settings.domStorageEnabled = true
@@ -289,7 +303,9 @@ class BrowserActivity : AppCompatActivity() {
                 "second — a JavaScript player only asks for its stream once it " +
                 "starts — then tap Scan. What shows up here is what the page " +
                 "asked for; the strongest signal (the stream you are actually " +
-                "watching) is marked as such."
+                "watching) is marked as such.\n\nIf the video needs a login, " +
+                "sign in to the site in this browser first — then press play " +
+                "and Scan again."
             setTextColor(GREY)
             textSize = 13f
             setLineSpacing(0f, 1.35f)
@@ -324,6 +340,9 @@ class BrowserActivity : AppCompatActivity() {
             "<p style='color:#8a93a8;font-size:14px;line-height:1.5'>Type the address of " +
             "the page that plays the video above and press Go. When the video is " +
             "playing, tap Scan.</p>" +
+            "<p style='color:#8a93a8;font-size:13px;line-height:1.5'>Need to sign in? " +
+            "Do it on this page — the browser's session is what a download will " +
+            "use.</p>" +
             "<p style='color:#8a93a8;font-size:13px;line-height:1.5'>This is a plain " +
             "browser with a sniffer attached. Its cookies stay inside this WebView " +
             "and nothing is sent anywhere.</p></body>"
