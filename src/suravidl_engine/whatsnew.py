@@ -15,6 +15,19 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.32.1",
+        "title": "The robustness pass",
+        "items": [
+            "Deleting a download can no longer take an older download folder with it.",
+            "Retry works with presets again, and switching between a preset and a "
+            "format no longer fails.",
+            "Files with non-English names (CJK, Cyrillic, emoji) play and open correctly.",
+            "Deleted videos take their subtitles along — including converted .srt files.",
+            "Streaming sizes stay honest, and a playlist can no longer point the "
+            "engine at local or internal addresses.",
+        ],
+    },
+    {
         "version": "0.32.0",
         "title": "The What's new card",
         "items": [

@@ -160,7 +160,15 @@ def _stream_file(path: Path, request: Request):
         headers = {"Accept-Ranges": "bytes",
                    "Content-Range": f"bytes {start}-{end}/{size}"}
     headers["Content-Length"] = str(max(0, end - start + 1))
-    headers["Content-Disposition"] = f'inline; filename="{path.name}"'
+    # HTTP headers are latin-1: a raw non-ASCII name (CJK, Cyrillic, emoji)
+    # made starlette raise UnicodeEncodeError and the file could not be
+    # opened at all. RFC 5987: an ASCII fallback plus the UTF-8 form.
+    from urllib.parse import quote
+
+    ascii_name = path.name.encode("ascii", "replace").decode("ascii")
+    headers["Content-Disposition"] = (
+        f'inline; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{quote(path.name)}")
 
     def body():
         with path.open("rb") as fh:
@@ -949,9 +957,30 @@ def create_app(download_dir, auth_token: str | None = None,
                 raise HTTPException(
                     status_code=400,
                     detail="raw yt-dlp arguments are disabled in Settings → Advanced")
+            if body.fmt and body.preset:
+                raise HTTPException(
+                    status_code=400,
+                    detail="pass either 'preset' or 'fmt', not both")
             patch = {"fmt": body.fmt, "preset": body.preset,
                      "overrides": body.overrides, "raw_args": raw}
             patch = {k: v for k, v in patch.items() if v is not None}
+            if "preset" in patch:
+                # expand exactly like /jobs does: a preset is a named patch,
+                # not a name to hand `create` raw. Before this, a bundle or
+                # saved preset died as "unknown preset" and a preset->format
+                # edit tripped create's "not both" refusal (v0.32.1 audit).
+                try:
+                    entry = presets.get(patch["preset"])
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from None
+                if entry is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"unknown preset: {patch['preset']!r}")
+                intent, extra = split_patch(entry["patch"])
+                patch["preset"] = intent
+                merged = {**(body.overrides or {}), **extra}
+                patch["overrides"] = merged or None
         try:
             return redact_job(mgr.retry(job_id, patch))
         except KeyError:

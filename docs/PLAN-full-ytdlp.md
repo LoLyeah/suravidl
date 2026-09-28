@@ -1042,3 +1042,38 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     release, a simulated 0.30.0 → 0.32.0 shows exactly the two unseen
     releases, dismissing records the version, a reload stays quiet, and the
     Settings button re-opens the card.
+
+- **v0.32.1 — the second audit's fix batch.** The v0.32.0 tree went through
+    another read-only agy audit ("delegate to agy, audit the app, then you
+    confirm and fix it"); eleven findings came back and six survived
+    independent reproduction — each has a RED test in `test_v32_1_fixes.py`
+    written before the fix, and the five that did not survive (a `_cmp_version`
+    helper, an `exportForEngine` cookie export, an api.py stem-prefix sidecar
+    match, a missing opus mime, unguarded extension fetches — none of them
+    exist in this tree; the report's line numbers drifted onto some other
+    codebase) are recorded as refuted, not fixed. The six that were real:
+    (1) `/files/stream` built `Content-Disposition` from the raw name, so any
+    non-latin-1 file name (CJK, Cyrillic, emoji) crashed the response with
+    `UnicodeEncodeError` — latin-1 headers can't carry it; now RFC 5987
+    (ASCII fallback + `filename*=UTF-8''…`). (2) HLS estimation fetched
+    whatever the playlist pointed at — `file:///…` (a local-file read) and
+    link-local addresses; every playlist URL now gets the same vetting as
+    the main URL (scheme + `blocked_reason`), the span math follows the
+    segments that survived, and a master whose best variant is unfetchable
+    is refused. (3) deleting a job `rmdir()`ed ANY empty parent that was not
+    the CURRENT root — after a Settings folder change that is the previous
+    download folder; the cleanup now prunes only a parent strictly INSIDE
+    one of the roots (current, or the row's recorded one) and never a root
+    itself. (4) `/jobs/{id}/retry` skipped `/jobs`' preset expansion, so
+    bundle/saved presets died as "unknown preset" and a preset↔format edit
+    tripped create's "not both" refusal; retry expands exactly like
+    queueing, and a `_requeue` edit that names one lane clears the other.
+    (5) a 206 range probe carries `Content-Length: 1` — the byte asked for —
+    and the real size in `Content-Range`; the estimate read the 1 and came
+    out as ~2 bytes (Content-Range now wins). (6) subtitles are reclaimed
+    with their video: the srt convertor leaves `Name.en.srt` and only the
+    final info knows the renamed path (the progress hook saw the `.vtt` it
+    replaced), so the run now records `requested_subtitles` filepaths, and
+    the delete-side sidecar pass matches language-tagged subtitles
+    (`Name.en.vtt`, `Name.en-US.srt`) with a strict language tag —
+    `Name.2.vtt` is not one. 14 new tests; suite 543 → 557, both orders.

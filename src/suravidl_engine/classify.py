@@ -279,6 +279,18 @@ def _resolve(base: str, ref: str) -> str:
     return urljoin(base, ref.strip())
 
 
+def _fetchable(url: str) -> bool:
+    """http(s) only, and never a URL `blocked_reason` refuses.
+
+    The main URL was always vetted; a playlist's own URLs used to be taken on
+    trust — a hostile or broken manifest could point the estimator at
+    `file:///…` (a local-file size read) or a link-local address (v0.32.1
+    audit).
+    """
+    return (urlsplit(url).scheme.lower() in ("http", "https")
+            and not blocked_reason(url))
+
+
 def _best_variant(lines: list, base: str) -> str:
     """From a master playlist, the highest-BANDWIDTH variant — what a download
     would pick."""
@@ -337,6 +349,8 @@ def _est_hls_size(url: str, headers: dict | None, fetch, peek: bytes = b""):
         return None
     variant = _best_variant(lines, base)
     if variant:
+        if not _fetchable(variant):
+            return None                 # a variant we must not fetch: refuse
         got = fetch(variant, headers, "GET", HLS_ESTIMATE_BYTES)
         if not got.ok():
             return None
@@ -345,14 +359,22 @@ def _est_hls_size(url: str, headers: dict | None, fetch, peek: bytes = b""):
     if any(ln.upper().startswith("#EXT-X-STREAM-INF") for ln in lines):
         return None                     # a master we could not resolve
     segs, durs = _segments(lines, base)
-    if not segs:
+    # a playlist does not get to point the estimator at the local disk or a
+    # link-local address: keep only fetchable segments, so also the span
+    # math below follows what survived (v0.32.1 audit)
+    pairs = [(s, d) for s, d in zip(segs, durs) if _fetchable(s)]
+    if not pairs:
         return None
+    segs, durs = (list(t) for t in zip(*pairs))
     head = fetch(segs[0], headers, "HEAD", None)
     seg_bytes = _size(head.headers) if head.ok() else None
     if not seg_bytes:
         one = fetch(segs[0], headers, "GET", 1)
         if one.ok():
-            seg_bytes = _size(one.headers) or _range_total(one.headers)
+            # a 206 carries `Content-Length: 1` — the byte we asked for —
+            # and the real number in `Content-Range`: read that first, or
+            # the estimate becomes one byte times the span (v0.32.1 audit)
+            seg_bytes = _range_total(one.headers) or _size(one.headers)
     if not seg_bytes:
         return None
     first = durs[0] if durs else 0.0

@@ -190,6 +190,28 @@ def ffmpeg_opts() -> dict:
     return {"ffmpeg_location": loc} if loc else {}
 
 
+# a language tag like `.en` or `.en-US`, nothing looser: `Name.2.vtt` is a
+# different video's sidecar, not a subtitle of `Name`
+_LANG_TAG_RE = re.compile(r"\.[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,})*")
+
+
+def _subtitle_files(info) -> list[str]:
+    """Subtitle paths a run really produced — under their FINAL names.
+
+    The srt convertor renames `Name.en.vtt` to `Name.en.srt` (and deletes
+    the original); only the final info knows the new name, and no progress
+    hook fires for a postprocessor's output — the hook recorded the `.vtt`
+    instead (v0.32.1 audit). Keep what is actually on disk.
+    """
+    out: list[str] = []
+    subs = (info or {}).get("requested_subtitles") or {}
+    for sub in subs.values():
+        fp = (sub or {}).get("filepath")
+        if fp and Path(fp).is_file() and str(fp) not in out:
+            out.append(str(fp))
+    return out
+
+
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
                  auto_resume: bool = False, cookie_session=None,
@@ -497,14 +519,26 @@ class JobManager:
         return self._requeue(src, patch)
 
     def _requeue(self, src: dict, patch: dict | None = None) -> dict:
-        """Create a new job from an old row, with optional edits applied."""
+        """Create a new job from an old row, with optional edits applied.
+
+        A row keeps one lane — a preset or a raw format, never both (`create`
+        refuses that) — so an edit that names one clears the other instead of
+        handing `create` a contradiction (v0.32.1 audit). A preset that
+        expands to no intent (a pure bundle) clears the lane just the same.
+        """
         patch = dict(patch or {})
         overrides = {**(src.get("overrides") or {}),
                      **(patch.get("overrides") or {})} or None
+        fmt = patch.get("fmt", src.get("fmt"))
+        preset = patch.get("preset", src.get("preset"))
+        if "fmt" in patch and "preset" not in patch:
+            preset = None               # a raw format asked for by name
+        if "preset" in patch and "fmt" not in patch:
+            fmt = None
         return self.create(src["url"],
-                           fmt=patch.get("fmt", src.get("fmt")),
+                           fmt=fmt,
                            extra_headers=patch.get("headers", src.get("headers")),
-                           preset=patch.get("preset", src.get("preset")),
+                           preset=preset,
                            playlist_items=src.get("playlist_items"),
                            raw_args=patch.get("raw_args", src.get("raw_args")),
                            overrides=overrides)
@@ -534,6 +568,9 @@ class JobManager:
     SIDECAR_SUFFIXES = (".info.json", ".description", ".annotations.xml",
                         ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt",
                         ".ass", ".lrc", ".json", ".live_chat.json")
+    # the sidecars that carry language tags (`Name.en.vtt`): see the tagged
+    # pass in `_sidecars_for`
+    SUBTITLE_SUFFIXES = (".vtt", ".srt", ".ass", ".lrc")
 
     def _require_inside(self, path: Path, job: dict | None = None) -> None:
         """A job row is not a licence to delete arbitrary paths.
@@ -567,6 +604,27 @@ class JobManager:
             sidecar = path.with_name(path.stem + suffix)
             if sidecar.exists() and sidecar.is_file() and sidecar != path:
                 out.append(sidecar)
+        # Language-tagged subtitles share no stem with the video: yt-dlp
+        # writes `Name.en.vtt`, and the srt convertor leaves only the renamed
+        # `Name.en.srt` — the hook only ever saw the `.vtt`, so deleting the
+        # job left the `.srt` behind (v0.32.1 audit). One directory pass; the
+        # tag must look like a language, so `Name.2.vtt` is left alone.
+        try:
+            entries = list(path.parent.iterdir())
+        except OSError:
+            return out
+        stem = path.stem
+        for cand in entries:
+            if cand == path or cand in out or not cand.is_file():
+                continue
+            name = cand.name
+            if not name.startswith(stem):
+                continue
+            for suffix in self.SUBTITLE_SUFFIXES:
+                if name.endswith(suffix):
+                    if _LANG_TAG_RE.fullmatch(name[len(stem):-len(suffix)]):
+                        out.append(cand)
+                    break
         return out
 
     def _partials_for(self, path: Path) -> list[Path]:
@@ -640,8 +698,21 @@ class JobManager:
                     deleted += 1
             except OSError:
                 pass
-        # a playlist that wrote into its own subfolder leaves it behind empty
-        root = Path(self.download_dir).resolve()
+        # a playlist that wrote into its own subfolder leaves it behind empty;
+        # only a parent strictly INSIDE one of the roots is fair game — the
+        # roots themselves are never removed, or a Settings folder change
+        # would let deleting a job take the previous download folder with it
+        # (v0.32.1 audit, extending the v0.21.2 fix below)
+        roots = []
+        for r in (Path(self.download_dir), job.get("download_dir")):
+            if not r:
+                continue
+            try:
+                resolved_root = Path(str(r)).resolve()
+            except OSError:
+                continue
+            if resolved_root not in roots:
+                roots.append(resolved_root)
         for p in {t.parent for t in targets}:
             # resolve BOTH sides: with a relative download_dir (or a symlinked
             # one) the unresolved parent never compared equal to the resolved
@@ -650,11 +721,14 @@ class JobManager:
                 p_resolved = p.resolve()
             except OSError:
                 continue
-            if p_resolved != root:
-                try:
-                    p_resolved.rmdir()
-                except OSError:
-                    pass
+            if any(p_resolved == r for r in roots):
+                continue                    # a root itself: never remove it
+            if not any(p_resolved.is_relative_to(r) for r in roots):
+                continue                    # outside every root: not ours
+            try:
+                p_resolved.rmdir()
+            except OSError:
+                pass
         note = None
         if not targets and job.get("filepath"):
             if Path(str(job["filepath"])).is_dir() and not job.get("files"):
@@ -857,6 +931,9 @@ class JobManager:
                     fp = req.get("filepath") or e.get("filepath")
                     if fp and str(fp) not in made:
                         made.append(str(fp))
+                    for sub_fp in _subtitle_files(e):
+                        if sub_fp not in made:
+                            made.append(sub_fp)
                 job["files"] = made or None
             else:
                 req = (info.get("requested_downloads") or [{}])[0]
@@ -874,6 +951,9 @@ class JobManager:
                 made = list(job.get("files") or [])
                 if str(job["filepath"]) not in made:
                     made.append(str(job["filepath"]))
+                for sub_fp in _subtitle_files(info):
+                    if sub_fp not in made:
+                        made.append(sub_fp)
                 job["files"] = made
             with self._lock:
                 if _stop_requested(job):
