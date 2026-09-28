@@ -5,6 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.io.File
 import java.security.KeyStore
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -134,10 +137,18 @@ object CookieVault {
         }
     }
 
-    /** What the settings row shows. */
+    /** What the settings row shows — including WHEN the cookies arrived
+     *  (v0.27.0): Instagram's session lasts hours, so the import date is the
+     *  difference between "it's broken" and "it's three days old". */
     fun status(context: Context): String = when {
-        has(context) -> "stored and encrypted (Android Keystore) — a readable copy " +
-            "exists only while the app runs"
+        has(context) -> {
+            val when = File(context.filesDir, ENC).lastModified()
+            val date = if (when > 0)
+                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(when))
+            else "unknown"
+            "stored and encrypted (Android Keystore), imported $date — a " +
+                "readable copy exists only while the app runs"
+        }
         else -> "no stored cookies"
     }
 }

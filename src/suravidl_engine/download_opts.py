@@ -31,6 +31,26 @@ IP_VERSIONS = ("auto", "ipv4", "ipv6")
 _SOURCE_ADDRESS = {"ipv4": "0.0.0.0", "ipv6": "::"}   # yt-dlp's own mapping
 SLEEP_REQUESTS_MAX = 30.0
 
+# Impersonation (v0.27.0): sites that fingerprint HTTP headers — Facebook
+# answers "Cannot parse data" even WITH valid cookies — only work when
+# yt-dlp wears a real browser's TLS/header profile. That is yt-dlp's
+# `impersonate` option, fulfilled by the curl_cffi package. Four clients,
+# spelled the way yt-dlp's own CLI spells them (its parser resolves each to
+# a concrete target version).
+IMPERSONATE_CLIENTS = ("chrome", "firefox", "safari", "edge")
+
+
+def impersonate_available() -> bool:
+    """Is the impersonation backend (curl_cffi) present in this build?
+
+    Checked at settings-save time (refuse clearly) and again when options are
+    built (fail loudly — a job must never quietly download WITHOUT the
+    impersonation the user asked for).
+    """
+    import importlib.util
+
+    return importlib.util.find_spec("curl_cffi") is not None
+
 # One-click quality picks, expressed the way yt-dlp recommends: a capped
 # video stream paired with the best audio when the site serves them apart
 # (`bv*` + `ba`), falling back to the best single file (`b`). The engine owns
@@ -165,6 +185,19 @@ def curated_settings_opts(settings: dict) -> dict:
     extractor_args = parse_extractor_args(settings.get("extractor_args"))
     if extractor_args:
         opts["extractor_args"] = extractor_args
+    target = str(settings.get("impersonate") or "").strip().lower()
+    if target:
+        if target not in IMPERSONATE_CLIENTS:
+            raise ValueError(
+                f"impersonate must be one of {list(IMPERSONATE_CLIENTS)}")
+        if not impersonate_available():
+            raise ValueError(
+                "impersonate is set but this build has no curl_cffi — "
+                "impersonation ships with the desktop builds; install "
+                "curl_cffi or turn impersonate off in Settings → Authentication")
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+
+        opts["impersonate"] = ImpersonateTarget(target)
     return opts
 
 
@@ -176,7 +209,7 @@ def probe_extra_opts(settings: dict) -> dict:
     """
     curated = curated_settings_opts(settings)
     allowed = ("geo_bypass", "geo_bypass_country", "source_address",
-               "nocheckcertificate", "extractor_args")
+               "nocheckcertificate", "extractor_args", "impersonate")
     out = {k: curated[k] for k in allowed if k in curated}
     proxy = str(settings.get("proxy") or "").strip()
     if proxy:

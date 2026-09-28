@@ -13,13 +13,22 @@ try:  # bundle pywebview's platform backends when the package is installed
 except Exception:  # noqa: BLE001 - pywebview is optional
     _webview_hidden = []
 
+try:  # impersonation: curl_cffi and its libcurl-impersonate travel along when
+    # installed at build time (the release workflow installs it, and its smoke
+    # test asserts --selftest can still construct an impersonating session)
+    from PyInstaller.utils.hooks import collect_all
+
+    _cffi_datas, _cffi_binaries, _cffi_hidden = collect_all("curl_cffi")
+except Exception:  # noqa: BLE001 - the engine works without it; Android too
+    _cffi_datas, _cffi_binaries, _cffi_hidden = [], [], []
+
 a = Analysis(
     ["scripts/entry.py"],
     pathex=[str(ROOT / "src")],
-    binaries=[],
+    binaries=_cffi_binaries,
     datas=[(str(ROOT / "src" / "suravidl_engine" / "web"),
-            "suravidl_engine/web")],
-    hiddenimports=["suravidl_engine.__main__"] + _webview_hidden,
+            "suravidl_engine/web")] + _cffi_datas,
+    hiddenimports=["suravidl_engine.__main__"] + _webview_hidden + _cffi_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -54,7 +63,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.26.0",
+            "CFBundleShortVersionString": "0.27.0",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

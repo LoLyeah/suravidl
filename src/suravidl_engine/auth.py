@@ -136,7 +136,9 @@ def explain_download_error(text: str) -> str:
 
     if looks_like_signin_wall(text):
         return (f"{text} — this looks like the site asking for an account: "
-                "add cookies in Settings → Authentication.")
+                "add cookies in Settings → Authentication (if some are "
+                "already added, they may have expired — Instagram sessions "
+                "last only hours).")
     if is_tiktok_flake(text):
         return f"{text} — {TIKTOK_FLAKE_HINT}"
     return text

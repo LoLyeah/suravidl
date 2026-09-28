@@ -1703,6 +1703,7 @@ async function initAppControls() {
     $("quitAppBtn").onclick = () => $("quitBtn").onclick();
     // browser cookie DBs aren't readable on Android — offer file import instead
     $("browserRow").classList.add("hidden");
+    $("impersonateRow").classList.add("hidden");   // no curl_cffi on the phone
     const imp = $("importCookies");
     imp.classList.remove("hidden");
     imp.onclick = () => window.AndroidHost.pickCookiesFile();
@@ -1900,6 +1901,7 @@ async function loadSettings() {
     $("setResume").checked = !!s.auto_resume;
     $("setCookies").value = s.cookies_file || "";
     $("setCookiesBrowser").value = s.cookies_from_browser || "";
+    $("setImpersonate").value = s.impersonate || "";
     $("setTemplate").value = s.filename_template || "";
     $("setSubfolders").value = s.subfolders || "off";
     $("setContainer").value = s.video_container || "auto";
@@ -2233,6 +2235,7 @@ function saveSettings() {
       auto_resume: $("setResume").checked,
       cookies_file: $("setCookies").value.trim(),
       cookies_from_browser: $("setCookiesBrowser").value,
+      impersonate: $("setImpersonate").value,
       filename_template: $("setTemplate").value.trim(),
       subfolders: $("setSubfolders").value,
       video_container: $("setContainer").value,

@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install . pyinstaller pystray pillow pywebview
+        run: pip install . pyinstaller pystray pillow pywebview curl_cffi
       - name: Build macOS app icon
         if: matrix.os == 'macos-14'
         run: |
@@ -51,6 +51,8 @@ jobs:
           codesign --force -s - dist/suravidl
           codesign --force -s - --deep dist/suravidl.app
       - name: Smoke test frozen binary
+        env:
+          SURAVIDL_EXPECT_IMPERSONATE: "1"
         run: ./dist/${{ matrix.binary }} --selftest --download-dir ./smoke_dl
       - name: Package
         shell: bash

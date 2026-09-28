@@ -12,6 +12,9 @@ DEFAULTS = {
     "glass": "frosted",    # frosted | liquid
     "cookies_file": "",          # Netscape cookies.txt for age-gated videos
     "cookies_from_browser": "",  # e.g. chrome / firefox / edge
+    "impersonate": "",           # off | chrome | firefox | safari | edge —
+                                 # sites that fingerprint HTTP headers
+                                 # (Facebook) need this ON TOP of cookies
     # --- tier-1 download options (see download_opts.py) -------------------
     "filename_template": "%(title).100B.%(ext)s",
     "subtitles_mode": "off",     # off | sidecar | embed
@@ -220,6 +223,22 @@ class Settings:
                 from .auth import parse_browser
 
                 parse_browser(value)  # raises ValueError with the known list
+            return value
+        if key == "impersonate":
+            value = str(value or "").strip().lower()
+            if not value:
+                return ""
+            from .download_opts import IMPERSONATE_CLIENTS, impersonate_available
+
+            if value not in IMPERSONATE_CLIENTS:
+                raise ValueError(
+                    f"impersonate must be one of {list(IMPERSONATE_CLIENTS)} "
+                    "(or empty for off)")
+            if not impersonate_available():
+                raise ValueError(
+                    "impersonation needs the curl_cffi package, which this "
+                    "build does not include (the desktop builds ship it) — "
+                    "leave it off here")
             return value
         if key == "theme":
             value = str(value)

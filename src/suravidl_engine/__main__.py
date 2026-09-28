@@ -100,6 +100,23 @@ def start_server(download_dir, token: str, port: int, db_path=None,
     return server
 
 
+def _impersonation_probe() -> tuple[bool, str]:
+    """Can this build really impersonate a browser? (v0.27.0)
+
+    Constructing the session loads the bundled libcurl-impersonate, so this
+    proves the whole chain travelled — the Python package AND its shared
+    library. The desktop release smoke test sets SURAVIDL_EXPECT_IMPERSONATE=1
+    so a build that lost curl_cffi fails in CI instead of on a user's Mac.
+    """
+    try:
+        import curl_cffi.requests
+
+        curl_cffi.requests.Session(impersonate="chrome")
+        return True, f"curl_cffi {getattr(curl_cffi, '__version__', '?')}, chrome target loads"
+    except Exception as e:  # noqa: BLE001 - any failure means "no"
+        return False, f"{e.__class__.__name__}: {e}"
+
+
 def self_test(download_dir, port: int = 0, timeout_s: float = 20) -> bool:
     """Boot the full app on a free port and poll /health. CI verification."""
     import urllib.request
@@ -114,6 +131,14 @@ def self_test(download_dir, port: int = 0, timeout_s: float = 20) -> bool:
             with urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/health", timeout=2) as r:
                 if r.status == 200:
+                    imp_ok, imp_detail = _impersonation_probe()
+                    print(f"SELFTEST_IMPERSONATE "
+                          f"{'ok' if imp_ok else 'missing'} — {imp_detail}")
+                    if (os.environ.get("SURAVIDL_EXPECT_IMPERSONATE") == "1"
+                            and not imp_ok):
+                        print("SELFTEST_FAIL (impersonation was expected, "
+                              "but this build cannot do it)")
+                        return False
                     print(f"SELFTEST_OK http://127.0.0.1:{port}/")
                     return True
         except Exception:

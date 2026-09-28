@@ -904,3 +904,33 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     DBs), the delete sweeps their partials through the same
     inside-the-folder leash, and the test waits for the second entry and
     the worker's death instead of hoping.
+
+- **v0.27.0 — authenticated video, round two: impersonation + the
+    stale-cookie voice.** The answer to "is there any way I can download
+    authenticated-gated video?" took inventory first: cookies were already
+    everywhere (cookies.txt, cookies-from-browser, the encrypted Android
+    vault, and the in-app browser handing its own cookie jar with every
+    sniff). The two real gaps:
+
+    1. *Facebook-class fingerprinting.* With cookies alone, yt-dlp still
+    gets "Cannot parse data" from sites that gatekeep on HTTP header
+    fingerprints; upstream's answer is `--impersonate` (curl_cffi), which
+    the app had nowhere. There is an **impersonate** setting now (off |
+    chrome | firefox | safari | edge — default off), refused at save time
+    with the missing package's name when the backend isn't there, carried
+    by the ONE options path into probes and downloads alike (a probe hits
+    the wall first), and the desktop builds ship curl_cffi: the release
+    workflow installs it, the spec collects it (`collect_all`), and the
+    frozen-binary smoke test runs with `SURAVIDL_EXPECT_IMPERSONATE=1` — a
+    build that lost the backend fails in CI, not on someone's Mac. Android
+    stays out honestly: curl_cffi has no Android wheels, the settings row
+    hides there, and the phone's route is the cookies import (or the
+    in-app browser) it already had. Verified against a real onefile build:
+    `SELFTEST_IMPERSONATE ok — curl_cffi 0.16.3, chrome target loads`,
+    plus an impersonated probe against the fixture server end to end.
+
+    2. *Stale-cookie silence.* An expired cookies.txt failed with the same
+    words as no cookies at all. The sign-in-wall hint now says the cookies
+    may have expired ("Instagram sessions last only hours"), and the
+    Android vault's status line reports WHEN the last import happened —
+    the difference between "it's broken" and "it's three days old".

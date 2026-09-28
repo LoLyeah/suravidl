@@ -45,6 +45,8 @@ class CookieVaultTest {
         CookieVault.save(ctx, sample.toByteArray())
 
         assertTrue(CookieVault.has(ctx))
+        assertTrue("the row must say when the cookies were imported",
+                   CookieVault.status(ctx).contains("imported"))
         assertTrue(File(ctx.filesDir, "cookies.enc").exists())
         assertFalse("plain import must not survive",
                     File(ctx.filesDir, "cookies.txt").exists())

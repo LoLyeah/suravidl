@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suravidl-engine"
-version = "0.26.0"
+version = "0.27.0"
 description = "suravidl engine - universal web video downloader engine (yt-dlp wrapper API)"
 requires-python = ">=3.10"
 dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx"]
+dev = ["pytest", "httpx", "curl_cffi"]
+# browser impersonation for sites with strict bot checks (e.g. Facebook):
+#   pip install -e '.[impersonate]'
+impersonate = ["curl_cffi"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

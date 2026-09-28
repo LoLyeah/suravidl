@@ -504,8 +504,19 @@
               <option value="safari">Use cookies from Safari</option>
             </select>
           </div>
+          <div class="jrow" id="impersonateRow">
+            <select id="setImpersonate">
+              <option value="">Impersonate: off</option>
+              <option value="chrome">Impersonate Chrome — strict bot checks (e.g. Facebook)</option>
+              <option value="firefox">Impersonate Firefox</option>
+              <option value="safari">Impersonate Safari</option>
+              <option value="edge">Impersonate Edge</option>
+            </select>
+          </div>
           <span class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
-            or read the cookies straight from a browser (close it first). On Android, use Import.</span>
+            or read the cookies straight from a browser (close it first). On Android, use Import.
+            Instagram sessions expire in hours — re-export when a download asks for a sign-in.
+            Impersonation is for sites that fingerprint the browser; the desktop builds include it.</span>
           <div class="jrow">
             <button id="testCookies" class="btn sm" type="button">Test cookies</button>
             <span id="cookiesMsg" class="msg muted small"></span>
