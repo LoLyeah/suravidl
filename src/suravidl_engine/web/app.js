@@ -1633,6 +1633,104 @@ $("updateBtn").onclick = async () => {
   $("updateBtn").disabled = false;
 };
 
+/* ---------- what's new ----------------------------------------------------- *
+ * One card per DEVICE after an update: the engine answers with its version and
+ * the notes for recent releases, and the UI shows the entries newer than the
+ * last version this device has seen (localStorage — the same per-device
+ * durability as the update skip/snooze; the Android WebView origin is fixed,
+ * so it survives there). A fresh install shows nothing — there was no update
+ * to explain — and the card waits for "Got it": until then, the next launch
+ * asks again. */
+const WN = {
+  seen: "suravidl.whatsnew.seen", // the engine version this device has seen
+  MAX: 3,                         // entries shown for one update, newest first
+};
+
+/** "0.32.0" -> [0, 32, 0]; junk floors at 0 so it only ever ranks below real versions. */
+function versionTuple(v) {
+  return String(v || "").split(".").map((x) => {
+    const n = parseInt(x, 10);
+    return Number.isFinite(n) ? n : 0;
+  });
+}
+
+/** a > b ? 1 : a < b ? -1 : 0 — element by element, missing parts are 0. */
+function versionCmp(a, b) {
+  const A = versionTuple(a), B = versionTuple(b);
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    const d = (A[i] || 0) - (B[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+/** The entries this device has not seen yet, newest first, capped. */
+function whatsNewFor(seen, entries) {
+  const pick = [];
+  for (const e of entries || []) {
+    if (!e || !e.version) continue;
+    if (versionCmp(e.version, seen) <= 0) continue;
+    pick.push(e);
+    if (pick.length >= WN.MAX) break;
+  }
+  return pick;
+}
+
+function showWhatsNew(entries, version) {
+  const box = $("whatsNewList");
+  box.innerHTML = "";
+  for (const e of entries) {
+    const sec = document.createElement("div");
+    sec.className = "wnentry";
+    const head = document.createElement("div");
+    head.className = "wntitle";
+    head.textContent = e.title ? `${e.version} — ${e.title}` : e.version;
+    sec.appendChild(head);
+    const ul = document.createElement("ul");
+    for (const item of e.items || []) {
+      const li = document.createElement("li");
+      li.textContent = item;
+      ul.appendChild(li);
+    }
+    sec.appendChild(ul);
+    box.appendChild(sec);
+  }
+  $("whatsNewDone").onclick = () => dismissWhatsNew(version);
+  $("whatsNewClose").onclick = () => dismissWhatsNew(version);
+  $("whatsNewModal").classList.remove("hidden");
+}
+
+/** Record on dismiss: until "Got it" is pressed, the next launch asks again. */
+function dismissWhatsNew(version) {
+  if (version) updStore.set(WN.seen, version);
+  $("whatsNewModal").classList.add("hidden");
+}
+
+async function maybeShowWhatsNew() {
+  let data;
+  try { data = await api("/whats-new"); } catch (_) { return; }
+  const seen = updStore.get(WN.seen, "");
+  if (!seen) { updStore.set(WN.seen, data.version); return; } // fresh install
+  if (seen === data.version) return;
+  const pick = whatsNewFor(seen, data.entries);
+  if (!pick.length) { updStore.set(WN.seen, data.version); return; }
+  showWhatsNew(pick, data.version);
+}
+
+async function openWhatsNew() {
+  let data;
+  try { data = await api("/whats-new"); }
+  catch (_) { toast("could not fetch what's new", "bad"); return; }
+  const pick = (data.entries || []).filter((e) => e && e.version === data.version);
+  if (!pick.length) { toast("nothing new to show"); return; }
+  showWhatsNew(pick, data.version);
+}
+
+function wireWhatsNewRow() {
+  const b = $("wnOpen");
+  if (b) b.onclick = openWhatsNew;
+}
+
 /* ---------- window controls (desktop app) / host controls (android app) ---------- */
 function wireQuitButton() {
   const quit = $("quitBtn");
@@ -2446,7 +2544,9 @@ wireToken();
 loadVersions();
 loadPresets();
 wireUpdateRow();
+wireWhatsNewRow();
 checkAppUpdate();
+maybeShowWhatsNew();
 loadSettings();
 initAppControls();
 initPlayer();

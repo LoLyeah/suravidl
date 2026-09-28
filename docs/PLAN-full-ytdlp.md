@@ -1021,3 +1021,20 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     playlist file's own few KB). Unmeasurable stays bare; the estimator
     reads playlists and probes a single segment, never a stream. DASH gets
     the honest no-size. 16 new tests, one real-HLS round trip.
+
+- **v0.32.0 — the "What's new" card.** Requested verbatim ("Can you add
+    'what's new' pop up for the first launch after the update in the app??"),
+    landing where one implementation covers every shell — the Android app,
+    the desktop window and the browser all render this UI. The engine owns
+    the notes (`whatsnew.ENTRIES`, `GET /whats-new`) and the suite fails on
+    a version bump that ships without an entry: the card is only as honest
+    as that list. The UI shows the entries NEWER than the version this
+    device last ran (localStorage — the same per-device durability as
+    skip/snooze), capped at three, and the selection rule is executed in
+    Node inside the tests against the real functions. The card waits for
+    "Got it" (until then the next launch asks again) and a fresh install
+    shows nothing — there was no update to explain. Settings → What's new
+    re-opens the current release's notes any time. Verified end-to-end in a
+    real browser: fresh boot quiet, a simulated 0.30.0 → 0.32.0 shows
+    exactly the two unseen releases, dismissing records the version, a
+    reload stays quiet, and the Settings button re-opens the card.

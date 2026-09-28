@@ -57,7 +57,9 @@ def test_index_has_new_controls(tmp_path):
                     "sniffRow", "sniffBtn", "browserOffer", "browserOfferBtn",
                     "apiToken", "copyToken",
                     "soundRow", "noSound", "openDir",
-                    "folderModal", "folderTitle", "folderList", "folderClose"):
+                    "folderModal", "folderTitle", "folderList", "folderClose",
+                    "whatsNewModal", "whatsNewTitle", "whatsNewList",
+                    "whatsNewClose", "whatsNewDone", "wnOpen"):
         assert f'id="{elem_id}"' in html, elem_id
 
 

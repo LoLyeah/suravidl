@@ -430,6 +430,13 @@ def create_app(download_dir, auth_token: str | None = None,
             return update_check_fn()
         return updater.check_update(__version__)
 
+    @app.get("/whats-new")
+    def whats_new(_mgr: JobManager = Depends(require_auth)):
+        """The release notes behind the UI's one-time card after an update."""
+        from . import whatsnew
+
+        return whatsnew.payload()
+
     @app.get("/settings")
     def get_settings(_mgr: JobManager = Depends(require_auth)):
         return settings.get()

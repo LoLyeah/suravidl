@@ -317,6 +317,15 @@
         </div>
         <div id="updMeta" class="muted small updmeta"></div>
       </div>
+
+      <div class="field">
+        <label class="lbl">What's new</label>
+        <div class="updrow">
+          <span class="small muted">what changed in this version</span>
+          <span class="spacer"></span>
+          <button id="wnOpen" class="btn sm" type="button">Show</button>
+        </div>
+      </div>
       </div><!-- /spanel-general -->
 
       <div class="spanel hidden" id="spanel-presets">
@@ -735,6 +744,22 @@
       <button id="playClose" class="btn ghost-sm">Close</button>
     </div>
     <div id="playBody"></div>
+  </div>
+</div>
+
+<!-- what's new: one card per device after an update (v0.32.0) -->
+<div id="whatsNewModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="whatsNewTitle">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="whatsNewTitle" class="title">What's new</span>
+      <span class="spacer"></span>
+      <button id="whatsNewClose" class="btn ghost-sm">Close</button>
+    </div>
+    <div id="whatsNewList" class="wnlist"></div>
+    <div class="modal-foot right">
+      <button id="whatsNewDone" class="btn prime">Got it</button>
+    </div>
   </div>
 </div>
 
