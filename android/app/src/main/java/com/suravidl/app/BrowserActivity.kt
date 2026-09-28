@@ -65,6 +65,7 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var listBox: LinearLayout
     private lateinit var status: TextView
     private lateinit var empty: TextView
+    private lateinit var handoffNote: TextView
     private val ui = Handler(Looper.getMainLooper())
     private var lastVersion = -1
     private var bg = MainActivity.BG_DARK
@@ -233,6 +234,21 @@ class BrowserActivity : AppCompatActivity() {
         row.addView(chip("Clear data") { clearBrowsingData() })
         root.addView(row)
 
+        // A page that tried to bounce the browser into its app (v0.30.0): the
+        // navigation used to die silently — scheme URL stuck in the field, the
+        // find list wiped, page blank (the 2026-09-28 screenshot). The refusal
+        // gets a line of its own, out of render()'s way; tap to hide, like the
+        // sign-in hint below.
+        handoffNote = TextView(this).apply {
+            tag = "app-handoff-note"
+            textSize = 12.5f
+            setTextColor(GREY)
+            setPadding(dp(12), 0, dp(12), dp(6))
+            visibility = View.GONE
+            setOnClickListener { handoffNote.visibility = View.GONE }
+        }
+        root.addView(handoffNote)
+
         // The phone's route to a signed-in video (v0.28.0): whatever session
         // this browser holds is exactly what a handoff sends. Said here, under
         // the toolbar — a login-walled page finds nothing at all, so the empty
@@ -283,8 +299,10 @@ class BrowserActivity : AppCompatActivity() {
                     currentPage = url
                     if (!urlField.hasFocus()) urlField.setText(url)
                     SniffLog.clear()                    // a new page, new finds
+                    handoffNote.visibility = View.GONE  // its note was about the page before
                     refreshIfChanged()
-                })
+                },
+                onAppLinkBlocked = { url -> reportAppLinkBlocked(url) })
         }
         ua = try {
             webView.settings.userAgentString.orEmpty()
@@ -354,16 +372,42 @@ class BrowserActivity : AppCompatActivity() {
     private fun go() {
         var u = urlField.text.toString().trim()
         if (u.isEmpty()) return
+        if (!isWebUrl(u) && u.contains("://")) {   // a pasted app link
+            reportAppLinkBlocked(u)
+            return
+        }
         if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://$u"
         load(u)
     }
 
     private fun load(url: String) {
+        if (!isWebUrl(url)) {                      // the popup door can carry a scheme
+            reportAppLinkBlocked(url)
+            return
+        }
         currentPage = url
         SniffLog.clear()
         refreshIfChanged()
         urlField.setText(url)
         webView.loadUrl(url)
+    }
+
+    /** A refused non-web link (snssdk1180://, intent://, market://…) is said
+     *  out loud — the silent half-dead navigation was the bug (v0.30.0). */
+    private fun reportAppLinkBlocked(url: String) {
+        handoffNote.text = "app link refused (" + schemeLabel(url) +
+            ") — only web pages load here"
+        handoffNote.visibility = View.VISIBLE
+    }
+
+    /** "snssdk1180://aweme/…" -> "snssdk1180://" — what the note names. */
+    private fun schemeLabel(url: String): String {
+        val cut = when {
+            url.contains("://") -> url.indexOf("://") + 3
+            url.contains(":") -> url.indexOf(":") + 1
+            else -> url.length
+        }
+        return url.take(minOf(cut, 24))
     }
 
     /** Ask again: re-install the hooks, then sweep the resource timeline. */

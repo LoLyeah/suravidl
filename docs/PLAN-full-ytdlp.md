@@ -980,3 +980,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `video-` names like `audio-` ones, and every new format expression is
     asserted against yt-dlp's own parser plus one real end-to-end remux
     download.
+
+- **v0.30.0 — refusing the app hand-off.** The 2026-09-28 report, second
+    half: a TikTok page inside "Find a video on a page" navigated itself to
+    `snssdk1180://aweme/detail/<id>` — the page's own "open our app" move.
+    Nothing refused it, so the navigation died half-way: scheme URL stuck in
+    the address bar, the find list wiped, the page blank (the screenshot that
+    started this). The engine was innocent — the probe runs yt-dlp directly
+    and never touches this browser; its failure that day was TikTok's known
+    intermittent rate-limiting (reproduced and green from the server within
+    the hour). Now `SnifferWebViewClient` overrides
+    `shouldOverrideUrlLoading`: anything that is not `http(s)` is refused
+    before the navigation starts, and the browser says so on its own line —
+    "app link refused (snssdk1180://) — only web pages load here". Every
+    door shares the one definition of a web URL (`isWebUrl`): the WebView
+    client, the popup (`target=_blank`) path and the Go button — where a
+    pasted app link is now named rather than mangled into a fake https URL.
+    The refusal note is its own view with its own tag, so `render()`'s
+    status line can never eat it, and a real navigation hides it. Proven on
+    the emulators: the new instrumented test fires `snssdk1180://` from a
+    live page and asserts the browser stays put and speaks.

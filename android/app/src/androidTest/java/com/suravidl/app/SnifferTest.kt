@@ -267,6 +267,64 @@ class SnifferTest {
     }
 
     /**
+     * TikTok's move, on the emulator: the page itself navigates to
+     * `snssdk1180://aweme/detail/1` (a plain link would do; script is what the
+     * real page uses). Before v0.30.0 this died half-way — the scheme URL
+     * replaced the address bar, the find list was wiped and the page went
+     * blank. Now the navigation is refused before it starts and the browser
+     * says so in its own line.
+     */
+    @Test(timeout = 150_000)
+    fun theBrowserRefusesAnAppHandOffAndSaysSo() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        SniffLog.clear()
+        try {
+            wakeScreen()
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+            var loaded = false
+            val pageDeadline = System.currentTimeMillis() + 90_000
+            while (System.currentTimeMillis() < pageDeadline && !loaded) {
+                loaded = currentBrowserUrl()?.endsWith("/page.html") == true
+                if (!loaded) Thread.sleep(1000)
+            }
+            assertTrue("the fixture page never loaded: " + browserState(), loaded)
+
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                for (stage in listOf(Stage.RESUMED, Stage.STARTED)) {
+                    ActivityLifecycleMonitorRegistry.getInstance()
+                        .getActivitiesInStage(stage)
+                        .filterIsInstance<BrowserActivity>()
+                        .forEach { act ->
+                            findWebView(act.window.decorView)
+                                ?.evaluateJavascript(
+                                    "location.href='snssdk1180://aweme/detail/1'", null)
+                        }
+                }
+            }
+
+            var said: String? = null
+            val deadline = System.currentTimeMillis() + 30_000
+            while (System.currentTimeMillis() < deadline && said == null) {
+                said = refusalNoteText()
+                if (said == null) Thread.sleep(500)
+            }
+            assertNotNull("the refused hand-off was swallowed silently — the exact " +
+                          "2026-09-28 bug: " + browserState(), said)
+            assertTrue("the note must name the refusal (got: $said)",
+                       said!!.contains("app link refused"))
+            val after = currentBrowserUrl()
+            assertTrue("the browser navigated to the scheme URL — the blank-page " +
+                       "bug is back: $after", after?.endsWith("/page.html") == true)
+        } finally {
+            server.stop()
+        }
+    }
+
+    /**
      * A stopped activity is only handed a new intent when it comes back to the
      * foreground, and an emulator with its screen off resumes nothing: this test
      * failed on API 30 while the 16 KB API 36 image passed, and the difference
@@ -297,6 +355,41 @@ class SnifferTest {
                     break
                 }
             }
+        }
+        return out
+    }
+
+    /** The live browser's page URL, or null when none is up — read on main. */
+    private fun currentBrowserUrl(): String? {
+        val inst = InstrumentationRegistry.getInstrumentation()
+        var out: String? = null
+        inst.runOnMainSync {
+            for (stage in listOf(Stage.RESUMED, Stage.STARTED, Stage.PAUSED)) {
+                val acts = ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(stage).filterIsInstance<BrowserActivity>()
+                if (acts.isNotEmpty()) {
+                    out = findWebView(acts.first().window.decorView)?.url
+                    break
+                }
+            }
+        }
+        return out
+    }
+
+    /** The refusal note's text, or null while it is not shown — read on main. */
+    private fun refusalNoteText(): String? {
+        val inst = InstrumentationRegistry.getInstrumentation()
+        var out: String? = null
+        inst.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<BrowserActivity>()
+                .forEach { act ->
+                    val v = act.window.decorView.findViewWithTag("app-handoff-note")
+                    if (v != null && v.visibility == View.VISIBLE) {
+                        out = (v as android.widget.TextView).text.toString()
+                    }
+                }
         }
         return out
     }

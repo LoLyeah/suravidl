@@ -25,6 +25,8 @@ import android.webkit.WebViewClient
 class SnifferWebViewClient(
     private val pageUrl: () -> String,
     private val onPageStart: (String) -> Unit,
+    /** A refused non-web navigation — the browser says so on screen. */
+    private val onAppLinkBlocked: (String) -> Unit,
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -35,6 +37,23 @@ class SnifferWebViewClient(
     override fun onPageFinished(view: WebView?, url: String?) {
         inject(view)
         view?.evaluateJavascript(SniffScript.scan(), null)
+    }
+
+    /**
+     * Refuse what is not a web page. TikTok's mobile pages (and others) fire
+     * `snssdk1180://aweme/…` / `intent://…` at the browser to bounce you into
+     * their app; letting one through left the load dead half-way with the
+     * scheme URL stuck in the address bar and the find list wiped — the
+     * 2026-09-28 screenshot. Refused up front, and said out loud instead:
+     * the page stays, the finds stay, the user is told why nothing moved.
+     */
+    override fun shouldOverrideUrlLoading(
+        view: WebView?, request: WebResourceRequest?
+    ): Boolean {
+        val u = request?.url?.toString() ?: return false
+        if (isWebUrl(u)) return false
+        onAppLinkBlocked(u)
+        return true
     }
 
     override fun shouldInterceptRequest(
@@ -57,3 +76,9 @@ class SnifferWebViewClient(
         view?.evaluateJavascript(SniffScript.js(), null)
     }
 }
+
+/** What this browser is for. Top-level on purpose: BrowserActivity's load()
+ *  and its Go button refuse the same set, so no door (a popup, a new intent,
+ *  the address bar) lets a non-web scheme in. */
+internal fun isWebUrl(url: String?): Boolean =
+    url != null && (url.startsWith("http://") || url.startsWith("https://"))
