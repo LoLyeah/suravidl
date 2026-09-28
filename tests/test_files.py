@@ -267,7 +267,12 @@ def test_summary_reports_the_app_cache(tmp_path):
         assert s["cache_dir"].endswith("cache")
 
 
-def test_clear_empties_the_app_cache_and_only_its_own_contents(tmp_path):
+# v0.24.9 folded the cache sweep into /files/clear; the 2026-09-28 ask
+# ("why not make 'delete cache' as a different button?") split it again:
+# /files/clear speaks files only, and /cache/clear is the endpoint with its
+# own confirm, its own button, and the stand-down guard.
+
+def test_the_cache_endpoint_frees_the_cache_and_nothing_else(tmp_path):
     with _client(tmp_path, cache_dir=tmp_path / "cache") as c:
         dl = tmp_path / "dl"
         dl.mkdir(parents=True, exist_ok=True)
@@ -278,21 +283,36 @@ def test_clear_empties_the_app_cache_and_only_its_own_contents(tmp_path):
         keep = tmp_path / "keep.txt"
         keep.write_bytes(b"k" * 5)          # outside every root
 
-        r = c.post("/files/clear", json={"confirm": "delete"},
+        r = c.post("/cache/clear", json={"confirm": "delete"},
                    headers=AUTH).json()
-        assert r["deleted"] == 1 and r["freed_bytes"] == 100
-        assert r["cache_freed_bytes"] == 300
+        assert r["deleted"] == 1 and r["freed_bytes"] == 300
         assert cache.exists(), "the cache root itself stays"
         assert not any(p.is_file() for p in cache.rglob("*"))
-        assert not any(p.is_file() for p in dl.rglob("*"))
+        assert (dl / "one.mp4").exists(), "a download is not cache"
         assert keep.exists(), "files outside both roots must survive"
         assert c.get("/files/summary", headers=AUTH).json()["cache_bytes"] == 0
 
+        # …and the file delete leaves the cache alone (the reversal)
+        (cache / "back").write_bytes(b"b" * 10)
+        f = c.post("/files/clear", json={"confirm": "delete"},
+                   headers=AUTH).json()
+        assert f["deleted"] == 1
+        assert "cache_freed_bytes" not in f, "the file delete no longer speaks cache"
+        assert (cache / "back").exists()
 
-def test_cache_clear_refuses_when_the_download_folder_sits_inside_it(tmp_path):
+
+def test_the_cache_endpoint_needs_the_word(tmp_path):
+    with _client(tmp_path) as c:
+        r = c.post("/cache/clear", json={}, headers=AUTH)
+        assert r.status_code == 400
+        assert "confirm" in r.json()["detail"]
+
+
+def test_the_cache_endpoint_stands_down_when_it_owns_the_downloads(tmp_path):
     """A cache dir that contains the download folder is a config mistake and
     the dangerous direction of overlap: wiping it would treat the user's
-    downloads as cache. The folder sweep owns those — this one stands down."""
+    downloads as cache. The endpoint stands down — the folder sweep owns
+    those files."""
     with _client(tmp_path, cache_dir=tmp_path) as c:
         dl = tmp_path / "dl"
         dl.mkdir(parents=True, exist_ok=True)
@@ -300,10 +320,11 @@ def test_cache_clear_refuses_when_the_download_folder_sits_inside_it(tmp_path):
         keep = tmp_path / "keep.txt"
         keep.write_bytes(b"k" * 5)
 
-        r = c.post("/files/clear", json={"confirm": "delete"},
+        r = c.post("/cache/clear", json={"confirm": "delete"},
                    headers=AUTH).json()
-        assert r["cache_freed_bytes"] == 0
+        assert r["freed_bytes"] == 0 and r["stood_down"] is True
         assert keep.exists(), "the cache sweep must not walk a dir that owns the downloads"
+        assert (dl / "one.mp4").exists()
 
 
 def test_jobs_point_yt_dlp_at_the_engine_cache(tmp_path):

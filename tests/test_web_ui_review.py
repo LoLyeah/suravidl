@@ -121,19 +121,21 @@ def test_settings_inputs_have_names_and_modals_announce_themselves():
     assert HTML.count('role="dialog" aria-modal="true"') == 3
 
 
-def test_the_deletes_also_clear_the_app_cache():
-    """The app cache was the piece with no owner: nothing counted it, nothing
-    cleared it, and on Android yt-dlp kept it in app *data* where the system's
-    own Clear-cache cannot reach (2026-09-27). The Device row now shows it,
-    both deletes free it, and an empty folder with a full cache still gets a
-    dialog instead of "nothing to delete"."""
+def test_the_cache_has_its_own_button_and_the_deletes_do_not_touch_it():
+    """v0.24.9 folded the cache sweep into both file deletes ("the app cache
+    was the piece with no owner", and the hint had to explain the side
+    effect); the 2026-09-28 ask undid exactly that. Each button now does one
+    visible thing, and the cache flow makes its own promise."""
     assert 'id="storageCache"' in HTML
     assert '$("storageCache").textContent' in APP
-    assert "cache_freed_bytes" in APP
-    assert "The app cache is cleared too." in APP
-    # refuses only when folder AND cache are both empty
-    flow = APP.split("const clearFiles = async (keepGallery)")[1]
-    before_dialog = flow.split("askConfirm")[0]
-    assert "s.files === 0 && !cacheBytes" in before_dialog
-    # a cache-only clear still asks, with a verb that fits it
-    assert 'okText: known && s.files === 0 ? "Clear" : "Delete"' in APP
+    assert 'id="clearCacheBtn"' in HTML and '$("clearCacheBtn").onclick' in APP
+    assert '"/cache/clear"' in APP
+    # the file deletes no longer bundle it, and nothing claims they do
+    assert "The app cache is cleared too." not in APP
+    assert "Both also clear the app cache" not in HTML
+    flow = APP.split("const clearFiles = async (keepGallery)")[1].split('$("clearCacheBtn")')[0]
+    assert "cacheBytes" not in flow, "the file path must not reason about the cache"
+    # a cache-only clear asks with a verb that fits it and a promise it keeps
+    cache_flow = APP.split('$("clearCacheBtn").onclick')[1][:800]
+    assert 'okText: "Clear"' in cache_flow
+    assert "nothing downloaded is touched" in cache_flow

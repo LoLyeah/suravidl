@@ -26,6 +26,14 @@ BUILTIN_PRESETS: dict[str, dict] = {
     "audio-mp3-128": {"preset": "audio-mp3-128"},
     "audio-flac": {"preset": "audio-flac"},
     "audio-opus": {"preset": "audio-opus"},
+    # v0.29.0: the video side — an MP4 compatibility intent, plus everyday
+    # bundles that are pure patches (they may be edited into user presets).
+    "video-mp4-1080": {"preset": "video-mp4-1080"},
+    "video-mp4-720": {"preset": "video-mp4-720"},
+    "subs-en-sidecar": {"subtitles_mode": "sidecar", "subtitles_langs": "en",
+                        "subtitles_to_srt": True},
+    "subs-en-embed": {"subtitles_mode": "embed", "subtitles_langs": "en"},
+    "metadata-cover": {"embed_metadata": True, "embed_thumbnail": True},
 }
 
 BUILTIN_DESCRIPTIONS = {
@@ -36,6 +44,11 @@ BUILTIN_DESCRIPTIONS = {
     "audio-mp3-128": "extract the audio to mp3 128k (small files)",
     "audio-flac": "extract the audio to flac (lossless)",
     "audio-opus": "extract the audio to opus (native, no generation loss)",
+    "video-mp4-1080": "up to 1080p, MP4 (H.264 + AAC when the site has it) — opens anywhere",
+    "video-mp4-720": "up to 720p, MP4 (H.264 + AAC when the site has it) — smaller files",
+    "subs-en-sidecar": "English subtitles as .srt files next to the video",
+    "subs-en-embed": "English subtitles embedded in the video",
+    "metadata-cover": "embed title/artist metadata and the cover art",
 }
 
 MAX_NAME = 40

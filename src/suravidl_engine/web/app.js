@@ -934,7 +934,7 @@ function renderOvCount() {
     return;
   }
   const parts = [];
-  if (OV.preset) parts.push(OV.preset.replace("audio-", ""));
+  if (OV.preset) parts.push(OV.preset.replace(/^(audio|video)-/, ""));
   if (patch) parts.push(Object.keys(patch).length + " option" +
     (Object.keys(patch).length === 1 ? "" : "s"));
   chip.textContent = parts.join(" · ");
@@ -1794,7 +1794,7 @@ async function initStorageSection() {
         ? `${s.files} file${s.files === 1 ? "" : "s"} · ${humanBytes(s.bytes)}`
         : "no downloaded files";
       // the app cache (yt-dlp's player/signature data): counted apart from
-      // the downloads, and freed by the same two buttons (v0.24.9)
+      // the downloads, with its own button since v0.29.0
       const cache = typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
       $("storageCache").textContent = cache
         ? `app cache · ${humanBytes(cache)}`
@@ -1809,18 +1809,16 @@ async function initStorageSection() {
   // Two deletes, one flow (the 2026-09-26 ask): the app's own folder can be
   // emptied while the Gallery/Music copy — the one the user can actually
   // open — stays. That copy is removed by a separate host call, so the
-  // app-copies path simply never makes it.
+  // app-copies path simply never makes it. Since v0.29.0 these only touch
+  // files: the cache has its own button below.
   const clearFiles = async (keepGallery) => {
     const s = await api("/files/summary").catch(() => null);
     const known = s && typeof s.files === "number";
-    const cacheBytes = known && typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
-    // Nothing anywhere: do not offer to delete it. The row above could have
-    // read "2 files · 73.2 MB" a minute ago (it is only re-read on tab open)
+    // Nothing to delete: do not offer it. The row above could have read
+    // "2 files · 73.2 MB" a minute ago (it is only re-read on tab open)
     // while a delete elsewhere emptied the folder — and "Delete 0 files
     // (0 B)?" against a row that says 2 is the consistency bug this fixes.
-    // A non-empty app cache still earns the dialog: it is the half the
-    // folder row never showed (v0.24.9).
-    if (known && s.files === 0 && !cacheBytes) {
+    if (known && s.files === 0) {
       toast("nothing to delete");
       show();
       return;
@@ -1829,21 +1827,17 @@ async function initStorageSection() {
     const counted = known
       ? `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})`
       : "Delete every downloaded file";
-    const cacheNote = cacheBytes ? " The app cache is cleared too." : "";
     let msg;
-    if (known && s.files === 0) {
-      // the folder is already empty — only the cache is left to clear
-      msg = `Clear the app cache (${humanBytes(cacheBytes)})?`;
-    } else if (keepGallery) {
-      msg = counted + " from the app's folder? The Gallery/Music copies stay." + cacheNote;
+    if (keepGallery) {
+      msg = counted + " from the app's folder? The Gallery/Music copies stay.";
     } else if (known) {
       msg = counted +
         (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
-        "?" + cacheNote + " This cannot be undone.";
+        "? This cannot be undone.";
     } else {
       msg = counted + "? (its size could not be read) This cannot be undone.";
     }
-    const ok = await askConfirm(msg, { okText: known && s.files === 0 ? "Clear" : "Delete" });
+    const ok = await askConfirm(msg, { okText: "Delete" });
     if (!ok) return;
     try {
       const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
@@ -1854,9 +1848,6 @@ async function initStorageSection() {
       if (r.deleted > 0) {
         parts.push(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"}`,
                    `freed ${humanBytes(r.freed_bytes)}`);
-      }
-      if (r.cache_freed_bytes > 0) {
-        parts.push(`cache cleared (${humanBytes(r.cache_freed_bytes)})`);
       }
       if (keepGallery && GALLERY()) parts.push("Gallery/Music copies kept");
       toast(parts.length ? parts.join(" · ") : "nothing freed");
@@ -1871,6 +1862,30 @@ async function initStorageSection() {
   // The distinction — and therefore this button — exists only where the host
   // actually writes gallery copies (Android 10+; the browser build has none).
   if (GALLERY()) $("clearAppCopiesBtn").classList.remove("hidden");
+  // v0.29.0: the cache frees through its own endpoint, and it never touches
+  // a download — the file deletes above no longer touch the cache either.
+  $("clearCacheBtn").onclick = async () => {
+    const s = await api("/files/summary").catch(() => null);
+    const cacheBytes = s && typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
+    if (s && cacheBytes === 0) {
+      toast("the app cache is already empty");
+      show();
+      return;
+    }
+    const what = s && cacheBytes ? ` (${humanBytes(cacheBytes)})` : "";
+    const ok = await askConfirm(
+      `Clear the app cache${what}? Player data yt-dlp simply fetches again — ` +
+      "nothing downloaded is touched.", { okText: "Clear" });
+    if (!ok) return;
+    try {
+      const r = await api("/cache/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
+      toast(r.freed_bytes > 0 ? `cache cleared (${humanBytes(r.freed_bytes)})`
+                              : "cache was already empty");
+      show();
+    } catch (e) {
+      toast("could not clear the cache: " + e.message, "bad");
+    }
+  };
 }
 
 /* called back by the Android host after the cookies file is imported */

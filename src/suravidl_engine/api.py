@@ -615,11 +615,13 @@ def create_app(download_dir, auth_token: str | None = None,
                 raise HTTPException(
                     status_code=400,
                     detail=f"unknown preset: {preset!r}")
-            if not entry["builtin"]:
-                # a user preset expands into an audio intent + a per-job patch
-                audio, patch = split_patch(entry["patch"])
-                preset = audio
-                overrides = {**(overrides or {}), **patch} or None
+            # v0.29.0: built-in and user presets expand the same way — an
+            # intent preset is {"preset": name}, a bundle carries its options,
+            # and both become (intent, per-job patch). Before this, a built-in
+            # that was not a bare intent would have died as an unknown preset.
+            intent, patch = split_patch(entry["patch"])
+            preset = intent
+            overrides = {**(overrides or {}), **patch} or None
         job = mgr.create(body.url, fmt=body.fmt,
                          extra_headers=body.headers,
                          preset=preset,
@@ -837,9 +839,9 @@ def create_app(download_dir, auth_token: str | None = None,
         asks, and this makes the engine refuse a stray call too (the v0.21.1
         audit found a bare POST wiped the folder).
 
-        The app cache goes with it: yt-dlp's player/signature data is always
-        re-fetchable, and on Android it lives in the cache bucket the system
-        may clear anyway (v0.24.9).
+        Since v0.29.0 this does exactly what it says and no more: the app
+        cache has its own endpoint (/cache/clear) and its own button — the
+        v0.24.9 bundling made "delete" quietly do two things.
         """
         if (body.confirm if body else "") != "delete":
             raise HTTPException(
@@ -857,14 +859,33 @@ def create_app(download_dir, auth_token: str | None = None,
                        "cancel them before clearing the folder")
         d = Path(manager.download_dir)
         deleted, freed = _wipe_dir(d)
-        cache_deleted = cache_freed = 0
-        if not _cache_owns_downloads():
-            cache_deleted, cache_freed = _wipe_dir(Path(cache_dir))
         pruned = mgr.clear_completed()
         return {"deleted": deleted, "freed_bytes": freed,
-                "cleared_jobs": pruned, "dir": str(d),
-                "cache_deleted": cache_deleted,
-                "cache_freed_bytes": cache_freed}
+                "cleared_jobs": pruned, "dir": str(d)}
+
+    @app.post("/cache/clear")
+    def cache_clear(body: FilesClearRequest | None = None,
+                    _mgr: JobManager = Depends(require_auth)):
+        """Free only the app cache — yt-dlp's player/signature data (v0.29.0).
+
+        Nothing here is a download: yt-dlp re-fetches what it needs, so this
+        is safe to run any time (and unlike /files/clear it never refuses for
+        a running job — nothing it deletes can be a `.part` or a finished
+        file). The one thing it will not do is run on a config mistake: a
+        cache root that contains the download folder stands down, because
+        wiping it would sweep the user's downloads as if they were cache.
+        """
+        if (body.confirm if body else "") != "delete":
+            raise HTTPException(
+                status_code=400,
+                detail='this clears the app cache — send '
+                       '{"confirm": "delete"} to proceed')
+        if _cache_owns_downloads():
+            return {"deleted": 0, "freed_bytes": 0, "dir": str(cache_dir),
+                    "stood_down": True}
+        deleted, freed = _wipe_dir(Path(cache_dir))
+        return {"deleted": deleted, "freed_bytes": freed, "dir": str(cache_dir),
+                "stood_down": False}
 
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):

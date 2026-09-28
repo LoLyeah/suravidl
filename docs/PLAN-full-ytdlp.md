@@ -954,3 +954,29 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     risk; DRM → never), where cookies live on each platform, and a
     five-minute verify-it-yourself checklist for desktop and phone. The
     README's signed-in bullet links it.
+
+- **v0.29.0 — the cache's own button; the built-in presets grow up.** Two
+    asks off one screenshot (2026-09-28). First: "why not make 'delete
+    cache' as a different button?" — right; v0.24.9 had folded the cache
+    sweep into both file deletes (the cache then had no owner), and the
+    hint had to explain the side effect. Now `/cache/clear` is its own
+    endpoint with its own confirm word, its own button ("Clear app cache"),
+    and the same stand-down guard (a cache root containing the downloads is
+    a config mistake, not a wipe target); `/files/clear` does files and
+    nothing else — the reversal is deliberate, and the old tests were
+    rewritten to the new contract, not deleted. Unlike the file delete, the
+    cache clear never refuses for a running job: nothing it deletes can be
+    a `.part` or a finished file. Second ask: "add more built in presets" —
+    the built-ins were seven audio intents. Added: two MP4-compatibility
+    format intents (`video-mp4-1080`, `video-mp4-720` — H.264+AAC preferred
+    when the site has them, the app's usual capped ladder when it doesn't,
+    and FFmpegVideoRemuxer repacks the result so the file opens on a
+    TV/iPhone/WhatsApp), and three pure-patch bundles (`subs-en-sidecar`,
+    `subs-en-embed`, `metadata-cover`). That exposed a real gap: `/jobs`
+    expanded only USER presets, so a built-in that was not a bare intent
+    would have died as an unknown preset — builtins and saved presets now
+    expand through the same `split_patch`. The intent map got its honest
+    name (`FORMAT_INTENTS` — it holds video now), the options chip shortens
+    `video-` names like `audio-` ones, and every new format expression is
+    asserted against yt-dlp's own parser plus one real end-to-end remux
+    download.

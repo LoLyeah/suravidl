@@ -235,11 +235,11 @@ def test_clipping_a_file_yields_a_shorter_video(tmp_path, server):
 # -- 4. audio presets (review #9) -------------------------------------------
 
 def test_modern_audio_presets_exist():
-    from suravidl_engine.jobs import AUDIO_PRESETS, preset_opts
+    from suravidl_engine.jobs import FORMAT_INTENTS, preset_opts
 
-    assert "audio-mp3-320" in AUDIO_PRESETS
-    assert "audio-flac" in AUDIO_PRESETS
-    assert "audio-opus" in AUDIO_PRESETS
+    assert "audio-mp3-320" in FORMAT_INTENTS
+    assert "audio-flac" in FORMAT_INTENTS
+    assert "audio-opus" in FORMAT_INTENTS
     q = preset_opts("audio-mp3-320")["postprocessors"][0]
     assert q["preferredcodec"] == "mp3" and q["preferredquality"] == "320"
     assert preset_opts("audio-flac")["postprocessors"][0]["preferredcodec"] == "flac"

@@ -40,6 +40,7 @@ def test_index_has_new_controls(tmp_path):
                     "setCookies", "setCookiesBrowser", "browseCookies",
                     "importCookies", "browserRow", "authHint",
                     "setImpersonate", "impersonateRow",
+                    "clearCacheBtn", "storageCache",
                     "audioRow", "audioNativeBtn", "audioM4aBtn", "audioMp3Btn",
                     "playlistRow", "playlistItems", "playlistBtn",
                     "settingsTabs", "spanel-general", "spanel-media",

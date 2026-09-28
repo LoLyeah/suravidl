@@ -95,7 +95,7 @@ def _safe_headers(h: dict | None) -> dict | None:
 # One-click download intents that don't fit the per-format table.
 # audio-native keeps the source stream untouched (no ffmpeg anywhere);
 # the convert variants run yt-dlp's FFmpegExtractAudio post-processor.
-AUDIO_PRESETS: dict[str, dict] = {
+FORMAT_INTENTS: dict[str, dict] = {
     "audio-native": {"format": "bestaudio/best"},
     "audio-m4a": {
         "format": "bestaudio/best",
@@ -140,17 +140,40 @@ AUDIO_PRESETS: dict[str, dict] = {
             {"key": "FFmpegExtractAudio", "preferredcodec": "opus"},
         ],
     },
+    # v0.29.0: the video side of the same idea. "MP4" here means "this file
+    # must open on a TV, an iPhone or WhatsApp": prefer H.264 + AAC streams
+    # when the site has them, keep the app's usual capped ladder for the
+    # sites that don't, and repackage whatever arrives into an mp4 container
+    # (FFmpegVideoRemuxer repacks, it never re-encodes).
+    "video-mp4-1080": {
+        "format": "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/b[height<=1080][ext=mp4]"
+                  "/bv*[height<=1080]+ba/b[height<=1080]/b",
+        "merge_output_format": "mp4",
+        "postprocessors": [
+            {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
+        ],
+    },
+    "video-mp4-720": {
+        "format": "bv*[height<=720][vcodec^=avc1]+ba[ext=m4a]/b[height<=720][ext=mp4]"
+                  "/bv*[height<=720]+ba/b[height<=720]/b",
+        "merge_output_format": "mp4",
+        "postprocessors": [
+            {"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"},
+        ],
+    },
 }
 
 
 def preset_opts(preset: str | None) -> dict:
-    """yt-dlp options for a preset; ValueError on unknown names."""
+    """yt-dlp options for a preset intent; ValueError on unknown names."""
     if not preset:
         return {}
-    if preset not in AUDIO_PRESETS:
+    if preset not in FORMAT_INTENTS:
         raise ValueError(f"unknown preset: {preset!r}")
-    spec = AUDIO_PRESETS[preset]
+    spec = FORMAT_INTENTS[preset]
     opts: dict = {"format": spec["format"]}
+    if spec.get("merge_output_format"):
+        opts["merge_output_format"] = spec["merge_output_format"]
     if spec.get("postprocessors"):
         opts["postprocessors"] = [dict(pp) for pp in spec["postprocessors"]]
     return opts
@@ -781,8 +804,9 @@ class JobManager:
         preset_pps: list[dict] = []
         if job.get("preset"):
             p = preset_opts(job["preset"])
-            opts["format"] = p["format"]
-            preset_pps = list(p.get("postprocessors", []) or [])
+            opts["format"] = p.pop("format")
+            preset_pps = list(p.pop("postprocessors", None) or [])
+            opts.update(p)   # e.g. merge_output_format on the mp4 intents
         pps = preset_pps + user_pps
         if pps:
             opts["postprocessors"] = pps
