@@ -14,3 +14,7 @@ android/app/src/main/jniLibs/
 
 # test artifacts
 x_skip/
+
+# impeccable design-tool state (PRODUCT.md / DESIGN.md are committed; the
+# tool's own cache is not)
+.impeccable/

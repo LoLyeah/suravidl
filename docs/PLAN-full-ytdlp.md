@@ -1077,3 +1077,33 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     the delete-side sidecar pass matches language-tagged subtitles
     (`Name.en.vtt`, `Name.en-US.srt`) with a strict language tag —
     `Name.2.vtt` is not one. 14 new tests; suite 543 → 557, both orders.
+- **v0.33.0 — the polish pass.** The first run of the `impeccable` design
+    skill over the real UI (desktop 1440×900 + phone 390×844, three themes,
+    both glass styles, every modal, every job state, live downloads on a
+    throttled fixture). Eight suspicions came out of the use-first pass;
+    seven survived verification. (1) `probeMsg` kept class `msg muted` — the
+    app's one grey error; now `.msg.bad.mono` (Nova Rose + machine voice per
+    DESIGN.md), with the class reset at the start of each probe. (2)
+    `Math.round(8 / 60) + " min"` = `"0 min"` for any clip under 30s — now
+    `"<1 min"`. (3) `.audioRow` carried 20px of side padding on top of the
+    card's 18, so the chip rows sat deeper than the probe title and the
+    format table beside them — flush now. (4) scrollbars were OS stock on
+    dark glass (loudest in the Presets list) — themed via `scrollbar-color:
+    var(--dim)` + a webkit fallback for Chromium < 121. (5) text selection
+    and the caret shipped browser defaults — new per-theme `--sel` token +
+    `caret-color`. (6) data numerals were proportional while sizes and
+    percents update between polls — `font-variant-numeric: tabular-nums` on
+    .meta/.jmeta/.fmt-s/.fsize. (7) link underlines ran through the word
+    space — the footer read "copy_path / open_folder"; `text-underline-offset`
+    now. The eighth (active Settings sub-tab cut off at 390px) was refuted
+    live before any edit: `showSettingsTab` has scrolled the active sub-tab
+    into view since v0.17.0; the repro was a viewport-shrink artifact — the
+    behavior is pinned now instead. The rendered-pass detector run caught one
+    more real one the file scan could not see: placeholder text sat under the
+    4.5:1 floor (the paste field's own 3.7:1, every bare input on the
+    browser's grey, 4.3:1) — placeholders now carry a per-theme `--ph` token.
+    The rest of its report (gradient palette, glow shadows, single font
+    family, the aurora halo, the width-transition progress bar) is the
+    committed DESIGN.md answering a generic checklist — recorded, not
+    changed. 9 new tests; suite 557 → 566, both orders; PRODUCT.md +
+    DESIGN.md join the repo, `.impeccable/` is ignored.

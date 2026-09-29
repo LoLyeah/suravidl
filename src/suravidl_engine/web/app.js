@@ -198,6 +198,8 @@ async function doProbe() {
   const url = $("url").value.trim();
   if (!url) return;
   const seq = ++PROBE_SEQ;      // two probes in flight: the newest one wins
+  // a previous failure's red clears before this probe starts speaking
+  $("probeMsg").className = "msg muted";
   $("probeMsg").textContent = "probing…";
   $("probeBtn").classList.add("busy");
   try {
@@ -213,6 +215,9 @@ async function doProbe() {
     // the engine explains a failure (it owns the "sign-in wall" judgement and
     // says so in its own words) — the UI does not second-guess it
     $("probeMsg").textContent = "probe failed: " + e.message;
+    // an error is Nova Rose and machine text is mono; this line was the one
+    // failure in the app that whispered in grey (polish pass)
+    $("probeMsg").className = "msg bad mono";
     offerBrowser(e, url);
     $("probeCard").classList.add("hidden");
     $("dlEmpty").classList.remove("hidden");
@@ -489,8 +494,11 @@ function renderProbe(url, info) {
   $("probeCard").classList.remove("hidden");
   $("dlEmpty").classList.add("hidden");
   $("probeTitle").textContent = info.title || url;
+  // "0 min" is not a duration: round() alone said a 40-second clip was zero
+  // minutes long (polish pass)
   const dur = info.duration
-    ? " · " + Math.round(info.duration / 60) + " min" : "";
+    ? " · " + (info.duration < 60 ? "<1 min"
+                                  : Math.round(info.duration / 60) + " min") : "";
   $("probeMeta").textContent = (info.extractor || "") + dur;
 
   // the probe has always carried these three; the UI now shows them

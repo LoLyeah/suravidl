@@ -15,6 +15,17 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.33.0",
+        "title": "The polish pass",
+        "items": [
+            "A failed probe now shows in red, like every other error — it used to whisper in grey.",
+            "Short clips stop claiming to be \"0 min\".",
+            "The Quality, Audio and Subtitles rows line up flush with the rest of the card.",
+            "Scrollbars, text selection, the caret, input hints and number columns follow the theme — not the browser's defaults.",
+            "The footer's copy path / open folder links finally read as words.",
+        ],
+    },
+    {
         "version": "0.32.1",
         "title": "The robustness pass",
         "items": [
