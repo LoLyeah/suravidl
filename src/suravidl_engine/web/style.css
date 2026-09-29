@@ -354,6 +354,8 @@ input::placeholder, textarea::placeholder { color: var(--ph); }
 .paste input:focus { outline: 0; border-color: var(--accent-line);
   box-shadow: 0 0 0 4px var(--accent-soft); }
 .msg { min-height: 1em; margin-top: 8px; font-size: 12px; }
+/* the applied preset, spelled out (v0.34.0) */
+#ovPresetInfo { margin-top: 6px; overflow-wrap: anywhere; }
 
 /* ---------- probe ---------- */
 .probe-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }

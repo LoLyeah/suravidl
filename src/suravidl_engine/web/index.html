@@ -141,6 +141,18 @@
           <button id="ovApply" class="btn sm" type="button">Apply</button>
           <button id="ovClear" class="btn sm" type="button">Clear</button>
         </div>
+        <div class="muted small hidden" id="ovPresetInfo"></div>
+        <div class="jrow">
+          <button id="ovSaveLink" class="linkbtn" type="button">Save these options as a preset…</button>
+          <button id="ovUpdate" class="linkbtn hidden" type="button">Update</button>
+        </div>
+        <div class="jrow hidden" id="ovSaveRow">
+          <input id="ovSaveName" type="text" spellcheck="false"
+                 placeholder="preset name" aria-label="preset name"/>
+          <button id="ovSaveGo" class="btn sm prime" type="button">Save</button>
+          <button id="ovSaveCancel" class="btn sm ghost-sm" type="button">Cancel</button>
+        </div>
+        <div class="msg hidden" id="ovSaveMsg"></div>
       </div>
       <div class="grid2">
         <div class="field">
@@ -215,7 +227,8 @@
         <input id="ovRaw" type="text" spellcheck="false" placeholder="--no-mtime"/>
       </div>
       <div class="hint" id="ovHint">These apply to the next download only; your saved
-        settings stay as they are. Manage bundles in Settings → Presets.</div>
+        settings stay as they are. Save what you set here as a preset above,
+        or manage bundles in Settings → Presets.</div>
     </details>
 
     <div class="empty" id="dlEmpty">

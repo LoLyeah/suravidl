@@ -1107,3 +1107,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     committed DESIGN.md answering a generic checklist — recorded, not
     changed. 9 new tests; suite 557 → 566, both orders; PRODUCT.md +
     DESIGN.md join the repo, `.impeccable/` is ignored.
+- **v0.34.0 — presets that make sense.** Two field reports off the phone.
+    (1) An m4a job died on `Unable to download video subtitles for 'en':
+    HTTP Error 429` — yt-dlp fetches captions before the media streams, so
+    a throttled captions endpoint cost the whole download. Subtitles are a
+    sidecar: a subtitle-shaped failure now retries once with every
+    subtitle option stripped (`_drop_subtitles`) and the job completes
+    with a note naming the refusal ("subtitles could not be fetched
+    (HTTP Error 429: …) — downloaded without them"); anything that is not
+    a subtitle error still fails, and the retry is offered once.
+    (2) The preset row could apply a bundle but never save, show or
+    change one. It now does all three: "Save these options as a preset…"
+    stores the block's own fields (audio intent included), "Update
+    “name”" writes them back into the applied user preset (built-ins
+    stay read-only), and the applied preset spells out every key it
+    carries — including keys the block has no field for. The select
+    learned to mirror the applied preset (it went blank after a save,
+    because the name was set before the option could exist). Impeccable's
+    Operate guidance: inline progressive disclosure, no modal, the
+    existing control vocabulary. 9 new tests; suite 566 → 575, both
+    orders. versionCode 54.

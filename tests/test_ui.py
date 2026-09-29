@@ -90,7 +90,10 @@ def test_index_is_a_four_tab_shell(tmp_path):
                     "ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb",
                     "ovRawRow", "ovRaw", "ovHint", "dlEmpty", "stabPresets",
                     "spanel-presets", "presetList", "presetName", "presetSave",
-                    "presetMsg"):
+                    "presetMsg",
+                    # v0.34.0: the preset row can save, show and change one
+                    "ovPresetInfo", "ovSaveLink", "ovUpdate", "ovSaveRow",
+                    "ovSaveName", "ovSaveGo", "ovSaveCancel", "ovSaveMsg"):
         assert f'id="{elem_id}"' in html, elem_id
     # the old modal shells are gone: settings and the catalogue are tabs now
     assert 'id="settingsModal"' not in html

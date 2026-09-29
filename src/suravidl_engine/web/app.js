@@ -817,7 +817,9 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
 // the audio intent of an applied preset (fmt and preset are exclusive in yt-dlp)
 // plus its full patch: the block only shows a few of the options a preset may
 // carry, so the rest must ride along instead of being lost on apply
-const OV = { preset: null, patch: {}, defaults: null, perJobKeys: null };
+// OV.name remembers WHICH preset is applied, so the block can show what it
+// carries and offer to update it (v0.34.0)
+const OV = { preset: null, name: null, patch: {}, defaults: null, perJobKeys: null };
 
 /** The block's values as a patch — only what the user actually set.
  *  A field the user emptied or unticked *removes* the preset's value too:
@@ -865,6 +867,7 @@ function readOv() {
 
 function clearOv() {
   OV.preset = null;
+  OV.name = null;
   OV.patch = {};
   $("ovSubs").value = "";
   $("ovSubLangs").value = "";
@@ -877,7 +880,12 @@ function clearOv() {
   $("ovContainer").value = "";
   $("ovArchive").value = "";
   $("ovPreset").value = "";
+  $("ovSaveRow").classList.add("hidden");
+  $("ovSaveMsg").classList.add("hidden");
+  $("ovSaveName").value = "";
   renderOvCount();
+  renderOvPresetInfo();
+  renderOvPresetActions();
 }
 
 /** 300+ rows must not become 300 tab stops: the catalogue owns ONE, and the
@@ -967,6 +975,7 @@ function applyOvPreset() {
   clearOv();
   const patch = entry.patch || {};
   OV.preset = patch.preset || null;
+  OV.name = name;
   // keep every option the preset carries, even the ones the block cannot show
   OV.patch = { ...patch };
   delete OV.patch.preset;
@@ -993,8 +1002,102 @@ function applyOvPreset() {
   if (patch.archive_ignore) $("ovArchive").value = "ignore";
   $("ovPreset").value = name;
   renderOvCount();
+  renderOvPresetInfo();
+  renderOvPresetActions();
   const n = Object.keys(readOv() || {}).length + (OV.preset ? 1 : 0);
   toast(`preset “${name}” applied — ${n} option(s) for the next download`);
+}
+
+/** What the applied preset carries, spelled out — the block shows a few of
+ *  these fields, but a preset may set options it has no field for, and those
+ *  used to ride invisibly (v0.34.0). */
+function renderOvPresetInfo() {
+  const box = $("ovPresetInfo");
+  const entry = OV.name
+    ? (PRESETS || []).find((p) => p.name === OV.name) : null;
+  if (!entry) {
+    box.classList.add("hidden");
+    box.textContent = "";
+    return;
+  }
+  const patch = entry.patch || {};
+  const sets = Object.keys(patch).map((k) => k + "=" + patch[k]).join(" · ");
+  box.textContent = `preset “${entry.name}”`
+    + (entry.builtin ? " (built-in)" : "")
+    + (entry.description ? ` — ${entry.description}` : "")
+    + (sets ? ` · sets ${sets}` : "");
+  box.classList.remove("hidden");
+}
+
+/** "Update “name”" exists only for the user's own presets: a built-in is
+ *  code, and overwriting it is not a thing — save a copy instead. */
+function renderOvPresetActions() {
+  const upd = $("ovUpdate");
+  const entry = OV.name
+    ? (PRESETS || []).find((p) => p.name === OV.name) : null;
+  if (entry && !entry.builtin) {
+    upd.textContent = `Update “${entry.name}”`;
+    upd.title = "write the fields above into this preset";
+    upd.classList.remove("hidden");
+  } else {
+    upd.classList.add("hidden");
+  }
+}
+
+/** The block's fields as a patch — exactly what a download would carry. */
+function presetFromPanel() {
+  const patch = { ...(readOv() || {}) };
+  if (OV.preset) patch.preset = OV.preset;
+  return patch;
+}
+
+function showOvSaveMsg(text, cls) {
+  const msg = $("ovSaveMsg");
+  msg.textContent = text;
+  msg.className = "msg " + cls;
+}
+
+async function savePanelPreset() {
+  const name = $("ovSaveName").value.trim();
+  const patch = presetFromPanel();
+  if (!Object.keys(patch).length) {
+    showOvSaveMsg("set an option first — a preset needs at least one", "warn");
+    return;
+  }
+  if (!name) {
+    showOvSaveMsg("give it a name first", "warn");
+    return;
+  }
+  try {
+    await api("/presets", { method: "POST", body: JSON.stringify({ name, patch }) });
+    $("ovSaveMsg").classList.add("hidden");
+    $("ovSaveRow").classList.add("hidden");
+    $("ovSaveName").value = "";
+    OV.name = name;               // it is what the block now carries
+    await loadPresets();          // dropdown (selects it), info line, Settings
+    toast(`saved “${name}” — ${Object.keys(patch).length} option(s)`);
+  } catch (e) {
+    showOvSaveMsg("could not save: " + e.message, "bad");
+  }
+}
+
+async function updatePanelPreset() {
+  const entry = OV.name
+    ? (PRESETS || []).find((p) => p.name === OV.name) : null;
+  if (!entry || entry.builtin) return;
+  const patch = presetFromPanel();
+  if (!Object.keys(patch).length) {
+    toast("set an option first — a preset needs at least one", "bad");
+    return;
+  }
+  try {
+    await api("/presets", { method: "POST",
+                            body: JSON.stringify({ name: entry.name, patch }) });
+    await loadPresets();
+    toast(`“${entry.name}” updated — ${Object.keys(patch).length} option(s)`);
+  } catch (e) {
+    toast("could not update: " + e.message, "bad");
+  }
 }
 
 function renderOvPresets() {
@@ -1018,12 +1121,33 @@ function renderOvPresets() {
     }
     sel.append(group);
   }
-  sel.value = keep;
+  // the select mirrors which preset is APPLIED (OV.name), not a stale pick:
+  // a freshly saved preset only becomes selectable after this re-render
+  sel.value = (OV.name && Array.from(sel.options).some((o) => o.value === OV.name))
+    ? OV.name : keep;
 }
 
 function initOverrides() {
   $("ovApply").onclick = applyOvPreset;
   $("ovClear").onclick = () => { clearOv(); toast("cleared — using your settings"); };
+  // the preset row grows the two actions it used to lack (v0.34.0): save
+  // the block as a preset, and write the fields back into the applied one
+  $("ovSaveLink").onclick = () => {
+    $("ovSaveRow").classList.remove("hidden");
+    $("ovSaveMsg").classList.add("hidden");
+    $("ovSaveMsg").textContent = "";
+    $("ovSaveName").focus();
+  };
+  $("ovSaveGo").onclick = savePanelPreset;
+  $("ovSaveCancel").onclick = () => {
+    $("ovSaveRow").classList.add("hidden");
+    $("ovSaveMsg").classList.add("hidden");
+    $("ovSaveMsg").textContent = "";
+  };
+  $("ovUpdate").onclick = updatePanelPreset;
+  $("ovSaveName").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") savePanelPreset();
+  });
   // the "whole video" button sat in the clip row since v0.22.0 with nothing
   // attached to it (UI review): pressing it did nothing at all
   $("ovClipClear").onclick = () => {
@@ -2232,6 +2356,8 @@ async function loadPresets() {
   }
   renderOvPresets();
   renderPresetList();
+  renderOvPresetInfo();
+  renderOvPresetActions();
 }
 
 function renderPresetList() {
@@ -2248,7 +2374,7 @@ function renderPresetList() {
       box.append(el("div", "muted",
         "your saved presets are not gone, they just could not be read"));
     } else {
-      box.append(el("div", "empty", "No presets yet — save one from your settings above."));
+      box.append(el("div", "empty", "No presets yet — save one from your settings above, or from the download panel."));
     }
     return;
   }

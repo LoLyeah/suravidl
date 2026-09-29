@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.34.0",
+        "title": "Presets that make sense",
+        "items": [
+            "A site that refuses subtitles no longer kills the download — the media still comes down, and the row says why the captions are missing.",
+            "Presets are editable now: apply one, change the fields, and press Update to change it for good.",
+            "You can save the This download only block as a preset, right from the download tab.",
+            "An applied preset spells out every option it carries — including ones the block has no field for.",
+        ],
+    },
+    {
         "version": "0.33.0",
         "title": "The polish pass",
         "items": [

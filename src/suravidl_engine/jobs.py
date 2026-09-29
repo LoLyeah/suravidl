@@ -212,6 +212,44 @@ def _subtitle_files(info) -> list[str]:
     return out
 
 
+# yt-dlp's wording when a caption track will not download; media failures
+# say "video data", so the two never collide (v0.34.0: an m4a job died on a
+# subtitles-endpoint 429 before the audio ever started)
+_SUB_ERROR_MARK = ("unable to download", "subtitle")
+
+
+def _is_subtitle_error(e: BaseException) -> bool:
+    text = str(e).lower()
+    return all(m in text for m in _SUB_ERROR_MARK)
+
+
+def _subtitle_reason(e: BaseException) -> str:
+    """The human half of yt-dlp's subtitle error, for the job row."""
+    text = str(e)
+    if "subtitle" in text.lower():
+        # "…video subtitles for 'en': HTTP Error 429: Too Many Requests"
+        tail = text.split("subtitles", 1)[1]
+        if ":" in tail:
+            text = tail.split(":", 1)[1]
+    return text.strip()[:120] or "the site refused them"
+
+
+def _drop_subtitles(opts: dict) -> None:
+    """Strip every subtitle option, so a retry fetches media only."""
+    for key in ("writesubtitles", "writeautomaticsub", "subtitleslangs",
+                "subtitlesformat"):
+        opts.pop(key, None)
+    pps = opts.get("postprocessors")
+    if pps:
+        keep = [p for p in pps
+                if p.get("key") not in ("FFmpegSubtitlesConvertor",
+                                        "FFmpegEmbedSubtitle")]
+        if keep:
+            opts["postprocessors"] = keep
+        else:
+            opts.pop("postprocessors", None)
+
+
 class JobManager:
     def __init__(self, download_dir, db_path=None, max_concurrent: int = 2,
                  auto_resume: bool = False, cookie_session=None,
@@ -911,11 +949,25 @@ class JobManager:
         if extra_headers:
             opts["http_headers"] = extra_headers
         try:
+            subs_skipped = None
             with (self._cookie_session() if self._cookie_session
                   else nullcontext()) as cookie_opts:
                 if cookie_opts:
                     opts.update(cookie_opts)
-                info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
+                try:
+                    info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
+                except Exception as e:  # noqa: BLE001 — classified below
+                    # a subtitle sidecar is not the download: when the site
+                    # refuses to serve captions (YouTube throttles them hard),
+                    # retry once without them instead of losing the media
+                    if not _is_subtitle_error(e):
+                        raise
+                    subs_skipped = _subtitle_reason(e)
+                    _drop_subtitles(opts)
+                    info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
+            if subs_skipped:
+                job["note"] = (f"subtitles could not be fetched ({subs_skipped})"
+                               " — downloaded without them")
             if (info or {}).get("_type") == "playlist":
                 entries = [e for e in (info.get("entries") or []) if e]
                 job["title"] = info.get("title") or "playlist"
