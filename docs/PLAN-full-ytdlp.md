@@ -1127,3 +1127,26 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     Operate guidance: inline progressive disclosure, no modal, the
     existing control vocabulary. 9 new tests; suite 566 → 575, both
     orders. versionCode 54.
+- **v0.35.0 — the download end of the preset workflow.** "Applying for
+    preset looks good, but how about downloading the video with applied
+    presets? The ux workflow doesn't makes sense for it." Reproduced live
+    at phone width — four defects, all real: the armed set hid in the
+    collapsed block below the formats table, nowhere near a download
+    button; the start toast said a bare "Added to downloads" whether or
+    not a preset shaped the job; a quality pick silently replaced an
+    audio preset's format (armed "m4a", tapped 720p, got a silent video);
+    and the one-shot clearing had no announcement anywhere. The video
+    card now carries an armed strip under its head row ("next download:
+    “audio-m4a” — extract the audio to m4a" + ✕), painted from
+    renderOvCount — the one count that already updates on every change
+    path — so it can never drift from the block. The start toast names
+    what rode ("— with preset “audio-m4a”", "— with 3 options set
+    below"), and the format-over-intent case speaks ("— “audio-m4a”
+    skipped: your format pick replaces it"). Tapping the strip opens the
+    block and scrolls it into view; its ✕ is the block's Clear. Two live
+    catches beyond the report: the strip's light-theme ink measured
+    3.65:1 (under the repo's 4.5 floor for small text) — light
+    `--accent-ink` is now #0a55a8 (5.43:1), pinned in a test; and
+    `behavior: "smooth"` scrollIntoView proved inert in the stripped
+    headless browser — the scroll is instant. 8 new tests; suite
+    575 → 583, both orders. versionCode 55.

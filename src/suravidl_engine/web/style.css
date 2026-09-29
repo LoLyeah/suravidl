@@ -47,7 +47,7 @@ html[data-theme="light"] {
   --accent2: #64d2ff;
   --accent-soft: rgba(10,132,255,.12);
   --accent-line: rgba(10,132,255,.3);
-  --accent-ink: #0a6fd8;
+  --accent-ink: #0a55a8;
   --ok: #1f9d55;   --ok-bg: rgba(31,157,85,.12);   --ok-line: rgba(31,157,85,.3);
   --err: #d93025;  --err-bg: rgba(217,48,37,.1);   --err-line: rgba(217,48,37,.28);
   --warn: #b45309; --warn-bg: rgba(180,83,9,.1);   --warn-line: rgba(180,83,9,.28);
@@ -356,6 +356,16 @@ input::placeholder, textarea::placeholder { color: var(--ph); }
 .msg { min-height: 1em; margin-top: 8px; font-size: 12px; }
 /* the applied preset, spelled out (v0.34.0) */
 #ovPresetInfo { margin-top: 6px; overflow-wrap: anywhere; }
+/* the armed strip on the card: what rides the NEXT download, where the
+   download buttons actually are (v0.35.0) */
+#armedBar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 10px; padding: 5px 6px 5px 12px;
+  border: 1px solid var(--accent-line); border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 12.5px; line-height: 1.45; color: var(--accent-ink);
+}
+#armedText { flex: 1 1 auto; cursor: pointer; overflow-wrap: anywhere; }
 
 /* ---------- probe ---------- */
 .probe-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }

@@ -77,6 +77,14 @@
         <span class="spacer"></span>
         <button id="bestBtn" class="btn prime sm">Download best quality</button>
       </div>
+      <!-- what rides the NEXT download, said where the downloads start (v0.35.0):
+           the armed set used to live only in the block below the table -->
+      <div id="armedBar" class="hidden" role="status">
+        <span id="armedText"></span>
+        <button id="armedClear" class="btn ghost-sm" type="button"
+                title="clear what is armed for the next download"
+                aria-label="clear what is armed for the next download">✕</button>
+      </div>
       <div id="qualityRow" class="audioRow hidden">
         <span class="muted">Quality:</span>
         <span id="qualityBtns" class="qrow"></span>

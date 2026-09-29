@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.35.0",
+        "title": "Presets you can see",
+        "items": [
+            "An applied preset now shows on the video card — name, what it does, and a ✕ — instead of hiding in the collapsed block below the table.",
+            "Tap the strip to open that block and change or clear it.",
+            "The toast after a download names the preset that went with it.",
+            "Picking a quality no longer silently throws away an audio preset — the app says what happened.",
+        ],
+    },
+    {
         "version": "0.34.0",
         "title": "Presets that make sense",
         "items": [

@@ -795,12 +795,20 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     // for "do not pair this video with the site's audio" (2026-09-27)
     if ($("noSound").checked) ov = { ...(ov || {}), no_audio: true };
     if (ov) body.overrides = ov;
+    // say what rode — and what a format pick silently replaced: jobs used to
+    // report a bare "Added to downloads" either way (v0.35.0)
+    const ovK = ov ? Object.keys(ov).length : 0;
+    const note = (fmt && OV.preset)
+      ? ` — “${OV.name || OV.preset}” skipped: your format pick replaces it`
+      : (OV.name && (body.preset === OV.preset || ovK)
+        ? ` — with preset “${OV.name}”`
+        : (ovK ? ` — with ${ovK} option${ovK === 1 ? "" : "s"} set below` : ""));
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
     // the block says "this download only" — so it is spent on this download
     // (v0.21.1 audit: it used to stick to every job for the rest of the session)
     clearOv();
     PLAYLIST_NONE = false;
-    toast(playlist ? "Playlist added to downloads" : "Added to downloads", "info");
+    toast((playlist ? "Playlist added to downloads" : "Added to downloads") + note, "info");
     refreshJobs();
   } catch (e) {
     toast("could not start download: " + e.message, "bad");
@@ -942,6 +950,25 @@ function initOptionListKeyboard() {
 function renderOvCount() {
   const patch = readOv();
   const n = (patch ? Object.keys(patch).length : 0) + (OV.preset ? 1 : 0);
+  // the same count, echoed on the card where the downloads actually start:
+  // an armed preset used to be visible only in the collapsed block below the
+  // formats table — nowhere near "Download best quality" (v0.35.0)
+  const bar = $("armedBar");
+  const txt = $("armedText");
+  if (!n) {
+    bar.classList.add("hidden");
+    txt.textContent = "";
+  } else {
+    const entry = OV.name
+      ? (PRESETS || []).find((p) => p.name === OV.name) : null;
+    const k = patch ? Object.keys(patch).length : 0;
+    const what = entry
+      ? "“" + entry.name + "”" + (entry.description ? " — " + entry.description : "")
+      : OV.name ? "“" + OV.name + "”"
+        : k + " option" + (k === 1 ? "" : "s") + " set below";
+    txt.textContent = "next download: " + what;
+    bar.classList.remove("hidden");
+  }
   const chip = $("ovCount");
   if (!n) {
     chip.classList.add("hidden");
@@ -1154,6 +1181,19 @@ function initOverrides() {
     $("ovClipStart").value = "";
     $("ovClipEnd").value = "";
     renderOvCount();
+  };
+  // the strip's ✕ is the block's Clear; tapping its text brings the block
+  // in — the card echoes the block, it does not duplicate it (v0.35.0)
+  $("armedClear").onclick = () => {
+    clearOv();
+    toast("cleared — using your settings");
+  };
+  $("armedText").onclick = () => {
+    $("ovBlock").open = true;
+    // instant, not smooth: a smooth scroll proved inert in the stripped-down
+    // headless browser — and a tap that appears to do nothing is worse than
+    // a jump (v0.35.0)
+    $("ovBlock").scrollIntoView({ block: "start" });
   };
   for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw",
                     "ovClipStart", "ovClipEnd", "ovContainer", "ovArchive"]) {

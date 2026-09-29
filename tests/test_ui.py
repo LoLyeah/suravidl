@@ -93,7 +93,9 @@ def test_index_is_a_four_tab_shell(tmp_path):
                     "presetMsg",
                     # v0.34.0: the preset row can save, show and change one
                     "ovPresetInfo", "ovSaveLink", "ovUpdate", "ovSaveRow",
-                    "ovSaveName", "ovSaveGo", "ovSaveCancel", "ovSaveMsg"):
+                    "ovSaveName", "ovSaveGo", "ovSaveCancel", "ovSaveMsg",
+                    # v0.35.0: the card's armed strip — what rides next
+                    "armedBar", "armedText", "armedClear"):
         assert f'id="{elem_id}"' in html, elem_id
     # the old modal shells are gone: settings and the catalogue are tabs now
     assert 'id="settingsModal"' not in html
