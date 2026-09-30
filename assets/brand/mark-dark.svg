@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<title>suravidl</title>
+<path d="M 62 8 H 194 A 54 54 0 0 1 248 62 V 194 A 54 54 0 0 1 194 248 H 62 A 54 54 0 0 1 8 194 V 62 A 54 54 0 0 1 62 8 Z" fill="#F2E9D8"/>
+<path d="M 90 48 H 166 A 12 12 0 0 1 178 60 V 160 H 216 L 128 224 L 40 160 H 78 V 60 A 12 12 0 0 1 90 48 Z M 104 71 L 104 137 Q 104 148 113 141.6 L 157 110.4 Q 166 104 157 97.6 L 113 66.4 Q 104 60 104 71 Z" fill="#14493C" fill-rule="evenodd"/>
+</svg>

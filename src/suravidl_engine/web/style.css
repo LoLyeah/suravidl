@@ -38,6 +38,9 @@
   --accent-soft: rgba(232,163,62,.16);
   --accent-line: rgba(232,163,62,.45);
   --accent-ink: #f0c98a;
+  --mark-tile: #F2E9D8;                   /* brand: the cream chip at night */
+  --mark-arrow: #14493C;                  /* pine ink on the chip */
+  --mark-deep: rgba(0,0,0,.45);
   --ok: #4ecf83;   --ok-bg: rgba(78,207,131,.14);   --ok-line: rgba(78,207,131,.4);
   --err: #ff8078;  --err-bg: rgba(255,128,120,.13); --err-line: rgba(255,128,120,.4);
   --warn: #e8a33e; --warn-bg: rgba(232,163,62,.13); --warn-line: rgba(232,163,62,.4);
@@ -66,6 +69,9 @@ html[data-theme="light"] {
   --accent-soft: rgba(192,122,22,.14);
   --accent-line: rgba(160,100,15,.32);
   --accent-ink: #6b4308;
+  --mark-tile: #14493C;                   /* brand: the pine tile at day */
+  --mark-arrow: #F2E9D8;
+  --mark-deep: rgba(20,73,60,.35);
   --ok: #1f7a4d;   --ok-bg: rgba(31,122,77,.12);   --ok-line: rgba(31,122,77,.3);
   --err: #b3261e;  --err-bg: rgba(179,38,30,.1);   --err-line: rgba(179,38,30,.3);
   --warn: #8a5a10; --warn-bg: rgba(138,90,16,.1);  --warn-line: rgba(138,90,16,.3);
@@ -94,6 +100,9 @@ html[data-theme="amoled"] {
   --accent-soft: rgba(232,163,62,.16);
   --accent-line: rgba(232,163,62,.5);
   --accent-ink: #f0c98a;
+  --mark-tile: #F2E9D8;                   /* brand: the cream chip at night */
+  --mark-arrow: #14493C;                  /* pine ink on the chip */
+  --mark-deep: rgba(0,0,0,.45);
   --ok: #4ecf83;   --ok-bg: rgba(78,207,131,.13);   --ok-line: rgba(78,207,131,.38);
   --err: #ff8078;  --err-bg: rgba(255,128,120,.12); --err-line: rgba(255,128,120,.38);
   --warn: #e8a33e; --warn-bg: rgba(232,163,62,.12); --warn-line: rgba(232,163,62,.38);
@@ -214,11 +223,10 @@ body.scrolled header { box-shadow: 0 8px 26px rgba(0,0,0,.28); }
 html[data-theme="light"] body.scrolled header { box-shadow: 0 8px 22px rgba(40,34,24,.14); }
 .mark {
   width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(160deg, var(--accent2), var(--accent));
-  box-shadow: 0 6px 16px -6px var(--accent-line), inset 0 1px 0 rgba(255,255,255,.4);
-  display: grid; place-items: center;
-  font-weight: 700; font-size: 15px; color: #1a1305;
+  display: block; flex: none;
+  box-shadow: 0 6px 16px -6px var(--mark-deep);
 }
+.mark svg { width: 100%; height: 100%; display: block; }
 header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .2px; }
 .meta, .jmeta, .fmt-s, .fsize {
   font-size: 11.5px; color: var(--dim);

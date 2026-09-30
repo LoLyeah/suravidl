@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.0",
+        "title": "Pine & cream",
+        "items": [
+            "A new mark: a big cream download arrow on a pine tile, with the play knocked out of it \u2014 it still reads at a 16px favicon, where the old blue icon turned to mush.",
+            "The header mark follows your theme: the pine tile in the light room, the cream chip at night and on AMOLED \u2014 no more one-size icon sinking into dark rooms.",
+        ],
+    },
+    {
         "version": "0.37.7",
         "title": "The readable queue",
         "items": [
@@ -92,16 +100,6 @@ ENTRIES = [
             "Anything a download itself says still wins: its own preset, a quality pick, or This-download-only fields.",
             "If that preset is deleted later, the setting says so instead of failing.",
             "Also in this release: the download-end preset workflow — the armed strip on the video card, toasts that name the preset that rode, and a quiet sigh when a quality pick replaces an audio preset.",
-        ],
-    },
-    {
-        "version": "0.35.0",
-        "title": "Presets you can see",
-        "items": [
-            "An applied preset now shows on the video card — name, what it does, and a ✕ — instead of hiding in the collapsed block below the table.",
-            "Tap the strip to open that block and change or clear it.",
-            "The toast after a download names the preset that went with it.",
-            "Picking a quality no longer silently throws away an audio preset — the app says what happened.",
         ],
     },
 ]

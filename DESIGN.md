@@ -399,3 +399,28 @@ bins. Nothing important settles silently in a tab nobody is watching.
   corner on a floating surface.
 - **Don't** start a download from a pick, and don't light two picks at once —
   the transport is the only starter, and the take is one thing.
+
+## The mark (brand)
+
+The mark is one idea: a download arrow with the play knocked out of it, on a
+tile. Drawn single-path SVG in `assets/brand/` — no text, no mask, no
+gradient, no embedded raster. Every raster under `assets/`, `extension/icons/`
+and the Android `mipmap-*` sets is generated from those masters by
+`scripts/build_brand.py`; never hand-edit a PNG.
+
+- **Pine & cream, two tones, theme-swapped.** The tile and the arrow carry the
+  brand; the play triangle is a knockout that inherits the tile, so one mark
+  serves every surface.
+  - **Light room:** pine tile `#14493C`, cream arrow `#F2E9D8` (8.5:1).
+  - **Dark & AMOLED rooms:** the chip flips — cream tile `#F2E9D8`, pine arrow
+    `#14493C`. The pine tile would sink on those grounds (1.8:1 graphite,
+    2.0:1 AMOLED); the cream chip reads like the header glow (15.6:1 / 17.4:1).
+  - The header mark consumes `--mark-tile` / `--mark-arrow` from the theme
+    blocks; the launcher and favicon files are the pine tile in every theme —
+    system surfaces don't follow app themes.
+- **Do** keep the play a knockout and the geometry untouched; **don't** recolor
+  the tile to amber — amber is the instrument's signal, not the brand, and the
+  mark must survive at 16px (the old blue mark did not).
+- Lockups — mark + wordmark outlines (Archivo 600, the app's own face) — live
+  beside it: `lockup-horizontal.svg`, `lockup-horizontal-dark.svg`,
+  `lockup-stacked.svg`.
