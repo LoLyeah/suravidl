@@ -72,8 +72,10 @@ def test_the_strip_is_wired_to_clear_and_to_open_the_block():
 
 def test_the_strip_ink_clears_the_contrast_floor_in_light():
     """#0a6fd8 on the light strip composite measured 3.65:1 — under the 4.5
-    floor this repo holds every small-text token to; #0a55a8 measures 5.43:1
-    on the same composite (accent-soft over the card over the page)."""
+    floor this repo holds every small-text token to. The Post House re-valued
+    the whole light palette; #6b4308 measures ~5.98:1 on the same composite
+    (accent-soft over the card over the page), and the v0.37 suite recomputes
+    every theme's ratios instead of trusting these literals."""
     css = (ROOT / "src/suravidl_engine/web/style.css").read_text(encoding="utf-8")
     light = css.split('html[data-theme="light"]', 1)[1].split("}", 1)[0]
-    assert "--accent-ink: #0a55a8" in light
+    assert "--accent-ink: #6b4308" in light

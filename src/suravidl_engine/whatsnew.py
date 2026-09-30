@@ -15,6 +15,17 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.0",
+        "title": "The Post House",
+        "items": [
+            "The whole app wears a new face: an ingest room with a scope strip over the deck — every link reads out source · formats · largest before anything downloads.",
+            "Picks now arm a take; the amber START fires it. Quality chips and format rows plan the download — nothing starts from a table row anymore.",
+            "A finished download speaks up: a Filed toast with Play and Show folder, a FILED stamp on the row, and the take shelved in the FILED TAKES rail.",
+            "Errors talk like people — plain words first (\"the site says this link does not exist (404) — check it was copied whole\"), with the raw engine message behind Show details.",
+            "Drawn icons replace every emoji, and the app now ships its own two fonts — no more system-font stand-ins. Liquid Glass is the polished style, Frosted the matte one.",
+        ],
+    },
+    {
         "version": "0.36.0",
         "title": "A preset that stays",
         "items": [
@@ -100,13 +111,6 @@ ENTRIES = [
         "items": [
             "Clear the app cache with its own button — file deletes no longer touch it.",
             "New built-in presets: MP4 1080p/720p, subtitles (sidecar or embedded), cover art.",
-        ],
-    },
-    {
-        "version": "0.28.0",
-        "title": "Sign-in guidance where you need it",
-        "items": [
-            "The in-app browser explains the sign-in routes, so gated videos make sense sooner.",
         ],
     },
 ]

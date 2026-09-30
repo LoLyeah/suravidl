@@ -10,6 +10,7 @@ These assert the *difference* rather than the wording: every glass style must
 change at least one visible property on every host, and the surfaces must
 consume the tokens that carry that difference.
 """
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -117,9 +118,9 @@ def test_the_glass_surfaces_consume_the_glass_tokens():
     hard-code --line, liquid's tinted border never shows up."""
     assert CSS.count("border: 1px solid var(--glass-border)") >= 3
     # unambiguous markers: several rules begin with a bare `.card {`
-    for surface in (".card {\n  background: var(--glass-bg);",
-                    ".modal {\n  width: min(560px",
-                    ".toast {\n  display: flex; align-items: center; gap: 10px;"):
+    for surface in (".card {\n  position: relative;\n  background: var(--glass-bg);",
+                    ".modal {\n  width: min(640px, 100%); max-height: 86vh;",
+                    ".toast {\n  pointer-events: auto; flex-wrap: wrap;"):
         assert "border: 1px solid var(--glass-border)" in _block(surface)
 
 
@@ -141,8 +142,12 @@ def test_mobile_toasts_clear_the_settings_save_bar():
     default_bottom = rule.split("#toasts {")[1].split("bottom:")[1].split(";")[0]
     settings_bottom = rule.split('body[data-tab="settings"] #toasts')[1] \
         .split("bottom:")[1].split(";")[0]
-    assert int(default_bottom.split("px")[0].split("(")[-1]) < \
-        int(settings_bottom.split("px")[0].split("(")[-1]), \
+    # the lane math runs through --tabbar-h now, so pull the px term out of
+    # each calc() rather than the first "(" chunk
+    m1 = re.search(r"(\d+)px", default_bottom)
+    m2 = re.search(r"(\d+)px", settings_bottom)
+    assert m1 and m2, (default_bottom, settings_bottom)
+    assert int(m1.group(1)) < int(m2.group(1)), \
         "the Settings lane must sit higher than the default one"
 
 

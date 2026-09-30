@@ -16,52 +16,97 @@
       document.documentElement.dataset.theme = c.theme || "dark";
       document.documentElement.dataset.glass = c.glass || "frosted";
     }
-    /* The Android WebView mis-composites backdrop-filter and is slow at it,
-       so the shell drops blurring there (keeps translucency + gloss). */
+    /* The Android WebView gets a lighter glass radius; a shell that cannot
+       blur at all falls back to solid plates via the @supports rule in CSS. */
     if (window.AndroidHost) document.documentElement.dataset.host = "android";
   } catch (e) { /* keep defaults */ }
 })();
 </script>
 </head>
 <body>
+
+<!-- one drawn icon system: stroke SVGs, never borrowed glyphs (emoji render
+     in a different face on Android — the shell where it shows most) -->
+<svg id="sprite" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.5v10.5m0 0-4.2-4.2M12 14l4.2-4.2M4.5 19.5h15"/></symbol>
+  <symbol id="i-stack" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 7h15M4.5 12h15M4.5 17h9"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4.5 7h15M4.5 12h15M4.5 17h15"/>
+    <circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="12" r="2.1"/><circle cx="14" cy="17" r="2.1"/></symbol>
+  <symbol id="i-cmd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 5.5h16v13H4z"/><path d="M8 10.2l2.3 2.3L8 14.8M12.5 15h4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="6"/><path d="M15.6 15.6 20 20"/></symbol>
+  <symbol id="i-battery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="8" width="15" height="9" rx="2.2"/><path d="M21 11v3"/>
+    <rect x="5.6" y="10.6" width="5.6" height="3.8" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.5v8"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 7h14M9.5 7V4.8h5V7M7.2 7l.9 12.2h7.8L16.8 7M10.4 10.8v5.6M13.6 10.8v5.6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="11" height="11" rx="2.2"/>
+    <path d="M5.5 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v.5"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3.5 6.4A1.9 1.9 0 0 1 5.4 4.5h4.2l2 2.4h7A1.9 1.9 0 0 1 20.5 8.8v8.3a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 5.6v12.8L19 12z"/></symbol>
+</svg>
+
 <header>
   <div class="mark">s</div>
   <h1>suravidl</h1>
   <span id="versions" class="meta"></span>
   <span class="spacer"></span>
   <button id="minBtn" class="btn sm hidden" title="Minimize window">—</button>
-  <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl">✕ Quit</button>
+  <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span>Quit</button>
 </header>
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
   <button class="tab active" data-tab="download" role="tab" type="button">
-    <span class="tab-ico">⬇</span><span class="tab-lbl">Download</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl">Download</span></button>
   <button class="tab" data-tab="queue" role="tab" type="button">
-    <span class="tab-ico">☰</span><span class="tab-lbl">Queue</span>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl">Queue</span>
     <span id="queueCount" class="badge hidden"></span></button>
   <button class="tab" data-tab="settings" role="tab" type="button">
-    <span class="tab-ico">⚙</span><span class="tab-lbl">Settings</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl">Settings</span></button>
   <button class="tab" data-tab="ytdlp" role="tab" type="button">
-    <span class="tab-ico">⌥</span><span class="tab-lbl">yt-dlp</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl">yt-dlp</span></button>
 </nav>
 
 <main id="panels">
 
+  <!-- the bins rail: finished takes, desktop rooms (v0.37.0) -->
+  <aside id="binsRail" class="bins" aria-label="filed takes">
+    <div class="bins-head">
+      <span class="lbl">Filed takes</span>
+      <span class="meta" id="binsCount"></span>
+    </div>
+    <div id="binsList" class="bins-list"></div>
+  </aside>
+
   <!-- ============================ Download ============================ -->
   <section class="panel" id="panel-download">
     <section class="card paste-card">
+      <label class="lbl" for="url">Source</label>
       <div class="paste">
         <input id="url" type="text" spellcheck="false"
                placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
         <button id="probeBtn" class="btn prime">Probe</button>
       </div>
+      <div id="probeSay" class="msg hidden" role="status"></div>
       <div id="probeMsg" class="msg muted"></div>
+      <button id="probeDetails" class="linkbtn hidden" type="button">Show details</button>
       <div id="browserOffer" class="audioRow hidden">
-        <button id="browserOfferBtn" class="btn prime sm">Open in the browser ↗</button>
+        <button id="browserOfferBtn" class="btn prime sm">Open in the browser</button>
         <span class="muted">this page has a player yt-dlp cannot read — press play there, then Scan</span>
       </div>
       <div id="sniffRow" class="audioRow hidden">
-        <button id="sniffBtn" class="btn sm">🔍 Find a video on a page</button>
+        <button id="sniffBtn" class="btn sm"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg></span>Find a video on a page</button>
         <span class="muted">opens a browser with a sniffer — press play, then Scan</span>
       </div>
       <div id="batchRow" class="audioRow hidden">
@@ -70,12 +115,31 @@
       </div>
     </section>
 
+    <!-- the scope strip: a finished probe lands here (v0.37.0) -->
+    <section class="scopes" id="scopeStrip" data-state="off" aria-label="source readout">
+      <div class="scope">
+        <span class="lbl">Source</span>
+        <span class="reading" id="scopeSrc">—</span>
+        <span class="led" data-led="src"></span>
+      </div>
+      <div class="scope">
+        <span class="lbl">Formats</span>
+        <span class="reading" id="scopeFmt">—</span>
+        <span class="led" data-led="fmt"></span>
+      </div>
+      <div class="scope">
+        <span class="lbl">Largest</span>
+        <span class="reading" id="scopeSize">—</span>
+        <span class="led" data-led="size"></span>
+      </div>
+      <span class="scope-say" id="scopeSay">feed the deck a link — the probe fills these</span>
+    </section>
+
     <section id="probeCard" class="card hidden">
       <div class="probe-head">
         <span id="probeTitle" class="title"></span>
         <span id="probeMeta" class="chip"></span>
         <span class="spacer"></span>
-        <button id="bestBtn" class="btn prime sm">Download best quality</button>
       </div>
       <!-- what rides the NEXT download, said where the downloads start (v0.35.0):
            the armed set used to live only in the block below the table -->
@@ -83,7 +147,7 @@
         <span id="armedText"></span>
         <button id="armedClear" class="btn ghost-sm" type="button"
                 title="clear what is armed for the next download"
-                aria-label="clear what is armed for the next download">✕</button>
+                aria-label="clear what is armed for the next download"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span></button>
       </div>
       <div id="qualityRow" class="audioRow hidden">
         <span class="muted">Quality:</span>
@@ -111,7 +175,7 @@
           site’s audio added automatically</span>
       </div>
       <div id="liveRow" class="audioRow hidden">
-        <span class="chip">● LIVE</span>
+        <span class="chip"><span class="led warn"></span>LIVE</span>
         <span class="muted small">live stream — the download keeps recording until you cancel it</span>
       </div>
       <div id="subsRow" class="audioRow hidden">
@@ -137,6 +201,17 @@
         <tbody></tbody>
       </table>
     </section>
+
+    <!-- the transport: what will start, and the one starter (v0.37.0) -->
+    <div id="transport" class="transport">
+      <span class="take">
+        <span class="lbl">Take</span>
+        <span class="reading" id="takeSay">best available</span>
+      </span>
+      <button id="studioBtn" class="ghost-sm" type="button"
+              title="open the per-download patch bay">Studio</button>
+      <button id="bestBtn" class="btn prime" type="button">START · best</button>
+    </div>
 
     <!-- "This download only": a patch over the saved settings, per job -->
     <details id="ovBlock" class="card">
@@ -579,15 +654,15 @@
       <div id="androidSection" class="field hidden">
         <label class="lbl">Android</label>
         <div class="col">
-          <button id="batteryBtn" class="btn sm" type="button">🔋 Battery settings — allow background downloads</button>
-          <button id="quitAppBtn" class="btn sm danger" type="button">⏻ Quit completely <span class="muted">(frees memory)</span></button>
+          <button id="batteryBtn" class="btn sm" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-battery"/></svg></span>Battery settings — allow background downloads</button>
+          <button id="quitAppBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-power"/></svg></span>Quit completely <span class="muted">(frees memory)</span></button>
         </div>
       </div>
       <div id="vaultSection" class="field hidden">
         <label class="lbl">Cookies on this device</label>
         <div class="col">
           <span id="vaultStatus" class="muted small">checking…</span>
-          <button id="deleteCookiesBtn" class="btn sm danger" type="button">🗑 Delete stored cookies</button>
+          <button id="deleteCookiesBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete stored cookies</button>
         </div>
         <span class="muted small">Imported cookies are encrypted with a key that only this
           device holds (Android Keystore). A readable copy exists only while the app is
@@ -598,9 +673,9 @@
         <div class="col">
           <span id="storageInfo" class="muted small">checking…</span>
           <span id="storageCache" class="muted small">checking…</span>
-          <button id="clearAppCopiesBtn" class="btn sm danger hidden" type="button">🗑 Delete app copies — keep Gallery/Music</button>
-          <button id="clearDownloadsBtn" class="btn sm danger" type="button">🗑 Delete downloaded files</button>
-          <button id="clearCacheBtn" class="btn sm danger" type="button">🗑 Clear app cache</button>
+          <button id="clearAppCopiesBtn" class="btn sm danger hidden" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete app copies — keep Gallery/Music</button>
+          <button id="clearDownloadsBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete downloaded files</button>
+          <button id="clearCacheBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Clear app cache</button>
         </div>
         <span class="muted small">Downloads land in the app's own folder, which a file
           manager cannot open. "Delete app copies" frees that folder and keeps the
@@ -728,8 +803,8 @@
 <footer class="meta">
   <span id="dlWhere">downloads</span> → <code id="dlDir"></code>
   <div class="footrow">
-    <button id="copyDir" class="linkbtn" type="button">copy path</button>
-    <button id="openDir" class="linkbtn" type="button">open folder</button>
+    <button id="copyDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg></span>copy path</button>
+    <button id="openDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder"/></svg></span>open folder</button>
   </div>
 </footer>
 

@@ -104,7 +104,7 @@ def test_toasts_sit_above_the_mobile_tab_bar():
     box, and without it the stack sat that much lower, clipped behind it."""
     assert "#toasts { left: 12px; right: 12px;" in CSS
     seg = CSS.split("#toasts { left: 12px; right: 12px;")[1].split("}")[0]
-    assert "bottom: calc(84px + env(safe-area-inset-bottom))" in seg
+    assert "bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom))" in seg
 
 
 def test_touch_targets_are_thumb_sized_on_coarse_pointers():

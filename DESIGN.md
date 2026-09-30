@@ -1,45 +1,47 @@
 ---
 name: suravidl
-description: "Aurora-glass UI — a quiet night instrument for downloading video"
+description: "The Post House — an ingest room: graphite ground, smoked-glass plates, signal amber for action, scope green for state"
 colors:
-  midnight-aurora: "#06080f"
-  starlight: "#e9edf9"
-  moon-mist: "#93a0bd"
-  twilight: "#5d6a88"
-  aurora-indigo: "#6366f1"
-  comet-cyan: "#22d3ee"
-  aurora-veil: "#c7d2fe"
-  aurora-green: "#34d399"
-  nova-rose: "#fb7185"
-  solar-amber: "#fbbf24"
-  glass-haze: "rgba(148, 163, 241, 0.07)"
-  aurora-glow: "rgba(99, 102, 241, 0.18)"
-  ink-pool: "rgba(6, 9, 18, 0.55)"
-  moonbeam: "rgba(255, 255, 255, 0.10)"
+  graphite-ground: "#0f1216"
+  day-room: "#e7e4de"
+  off-room: "#000000"
+  film-white: "#e8eaed"
+  slate-mist: "#a8b1bd"
+  slate-dim: "#7f8a97"
+  signal-amber: "#e8a33e"
+  lamp-full: "#f3c169"
+  amber-ink: "#f0c98a"
+  scope-green: "#4ecf83"
+  tally-rose: "#ff8078"
+  smoked-glass: "rgba(232, 236, 240, 0.05)"
+  smoked-glass-strong: "rgba(232, 236, 240, 0.09)"
+  ink-well: "rgba(4, 6, 8, 0.45)"
+  panel-solid: "#14181d"
+  lamp-glow: "rgba(232, 163, 62, 0.10)"
 typography:
   title:
-    fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif"
-    fontSize: "15.5px"
-    fontWeight: 600
+    fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
+    fontSize: "15px"
+    fontWeight: 700
   body:
-    fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif"
+    fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "0.1px"
   label:
-    fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif"
-    fontSize: "12.5px"
-    fontWeight: 600
-    letterSpacing: "0.12em"
+    fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
+    fontSize: "10px"
+    fontWeight: 700
+    letterSpacing: "0.14em"
   mono:
-    fontFamily: "'JetBrains Mono', ui-monospace, Menlo, monospace"
-    fontSize: "11.5px"
+    fontFamily: "'Martian Mono', ui-monospace, Menlo, monospace"
+    fontSize: "12.5px"
     fontWeight: 400
 rounded:
-  sm: "10px"
-  md: "12px"
-  lg: "14px"
+  sm: "8px"
+  md: "9px"
+  lg: "13px"
   xl: "16px"
   surface: "20px"
   pill: "999px"
@@ -51,27 +53,27 @@ spacing:
   xl: "22px"
 components:
   button-primary:
-    backgroundColor: "{colors.aurora-indigo}"
-    textColor: "#ffffff"
+    backgroundColor: "{colors.signal-amber}"
+    textColor: "#1a1305"
     rounded: "{rounded.md}"
-    padding: "8px 14px"
+    padding: "12px 22px"
   button-glass:
-    backgroundColor: "{colors.glass-haze}"
-    textColor: "{colors.starlight}"
+    backgroundColor: "{colors.smoked-glass}"
+    textColor: "{colors.film-white}"
     rounded: "{rounded.md}"
-    padding: "8px 14px"
+    padding: "9px 15px"
   chip:
-    backgroundColor: "{colors.aurora-glow}"
-    textColor: "{colors.aurora-veil}"
+    backgroundColor: "{colors.smoked-glass}"
+    textColor: "{colors.slate-mist}"
     rounded: "{rounded.pill}"
     padding: "3px 10px"
   input:
-    backgroundColor: "{colors.ink-pool}"
-    textColor: "{colors.starlight}"
+    backgroundColor: "{colors.ink-well}"
+    textColor: "{colors.film-white}"
     rounded: "{rounded.sm}"
     padding: "10px 12px"
   card:
-    backgroundColor: "{colors.glass-haze}"
+    backgroundColor: "{colors.smoked-glass}"
     rounded: "{rounded.surface}"
     padding: "18px"
 ---
@@ -80,279 +82,279 @@ components:
 
 ## Overview
 
-**Creative North Star: "The Aurora Observatory"**
+**Creative North Star: "The Post House"**
 
-suravidl's interface is an instrument deck under polar light: a dark, quiet
-room where the aurora — three drifting radial gradients, blurred 70px — glows
-behind frosted glass panels, and every control reads like a machined surface
-you can press. It is an application, not a document: the layout is a stable
-shell (sticky glass header over a left rail on desktop, a fixed bottom tab bar
-on phones) with a single 980px column of glass cards doing the work. Density is
-comfortable-compact and type stays in a tight ≈10–16px band, because the
-audience is watching a queue, not reading prose. Every shell — desktop, phone,
-extension — fronts this one visual world.
+suravidl is an ingest room: you bring footage in, the scopes read it out loud,
+you set what you're taking, one lamp starts the run, and finished takes get
+stamped FILED and shelved in the bins. The room is cool graphite at night and
+brushed aluminium with paper tape by day — a working post house, not a
+showroom. Every surface is a smoked-glass instrument plate with a hairline
+edge and one inset highlight; the only warm light in the room is the practical
+lamp above the deck, and amber is what that lamp is made of: the START button,
+the active tab's underline, an LED going live, the selection you just made.
 
-The mood is calm, nocturnal, and precise — light you watch by, not light that
-shouts. The aurora never competes: it sits at 55% opacity under the panels on
-dark (14% on AMOLED, brighter but pastel on light), and the panels themselves
-are thin periwinkle glass (7% indigo haze) with hairline borders and one inset
-top highlight — a real sheet of glass catching the room's light. Color is a
-signal, not decoration: the indigo→cyan gradient appears only on primary
-actions (Probe, Download, Save) and on progress, and the three status lights
-(green / rose / amber) only ever carry state.
-
-Every interaction is physical but quiet: buttons, tabs and swatches press down
-(scale .97), busy controls pulse, rows fade in place instead of jumping, and
-nothing anywhere exceeds half a second. On touch, taps never eat a
-double-tap-zoom and hover styling disappears; in Android's WebView the aurora
-freezes and blur drops to 11px, so a download is never taxed by decoration.
+The mood is calm and operational. An instrument, so numbers are the point:
+every readout — scope values, file sizes, durations, versions, paths — is set
+in a mono voice, and instrument vocabulary (scopes, tally lights, the
+transport, the patch bay) names the parts. But it is an instrument for
+people: one obvious button starts the work, errors are written in sentences
+before they are written in stack traces, and a finished download says so.
 
 **Key Characteristics:**
-- Dark-first — light and AMOLED are token swaps, not separate designs
-- Glass over aurora: translucent cards, hairline borders, inset top highlight
-- Two accents with fixed jobs: indigo = interactive, cyan = momentum
-- One tight family (Inter) plus mono for machine text only
-- Soft-instrument shapes: nothing sharper than 10px; pills for state
-- Motion under half a second; reduced-motion stops it, never shortens it
+- Dark-first; light is the room at day (brushed alu + paper tape), AMOLED is
+  the room with the lights off (true #000). One token set, three values.
+- Smoked glass over one soft room lamp — a single radial glow, no blur pass
+  (the old three-radial aurora cost phones battery for decoration).
+- One action colour: signal amber, only where you press or progress. Three
+  state colours (scope green / tally rose / warm amber) only ever carry state.
+- Two voices, both shipped with the app: Archivo for prose, Martian Mono for
+  every machine readout.
+- Machine-instrument shapes: 8–14px controls, 20px floating plates; pills for
+  state. Nothing sharper than 8px, nothing rounder than a pill.
+- Motion stays under half a second; reduced-motion stops it — never shortens it.
 
 ## Colors
 
-A night-sky palette: near-black ink, moonlit text, and a single aurora running
-indigo-to-cyan, plus three honest status lights. The dark theme is normative
-here; light and AMOLED re-value the same roles (light swaps the accent to the
-iOS-style daylight blue #0a84ff; AMOLED sets the ink to true #000).
+A film-lab palette: graphite ink, film-white text, and the amber of a single
+practical lamp, plus three honest state lights. The dark theme is normative;
+light and AMOLED re-value the same roles (light darkens amber to #c07a16 with
+#6b4308 as its ink so small amber text keeps 4.5:1; AMOLED sets the ground to
+true #000 and drops shadows for hairlines).
 
 ### Primary
-- **Aurora Indigo** (#6366f1): the interactive color — active tabs, count
-  badges, focus rings, selected chips, link buttons, and the first stop of
-  every gradient.
-- **Aurora Glow** (rgba(99, 102, 241, 0.18)): indigo at 18% — the soft fill
-  behind quiet-accent surfaces (chips, "get" buttons, selected states).
-- **Aurora Veil** (#c7d2fe): pale indigo — the text and glyphs that sit ON the
-  glow (chip labels, get-button text).
+- **Signal Amber** (#e8a33e): the action colour — the START and Probe fills,
+  the active tab underline, LEDs in live states, the selection wash, the
+  unsaved-settings dot. In light theme: #c07a16.
+- **Lamp Full** (#f3c169): amber at full — hover on the primary fill only.
+- **Amber Ink** (#f0c98a): amber as text — link buttons, readouts in an armed
+  state, "this download only" markers. In light theme: #6b4308.
 
-### Secondary
-- **Comet Cyan** (#22d3ee): the momentum color — second stop of the action
-  gradient and of the progress fill, the LIVE chip, toast accents. Never used
-  for static chrome: where cyan is, something is moving or is about to.
-- The action gradient (120deg, indigo → cyan) is the only sanctioned gradient
-  in UI chrome; it marks primary buttons and progress.
-
-### Tertiary (status)
-- **Aurora Green** (#34d399): success — completed pills, good messages.
-- **Nova Rose** (#fb7185): error — failed pills, destructive actions, error
-  text and lines.
-- **Solar Amber** (#fbbf24): attention — paused / cancelled, warnings, the
-  unsaved-settings dot, "engine unreachable" text.
+### Secondary (status)
+- **Scope Green** (#4ecf83): good — completed pills, live scope LEDs, the
+  FILED stamp, good messages.
+- **Tally Rose** (#ff8078): refused — errors, failed probes, destructive
+  actions, the human error line on a failed row.
+- **Warm Amber** (amber again, at line weight): attention — paused/cancelled,
+  warnings, "engine unreachable".
 
 ### Neutral
-- **Midnight Aurora** (#06080f): the ink the whole app sits on.
-- **Starlight** (#e9edf9): primary text — an off-white with a cool cast; pure
-  #fff is reserved for text on accent gradients.
-- **Moon Mist** (#93a0bd): muted text — labels, hints, secondary copy.
-- **Twilight** (#5d6a88): dim text — metadata, version strings, placeholders.
-- **Glass Haze** (rgba(148, 163, 241, 0.07)): the periwinkle glass of every
-  card, header and button.
-- **Ink Pool** (rgba(6, 9, 18, 0.55)): input wells — darker than the room, so
+- **Graphite Ground** (#0f1216): the room. Light: #e7e4de. AMOLED: #000000.
+- **Film White** (#e8eaed): primary text.
+- **Slate Mist** (#a8b1bd): muted text — labels, hints, secondary copy.
+- **Slate Dim** (#7f8a97): dim text — metadata, versions, placeholders.
+- **Smoked Glass** (rgba(232,236,240,.05)): the glass of every plate, header
+  and button; Strong (…,.09) for bars and hover fills.
+- **Ink Well** (rgba(4,6,8,.45)): input wells — darker than the room, so
   fields read as recessed.
-- **Moonbeam** (rgba(255, 255, 255, 0.10)): hairlines — all borders and
-  dividers.
+- **Panel Solid** (#14181d): the one honest slab — toasts and flattened
+  surfaces where reading beats atmosphere.
 
 ### Named Rules
-**The Signal, Not Wallpaper Rule.** Accent covers a small fraction of any
-screen — a glow, a badge, one gradient button per region. The room is ink and
-glass; the aurora is what you notice BECAUSE it is rare.
+**The One Lamp Rule.** Each plate has at most ONE filled amber control; every
+other appearance of amber in that region is a hairline, a glow, an underline
+or an LED. Two filled amber buttons side by side is a signal failure.
 
-**The Two-Light Rule.** Indigo means "interactive". Cyan means "moving or in
-progress". A surface that stores neither never wears either.
+**The Live-Light Rule.** Amber/Green/Rose never decorate: an LED is lit only
+while its state is true (live, armed, filed, refused), and glow follows power
+— lit LEDs glow faintly, dark ones don't.
 
 ## Typography
 
-**UI Font:** Inter (with system-ui, -apple-system, "Segoe UI" fallbacks)
-**Mono Font:** JetBrains Mono (with ui-monospace, Menlo fallbacks)
+**UI Font:** Archivo (variable, weight 100–900, OFL, **self-hosted** —
+`fonts/archivo-var.woff2`, latin subset)
+**Readout Font:** Martian Mono (variable, OFL, self-hosted —
+`fonts/martian-mono-var.woff2`)
 
-**Character:** One quiet family in a tight, app-sized band — hierarchy is
-carried by weight, case and color rather than size. Mono is a second voice,
-reserved for machine text.
+**Character:** One grotesque in a tight, app-sized band; hierarchy is carried
+by weight, case and colour, not size. Mono is the instrument voice: it is
+slightly WIDER and more present here than a decorative mono — readouts are the
+product.
 
 ### Hierarchy
-- **Title** (600, 15.5–16px): card titles and probe headings; the largest text
-  in the app.
-- **Body** (400, 14px, line-height 1.5, letter-spacing .1px): all controls,
-  inputs, buttons and descriptions.
-- **Label** (600, 12.5px, letter-spacing .12em, uppercase): section headings
-  (SETTINGS, DOWNLOADS, "Appearance") — small, spaced, muted, quiet by design.
+- **Title** (700, 15–16px): card titles and probe headings.
+- **Body** (400, 14px, line-height 1.5): controls, inputs, descriptions.
+- **Label** (700, 9.5–10px, letter-spacing .14em, uppercase): scope names,
+  card kickers, section heads — small, spaced, quiet by design.
 - **Small** (400, 12–12.5px): hints, footnotes, counters.
-- **Mono** (400, 11.5–12.5px): versions, file paths, sizes, durations, error
-  messages, raw args.
+- **Readout / Mono** (400, 11.5–15px): scope readings (the largest mono in the
+  app), sizes, durations, paths, versions, error bodies, file names.
 
 ### Named Rules
-**The Quiet Label Rule.** Section headings never grow. If a section needs more
-emphasis, change the content's weight or color, not the label's size; the
-uppercase 12.5px label is the app's loudest structural voice.
-
 **The Machine Voice Rule.** Anything a machine produced or consumes — sizes,
-paths, versions, flags, error lines — is set in mono. Prose stays in Inter.
+paths, versions, durations, error bodies, flags — is set in Martian Mono.
+Prose stays in Archivo. A number presented as information is machine voice.
+
+**The Quiet Label Rule.** Section labels never grow. If a section needs more
+emphasis, change the content's weight or colour, not the label's size.
 
 ## Layout
 
-A stable single-column shell: sticky glass header (12px × 20px padding) over a
-max-980px content column (22px × 20px padding). At ≥900px the tabs become a
-208px sticky left rail (top: 64px) beside the column; below 900px they dock as
-a fixed bottom bar (thumb reach, safe-area padding, equal segmented columns).
-≤640px hides the version meta and tightens page padding; ≤560px modals become
-full-height sheets with a sticky head and a sticky Save bar that rides above
-the tab bar.
+A deck and a rail. The header strip (mark + wordmark + engine/yt-dlp version
+meta in mono) sits over a content column; at ≥1080px a FILED TAKES rail
+(newest first, count badge) stands beside it. The tab strip is a top row on
+desktop and a fixed bottom bar under 900px (thumb reach, safe-area padding).
+The scope strip is three readouts across the top of the deck. The transport —
+what you're taking and the one button that starts it — is in-flow at the
+deck's end on desktop (sticky bottom 14px) and a fixed bar above the tab bar
+on phones (download tab only). The patch bay ("This download only") sits under
+the deck; Settings is a tab panel with sub-tabs and a sticky Save bar that
+keeps the plate's glass and its bottom corners.
 
-Spacing runs on a compact rhythm — 6 / 10 / 14 / 18 / 22px — for gaps, card
-padding and page padding; controls inside a row breathe with 10–14px gaps and
-cards stack with 16px margins.
+Spacing stays on a compact rhythm — 6 / 10 / 14 / 18 / 22px. Cards stack with
+16px gaps; controls in a row breathe with 10–14px.
 
 ### Named Rules
-**The Stable Shell Rule.** The shell never scrolls away: header sticks, the
-rail sticks, the mobile tab bar is fixed. Content moves; the instrument panel
-stays put.
+**The Stable Shell Rule.** The shell never scrolls away: header and tab strip
+stick, the mobile tab bar is fixed, the phone transport floats above it.
+Content moves; the instrument panel stays put.
+
+**The Read-Before-Start Rule.** The deck's order is fixed: source → scopes →
+take → START, then options. Nothing that acts on a probe may sit above it, and
+a control that shapes a download must be visible next to the control that
+starts it (the armed take lives on the transport, not in a collapsed block).
 
 ## Elevation & Depth
 
-Ambient soft-lift. Depth is carried by translucency first — glass panels over
-the aurora, each with a 1px inset highlight (the glass's wet edge) — and by a
-single deep, diffuse shadow (0 24px 60px rgba(2,4,10,.5)) that lifts the whole
-card family off the night. Shadows are ambient, never structural: they say
-"this pane floats", not "this ranks higher". On AMOLED the shadow drops to none
-and hairlines take over; the light theme's shadow warms and softens. Overlays
-blur their backdrop 10px and dim it; message surfaces (toasts) deliberately sit
-on a near-opaque plate (rgba(13,17,30,.97)) so text never fights the blur.
+Ambient soft-lift over one room lamp. Depth is carried by translucency first —
+smoked glass plates with a 1px inset highlight (the glass's wet edge) — and by
+one deep diffuse shadow (dark: `0 26px 60px rgba(0,0,0,.55), 0 2px 10px
+rgba(0,0,0,.35)`) that lifts the plate family off the room. Shadows are
+ambient, never structural. On AMOLED the shadow drops to none and hairlines
+take over; the light theme's shadow warms and softens. Toasts deliberately sit
+on a near-opaque plate (Panel Solid) so text never fights the blur.
 
-### Shadow Vocabulary
-- **card-lift** (`0 24px 60px rgba(2,4,10,.5)`): under cards, modals and
-  toasts (dark; AMOLED: none; light: a softened pair).
-- **scroll-shade** (`0 8px 26px rgba(0,0,0,.28)`): the sticky header once
-  content scrolls beneath it.
-- **accent-spark** (`0 6px 22px rgba(99,102,241,.18)`, hover
-  `0 10px 30px rgba(99,102,241,.45)`): the primary button's own glow.
-- **status-halo** (`0 0 14px <state background>`): pills glow faintly in their
-  state color.
+### Glass styles (the material system)
+- **Frosted (smoked):** `blur(14px) saturate(115%)`, no gloss, plain hairline
+  border. The default: matte smoked glass.
+- **Liquid (polished):** `blur(26px) saturate(165%) brightness(1.04)`, a
+  specular gloss gradient at 150°, brighter top highlight
+  (rgba(255,255,255,.24)), and amber-tinted borders (accent-line). The panel
+  reads wet; content behind it visibly smears.
+- **Android host:** the SAME blur, lighter radius — 11px frosted / 19px
+  liquid — plus a flattened full-screen overlay and settings Save bar (solid,
+  no backdrop pass). The host may lighten the radius; it never denies the
+  glass.
 
 ### Named Rules
-**The Glass Above Aurora Rule.** Every elevated surface is glass over the
-backdrop — blur, hairline, inset highlight — never an opaque slab. The one
-exception is the reading path: toasts go opaque, because a message must win
-over atmosphere.
+**The Real Glass Rule.** Every blurred surface ships `-webkit-backdrop-filter`
+beside `backdrop-filter`, and unsupported engines fall back to SOLID panels
+(@supports) — never a fake half-glass. Blur is a real material, not a tint.
 
-**The AMOLED Hairline Rule.** When there is no shadow (AMOLED), borders carry
-all the separation; never re-introduce grey shadows there.
+**The AMOLED Hairline Rule.** Where there is no shadow (AMOLED), borders carry
+all separation; never re-introduce grey shadows there.
 
 ## Shapes
 
-Soft instruments: every surface is a rounded rectangle — 10px (fields, small
-buttons), 12px (buttons, tabs), 14px (toasts, swatches, the paste field), 16px
-(queue rows), 20px (cards), 22px (modals) — plus the full pill (999px) for
-chips, status, badges and the progress bar. There are no sharp corners
-anywhere in the chrome. Borders are 1px hairlines (Moonbeam) that strengthen to
-accent-line when a surface is selected or focused. The app mark is a 30px
-rounded square (9px radius) carrying the gradient.
+Machined plates: 8–9px for buttons and fields, 12–13px for the transport and
+toasts, 14px for the patch bay, 20px for cards, modals and the FILED stamp's
+plate family; full pills (999px) for chips, status and the progress bar. The
+app mark is a 30px rounded square (9px radius) in Signal Amber carrying the
+letterform. Borders are 1px hairlines that strengthen to accent-line on
+selection, focus or an armed state.
 
 ### Named Rules
-**The Nothing Sharp Rule.** If it can be touched, it is rounded ≥10px. Radii
-above 20px are reserved for surfaces that float over content (cards, modals),
-never for inline controls.
+**The Nothing Sharp Rule.** If it can be touched, it is rounded ≥8px. Radii
+above 14px are reserved for surfaces that float over content, never for
+inline controls.
+
+**The Armed Means Lit Rule.** A selected pick (`.picked`) keeps its amber
+edge and glow until the take is spent or replaced — and only ONE pick can be
+lit at a time; the paint comes from the one render function that owns the
+take.
 
 ## Components
 
 Tactile instruments — machined glass you can press.
 
+### The Transport (signature)
+The deck's one starter: a TAKE readout in mono ("best available", or the
+armed pick's label in amber ink), a Studio ghost button (opens the patch
+bay), and the START lamp — the ONE amber fill of the region. Its label echoes
+the take ("START · 720p"). Fixed above the phone tab bar; sticky at the
+deck's end on desktop. Fired = spent: the take clears, every pick unlights,
+the readout returns to "best available".
+
+### Switchgear (picks)
+Quality chips, format-row Take buttons and audio picks ARM — they never
+start a download. Armed = `data-pick` match: amber border, faint wash. A
+second tap disarms. Labels stay human ("this file" for a bare direct link).
+
+### The Scope Strip
+Three scopes — SOURCE · FORMATS · LARGEST — each a tiny uppercase label, an
+LED, and a mono reading (the widest mono in the app). State is the strip's:
+off (dim dashes, "feed the deck a link"), live (green LEDs, "take ready — set
+the deck, press START"), bad (rose LEDs + a say line pointing at the error
+above). The strip is read, not pressed.
+
 ### Buttons
-- **Shape:** 12px radius, 8×14px padding, 7px icon gap.
-- **Primary (`.btn.prime`):** the indigo→cyan gradient on white text, weight
-  600, accent-spark glow, 1px inset highlight. One per region — it is the
-  page's answer to "what next".
-- **Glass (`.btn`):** Glass Haze fill over blur, hairline border, Starlight
-  text; hover lifts 1px and strengthens the fill (hover-capable pointers only).
-- **Small / ghost (`.btn.sm`, `.ghost-sm`):** 10px / 9px radii for row actions;
-  ghost is transparent with a hairline and muted text.
-- **Danger (`.btn.danger`):** Nova Rose fill, line and text; also the confirm
-  dialog's affirmative.
-- **States:** press scales to .97 (buttons, tabs, swatches); busy pulses;
-  disabled drops to ~50% opacity and refuses transform; focus-visible is a 2px
-  Aurora Indigo outline at 2px offset — everywhere, always.
+- **Primary (`.btn.prime`):** Signal Amber fill, #1a1305 text, 700, glow
+  `0 10px 22px -10px rgba(232,163,62,.55)` + inset top light. One per plate.
+- **Glass (`.btn`):** smoked fill over blur, hairline, film-white text;
+  hover lifts the fill and warms the border (hover-capable pointers only).
+- **Ghost (`.ghost-sm`):** transparent, hairline, muted; destructive variants
+  carry tally rose. Row actions live here.
+- **States:** press scales to .97; busy pulses (1.1s) and refuses pointers;
+  disabled drops opacity and refuses transform; focus-visible is a 2px amber
+  outline at 2px offset — everywhere, always.
 
-### Chips
-- **Style:** pill, 11px text, Aurora Glow fill, Aurora Veil text, 1px
-  accent-line border.
-- **Pressed:** `aria-pressed="true"` flips to solid Aurora Indigo with white
-  text — paint and semantics move together.
+### Job rows
+Pill + (completed) FILED stamp; title link; mono meta (size · time · site);
+path line in mono; actions Play / Copy / Retry / Delete (+ "Edit & retry").
+A failed row leads with the human sentence in tally rose ("the site says this
+link does not exist (404) — check it was copied whole"); the raw engine text
+sits clamped behind "Show details". A live row's fill glides for exactly one
+poll interval (1.1s linear) so it never stalls between polls.
 
-### Cards / Containers
-- **Corner:** 20px radius. **Background:** Glass Haze + gloss layer over
-  blur(16px) saturate(125%). **Border:** hairline (the liquid glass style swaps
-  it to accent-line). **Shadow:** card-lift + inset top highlight. **Padding:**
-  18px; stacked with 16px gaps.
-
-### Inputs / Fields
-- **Style:** Ink Pool wells, hairline border, 10px radius (the paste field:
-  14px radius, 13×16px padding — the app's front door).
-- **Focus:** the paste field swaps the standard ring for a border shift to
-  accent-line plus a 4px Aurora Glow halo; plain inputs keep the global 2px
-  outline.
-- **Labels:** 12px Moon Mist above the control; hints in Small muted text.
-
-### Navigation
-- **Style:** icon + label tabs, 12px radius, muted text at rest.
-- **Active:** Glass Strong fill + accent-line border + Starlight text (desktop
-  rail: Aurora Glow fill); a count badge in solid Aurora Indigo where relevant.
-- **Touch:** below 900px the same markup becomes a fixed bottom bar — icons
-  grow to 17px, labels shrink to 10px.
-
-### Status Pill
-- **Shape:** pill, 11px / 600, letter-spacing .02em.
-- **Spelling by state:** downloading / queued / merging = Aurora Glow fill,
-  veil text, faint accent glow; completed = Aurora Green family; error /
-  interrupted = Nova Rose; paused / cancelled = Solar Amber.
-
-### Progress Bar
-- **Track:** 8px pill of ink at 70%. **Fill:** the action gradient. A live
-  download's width glides for exactly one poll interval (1.1s linear) so it
-  never stalls between polls; indeterminate work shows a full muted track with
-  a moving sheen — "working, position unknown".
+### The FILED TAKES rail (≥1080px)
+Newest takes first: bin title + mono file name, count badge in amber. The
+rail is a shelf, not a second queue — its items open the take.
 
 ### Toasts
-- **Style:** near-opaque plate (Panel Solid), 14px radius, card-lift shadow,
-  13px text; a state dot (green / rose / indigo) leads. Choices wrap under the
-  message; update toasts carry the accent border and wait for an answer.
+Near-opaque plate, 12px radius, a state dot (green / rose / amber), message
+13px; choices wrap under the message. Completion toasts carry actions (Play /
+Show folder) and the toast lane sits above the mobile tab bar and the
+Settings Save bar (lane math via --tabbar-h).
 
 ### Named Rules
 **The Machined Press Rule.** Every control answers a press physically before
-it answers with state: scale .97 down, then the work. No tappable surface ships
-without a press state.
+it answers with state: scale .97 down, then the work. No tappable surface
+ships without a press state.
+
+**The Finish Speaks Rule.** Completion is an event, not a pill flip: one
+transition-fired toast with real actions, a stamp on the row, the take in the
+bins. Nothing important settles silently in a tab nobody is watching.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep the gradient scarce: primary actions, progress fill, the app
-  mark — nowhere else.
-- **Do** give every focusable element a 2px Aurora Indigo `:focus-visible`
-  ring at 2px offset, and every touchable one a press state.
+- **Do** keep amber scarce and purposeful: fills only on the one action per
+  plate, elsewhere hairline / glow / underline / LED.
+- **Do** give every focusable element a 2px amber `:focus-visible` ring at
+  2px offset, and every touchable one a press state.
 - **Do** guard all hover styling in `@media (hover: hover)`; on touch screens
   the press state is the only feedback.
-- **Do** keep machine text (paths, sizes, versions, errors, flags) in the mono
-  stack.
+- **Do** keep machine text (paths, sizes, versions, error bodies, flags) in
+  the Martian Mono stack, and machine numbers at readout size on the scopes.
 - **Do** stop motion — not shorten it — under `prefers-reduced-motion`;
-  infinite animations must be set to `none` (a .001s infinite loop is MORE
+  infinite animations must be set to none (a .001s infinite loop is MORE
   motion, not less).
 - **Do** keep touch targets ≥44px tall on coarse pointers
   (`@media (pointer: coarse)`) with safe-area padding at the bottom edge.
+- **Do** keep every blurred surface paired with `-webkit-backdrop-filter` and
+  a solid `@supports` fallback.
 
 ### Don't:
-- **Don't** use pure black (#000) except AMOLED's background and video
-  letterboxing.
-- **Don't** introduce hard or dark shadows; the card-lift family is ambient
-  only — and on AMOLED it is absent, not weakened.
-- **Don't** set text directly on the aurora; every text surface needs glass or
-  a plate beneath it.
+- **Don't** add accent hues beyond signal amber + the three state lights; a
+  second decorative hue is how this room stops reading as one instrument.
+- **Don't** reintroduce gradient chrome: the only sanctioned gradient is the
+  liquid glass's specular gloss (a material), never a coloured button fill.
+- **Don't** use pure black (#000) except AMOLED's ground and video
+  letterboxing; graphite is the room.
+- **Don't** set text directly on the lamp glow; every text surface needs
+  glass or a plate beneath it.
 - **Don't** exceed the half-second ceiling or delay repeat interactions with
   entrance choreography.
-- **Don't** use radius below 10px on interactive chrome, or leave a sharp
+- **Don't** use radius below 8px on interactive chrome, or leave a sharp
   corner on a floating surface.
-- **Don't** add new accent hues beyond indigo / cyan + the three status
-  lights; a fourth hue is how this deck stops reading as one instrument.
+- **Don't** start a download from a pick, and don't light two picks at once —
+  the transport is the only starter, and the take is one thing.

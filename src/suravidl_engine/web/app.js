@@ -48,6 +48,122 @@ const ACTIVE = new Set(["queued", "downloading", "merging"]);
 let DESKTOP = false;
 let APP_INFO = null;   // /app/info payload (desktop capabilities)
 
+/* ---------- drawn icons (the sprite lives in index.html) ---------- */
+/** `ico("play")` → a span the CSS sizes; one stroke system, no emoji. */
+function ico(name) {
+  const s = document.createElement("span");
+  s.className = "ico";
+  s.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
+    name + '"/></svg>';
+  return s;
+}
+
+/* ---------- the human voice of an engine error ---------- */
+/** yt-dlp explains failures in its own dialect ("ERROR: unable to download
+ *  video data: HTTP Error 403: Forbidden"). The first line a person reads
+ *  says what it MEANS; the raw text stays one tap away (v0.37.0). */
+function humanErr(s) {
+  s = String(s == null ? "" : s);
+  if (/HTTP Error 404|not found|does not exist/i.test(s))
+    return "the site says this link does not exist (404) — check it was copied whole";
+  if (/HTTP Error 403|forbidden/i.test(s))
+    return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
+  if (/HTTP Error 429|too many requests/i.test(s))
+    return "the site is rate-limiting this address (429) — wait a bit, then try once more";
+  if (/sign ?in|log ?in|login required|private video|age/i.test(s))
+    return "the site wants a signed-in session — load cookies in Settings → Authentication";
+  if (/unsupported url/i.test(s))
+    return "no extractor recognises this link — try the in-app browser, or a direct media link";
+  if (/timed? ?out|timeout/i.test(s))
+    return "the site never answered in time — check the connection and retry";
+  if (/certificate|SSL/i.test(s))
+    return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
+  if (/ffmpeg/i.test(s))
+    return "the last step needs ffmpeg — audio “keep original” avoids the conversion";
+  const line = s.split("\n")[0];
+  return line.length > 140 ? line.slice(0, 140) + "…" : (line || "the download failed");
+}
+
+/* ---------- the scope strip: instruments that read the source ---------- */
+/** data-state drives the lamps and the reading colours (style.css). */
+function setScopes(state, read) {
+  const strip = $("scopeStrip");
+  if (!strip) return;
+  strip.dataset.state = state;
+  if (read) {
+    if (read.src != null) $("scopeSrc").textContent = read.src;
+    if (read.fmt != null) $("scopeFmt").textContent = read.fmt;
+    if (read.size != null) $("scopeSize").textContent = read.size;
+    if (read.say != null) $("scopeSay").textContent = read.say;
+  }
+}
+
+/** Per-site livery: the probe card takes a tint from the source (v0.37.0). */
+function liveryOf(extractor) {
+  const e = String(extractor || "").toLowerCase();
+  for (const key of ["youtube", "twitter", "vimeo", "instagram", "tiktok"]) {
+    if (e.indexOf(key) !== -1) return key;
+  }
+  return "";
+}
+
+/* ---------- the transport: arm a take, then commit it (v0.37.0) ---------- */
+/** Choosing and downloading used to be the same click on eleven controls.
+ *  The deck now works like a room: picks ARM a take (one at a time — the
+ *  newest arm replaces the old), the START lamp commits it, and a commit
+ *  spends the take (one-shot, like the patch bay below). */
+let TAKE = { fmt: null, preset: null, label: "" };
+
+function armTake(pick, label, btn) {
+  if (!pick) return;
+  if (TAKE.fmt === pick || TAKE.preset === pick) {
+    // tapping the armed pick again disarms it
+    TAKE.fmt = null;
+    TAKE.preset = null;
+    TAKE.label = "";
+  } else if (pick.indexOf("audio-") === 0) {
+    TAKE.fmt = null;
+    TAKE.preset = pick;
+    TAKE.label = label || pick.replace(/^audio-/, "");
+  } else {
+    TAKE.preset = null;
+    TAKE.fmt = pick;
+    TAKE.label = label || pick;
+  }
+  renderTake();
+}
+
+function renderTake() {
+  const say = $("takeSay");
+  const lamp = $("bestBtn");
+  if (!say || !lamp) return;
+  const armed = TAKE.fmt || TAKE.preset;
+  say.textContent = armed
+    ? (TAKE.preset ? "audio · " + TAKE.label : TAKE.label)
+    : "best available";
+  say.classList.toggle("set", !!armed);
+  lamp.textContent = armed ? "START · " + (TAKE.label || "take") : "START · best";
+  // the armed pick stays lit wherever it lives (chips, format rows, audio) —
+  // and ONLY the armed one: a commit spends the take and every light goes out
+  document.querySelectorAll("[data-pick]").forEach((b) => {
+    b.classList.toggle("picked", b.dataset.pick === armed);
+  });
+}
+
+async function commitTake(btn) {
+  btn = btn || $("bestBtn");
+  const url = $("url").value.trim();
+  const ok = playlistMode()
+    ? await startJob(url, null, TAKE.preset, true, btn)
+    : await startJob(url, TAKE.fmt, TAKE.preset, false, btn);
+  if (ok) {
+    TAKE.fmt = null;
+    TAKE.preset = null;
+    TAKE.label = "";
+    renderTake();
+  }
+}
+
 /* ---------- toasts ---------- */
 /** msg, kind ("ok" | "bad" | "info"), and optionally:
  *  - sticky:  do not time out; it stays until dismissed (an update notice)
@@ -201,6 +317,11 @@ async function doProbe() {
   // a previous failure's red clears before this probe starts speaking
   $("probeMsg").className = "msg muted";
   $("probeMsg").textContent = "probing…";
+  $("probeMsg").classList.remove("hidden");
+  $("probeSay").classList.add("hidden");
+  $("probeSay").textContent = "";
+  $("probeDetails").classList.add("hidden");
+  setScopes("scan", { say: "reading the source…" });
   $("probeBtn").classList.add("busy");
   try {
     const info = await api("/probe", {
@@ -218,6 +339,15 @@ async function doProbe() {
     // an error is Nova Rose and machine text is mono; this line was the one
     // failure in the app that whispered in grey (polish pass)
     $("probeMsg").className = "msg bad mono";
+    // the human line leads; the raw engine text sits behind "Show details"
+    // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
+    $("probeMsg").classList.add("hidden");
+    $("probeSay").textContent = humanErr(e.message);
+    $("probeSay").className = "msg bad";
+    $("probeSay").classList.remove("hidden");
+    $("probeDetails").textContent = "Show details";
+    $("probeDetails").classList.remove("hidden");
+    setScopes("bad", { say: "no readout — see the message above" });
     offerBrowser(e, url);
     $("probeCard").classList.add("hidden");
     $("dlEmpty").classList.remove("hidden");
@@ -500,6 +630,17 @@ function renderProbe(url, info) {
     ? " · " + (info.duration < 60 ? "<1 min"
                                   : Math.round(info.duration / 60) + " min") : "";
   $("probeMeta").textContent = (info.extractor || "") + dur;
+  // the probe lands on the scope strip — source, formats, largest (v0.37.0)
+  $("probeCard").dataset.livery = liveryOf(info.extractor || "");
+  const scopeFmts = (info.formats || []).filter((f) => f.ext && f.format_id);
+  const biggest = Math.max(0, ...scopeFmts.map(
+    (f) => f.filesize || f.filesize_approx || 0));
+  setScopes("live", {
+    src: String(info.extractor || (info.playlist ? "playlist" : "direct")).slice(0, 22),
+    fmt: info.playlist ? ((info.count || 0) + " items") : String(scopeFmts.length),
+    size: biggest ? humanBytes(biggest) : "—",
+    say: "take ready — set the deck, press START",
+  });
 
   // the probe has always carried these three; the UI now shows them
   const live = info.is_live === true || info.live_status === "is_live";
@@ -522,6 +663,10 @@ function renderProbe(url, info) {
     const entries = info.entries || [];
     PLAYLIST = { count: info.count || entries.length, shown: entries.length };
     PLAYLIST_NONE = false;
+    setScopes("live", {
+      fmt: (info.count || entries.length) + " items",
+      say: "pick items on the deck, then START",
+    });
     for (const [i, e] of entries.entries()) {
       const tr = el("tr", "enter");
       // capped lower than a full stagger: a table that takes a quarter second
@@ -585,8 +730,9 @@ function renderProbe(url, info) {
       sizeCell(f),
     );
     const td = el("td");
-    const btn = el("button", "get", "Get");
-    btn.onclick = () => startJob(url, fmtSpec(f, separateAudio), null, false, btn);
+    const btn = el("button", "get", "Take");
+    btn.dataset.pick = fmtSpec(f, separateAudio);
+    btn.onclick = () => armTake(btn.dataset.pick, fmtQuality(f) || "this file", btn);
     td.append(btn);
     tr.append(td);
     tb.append(tr);
@@ -621,11 +767,12 @@ function renderQualityRow(url, remembered) {
     const last = remembered && q.key === remembered;
     const btn = el("button",
       "btn sm" + (last ? " pick" : (q.key === "best" ? " prime" : "")),
-      last ? q.label + " ✓" : q.label);
+      last ? q.label + " · last used" : q.label);
+    btn.dataset.pick = q.fmt;
     btn.title = last
-      ? "your pick for this site last time — click to download at " + q.label
-      : "download the best stream up to " + q.label + " (" + q.fmt + ")";
-    btn.onclick = () => startJob(url, q.fmt, null, false, btn);
+      ? "your pick for this site last time — click to arm it as the take"
+      : "arm the take at best up to " + q.label + " (" + q.fmt + ")";
+    btn.onclick = () => armTake(q.fmt, q.label, btn);
     box.append(btn);
   }
   row.classList.remove("hidden");
@@ -768,11 +915,11 @@ function pickAll(checked) {
 async function startJob(url, fmt, preset, playlist, triggerBtn) {
   if (playlist && PLAYLIST_NONE && !playlistFieldText()) {
     toast("pick at least one item first", "bad");
-    return;
+    return false;
   }
   if (!url) {
     toast("paste a video link first", "bad");
-    return;
+    return false;
   }
   // A start can take most of a second (SQLite lock, a busy worker), and a
   // button that does not move invites a second and third tap — which queued
@@ -802,7 +949,8 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
       ? ` — “${OV.name || OV.preset}” skipped: your format pick replaces it`
       : (OV.name && (body.preset === OV.preset || ovK)
         ? ` — with preset “${OV.name}”`
-        : (ovK ? ` — with ${ovK} option${ovK === 1 ? "" : "s"} set below` : ""));
+        : (ovK ? ` — with ${ovK} option${ovK === 1 ? "" : "s"} set below`
+          : (TAKE.label ? " — " + TAKE.label : "")));
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
     // the block says "this download only" — so it is spent on this download
     // (v0.21.1 audit: it used to stick to every job for the rest of the session)
@@ -810,8 +958,10 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     PLAYLIST_NONE = false;
     toast((playlist ? "Playlist added to downloads" : "Added to downloads") + note, "info");
     refreshJobs();
+    return true;
   } catch (e) {
     toast("could not start download: " + e.message, "bad");
+    return false;
   } finally {
     if (triggerBtn) {
       triggerBtn.disabled = false;
@@ -1182,8 +1332,8 @@ function initOverrides() {
     $("ovClipEnd").value = "";
     renderOvCount();
   };
-  // the strip's ✕ is the block's Clear; tapping its text brings the block
-  // in — the card echoes the block, it does not duplicate it (v0.35.0)
+  // the strip's clear button is the block's Clear; tapping its text brings
+  // the block in — the card echoes the block, it does not duplicate it (v0.35.0)
   $("armedClear").onclick = () => {
     clearOv();
     toast("cleared — using your settings");
@@ -1244,7 +1394,8 @@ async function settleThenDelete(job) {
 /** The trash button — one download gone, file and all, after a confirm. */
 function deleteButton(j) {
   const running = ACTIVE.has(j.status);
-  const b = el("button", "ghost-sm del", "🗑 Delete");
+  const b = el("button", "ghost-sm del", "Delete");
+  b.prepend(ico("trash"));
   b.title = "Delete this download — the file on disk goes with it";
   b.onclick = async () => {
     const name = j.filepath ? j.filepath.split("/").pop()
@@ -1302,16 +1453,23 @@ function jobRow(j) {
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
   top.append(title, el("span", "pill " + j.status, j.status));
+  // a finished take gets the stamp (v0.37.0: completion used to be a pill
+  // you never saw flip in a tab you were not on)
+  if (j.status === "completed") {
+    const stamp = el("span", "stamp", "FILED");
+    stamp.title = "download finished — the file is in your downloads";
+    top.append(stamp);
+  }
   // what this job actually carries (preset / per-download overrides)
   const extra = j.overrides ? Object.keys(j.overrides).length : 0;
   if (j.preset) {
-    const chip = el("span", "chip tag", "⚙ " + j.preset.replace("audio-", ""));
+    const chip = el("span", "chip tag", j.preset.replace("audio-", "") + " preset");
     chip.title = "audio preset: " + j.preset;
     top.append(chip);
   }
   if (extra) {
     const chip = el("span", "chip tag",
-      "⚙ " + extra + " option" + (extra === 1 ? "" : "s"));
+      extra + " option" + (extra === 1 ? "" : "s"));
     chip.title = Object.keys(j.overrides).join(", ") + " — this download only";
     top.append(chip);
   }
@@ -1333,6 +1491,9 @@ function jobRow(j) {
     meta.append(...metaParts(j).map((t) => el("span", "", t)));
     row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
+    // the human consequence leads; the engine's own dialect goes below,
+    // behind the toggle (v0.37.0 — it used to be the first thing you read)
+    row.append(el("div", "jerrsay", humanErr(j.error || "")));
     const r = el("div", "jrow");
     // The whole message. A 160-char slice in a single ellipsised line cut
     // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
@@ -1349,6 +1510,16 @@ function jobRow(j) {
       };
     }
     r.append(errEl);
+    if (errEl.classList.contains("clamp")) {
+      // a visible affordance, not just a hidden cursor (v0.37.0)
+      const more = el("button", "linkbtn jrr-toggle", "Show details");
+      more.onclick = () => {
+        const open = errEl.classList.toggle("open");
+        errEl.title = open ? "tap to collapse" : "tap to show the whole message";
+        more.textContent = open ? "Hide details" : "Show details";
+      };
+      r.append(more);
+    }
     const copy = el("button", "ghost-sm", "Copy");
     copy.title = "copy the whole message";
     copy.onclick = async () => {
@@ -1562,6 +1733,51 @@ function leaveRow(node) {
   setTimeout(drop, 400);
 }
 
+/* ---------- a finish that speaks (v0.37.0) ---------- */
+/** The queue used to turn a pill green in a tab you were not on. The first
+ *  poll that sees a job BECOME `completed` fires one toast with the real
+ *  choices — play it, or open the folder it was filed in. */
+let JOB_STATE = new Map();
+
+function onFiled(j) {
+  const name = j.filepath ? String(j.filepath).split("/").pop()
+    : (j.title || j.url);
+  const actions = [];
+  if (j.filepath) {
+    actions.push({ label: "Play", prime: true, onClick: () => openPlayer(j) });
+  }
+  actions.push({
+    label: "Show folder",
+    onClick: () => { const b = $("openDir"); if (b) b.click(); },
+  });
+  toast("Filed — " + name, "ok", { actions: actions });
+}
+
+/** The bins rail: the last few finished takes, newest first (v0.37.0). */
+function renderBins(list) {
+  const box = $("binsList");
+  if (!box) return;
+  const filed = (list || []).filter((j) => j.status === "completed");
+  const count = $("binsCount");
+  if (count) count.textContent = filed.length ? String(filed.length) : "";
+  box.replaceChildren();
+  if (!filed.length) {
+    box.append(el("div", "bins-empty muted small",
+      "Nothing filed yet — a finished download lands here."));
+    return;
+  }
+  for (const j of filed.slice(0, 8)) {
+    const b = el("button", "bin");
+    b.type = "button";
+    b.title = j.filepath || j.url;
+    b.append(el("span", "bin-title", j.title || j.url));
+    const file = j.filepath ? String(j.filepath).split("/").pop() : "";
+    if (file) b.append(el("span", "bin-meta mono", file));
+    b.onclick = () => { if (j.filepath) openPlayer(j); };
+    box.append(b);
+  }
+}
+
 async function refreshJobs() {
   if (JOBS_BUSY) return;      // one poll at a time: a slow, older snapshot
   JOBS_BUSY = true;           // must never repaint newer state
@@ -1580,6 +1796,17 @@ async function refreshJobs() {
     if (stale) stale.remove();
     const list = jobs.sort(
       (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    // a finish that speaks: the FIRST poll that sees a job become completed
+    // says so — once (v0.37.0)
+    const seen = new Set();
+    for (const j of list) {
+      seen.add(j.id);
+      const prev = JOB_STATE.get(j.id);
+      if (j.status === "completed" && prev && prev !== "completed") onFiled(j);
+      JOB_STATE.set(j.id, j.status);
+    }
+    for (const id of [...JOB_STATE.keys()]) if (!seen.has(id)) JOB_STATE.delete(id);
+    renderBins(list);
     if (!list.length) {
       // rows that are gone should leave, not blink out: the same exit the
       // delete path uses, then the empty state fades in behind them
@@ -1705,7 +1932,7 @@ function renderUpdateRow() {
       renderUpdateRow();
     };
   } else {
-    state.textContent = "up to date ✓";
+    state.textContent = "up to date";
     meta.textContent = `you have ${u.current} · ${when}`;
     get.classList.add("hidden");
     skip.classList.add("hidden");
@@ -2481,7 +2708,8 @@ function renderPresetList() {
       (p.description || keys.map((k) => `${k}=${p.patch[k]}`).join(" · ")).slice(0, 140)));
     row.append(left);
     if (!p.builtin) {
-      const del = el("button", "ghost-sm del", "🗑 Delete");
+      const del = el("button", "ghost-sm del", "Delete");
+      del.prepend(ico("trash"));
       del.onclick = async () => {
         if (!(await askConfirm(`Delete the preset “${p.name}”? Downloads already
 started keep their options.`, { okText: "Delete" }))) return;
@@ -2701,19 +2929,30 @@ window.suravidlShared = (url) => {
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
-$("bestBtn").onclick = () => startJob($("url").value.trim(), null, null, playlistMode(), $("bestBtn"));
-$("audioNativeBtn").onclick = () => startJob($("url").value.trim(), null, "audio-native", playlistMode(), $("audioNativeBtn"));
-$("audioM4aBtn").onclick = () => startJob($("url").value.trim(), null, "audio-m4a", playlistMode(), $("audioM4aBtn"));
-$("audioMp3Btn").onclick = () => startJob($("url").value.trim(), null, "audio-mp3", playlistMode(), $("audioMp3Btn"));
+// the transport: picks arm a take; the START lamp commits it (v0.37.0)
+$("bestBtn").onclick = () => commitTake($("bestBtn"));
+$("studioBtn").onclick = () => {
+  $("ovBlock").open = true;
+  $("ovBlock").scrollIntoView({ block: "start" });
+};
+$("probeDetails").onclick = () => {
+  const hidden = $("probeMsg").classList.toggle("hidden");
+  $("probeDetails").textContent = hidden ? "Show details" : "Hide details";
+};
+$("audioNativeBtn").dataset.pick = "audio-native";
+$("audioM4aBtn").dataset.pick = "audio-m4a";
+$("audioMp3Btn").dataset.pick = "audio-mp3";
+$("audioNativeBtn").onclick = () => armTake("audio-native", "keep original", $("audioNativeBtn"));
+$("audioM4aBtn").onclick = () => armTake("audio-m4a", "m4a", $("audioM4aBtn"));
+$("audioMp3Btn").onclick = () => armTake("audio-mp3", "mp3", $("audioMp3Btn"));
 // the formats people kept asking for (review #9) — a picker beats raw args
 $("audioMore").onchange = () => {
   const preset = $("audioMore").value;
   $("audioMore").value = "";
   if (!preset) return;
-  const url = $("url").value.trim();
-  if (!url) { toast("paste a link first", "bad"); return; }
-  startJob(url, null, preset, playlistMode(), $("audioMore"));
+  armTake(preset, preset.replace(/^audio-/, ""), $("audioMore"));
 };
+renderTake();
 $("playlistBtn").onclick = () => startJob($("url").value.trim(), null, null, true, $("playlistBtn"));
 $("plAll").onclick = () => pickAll(true);
 $("plNone").onclick = () => pickAll(false);
@@ -2757,7 +2996,7 @@ function wireToken() {
   if (btn) {
     btn.onclick = () => {
       const done = (ok) => {
-        btn.textContent = ok ? "Copied ✓" : "Select it above";
+        btn.textContent = ok ? "Copied" : "Select it above";
         setTimeout(() => (btn.textContent = "Copy"), 1800);
       };
       if (navigator.clipboard) {

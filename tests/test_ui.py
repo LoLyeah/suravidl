@@ -195,9 +195,10 @@ def test_app_js_marks_the_remembered_quality_without_applying_it():
     assert "renderQualityRow(url, info.site_quality)" in js
     assert "function renderQualityRow(url, remembered)" in js
     assert 'q.key === remembered' in js and "last ? q.label" in js
-    # every chip still starts a download only on click
-    # the trigger button rides along so a slow start can disable it (motion pass)
-    assert "btn.onclick = () => startJob(url, q.fmt, null, false, btn)" in js
+    # every chip ARMS a take now — the transport's START commits it (v0.37.0)
+    # (the arm carries the button so a commit can disable it while it flies)
+    assert "btn.onclick = () => armTake(q.fmt, q.label, btn)" in js
+    assert "let TAKE = {" in js and "async function commitTake(" in js
 
 
 def test_index_has_the_playlist_pick_controls(tmp_path):

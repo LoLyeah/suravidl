@@ -1166,3 +1166,34 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     refuses an unknown name at the boundary. 10 new tests; suite
     583 → 593, both orders. versionCode 56. Ships the v0.35.0 workflow
     fixes in the same release (v0.35.0 was never tagged on its own).
+- **v0.37.0 — The Post House (the major overhaul).** "Impeccable my app
+    suravidl UI feels generic … modern with ios like liquid glass and
+    frosted glass … easy to use for users, with advanced options for
+    enthusiasts … multi-platform … across all screen sizes." Ran the
+    impeccable machinery end to end: the review found 25/40 with the
+    verdict "generic shell, specific instrument"; a seeded direction round
+    produced five options; the user picked The Post House (an ingest room:
+    deck, scopes, transport, patch bay, filed bins) — code-led build, no
+    comp round. The replacement world ships whole: a scope strip that reads
+    source · formats · largest for every probe; picks ARM a take and only
+    the amber START commits it (startJob returns a boolean; a commit
+    spends the take and unlights every pick — caught live: the paint loop
+    lived in armTake alone, so a spent row stayed lit); a finish that
+    speaks (one transition-fired toast with Play / Show folder, a FILED
+    stamp on the row, the FILED TAKES rail); a human-first error voice
+    with the raw engine message behind Show details; 30 drawn SVG icons
+    (the emoji die); self-hosted variable fonts (Archivo + Martian Mono,
+    OFL, latin woff2); stylesheet and markup rebuilt from the ground up
+    (1,041 + 872 lines) with every legacy contract kept (.chk,
+    .chip[aria-pressed], .ghost-sm.del, k-* kind colours). The glass
+    ladder verified live — frosted blur(14px) saturate(115%); liquid
+    blur(26px) saturate(165%) brightness(1.04) + specular gloss + amber
+    edges; Android keeps REAL blur at 11/19px and only flattens the
+    full-screen overlay; @supports falls back to solid panels — pixel
+    proof captured (footer text visibly smeared behind the fixed
+    transport). Live walk: deck → probe → arm → START → Added → Filed →
+    bins 13→14 across phone, tablet, ultrawide, light/dark/AMOLED, zero
+    console errors. Fixed en route: the mobile take readout truncated to
+    "best availa…" (12.5px reading + slimmer START), and the toast lane
+    math re-based on --tabbar-h. 19 new tests; suite 593 → 612, both
+    orders. versionCode 57. DESIGN.md rewritten to the committed system.
