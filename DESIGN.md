@@ -196,8 +196,11 @@ meta in mono) sits over a content column; at ≥1080px a FILED TAKES rail
 desktop and a fixed bottom bar under 900px (thumb reach, safe-area padding).
 The scope strip is three readouts across the top of the deck. The transport —
 what you're taking and the one button that starts it — is in-flow at the
-deck's end on desktop (sticky bottom 14px) and a fixed bar above the tab bar
-on phones (download tab only). The patch bay ("This download only") sits under
+deck's end on desktop (sticky bottom 14px) and a sticky bar parked above the
+tab bar on phones (download tab only). Sticky, never fixed: this WebView
+composites the backdrop pass in flow but not for fixed layers over scrolling
+content (device photo, 2026-10-01), and in flow the bar can never overlap
+the page's end. The patch bay ("This download only") sits under
 the deck; Settings is a tab panel with sub-tabs and a sticky Save bar that
 keeps the plate's glass and its bottom corners.
 
@@ -206,7 +209,8 @@ Spacing stays on a compact rhythm — 6 / 10 / 14 / 18 / 22px. Cards stack with
 
 ### Named Rules
 **The Stable Shell Rule.** The shell never scrolls away: header and tab strip
-stick, the mobile tab bar is fixed, the phone transport floats above it.
+stick, the mobile tab bar is fixed, the phone transport rides sticky above
+it — parked while the deck scrolls, scrolling home with the deck's end.
 Content moves; the instrument panel stays put.
 
 **The Read-Before-Start Rule.** The deck's order is fixed: source → scopes →
@@ -244,10 +248,13 @@ changing tokens, never surface by surface.
   `blur(11px) saturate(120%)`, liquid `blur(19px) saturate(165%)
   brightness(1.04)` with an accent-tinted gloss and a `.22` highlight. The
   shell may lighten the radius; it NEVER loses the material — this WebView
-  composites `backdrop-filter` correctly (proved on device pixels: ghost
-  text behind the transport measured edge energy 19 against crisp text's
-  81). Where a WebView truly cannot blur, the `@supports` block turns every
-  plate solid — a fake half-glass never ships.
+  composites `backdrop-filter` correctly in flow. One boundary is real,
+  measured on device pixels (2026-10-01): a `position: fixed` layer over
+  scrolling content does NOT get its backdrop pass composited — its
+  backdrop reads the page as if static, so floating text stays crisp
+  through the glass. Floating chrome therefore stays in flow (sticky) on
+  this host. Where a WebView truly cannot blur, the `@supports` block turns
+  every plate solid — a fake half-glass never ships.
 - **Where it lands:** header, tab bar, cards, glass buttons, the scope
   strip, the patch bay, job rows, the transport, dialogs. A dialog's
   full-screen overlay frosts behind it too (`blur(10px) saturate(120%)`

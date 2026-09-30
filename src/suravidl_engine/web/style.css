@@ -666,6 +666,15 @@ table#formats { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 #ovBlock[open] > summary { color: var(--text); }
 #ovPresetInfo { margin: 2px 0 8px; overflow-wrap: anywhere; }
 details.card { padding: 0 18px 6px; }
+/* the bay opens as a door, not a pop: the wrapper — not <details> itself,
+   whose content the browser snaps — carries max-height + opacity, driven by
+   the intercepted summary clicks in app.js. prefers-reduced-motion clamps
+   the transition itself to .001s, so the door is instant there, free. */
+#ovBlock .bay-body {
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height var(--t-base) var(--e-out), opacity var(--t-base) var(--e-out);
+}
+#ovBlock[open] .bay-body { max-height: none; opacity: 1; }
 
 /* ---------- empty states ---------- */
 .empty {
@@ -979,7 +988,11 @@ footer .linkbtn { color: var(--accent-ink); }
   .paste { flex-direction: column; }
   .paste .btn { width: 100%; }
   .transport {
-    position: fixed; left: 10px; right: 10px; z-index: 35;
+    /* sticky in the deck's flow, never fixed: this WebView composites the
+       backdrop pass in flow but not for fixed layers over scrolling content
+       (device photo, 2026-10-01 — the storage text read crisp THROUGH the
+       bar), and in flow the bar can never overlap the page's end either */
+    position: sticky; left: 10px; right: 10px; z-index: 30;
     bottom: calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom));
     gap: 10px;
   }
@@ -988,7 +1001,7 @@ footer .linkbtn { color: var(--accent-ink); }
   body:not([data-tab="download"]) .transport { display: none; }
   #toasts { left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom)); width: auto; }
   body[data-tab="settings"] #toasts { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-inset-bottom)); }
-  footer.meta { padding: 10px 14px 190px; }
+  footer.meta { padding: 10px 14px 150px; }
   h2 { font-size: 14.5px; }
   .modal { max-height: 92vh; }
   /* six sub-tabs never fit one phone row — they wrap rather than run a

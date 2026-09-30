@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.5",
+        "title": "The bar comes home",
+        "items": [
+            "The START bar blurs for real again: it rides in the page's flow now — this WebView only composites the blur for in-flow layers (and the bar can no longer sit on top of the text at the page's end).",
+            "\"This download only\" opens and closes with a door now — it grows and settles instead of popping.",
+        ],
+    },
+    {
         "version": "0.37.4",
         "title": "The backdrop pass",
         "items": [
@@ -98,19 +106,6 @@ ENTRIES = [
             "The Quality, Audio and Subtitles rows line up flush with the rest of the card.",
             "Scrollbars, text selection, the caret, input hints and number columns follow the theme — not the browser's defaults.",
             "The footer's copy path / open folder links finally read as words.",
-        ],
-    },
-    {
-        "version": "0.32.1",
-        "title": "The robustness pass",
-        "items": [
-            "Deleting a download can no longer take an older download folder with it.",
-            "Retry works with presets again, and switching between a preset and a "
-            "format no longer fails.",
-            "Files with non-English names (CJK, Cyrillic, emoji) play and open correctly.",
-            "Deleted videos take their subtitles along — including converted .srt files.",
-            "Streaming sizes stay honest, and a playlist can no longer point the "
-            "engine at local or internal addresses.",
         ],
     },
 ]

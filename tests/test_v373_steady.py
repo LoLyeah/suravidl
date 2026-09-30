@@ -74,5 +74,5 @@ def test_the_take_readout_keeps_its_room_on_a_phone():
     """"best available" survives a 393px row: the reading gives up a little
     size (12px) and the transport a little gap (10px)."""
     assert ".transport .take .reading { font-size: 12px; }" in CSS
-    seg = CSS.split(".transport {\n    position: fixed", 1)[1].split("}")[0]
+    seg = CSS.split(".transport {\n    /* sticky in the deck's flow", 1)[1].split("}")[0]
     assert "gap: 10px;" in seg

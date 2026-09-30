@@ -1266,3 +1266,21 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     the edge-energy proof, where the material lands, the intentionally
     solid surfaces (toasts, Settings Save strip), and a new Measured-Blur
     rule. Suite 624 → 626; versionCode 61.
+
+- **v0.37.5 — the bar comes home.** "there's no liquid glass effect aka the
+    blur in the 'best available' card" + "where's the animation for 'this
+    download only' opening and closing?" The zoomed photo showed the storage
+    block's text crisp THROUGH the transport — no backdrop pass composited.
+    Truth established across three versions: the in-flow glass blurred on
+    the device (v0.36 + v0.37.0), the fixed bar does not (v0.37.1+); the
+    2026-09-30 "19 vs 81 edge-energy proof" was measured through v0.37.1's
+    near-opaque fill, so it proved dimming, not blur — and this WebView
+    skips the backdrop pass for fixed layers over scrolling content (the
+    same reason the fixed bar collided with the footer's last line). The
+    phone transport rides sticky-in-flow again (also structurally unable to
+    overlap the page's end; footer leg 190px → 150px). The bay — a bare
+    <details> since M17 — now opens through a door: summary clicks are
+    intercepted so the browser never snaps the content; a .bay-body wrapper
+    transitions max-height + opacity and [open] flips when it settles
+    (500ms safety seal; programmatic opens skip the door on purpose).
+    Suite 626 → 631; versionCode 62.

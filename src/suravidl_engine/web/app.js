@@ -2925,6 +2925,48 @@ window.suravidlShared = (url) => {
   toast("shared link ready — pick a format");
 };
 
+/* the bay's door: summary clicks are intercepted (preventDefault) so
+   <details> never snaps its content in or out; the .bay-body wrapper
+   transitions max-height + opacity instead and the [open] attribute flips
+   only when the door finishes moving. prefers-reduced-motion clamps the
+   transition to .001s, so nothing waits there either. Programmatic opens
+   (Studio, the armed strip) skip the door on purpose — they are
+   "bring me there" actions. */
+function wireBayDoor(d) {
+  const body = d.querySelector(".bay-body");
+  if (!body) return;
+  const seal = () => { body.style.maxHeight = ""; body.style.opacity = ""; d.open = false; };
+  d.querySelector("summary").addEventListener("click", (e) => {
+    e.preventDefault();                            // <details> must not snap
+    if (!d.open) {                                 // open: flip first, then play
+      d.open = true;
+      body.style.maxHeight = "0px";
+      void body.offsetHeight;
+      body.style.maxHeight = body.scrollHeight + "px";
+      body.style.opacity = "1";
+      body.addEventListener("transitionend", function h(ev) {
+        if (ev.propertyName !== "max-height") return;
+        body.removeEventListener("transitionend", h);
+        if (d.open) body.style.maxHeight = "none";
+      });
+      return;
+    }
+    let done = false;                              // close: play the door, then flip
+    const sealOnce = () => { if (!done) { done = true; seal(); } };
+    body.style.maxHeight = body.scrollHeight + "px";
+    void body.offsetHeight;
+    body.style.maxHeight = "0px";
+    body.style.opacity = "0";
+    body.addEventListener("transitionend", function h(ev) {
+      if (ev.propertyName !== "max-height") return;
+      body.removeEventListener("transitionend", h);
+      sealOnce();
+    });
+    setTimeout(sealOnce, 500);                     // a door that can never jam
+  });
+}
+wireBayDoor($("ovBlock"));
+
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
