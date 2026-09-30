@@ -103,8 +103,9 @@ before they are written in stack traces, and a finished download says so.
 **Key Characteristics:**
 - Dark-first; light is the room at day (brushed alu + paper tape), AMOLED is
   the room with the lights off (true #000). One token set, three values.
-- Smoked glass over one soft room lamp — a single radial glow, no blur pass
-  (the old three-radial aurora cost phones battery for decoration).
+- Smoked glass over one soft room lamp — a single radial glow, no
+  background blur layer (the old three-radial aurora cost phones battery
+  for decoration).
 - One action colour: signal amber, only where you press or progress. Three
   state colours (scope green / tally rose / warm amber) only ever carry state.
 - Two voices, both shipped with the app: Archivo for prose, Martian Mono for
@@ -224,25 +225,51 @@ take over; the light theme's shadow warms and softens. Toasts deliberately sit
 on a near-opaque plate (Panel Solid) so text never fights the blur.
 
 ### Glass styles (the material system)
-- **Frosted (smoked):** `blur(14px) saturate(115%)`, no gloss, plain hairline
-  border. The default: matte smoked glass.
+One material, two finishes. Every plate is a thin translucent fill over a
+real `backdrop-filter` pass — the room and the content behind it stay
+visible, and that visibility IS the material. Five parts, always the same:
+fill (`--glass-bg`, `-strong` for bars), blur (`--glass-blur`), gloss image
+(`--glass-gloss`, liquid only), hairline (`--glass-border`), and one inset
+top highlight (`--glass-hi` — the glass's wet edge). Change the material by
+changing tokens, never surface by surface.
+
+- **Frosted (smoked) — the default:** `blur(14px) saturate(115%)`, no gloss,
+  `--line` hairline, `--inset-hi` highlight. Matte smoked glass: the
+  workhorse.
 - **Liquid (polished):** `blur(26px) saturate(165%) brightness(1.04)`, a
-  specular gloss gradient at 150°, brighter top highlight
-  (rgba(255,255,255,.24)), and amber-tinted borders (accent-line). The panel
-  reads wet; content behind it visibly smears.
-- **Android host:** the same blur tokens at a lighter radius — 11px
-  frosted / 19px liquid — plus a lighter settings Save bar; the full-screen
-  overlay frosts too (blur(10px) — the popup report, 2026-10-01). Everything else keeps its glass, dialogs, the transport and
-  the toasts included: this WebView composites `backdrop-filter` fine
-  (device pixels, 2026-09-30 — ghost text behind the transport measured at
-  edge 19 against crisp text's 81). The host may lighten the radius; it
-  never loses the material. A WebView that truly cannot blur still lands
-  on solid panels through the `@supports` block.
+  specular gloss at 150° (`rgba(255,255,255,.14) → .02 45% → .08`), a
+  brighter top highlight (`rgba(255,255,255,.24)`), and `--accent-line`
+  borders. Content behind it visibly smears; the panel reads wet.
+- **Host deltas (Android):** the same tokens at a lighter radius — frosted
+  `blur(11px) saturate(120%)`, liquid `blur(19px) saturate(165%)
+  brightness(1.04)` with an accent-tinted gloss and a `.22` highlight. The
+  shell may lighten the radius; it NEVER loses the material — this WebView
+  composites `backdrop-filter` correctly (proved on device pixels: ghost
+  text behind the transport measured edge energy 19 against crisp text's
+  81). Where a WebView truly cannot blur, the `@supports` block turns every
+  plate solid — a fake half-glass never ships.
+- **Where it lands:** header, tab bar, cards, glass buttons, the scope
+  strip, the patch bay, job rows, the transport, dialogs. A dialog's
+  full-screen overlay frosts behind it too (`blur(10px) saturate(120%)`
+  under the veil `rgba(4,6,9,.55)`) — the popup crisp, the room behind it
+  at a smudge. (2026-10-01: the veil used to be a flat dim; the popup read
+  as blur-less until it frosted.)
+- **Flattened on purpose:** toasts (Panel Solid — reading beats atmosphere)
+  and the phone's Settings Save strip (rows scroll beneath it). Both keep
+  hairlines and radii so they still read as plates; solid is a legibility
+  choice, never a fallback for ability.
 
 ### Named Rules
 **The Real Glass Rule.** Every blurred surface ships `-webkit-backdrop-filter`
 beside `backdrop-filter`, and unsupported engines fall back to SOLID panels
 (@supports) — never a fake half-glass. Blur is a real material, not a tint.
+
+**The Measured-Blur Rule.** Glass is judged on pixels, never by "can I
+still read the text behind it" — smeared text at phone scale still reads as
+text. Verify in three layers: computed values per style, the full alpha
+stack, and one capture with real content passing behind the plate —
+compared by edge energy (blurred vs crisp). A build that shipped working
+blur keeps it until pixels prove otherwise.
 
 **The AMOLED Hairline Rule.** Where there is no shadow (AMOLED), borders carry
 all separation; never re-introduce grey shadows there.

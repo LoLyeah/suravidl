@@ -1252,3 +1252,17 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     accent-line, 15px radius, glass fill). Take readout keeps "best
     available" whole on a phone (12px + 10px gap). Suite 620 → 624;
     versionCode 60.
+
+- **v0.37.4 — the backdrop pass.** The DESIGN.md request ("don't forget to
+    add the blur liquid glass design") turned up a doc-vs-code gap: DESIGN.md
+    claimed the overlay frost, but only the phone had it (v0.37.3) — the
+    desktop veil was still a flat dim, the exact state that made the popup
+    read as blur-less. The frost now lives on the base `.overlay` rule
+    (blur(10px) saturate(120%), veil rgba(4,6,9,.55)), one definition for
+    every host, the android-era override gone; a lying CSS comment ("desktop
+    has blurred it since v0.22") corrected. DESIGN.md's glass section is now
+    the material spec sheet: the five-part stack (fill / blur / gloss /
+    hairline / highlight), both finishes with exact tokens, host deltas with
+    the edge-energy proof, where the material lands, the intentionally
+    solid surfaces (toasts, Settings Save strip), and a new Measured-Blur
+    rule. Suite 624 → 626; versionCode 61.

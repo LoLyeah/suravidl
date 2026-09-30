@@ -5,8 +5,9 @@
    its `position: fixed` transport: after every switch the bar re-anchored
    to the panel and hung over the content (reproduced live: content-relative
    y 405 that moved with scroll, vs 699 pinned to the viewport).
-2. "What's new pop up doesn't have blur" — the android host kept a flat
-   overlay from the v0.22 cost era; the popup's backdrop frosts again.
+2. "What's new pop up doesn't have blur" — the full-screen overlay was a
+   flat veil; the popup's backdrop frosts now (v0.37.4 moved it to the
+   base rule, every host).
 3. "the chosen Bottom bar tab needs a squircle outline instead of just one
    line" — the 2px top hairline became a rounded outline.
 """
@@ -42,13 +43,14 @@ def test_the_tab_arrival_never_transforms_the_panel():
     assert "translateY" not in into
 
 
-def test_the_android_overlay_frosts_the_backdrop():
-    """The popup report ends here: the overlay carries a real backdrop pass
-    on the phone instead of a flat veil."""
-    blk = _block('html[data-host="android"] .overlay {')
+def test_the_overlay_frosts_the_backdrop():
+    """The popup report ("doesn't have blur") ends here: the veil carries a
+    real backdrop pass — one definition on the base rule (v0.37.4); the
+    android-era override is gone."""
+    blk = _block(".overlay {")
     assert "backdrop-filter: blur(" in blk
     assert "-webkit-backdrop-filter: blur(" in blk
-    assert "backdrop-filter: none" not in blk
+    assert 'html[data-host="android"] .overlay {' not in CSS
 
 
 def test_the_chosen_tab_wears_a_squircle_outline():

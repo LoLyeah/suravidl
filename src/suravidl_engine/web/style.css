@@ -790,6 +790,10 @@ body[data-tab="settings"] #toasts { bottom: 150px; }
 .overlay {
   position: fixed; inset: 0; z-index: 70;
   background: rgba(4,6,9,.55);
+  /* the veil frosts, not just dims — the popup is crisp, the room behind
+     it isn't ("What's new pop up doesn't have blur", 2026-10-01) */
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
   display: grid; place-items: center;
   padding: 18px;
   animation: fade var(--t-base) var(--e-out) both;
@@ -1061,14 +1065,8 @@ html[data-host="android"][data-glass="liquid"] {
   --glass-hi: rgba(255,255,255,.22);
   --glass-border: var(--accent-line);
 }
-html[data-host="android"] .overlay {
-  /* 2026-10-01, "What's new pop up doesn't have blur": the flat veil alone
-     read as no blur behind dialogs. The backdrop frosts now — desktop has
-     blurred it since v0.22; the phone joins with the lighter radius. */
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
-  background: rgba(4,6,9,.55);
-}
+/* the overlay's frost lives on the base .overlay rule as of v0.37.4 —
+   one definition, every host (the android-era override is gone) */
 /* 2026-09-30, corrected: v0.37.1 briefly made the floating surfaces
    (dialogs, the transport, toasts) near-opaque here on the premise that
    this WebView composites rgba and skips backdrop-filter. The premise was

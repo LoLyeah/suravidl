@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.4",
+        "title": "The backdrop pass",
+        "items": [
+            "Every dialog now frosts the whole screen behind it — on desktop and phone alike (the flat dim veil that made the popup look blur-less is gone).",
+            "The liquid-glass material is written down properly — fill, blur, gloss and edge per style and per host, in DESIGN.md.",
+        ],
+    },
+    {
         "version": "0.37.3",
         "title": "The steady pass",
         "items": [
@@ -103,14 +111,6 @@ ENTRIES = [
             "Deleted videos take their subtitles along — including converted .srt files.",
             "Streaming sizes stay honest, and a playlist can no longer point the "
             "engine at local or internal addresses.",
-        ],
-    },
-    {
-        "version": "0.32.0",
-        "title": "The What's new card",
-        "items": [
-            "After every update, the app shows what changed — once, on the first launch.",
-            "Re-read it any time from Settings → What's new.",
         ],
     },
 ]
