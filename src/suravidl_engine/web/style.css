@@ -701,6 +701,17 @@ details.card { padding: 0 18px 6px; }
 .jobtitle {
   flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+/* a phone title ellipsises ("Japanese Wagyu…") and there is no hover to
+   reveal it: a tap unfolds the whole line at the row's FULL width — with
+   the pills beside it the collapsed title can be ~30px wide, so the open
+   title takes its own wrapped line (2026-10-01 report — an open title
+   without the full-width basis wrapped one letter per line). */
+.jobtop:has(.jobtitle.open) { flex-wrap: wrap; }
+.jobtitle.open {
+  flex: 1 0 100%; white-space: normal; overflow: visible;
+  text-overflow: clip; word-break: break-word;
 }
 .job .jmeta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .job .jrow { margin-top: 9px; }
@@ -976,9 +987,17 @@ footer .linkbtn { color: var(--accent-ink); }
     flex: 1; flex-direction: column; gap: 2px;
     padding: 5px 4px;
     border: 1px solid transparent; border-radius: 15px;
-    min-height: 44px; justify-content: center;
+    min-height: 44px; justify-content: center; position: relative;
     transition: color var(--t-fast) ease, background var(--t-fast) ease,
                 border-color var(--t-fast) ease;
+  }
+  /* the count rides the icon's corner, OUT of flow: as a flow child of the
+     centered column it stretched the tab and pushed icon+label up against
+     the siblings (2026-10-01 photo — numbered Queue sat higher than the
+     rest). Absolutely placed + inert: zero layout impact anywhere. */
+  .badge {
+    position: absolute; top: 2px; left: calc(50% + 6px);
+    pointer-events: none;
   }
   /* the chosen tab wears a squircle outline, not a hairline (2026-10-01) */
   .tab.active { border-color: var(--accent-line); background: var(--glass-bg); }

@@ -64,7 +64,7 @@ def test_the_chosen_tab_wears_a_squircle_outline():
     flex: 1; flex-direction: column; gap: 2px;
     padding: 5px 4px;
     border: 1px solid transparent; border-radius: 15px;
-    min-height: 44px; justify-content: center;
+    min-height: 44px; justify-content: center; position: relative;
     transition: color var(--t-fast) ease, background var(--t-fast) ease,
                 border-color var(--t-fast) ease;
   }"""

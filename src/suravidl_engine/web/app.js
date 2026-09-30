@@ -1452,6 +1452,9 @@ function jobRow(j) {
   const top = el("div", "jobtop");
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
+  // the title ellipsises on a phone and nothing hover-reveals it there: a
+  // tap unfolds the whole line (2026-10-01 report)
+  title.onclick = () => { title.classList.toggle("open"); };
   top.append(title, el("span", "pill " + j.status, j.status));
   // a finished take gets the stamp (v0.37.0: completion used to be a pill
   // you never saw flip in a tab you were not on)

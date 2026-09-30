@@ -1300,3 +1300,16 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     bottom bar" — the settings tab's +150px lane floated toasts over the
     panel; one phone lane now (tab bar + 84px, clears the Save strip).
     Suite 631 → 635; versionCode 63.
+
+- **v0.37.7 — the readable queue.** Device report (17:32 photo + a crop).
+    (1) "when there's a queue, the number pushes the queue button" — the
+    phone tab is a centered column; the count badge was a flow child, so
+    its height shifted the tab's icon+label up against the siblings. The
+    badge is absolute on the icon's corner now (inert, zero layout
+    impact; verified live: icon Y identical across all four tabs with the
+    badge on/off). (2) "expand the card when you click on the queue card,
+    so I can read at least the full title" — a tap on the title unfolds
+    it; the open title takes the row's FULL width (flex basis 100% + a
+    wrapping .jobtop:has rule — beside the pills its box can collapse to
+    ~30px and the naive fix wrapped one letter per line, caught in the
+    live harness). Suite 635 → 637; versionCode 64.
