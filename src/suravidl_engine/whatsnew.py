@@ -15,11 +15,17 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.2",
+        "title": "The glass stays",
+        "items": [
+            "The phone's frosted and liquid glass keeps its real blur — floating bars, dialogs and toasts included. (A fix earlier in this release had briefly replaced them with solid plates; that was a wrong call, and it is undone.)",
+        ],
+    },
+    {
         "version": "0.37.1",
         "title": "The device pass",
         "items": [
             "Switching tabs is immediate now — the next screen starts the moment you tap, instead of waiting for the old one to finish leaving.",
-            "On a phone, floating bars and dialogs are solid where the screen can't blur — nothing shows through their text anymore.",
             "The What's new card no longer draws a scrollbar on touch screens, and the Settings sub-tabs wrap onto two rows instead of running off the edge.",
             "A failed download's raw error reads across the full width, not one word per line.",
         ],
@@ -105,14 +111,6 @@ ENTRIES = [
             "instead of dying half-way (Instagram/Facebook/TikTok-style links).",
             "Streaming (HLS) finds now show an estimated size — like "
             "\"HLS · ~42 MB\" — instead of nothing.",
-        ],
-    },
-    {
-        "version": "0.30.0",
-        "title": "The in-app browser stays put",
-        "items": [
-            "Pages that try to kick you into another app (TikTok's app link) are "
-            "refused — the page stays open and your finds are kept.",
         ],
     },
 ]

@@ -1204,11 +1204,13 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     animation." Each photo traced to a cause: (1) the custom webkit
     scrollbar rules had overridden Android's native transient overlay with
     always-on 9px bars that read like a desktop bar inside a phone dialog —
-    6px on desktop, hidden entirely on touch; (2) the WebView composites
-    rgba but silently skips backdrop-filter (dialogs and the transport
-    showed their content THROUGH them, crisp), so floating text-bearing
-    plates go near-opaque on the android host (--glass-float, 95–96%) with
-    no backdrop pass — the browser keeps the full glass (26px verified);
+    6px on desktop, hidden entirely on touch; (2) [MIS-DIAGNOSIS, reverted
+    in v0.37.2] I read the device screenshots as showing the transport and
+    dialogs unblurred, and made the floating plates near-opaque on the
+    android host (--glass-float); re-measuring the same screenshots (edge
+    energy: blurred ghost text 19 vs crisp text 81 behind the transport)
+    proves the phone compositing the real blur — the revert restores the
+    shared glass;
     (3) the tab swap was serial — a .14s exit fade, THEN a .4s panel wash:
     the next screen only STARTED once the old one had finished leaving; the
     swap is synchronous now with one 140ms arrival lift and no event
@@ -1222,3 +1224,15 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     they wrap to two. Suite 612 → 620; two motion-contract tests rewritten
     to the new truth; the phone capture rig still drops the fixed transport
     layer (DOM + computed styles are the truth). versionCode 58.
+
+- **v0.37.2 — the glass stays (revert).** The user: "Why did you delete the
+    blur for the Android. The previous version has a working liquid glass
+    blur." Correct. My v0.37.1 read of their screenshots was wrong — soft
+    ghost text at a small blur radius reads as "crisp" at phone scale, and
+    I trusted that reading over both the pixels and their own history. The
+    numeric pass (blurred ghost text 19 vs crisp 81 behind the transport;
+    modal ghosts 44 vs dialog text 57–70) confirms the WebView composites
+    backdrop-filter. The near-opaque float plates, their three theme tokens
+    and their pins are gone; the shared glass (11/19px on android) covers
+    dialogs, the transport and toasts again. Everything else from the
+    device pass stands. versionCode 59.

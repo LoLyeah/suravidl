@@ -230,14 +230,14 @@ on a near-opaque plate (Panel Solid) so text never fights the blur.
   specular gloss gradient at 150°, brighter top highlight
   (rgba(255,255,255,.24)), and amber-tinted borders (accent-line). The panel
   reads wet; content behind it visibly smears.
-- **Android host:** the same blur tokens, lighter radius — 11px frosted /
-  19px liquid — plus a flattened full-screen overlay and settings Save bar.
-  But the shell is trusted only as far as it can be audited: this WebView
-  composites rgba and silently skips backdrop-filter, so floating plates
-  that text reads over (the transport, dialogs, toasts) go near-opaque
-  (`--glass-float`, 95–96% per theme) with no backdrop pass at all — an
-  opaque plate paying for an invisible blur is a lie and a compositor
-  cost. The host may lighten the radius; it never fakes the glass.
+- **Android host:** the same blur tokens at a lighter radius — 11px
+  frosted / 19px liquid — plus a flattened full-screen overlay and settings
+  Save bar. Everything else keeps its glass, dialogs, the transport and
+  the toasts included: this WebView composites `backdrop-filter` fine
+  (device pixels, 2026-09-30 — ghost text behind the transport measured at
+  edge 19 against crisp text's 81). The host may lighten the radius; it
+  never loses the material. A WebView that truly cannot blur still lands
+  on solid panels through the `@supports` block.
 
 ### Named Rules
 **The Real Glass Rule.** Every blurred surface ships `-webkit-backdrop-filter`

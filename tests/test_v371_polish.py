@@ -2,9 +2,9 @@
 
 1. the What's-new list scrolled behind a fat desktop scrollbar — the custom
    webkit rules had overridden Android's native transient overlay;
-2. the phone's floating glass was transparent but NOT blurred (the WebView
-   composites rgba and silently skips backdrop-filter), so the transport and
-   the dialogs showed their content THROUGH them, crisp and colliding;
+2. (mis-diagnosis, reverted in v0.37.2) the floating glass was believed
+   blur-less on the phone and briefly made near-opaque; device pixels prove
+   the blur renders — the pin below guards the revert;
 3. a tab swap was serial: the old screen faded out, and only after it was
    GONE did the new screen start arriving (plus an extra .4s panel wash);
 4. Settings sub-tabs swapped with no transition at all — the only navigation
@@ -66,27 +66,22 @@ def test_the_dialog_scroller_wears_a_hairline_and_loses_it_on_touch():
     assert "scrollbar-width: none" in blk
 
 
-# --- 2. the honest plate on a WebView that cannot blur ---------------------
+# --- 2. the floating glass keeps its real blur (the revert) ----------------
 
-def test_the_touched_glass_plates_read_at_phone_opacity():
-    """Backdrop-filter is a claim the shell cannot audit, and the photos show
-    this shell compositing rgba while skipping the blur: text read THROUGH
-    the transport and the dialogs. Floating surfaces go near-opaque on the
-    phone; the browser keeps the real thing."""
-    for theme in ("dark", "light", "amoled"):
-        b = _theme_block(theme)
-        assert "--glass-float:" in b, theme + " has no float-plate token"
-        val = b.split("--glass-float:")[1].split(";")[0]
-        alpha = float(val.rsplit(",", 1)[1].strip().rstrip(")"))
-        assert alpha >= 0.9, f"{theme} float plate is see-through ({alpha})"
-    prelude = CSS.split('html[data-host="android"] .modal,')[1].split("{")[0]
-    for sel in (".transport", ".toast"):
-        assert sel in prelude, sel
-    blk = _block('html[data-host="android"] .modal,')
-    assert "var(--glass-float)" in blk
-    assert "background-image: none" in blk
-    assert "backdrop-filter: none" in blk, \
-        "an opaque plate still pays for a blur nobody can see"
+def test_the_floating_glass_keeps_its_blur_on_the_phone():
+    """v0.37.1 flipped dialogs and the transport to near-opaque plates on the
+    android host on the premise that this WebView skips backdrop-filter. The
+    premise was wrong: an edge-energy pass over the same device screenshots
+    (blurred ghost text at 19 against crisp text at 81 behind the transport)
+    shows the phone compositing the real blur."""
+    assert "--glass-float" not in CSS, "the near-opaque float plates are back"
+    assert 'html[data-host="android"] .modal' not in CSS
+    assert 'html[data-host="android"] .transport' not in CSS
+    assert 'html[data-host="android"] .toast' not in CSS
+    # and the floating surfaces consume the shared material
+    for sel in (".modal {", ".transport {"):
+        blk = _block(sel)
+        assert "backdrop-filter: var(--glass-blur)" in blk, sel
 
 
 def test_the_glass_blur_css_survives_somewhere_it_can_run():

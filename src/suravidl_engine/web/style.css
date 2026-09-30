@@ -45,7 +45,6 @@
   --shadow: 0 26px 60px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.35);
   --inset-hi: rgba(255,255,255,.10);
   --panel-solid: #14181d;
-  --glass-float: rgba(21,25,30,.95);   /* floating plates on shells that skip blur */
   --bar-bg: rgba(10,12,15,.78);
   --sheen: rgba(255,255,255,.07);
   --sel: rgba(232,163,62,.30);
@@ -74,7 +73,6 @@ html[data-theme="light"] {
   --shadow: 0 18px 44px rgba(40,34,24,.18), 0 2px 6px rgba(40,34,24,.10);
   --inset-hi: #fff;
   --panel-solid: #f7f5f0;
-  --glass-float: rgba(250,248,244,.96);
   --bar-bg: rgba(231,228,222,.82);
   --sheen: rgba(255,255,255,.6);
   --sel: rgba(192,122,22,.25);
@@ -103,7 +101,6 @@ html[data-theme="amoled"] {
   --shadow: none;
   --inset-hi: rgba(255,255,255,.10);
   --panel-solid: #0b0d10;
-  --glass-float: rgba(8,10,12,.96);
   --bar-bg: rgba(0,0,0,.85);
   --sheen: rgba(255,255,255,.06);
   --sel: rgba(232,163,62,.34);
@@ -1062,20 +1059,15 @@ html[data-host="android"][data-glass="liquid"] {
 html[data-host="android"] .overlay {
   backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4,6,9,.72);
 }
-/* The phone keeps the instrument face HONEST: WebViews composite the rgba
-   but silently skip backdrop-filter, so a light translucent plate there is
-   text you can read THROUGH, blurred by nothing (2026-09-30 screenshots:
-   the transport and the dialogs). Floating surfaces that text reads over go
-   near-opaque on the phone; the browser keeps the real glass. */
-html[data-host="android"] .modal,
-html[data-host="android"] .transport,
-html[data-host="android"] .toast {
-  background: var(--glass-float);
-  background-image: none;
-  /* at 96% the blur underneath it is invisible work — the plate is the
-     material; this is also the cheapest layer on the phone's compositor */
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-}
+/* 2026-09-30, corrected: v0.37.1 briefly made the floating surfaces
+   (dialogs, the transport, toasts) near-opaque here on the premise that
+   this WebView composites rgba and skips backdrop-filter. The premise was
+   wrong — an edge-energy pass over the user's own device screenshots
+   (blurred ghost text at 19 vs crisp text at 81, behind the transport)
+   shows the phone compositing the real blur. The floating surfaces keep
+   the same glass as everything else: the shell may lighten the radius,
+   it never loses the material. */
+
 /* the Settings Save strip is the one foot that stays solid — content scrolls
    UNDER it; the other dialogs' feet were never meant to be slabs (the
    black bar behind Got it / Cancel / Delete, 2026-09-30) */
