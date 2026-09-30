@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.1",
+        "title": "Straight to Download",
+        "items": [
+            "The app opens on the Download page again \u2014 quitting and reopening no longer drops you back on whichever tab you last touched. A URL that names a tab (like a #settings bookmark) still opens it.",
+        ],
+    },
+    {
         "version": "0.38.0",
         "title": "Pine & cream",
         "items": [
@@ -90,16 +97,6 @@ ENTRIES = [
             "A finished download speaks up: a Filed toast with Play and Show folder, a FILED stamp on the row, and the take shelved in the FILED TAKES rail.",
             "Errors talk like people — plain words first (\"the site says this link does not exist (404) — check it was copied whole\"), with the raw engine message behind Show details.",
             "Drawn icons replace every emoji, and the app now ships its own two fonts — no more system-font stand-ins. Liquid Glass is the polished style, Frosted the matte one.",
-        ],
-    },
-    {
-        "version": "0.36.0",
-        "title": "A preset that stays",
-        "items": [
-            "Settings → Presets has a Default preset: pick one and it rides every new download — no re-applying.",
-            "Anything a download itself says still wins: its own preset, a quality pick, or This-download-only fields.",
-            "If that preset is deleted later, the setting says so instead of failing.",
-            "Also in this release: the download-end preset workflow — the armed strip on the video card, toasts that name the preset that rode, and a quiet sigh when a quality pick replaces an audio preset.",
         ],
     },
 ]

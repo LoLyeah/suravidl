@@ -1324,3 +1324,13 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     --mark-tile/--mark-arrow: pine by day, the cream chip at night/AMOLED
     (the pine tile measured 1.8:1 on graphite — it sank). Suite 637 → 644;
     versionCode 65.
+
+- **v0.38.1 — straight to Download.** Report: "After I quit, and opened the app
+    again, can you make download as the default page?" The boot restored the
+    last tab from localStorage (suravidl.tab) — the phone loads a fresh
+    http://127.0.0.1:PORT/ each launch, so the remembered key always won. The
+    restore (const + write + read) is gone: boot = hash || download. The hash
+    stays a real address (a #settings link still opens Settings; a mid-session
+    reload keeps its tab). Verified live on all four boot paths (stale key →
+    download, #settings → settings, reload #queue → queue, fresh → download).
+    Suite 644 → 647; versionCode 66.

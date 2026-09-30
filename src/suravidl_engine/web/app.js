@@ -2499,7 +2499,6 @@ document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
 
 /* ---------- the shell: four tabs, hash-routed ---------- */
 const TABS = ("download queue settings ytdlp").split(" ");
-const TAB_KEY = "suravidl.tab";
 
 function showTab(name, opts) {
   const target = TABS.includes(name) ? name : "download";
@@ -2530,7 +2529,6 @@ function showTab(name, opts) {
       b.setAttribute("aria-selected", t === target ? "true" : "false");
     });
   });
-  try { localStorage.setItem(TAB_KEY, target); } catch (_) { /* private mode */ }
   if (location.hash.slice(1) !== target) {
     history.replaceState(null, "", "#" + target);
   }
@@ -3066,14 +3064,13 @@ initPlayer();
 initFolderSheet();
 initBatch();
 initArchive();
-/* start on the remembered tab, unless the URL names one */
+/* Start on Download — a quit and reopen is a fresh start, not a return to
+   wherever the device was left (v0.38.1 report). The URL stays a real
+   address: a hash that names a tab (#settings in a bookmark or a link)
+   still opens it. */
 (function bootTab() {
-  let want = location.hash.slice(1);
-  if (!TABS.includes(want)) {
-    try { want = localStorage.getItem(TAB_KEY) || "download"; }
-    catch (_) { want = "download"; }
-  }
-  showTab(want, { keepScroll: true });
+  const want = location.hash.slice(1);
+  showTab(TABS.includes(want) ? want : "download", { keepScroll: true });
 })();
 refreshJobs();
 setInterval(refreshJobs, 1200);
