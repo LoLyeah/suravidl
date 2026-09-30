@@ -65,13 +65,16 @@ def test_the_probed_list_stacks_instead_of_overflowing():
     assert _block("#formats td.fmt-s", seg)       # size gets its own line
 
 
-def test_the_phone_toast_docks_above_the_tab_bar():
-    """One lane on the phone — the settings tab no longer shoves the toast
-    into the middle of the panel (the Save strip clears at +72px)."""
+def test_the_phone_toast_lane_is_adaptive():
+    """v0.38.2 report: on Queue the lane hung 84px up over nothing ("above
+    something missing"). The fallback is just above the bar now, and
+    syncToastLane() lifts it only over furniture that is really docked."""
     seg = _mobile_seg(want="#toasts")
-    assert 'body[data-tab="settings"] #toasts' not in seg
     lane = _block("#toasts {", seg)
     assert "--tabbar-h" in lane
+    assert "+ 12px" in lane
+    assert 'body[data-tab="download"] #toasts' not in seg
+    assert 'body[data-tab="settings"] #toasts' not in seg
 
 
 def test_the_phone_transport_pours_dense():

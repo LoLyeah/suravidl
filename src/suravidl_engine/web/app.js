@@ -165,6 +165,35 @@ async function commitTake(btn) {
 }
 
 /* ---------- toasts ---------- */
+/** Keep the phone's toast lane clear of the functional strips that are
+ *  ACTUALLY docked at the bottom right now — the transport once it pins
+ *  (it is sticky, so at the top of a page it is not down there), the
+ *  settings Save strip once it docks. Nothing docked: the lane drops to
+ *  just above the tab bar (v0.38.2 report: a fixed 84px lane hovered
+ *  "above something missing" on Queue). Desktop keeps the CSS lane. */
+function syncToastLane() {
+  const host = $("toasts");
+  if (!host) return;
+  if (!window.matchMedia || !matchMedia("(max-width: 899px)").matches) {
+    host.style.bottom = "";
+    return;
+  }
+  const vh = window.innerHeight;
+  let top = Infinity;
+  for (const el of document.querySelectorAll(".transport, #panel-settings .modal-foot")) {
+    const r = el.getBoundingClientRect();
+    if (r.height < 8 || r.top > vh || r.bottom < 0) continue;   // hidden or gone
+    if (r.bottom < vh - 140) continue;                          // in the flow, not docked
+    top = Math.min(top, r.top);
+  }
+  host.style.bottom = top === Infinity ? "" : Math.round(vh - (top - 8)) + "px";
+}
+window.addEventListener("resize", syncToastLane, { passive: true });
+// capture: the phone panels can be their own scroll containers
+window.addEventListener("scroll", () => {
+  if ($("toasts").children.length) syncToastLane();
+}, { passive: true, capture: true });
+
 /** msg, kind ("ok" | "bad" | "info"), and optionally:
  *  - sticky:  do not time out; it stays until dismissed (an update notice)
  *  - actions: [{label, prime, onClick}] — real choices on the toast itself.
@@ -190,6 +219,7 @@ function toast(msg, kind = "ok", opts) {
   } else {
     t.onclick = () => dismiss(t);
   }
+  syncToastLane();
   $("toasts").append(t);
   if (!(opts && opts.sticky)) setTimeout(() => dismiss(t), 4200);
   return t;
@@ -1604,6 +1634,17 @@ function jobRow(j) {
     }
     trashHost = r;
     row.append(r);
+    // the unfolded card reads like a receipt (v0.38.2: "other than name show
+    // us the file size and the location too — it's expanding for a reason").
+    // Collapsed rows keep the compact strip; the title tap unfolds both.
+    const details = el("div", "jdetails");
+    details.append(
+      el("span", "jdlbl", "size"),
+      el("span", "jdval", j.size_bytes != null ? humanBytes(j.size_bytes) : "—"),
+      el("span", "jdlbl", "saved"),
+      el("span", "jdpath", j.filepath || "—"),
+    );
+    row.append(details);
     if (j.note) row.append(el("div", "jobhint", j.note));
   }
 
@@ -2539,6 +2580,7 @@ function showTab(name, opts) {
   if (target === "ytdlp") loadOptions(false);
   if (target === "queue") refreshJobs();
   if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });
+  syncToastLane();
 }
 
 document.querySelectorAll("#tabs .tab").forEach((b) => {

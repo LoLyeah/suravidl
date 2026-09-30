@@ -134,18 +134,15 @@ def test_mobile_toasts_clear_the_tab_bar_and_its_safe_area():
 
 
 def test_mobile_toasts_clear_the_settings_save_bar():
-    """Settings pins a Save bar into the same lane. Two toasts over it left a
-    sliver of the button showing through the gap — on the one screen where
-    everyone taps a theme or glass swatch. Since v0.37.6 the phone has ONE
-    lane (tab bar + 84px): it docks the toast "after the bottom bar" on
-    every tab (the old settings-only +150px lane floated it over the panel,
-    2026-10-01 photo) while still clearing the Save strip, whose phone top
-    edge sits at tab bar + 8 + ~64px."""
+    """Settings pins a Save strip into the lane above the tab bar. The phone
+    lane now falls back to just above the bar and rises only when a strip is
+    really docked (v0.38.2: syncToastLane() measures; one static 84px lane
+    read as "above something missing" on Queue, 2026-10-01)."""
     lane = _mobile_block("#toasts {")
     rule = lane.split("#toasts {")[1].split("}")[0]
     m = re.search(r"(\d+)px", rule.split("bottom:")[1].split(";")[0])
-    assert m and m.group(1) == "84", rule
-    assert 'body[data-tab="settings"] #toasts' not in lane
+    assert m and m.group(1) == "12", rule
+    assert 'body[data-tab="settings"] #toasts { bottom: calc(' not in lane
 
 
 def test_show_tab_marks_the_body_so_css_can_react():

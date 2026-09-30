@@ -55,6 +55,34 @@ def _stop_requested(job: dict) -> bool:
     """
     return job["status"] in ("cancelled", "paused")
 
+
+def _stat_size(job: dict) -> int | None:
+    """Bytes on disk for a job's files — what the expanded queue card shows.
+
+    A single-file row reads its filepath (the record's true size when the
+    download is finished — a merged download's `files` also lists the muxed
+    fragments, so summing would double-count). A playlist row's filepath is
+    a folder, so its finished entries are summed instead. None while nothing
+    is on disk (v0.38.2 report: "show us the file size and the location").
+    """
+    path = job.get("filepath")
+    try:
+        if path and os.path.isfile(path):
+            return os.path.getsize(path)
+    except OSError:
+        pass
+    total, found = 0, False
+    for f in job.get("files") or []:
+        if f == path:
+            continue
+        try:
+            if os.path.isfile(f):
+                total += os.path.getsize(f)
+                found = True
+        except OSError:
+            continue
+    return total if found else None
+
 # A URL longer than this is junk, not a link (the audit found the engine
 # happily storing 5000 characters of "xxxx…" as a job).
 URL_MAX = 4096
@@ -393,6 +421,7 @@ class JobManager:
                 job["partials"] = None
         else:
             job["partials"] = None
+        job["size_bytes"] = _stat_size(job)
         return job
 
     def _save(self, job: dict):
@@ -503,11 +532,19 @@ class JobManager:
 
     def get(self, job_id: str) -> dict:
         with self._lock:
-            return dict(self._jobs[job_id])
+            job = dict(self._jobs[job_id])
+        job["size_bytes"] = _stat_size(job)
+        return job
 
     def list(self) -> list[dict]:
         with self._lock:
-            return [dict(j) for j in self._jobs.values()]
+            jobs = [dict(j) for j in self._jobs.values()]
+        # the size on disk is read per call: a listing is how the queue card
+        # learns it, and the worker's in-memory dict never stats anything
+        # (v0.38.2 — without this the API answered size_bytes: null)
+        for j in jobs:
+            j["size_bytes"] = _stat_size(j)
+        return jobs
 
     def cancel(self, job_id: str) -> dict:
         """Cancel a queued or running job. Running ones stop at the next hook."""

@@ -729,6 +729,20 @@ details.card { padding: 0 18px 6px; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   flex: 1; min-width: 0;
 }
+/* the unfolded card reads like a receipt: size + the full saved path
+   (v0.38.2 report — "other than name show us the file size and the
+   location too; it's expanding for a reason"). Collapsed rows keep the
+   compact ellipsised strip above; the title tap unfolds both. */
+.job:has(.jobtitle.open) .jdetails {
+  display: grid; grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 12px; margin-top: 9px; padding-top: 8px;
+  border-top: 1px dashed var(--line-soft);
+  font-family: "Martian Mono", ui-monospace, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.5;
+}
+.jdetails { display: none; }
+.jdetails .jdlbl { color: var(--dim); }
+.jdetails .jdval, .jdetails .jdpath { color: var(--text); overflow-wrap: anywhere; }
 .jobhint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 /* the FILED stamp — a take that landed */
 .job .stamp, .stamp {
@@ -812,7 +826,7 @@ details.card { padding: 0 18px 6px; }
 .toast .toactions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; flex: none; }
 .toast .toactions .ghost-sm { white-space: nowrap; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
-body[data-tab="settings"] #toasts { bottom: 150px; }
+body[data-tab="settings"] #toasts { bottom: 150px; }   /* desktop: above the sticky Save foot (phones override in the mobile block — v0.38.2) */
 
 /* ---------- overlays & modals ---------- */
 .overlay {
@@ -1026,12 +1040,14 @@ footer .linkbtn { color: var(--accent-ink); }
   .transport .take .reading { font-size: 12px; }
   #bestBtn { padding: 11px 16px; }
   body:not([data-tab="download"]) .transport { display: none; }
-  #toasts { left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom)); width: auto; }
-  /* one toast lane on the phone — right above the tab bar (it clears the
-     sticky Save strip, whose top edge sits at tab bar + ~72px). The old
-     settings-only +150px lane floated the toast over the panel's content
-     and read as "centered" (2026-10-01 photo).
-     A probed list cannot fit a phone row: the four columns re-stack —
+  /* the lane's fallback is just above the tab bar; when a functional strip
+     is actually docked at the bottom (the pinned transport, the settings
+     Save strip) syncToastLane() lifts it above whatever sits there
+     (v0.38.2 report: a fixed 84px lane hovered "above something missing"
+     on Queue — and the transport is sticky, so on Download it is only at
+     the bottom when scrolled there). */
+  #toasts { left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)); width: auto; }
+  /* A probed list cannot fit a phone row: the four columns re-stack —
      quality + Take on the first line, the format beneath, the size last
      (2026-10-01 photo: Take buttons ran off the right edge). */
   #formats thead { display: none; }

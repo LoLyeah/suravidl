@@ -1334,3 +1334,21 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     reload keeps its tab). Verified live on all four boot paths (stale key →
     download, #settings → settings, reload #queue → queue, fresh → download).
     Suite 644 → 647; versionCode 66.
+
+- **v0.38.2 — the receipt and the lane.** Two device reports (06:23 photo,
+    2026-10-01). (1) "Why the toast is still way above the bottom bar like
+    it's above something missing? ... make it adaptive": the phone lane was
+    pinned at bar + 84px everywhere — a value tuned for the Download
+    transport, which is STICKY and only sits at the bottom once the page is
+    long enough (a probed list) — so on Queue it hovered over nothing. The
+    lane now MEASURES (syncToastLane): its fallback is bar + 12px; when the
+    transport or the settings Save strip is really docked in the bottom
+    140px band it lifts to 8px above that furniture. Verified live at
+    393x852: Queue 9px above the bar; probed Download lifts to 707 vs
+    transport top 715 (inline bottom: 145px); Settings 8px above the strip.
+    (2) "in Queue when the card expand ... show us the file size and the
+    location too": the unfolded card gains a receipt (size + full saved
+    path, mono, wrapping); the engine stats the real bytes — size_bytes in
+    the row serializer AND in the live get()/list() copies (the in-memory
+    dict never passes _row_to_job — caught live when the API answered
+    null). Suite 647 → 653; versionCode 67.

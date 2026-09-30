@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.2",
+        "title": "The receipt and the lane",
+        "items": [
+            "Toasts and the update notice sit right above the bottom bar on tabs where nothing is docked \u2014 they only lift when your transport (or the Settings Save strip) is actually there. No more hovering over a gap.",
+            "Tap a finished download's title and the card reads like a receipt now: the file size and the full saved location, in full \u2014 not just the name.",
+        ],
+    },
+    {
         "version": "0.38.1",
         "title": "Straight to Download",
         "items": [
@@ -86,17 +94,6 @@ ENTRIES = [
             "Switching tabs is immediate now — the next screen starts the moment you tap, instead of waiting for the old one to finish leaving.",
             "The What's new card no longer draws a scrollbar on touch screens, and the Settings sub-tabs wrap onto two rows instead of running off the edge.",
             "A failed download's raw error reads across the full width, not one word per line.",
-        ],
-    },
-    {
-        "version": "0.37.0",
-        "title": "The Post House",
-        "items": [
-            "The whole app wears a new face: an ingest room with a scope strip over the deck — every link reads out source · formats · largest before anything downloads.",
-            "Picks now arm a take; the amber START fires it. Quality chips and format rows plan the download — nothing starts from a table row anymore.",
-            "A finished download speaks up: a Filed toast with Play and Show folder, a FILED stamp on the row, and the take shelved in the FILED TAKES rail.",
-            "Errors talk like people — plain words first (\"the site says this link does not exist (404) — check it was copied whole\"), with the raw engine message behind Show details.",
-            "Drawn icons replace every emoji, and the app now ships its own two fonts — no more system-font stand-ins. Liquid Glass is the polished style, Frosted the matte one.",
         ],
     },
 ]
