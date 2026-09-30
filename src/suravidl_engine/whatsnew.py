@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.6",
+        "title": "The board reads",
+        "items": [
+            "A probed list no longer runs off the phone's right edge — each format row re-stacks: quality and its Take button on top, the format beneath, the size last.",
+            "Toasts dock right above the bottom bar on every tab (the settings tab no longer floats them over the page).",
+            "The START bar and the update popup pour denser on the phone — the readout and the dialog never share pixels with the page behind them again.",
+        ],
+    },
+    {
         "version": "0.37.5",
         "title": "The bar comes home",
         "items": [
@@ -95,17 +104,6 @@ ENTRIES = [
             "Presets are editable now: apply one, change the fields, and press Update to change it for good.",
             "You can save the This download only block as a preset, right from the download tab.",
             "An applied preset spells out every option it carries — including ones the block has no field for.",
-        ],
-    },
-    {
-        "version": "0.33.0",
-        "title": "The polish pass",
-        "items": [
-            "A failed probe now shows in red, like every other error — it used to whisper in grey.",
-            "Short clips stop claiming to be \"0 min\".",
-            "The Quality, Audio and Subtitles rows line up flush with the rest of the card.",
-            "Scrollbars, text selection, the caret, input hints and number columns follow the theme — not the browser's defaults.",
-            "The footer's copy path / open folder links finally read as words.",
         ],
     },
 ]

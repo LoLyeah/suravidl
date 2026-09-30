@@ -45,12 +45,15 @@ def test_the_tab_arrival_never_transforms_the_panel():
 
 def test_the_overlay_frosts_the_backdrop():
     """The popup report ("doesn't have blur") ends here: the veil carries a
-    real backdrop pass — one definition on the base rule (v0.37.4); the
-    android-era override is gone."""
+    real backdrop pass on the base rule. The android host re-values the
+    veil's COLOR only (the dense v0.36 veil) — it must never touch the
+    frost itself."""
     blk = _block(".overlay {")
     assert "backdrop-filter: blur(" in blk
     assert "-webkit-backdrop-filter: blur(" in blk
-    assert 'html[data-host="android"] .overlay {' not in CSS
+    veil = _block('html[data-host="android"] .overlay {')
+    assert "rgba(3, 5, 12, .72)" in veil
+    assert "backdrop-filter" not in veil
 
 
 def test_the_chosen_tab_wears_a_squircle_outline():

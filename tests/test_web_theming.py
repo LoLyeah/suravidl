@@ -136,19 +136,16 @@ def test_mobile_toasts_clear_the_tab_bar_and_its_safe_area():
 def test_mobile_toasts_clear_the_settings_save_bar():
     """Settings pins a Save bar into the same lane. Two toasts over it left a
     sliver of the button showing through the gap — on the one screen where
-    everyone taps a theme or glass swatch."""
-    rule = _mobile_block('body[data-tab="settings"] #toasts')
-    assert 'body[data-tab="settings"] #toasts' in rule
-    default_bottom = rule.split("#toasts {")[1].split("bottom:")[1].split(";")[0]
-    settings_bottom = rule.split('body[data-tab="settings"] #toasts')[1] \
-        .split("bottom:")[1].split(";")[0]
-    # the lane math runs through --tabbar-h now, so pull the px term out of
-    # each calc() rather than the first "(" chunk
-    m1 = re.search(r"(\d+)px", default_bottom)
-    m2 = re.search(r"(\d+)px", settings_bottom)
-    assert m1 and m2, (default_bottom, settings_bottom)
-    assert int(m1.group(1)) < int(m2.group(1)), \
-        "the Settings lane must sit higher than the default one"
+    everyone taps a theme or glass swatch. Since v0.37.6 the phone has ONE
+    lane (tab bar + 84px): it docks the toast "after the bottom bar" on
+    every tab (the old settings-only +150px lane floated it over the panel,
+    2026-10-01 photo) while still clearing the Save strip, whose phone top
+    edge sits at tab bar + 8 + ~64px."""
+    lane = _mobile_block("#toasts {")
+    rule = lane.split("#toasts {")[1].split("}")[0]
+    m = re.search(r"(\d+)px", rule.split("bottom:")[1].split(";")[0])
+    assert m and m.group(1) == "84", rule
+    assert 'body[data-tab="settings"] #toasts' not in lane
 
 
 def test_show_tab_marks_the_body_so_css_can_react():

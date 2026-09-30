@@ -1000,7 +1000,24 @@ footer .linkbtn { color: var(--accent-ink); }
   #bestBtn { padding: 11px 16px; }
   body:not([data-tab="download"]) .transport { display: none; }
   #toasts { left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom)); width: auto; }
-  body[data-tab="settings"] #toasts { bottom: calc(var(--tabbar-h) + 150px + env(safe-area-inset-bottom)); }
+  /* one toast lane on the phone — right above the tab bar (it clears the
+     sticky Save strip, whose top edge sits at tab bar + ~72px). The old
+     settings-only +150px lane floated the toast over the panel's content
+     and read as "centered" (2026-10-01 photo).
+     A probed list cannot fit a phone row: the four columns re-stack —
+     quality + Take on the first line, the format beneath, the size last
+     (2026-10-01 photo: Take buttons ran off the right edge). */
+  #formats thead { display: none; }
+  #formats tbody tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 10px; align-items: start;
+    border-top: 1px solid var(--line-soft); padding: 9px 0;
+  }
+  #formats td { padding: 0; border-top: 0; grid-column: 1 / -1; }
+  #formats td.fmt-q { grid-column: 1; grid-row: 1; align-self: center; }
+  #formats td:last-child { grid-column: 2; grid-row: 1; justify-self: end; }
+  #formats td.fmt-c { grid-row: 2; overflow-wrap: anywhere; }
+  #formats td.fmt-s { grid-column: 1 / -1; grid-row: 3; color: var(--muted); }
   footer.meta { padding: 10px 14px 150px; }
   h2 { font-size: 14.5px; }
   .modal { max-height: 92vh; }
@@ -1077,6 +1094,23 @@ html[data-host="android"][data-glass="liquid"] {
     linear-gradient(0deg, rgba(255,255,255,.05), transparent 55%);
   --glass-hi: rgba(255,255,255,.22);
   --glass-border: var(--accent-line);
+}
+/* 2026-10-01, second device report ("behind best available it's still
+   crisp"): proven in BOTH geometries now — fixed (v0.37.1-4) and sticky
+   in-flow (v0.37.5) put crisp page text through the bar. The shell is
+   hardware-accelerated; this WebView simply does not composite the
+   backdrop pass for floating plates. The blur declarations STAY — a
+   WebView that composites lights them up — but the plate stops depending
+   on it: a dense smoked pour keeps the readout's pixels its own, the page
+   behind dims to a whisper. */
+html[data-host="android"] .transport {
+  background: color-mix(in srgb, var(--panel-solid) 85%, transparent);
+}
+/* and the full-page veil returns to the v0.36-proven density — this device
+   never frosted it either; the base rule keeps the frost for engines that
+   paint it */
+html[data-host="android"] .overlay {
+  background: rgba(3, 5, 12, .72);
 }
 /* the overlay's frost lives on the base .overlay rule as of v0.37.4 —
    one definition, every host (the android-era override is gone) */

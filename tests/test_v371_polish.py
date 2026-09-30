@@ -69,16 +69,21 @@ def test_the_dialog_scroller_wears_a_hairline_and_loses_it_on_touch():
 # --- 2. the floating glass keeps its real blur (the revert) ----------------
 
 def test_the_floating_glass_keeps_its_blur_on_the_phone():
-    """v0.37.1 flipped dialogs and the transport to near-opaque plates on the
-    android host on the premise that this WebView skips backdrop-filter. The
-    premise was wrong: an edge-energy pass over the same device screenshots
-    (blurred ghost text at 19 against crisp text at 81 behind the transport)
-    shows the phone compositing the real blur."""
+    """History, for the record: v0.37.1 flipped the floating plates
+    near-opaque on the premise that this WebView skips backdrop-filter;
+    v0.37.2 reverted that on an edge-energy misread; v0.37.6 settled it —
+    the device photos prove the WebView does not composite the pass for
+    floating plates in EITHER geometry (fixed or sticky). The declarations
+    stay (a WebView that composites lights them up) and the android bar
+    pours dense so the readout never shares pixels with the page."""
     assert "--glass-float" not in CSS, "the near-opaque float plates are back"
     assert 'html[data-host="android"] .modal' not in CSS
-    assert 'html[data-host="android"] .transport' not in CSS
     assert 'html[data-host="android"] .toast' not in CSS
-    # and the floating surfaces consume the shared material
+    # the android transport may override the POUR only — never the material
+    pour = _block('html[data-host="android"] .transport {')
+    assert "color-mix" in pour and "85%" in pour
+    assert "backdrop-filter" not in pour
+    # the floating surfaces still consume the shared material
     for sel in (".modal {", ".transport {"):
         blk = _block(sel)
         assert "backdrop-filter: var(--glass-blur)" in blk, sel

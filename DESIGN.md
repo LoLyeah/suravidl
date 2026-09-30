@@ -248,13 +248,16 @@ changing tokens, never surface by surface.
   `blur(11px) saturate(120%)`, liquid `blur(19px) saturate(165%)
   brightness(1.04)` with an accent-tinted gloss and a `.22` highlight. The
   shell may lighten the radius; it NEVER loses the material — this WebView
-  composites `backdrop-filter` correctly in flow. One boundary is real,
-  measured on device pixels (2026-10-01): a `position: fixed` layer over
-  scrolling content does NOT get its backdrop pass composited — its
-  backdrop reads the page as if static, so floating text stays crisp
-  through the glass. Floating chrome therefore stays in flow (sticky) on
-  this host. Where a WebView truly cannot blur, the `@supports` block turns
-  every plate solid — a fake half-glass never ships.
+  composites `backdrop-filter` correctly in flow. Two device realities
+  (measured against photos, 2026-10-01): the full-screen overlay keeps the
+  dense v0.36 veil `rgba(3,5,12,.72)`, and the transport pours dense —
+  85% panel-solid via `color-mix` — because this WebView does not composite
+  the backdrop pass for floating plates in EITHER geometry (fixed or
+  sticky): page text stays crisp through the glass. The blur declarations
+  stay on both; a WebView that composites lights them up, and until then
+  the pour carries the plate. Where a WebView truly cannot blur, the
+  `@supports` block turns every plate solid — a fake half-glass never
+  ships.
 - **Where it lands:** header, tab bar, cards, glass buttons, the scope
   strip, the patch bay, job rows, the transport, dialogs. A dialog's
   full-screen overlay frosts behind it too (`blur(10px) saturate(120%)`

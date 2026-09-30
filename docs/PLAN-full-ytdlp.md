@@ -1284,3 +1284,19 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     transitions max-height + opacity and [open] flips when it settles
     (500ms safety seal; programmatic opens skip the door on purpose).
     Suite 626 → 631; versionCode 62.
+
+- **v0.37.6 — the board reads at phone width.** Second device report off the
+    16:22-16:24 photos. (1) "the blur still not applied ... behind 'best
+    available' it's still crisp" — sticky in-flow did NOT restore the pass:
+    proven dead in both geometries (fixed v0.37.1-4, sticky v0.37.5); the
+    shell is hardware-accelerated (no setLayerType, manifest default), this
+    WebView just doesn't composite backdrop-filter for floating plates. The
+    blur declarations stay; the android transport pours dense (85%
+    panel-solid via color-mix) and the overlay veil returns to the
+    v0.36-proven rgba(3,5,12,.72). (2) "after probing the list goes
+    overflow" — the four-column format table cannot fit 393px (Take buttons
+    off the right edge); phone rows re-stack (quality+Take / format / size,
+    header hidden). (3) "toast appears to the center instead of after the
+    bottom bar" — the settings tab's +150px lane floated toasts over the
+    panel; one phone lane now (tab bar + 84px, clears the Save strip).
+    Suite 631 → 635; versionCode 63.
