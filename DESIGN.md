@@ -231,8 +231,8 @@ on a near-opaque plate (Panel Solid) so text never fights the blur.
   (rgba(255,255,255,.24)), and amber-tinted borders (accent-line). The panel
   reads wet; content behind it visibly smears.
 - **Android host:** the same blur tokens at a lighter radius — 11px
-  frosted / 19px liquid — plus a flattened full-screen overlay and settings
-  Save bar. Everything else keeps its glass, dialogs, the transport and
+  frosted / 19px liquid — plus a lighter settings Save bar; the full-screen
+  overlay frosts too (blur(10px) — the popup report, 2026-10-01). Everything else keeps its glass, dialogs, the transport and
   the toasts included: this WebView composites `backdrop-filter` fine
   (device pixels, 2026-09-30 — ghost text behind the transport measured at
   edge 19 against crisp text's 81). The host may lighten the radius; it

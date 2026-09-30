@@ -110,7 +110,9 @@ def test_the_tab_swap_starts_immediately_and_lands_in_a_beat():
     assert "tabOut" not in CSS, "the serial exit is still defined"
     assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }" in CSS
     into = _block("@keyframes tabIn")
-    assert "opacity" in into and "translateY(4px)" in into
+    assert "opacity" in into
+    assert "transform" not in into, \
+        "a transform arrival re-anchors the panel's fixed transport (v0.37.3)"
     assert "height" not in into and "max-height" not in into
     seg = APP.split("function showTab(")[1].split("TABS.forEach((t) => {")[0]
     assert '"tab-in"' in seg

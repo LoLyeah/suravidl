@@ -268,12 +268,13 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .2px; 
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
 }
-/* tab swap fade (v0.37.1): the arrival dresses the switch. The serial exit
-   fade (.14s out, then in) and the extra .4s panel wash made the next
-   screen wait for the old one to leave (2026-09-30 report) — it lifts and
-   lands in a beat now */
+/* tab swap fade (v0.37.1): the arrival dresses the switch. v0.37.3 made it
+   opacity-ONLY: a transform here makes the panel a containing block for its
+   `position: fixed` transport, so the bar re-anchored to the page and sat
+   stuck over the content after every tab switch (2026-10-01 phone photos;
+   reproduced live: content-relative y 405, moved with scroll — 699 pinned) */
 .tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }
-@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } }
+@keyframes tabIn { from { opacity: 0; } }
 
 /* ---------- layout: bins rail + the deck ---------- */
 main { display: block; padding: 18px 20px 110px; }
@@ -954,17 +955,20 @@ footer .linkbtn { color: var(--accent-ink); }
   header .meta { display: none; }
   .tabs {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-    padding: 0 8px calc(4px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line); border-bottom: 0;
     justify-content: space-around;
   }
   .tab {
     flex: 1; flex-direction: column; gap: 2px;
-    padding: 9px 4px 7px; border-radius: 10px 10px 0 0;
-    border-bottom: 0; border-top: 2px solid transparent;
-    min-height: var(--tabbar-h); justify-content: center;
+    padding: 5px 4px;
+    border: 1px solid transparent; border-radius: 15px;
+    min-height: 44px; justify-content: center;
+    transition: color var(--t-fast) ease, background var(--t-fast) ease,
+                border-color var(--t-fast) ease;
   }
-  .tab.active { border-top-color: var(--accent); background: transparent; border-bottom: 0; }
+  /* the chosen tab wears a squircle outline, not a hairline (2026-10-01) */
+  .tab.active { border-color: var(--accent-line); background: var(--glass-bg); }
   .tab .tab-ico .ico, .tab .tab-ico svg { width: 20px; height: 20px; }
   .tab-lbl { font-size: 10.5px; letter-spacing: .02em; }
   .card { padding: 14px; }
@@ -973,8 +977,9 @@ footer .linkbtn { color: var(--accent-ink); }
   .transport {
     position: fixed; left: 10px; right: 10px; z-index: 35;
     bottom: calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom));
+    gap: 10px;
   }
-  .transport .take .reading { font-size: 12.5px; }
+  .transport .take .reading { font-size: 12px; }
   #bestBtn { padding: 11px 16px; }
   body:not([data-tab="download"]) .transport { display: none; }
   #toasts { left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom)); width: auto; }
@@ -1057,7 +1062,12 @@ html[data-host="android"][data-glass="liquid"] {
   --glass-border: var(--accent-line);
 }
 html[data-host="android"] .overlay {
-  backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4,6,9,.72);
+  /* 2026-10-01, "What's new pop up doesn't have blur": the flat veil alone
+     read as no blur behind dialogs. The backdrop frosts now — desktop has
+     blurred it since v0.22; the phone joins with the lighter radius. */
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  background: rgba(4,6,9,.55);
 }
 /* 2026-09-30, corrected: v0.37.1 briefly made the floating surfaces
    (dialogs, the transport, toasts) near-opaque here on the premise that

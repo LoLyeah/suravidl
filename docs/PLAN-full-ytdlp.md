@@ -1236,3 +1236,19 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     and their pins are gone; the shared glass (11/19px on android) covers
     dialogs, the transport and toasts again. Everything else from the
     device pass stands. versionCode 59.
+
+- **v0.37.3 — the steady pass (three phone reports).** "the start best is
+    stuck after tab switching … the chosen Bottom bar tab needs a squircle
+    outline … What's new pop up doesn't have blur." Root cause of the stuck
+    bar: the v0.37.1 arrival animated `transform: translateY(4px)` on the
+    panel, and a transform makes the panel a CONTAINING BLOCK for its
+    `position: fixed` transport — after each switch the bar re-anchored to
+    the panel (reproduced live: content-relative y 405, moved with scroll)
+    instead of the viewport (699, pinned, unmoved). The arrival is
+    opacity-only now. The android overlay kept the v0.22-era flat veil, so
+    the popup's backdrop read as "no blur" — it frosts again (blur(10px)
+    saturate(120%), veil .72 → .55; desktop has blurred it since v0.22).
+    The chosen bottom-bar tab: 2px top hairline → squircle outline (1px
+    accent-line, 15px radius, glass fill). Take readout keeps "best
+    available" whole on a phone (12px + 10px gap). Suite 620 → 624;
+    versionCode 60.

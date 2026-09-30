@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.3",
+        "title": "The steady pass",
+        "items": [
+            "The START · best bar stays at the bottom now — a tab switch used to re-anchor it to the page, leaving it stuck over the content.",
+            "Opening What's new (or any dialog) frosts the whole screen behind it — the blur reaches the backdrop, not just the plate.",
+            "The chosen tab in the bottom bar wears a squircle outline instead of a hairline.",
+            "\"best available\" keeps its whole readout on a phone.",
+        ],
+    },
+    {
         "version": "0.37.2",
         "title": "The glass stays",
         "items": [
@@ -101,16 +111,6 @@ ENTRIES = [
         "items": [
             "After every update, the app shows what changed — once, on the first launch.",
             "Re-read it any time from Settings → What's new.",
-        ],
-    },
-    {
-        "version": "0.31.0",
-        "title": "Downloads survive expired links",
-        "items": [
-            "A download that hits an expired link now refreshes it and resumes, "
-            "instead of dying half-way (Instagram/Facebook/TikTok-style links).",
-            "Streaming (HLS) finds now show an estimated size — like "
-            "\"HLS · ~42 MB\" — instead of nothing.",
         ],
     },
 ]

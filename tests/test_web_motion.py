@@ -190,13 +190,16 @@ def test_a_tab_change_fades_through_instead_of_switching_abruptly():
     """Switching tabs was an instant `display: none` swap: no signal that the
     screen had changed. The fade stays — but v0.37.1 dropped the serial exit
     (.14s out, then in) and the extra .4s panel wash: on a phone the next
-    screen only STARTED arriving once the old one had finished leaving."""
+    screen only STARTED arriving once the old one had finished leaving.
+    v0.37.3 made the arrival opacity-only: a transform on the panel makes it
+    a containing block for its `position: fixed` transport (stuck-bar)."""
     assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }" in CSS
     assert ".tab-out" not in CSS and "@keyframes tabOut" not in CSS, \
         "the swap waits on an exit again"
     into = _block("@keyframes tabIn")
     assert "opacity" in into
-    assert "translateY(4px)" in into, "the arrival is a lift, not a wash"
+    assert "transform" not in into, \
+        "a transform arrival re-anchors the panel's fixed transport (v0.37.3)"
     assert "height" not in into and "max-height" not in into
 
 
