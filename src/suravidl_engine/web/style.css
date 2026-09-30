@@ -45,6 +45,7 @@
   --shadow: 0 26px 60px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.35);
   --inset-hi: rgba(255,255,255,.10);
   --panel-solid: #14181d;
+  --glass-float: rgba(21,25,30,.95);   /* floating plates on shells that skip blur */
   --bar-bg: rgba(10,12,15,.78);
   --sheen: rgba(255,255,255,.07);
   --sel: rgba(232,163,62,.30);
@@ -73,6 +74,7 @@ html[data-theme="light"] {
   --shadow: 0 18px 44px rgba(40,34,24,.18), 0 2px 6px rgba(40,34,24,.10);
   --inset-hi: #fff;
   --panel-solid: #f7f5f0;
+  --glass-float: rgba(250,248,244,.96);
   --bar-bg: rgba(231,228,222,.82);
   --sheen: rgba(255,255,255,.6);
   --sel: rgba(192,122,22,.25);
@@ -101,6 +103,7 @@ html[data-theme="amoled"] {
   --shadow: none;
   --inset-hi: rgba(255,255,255,.10);
   --panel-solid: #0b0d10;
+  --glass-float: rgba(8,10,12,.96);
   --bar-bg: rgba(0,0,0,.85);
   --sheen: rgba(255,255,255,.06);
   --sel: rgba(232,163,62,.34);
@@ -268,11 +271,12 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .2px; 
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
 }
-/* tab swap fade (kept from the motion pass; opacity is the whole gesture) */
-.tab-out { animation: tabOut var(--t-fast) var(--e-in) both; }
-.tab-in  { animation: tabIn  var(--t-fast) var(--e-out) both; }
-@keyframes tabOut { to { opacity: 0; } }
-@keyframes tabIn { from { opacity: 0; } }
+/* tab swap fade (v0.37.1): the arrival dresses the switch. The serial exit
+   fade (.14s out, then in) and the extra .4s panel wash made the next
+   screen wait for the old one to leave (2026-09-30 report) — it lifts and
+   lands in a beat now */
+.tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }
+@keyframes tabIn { from { opacity: 0; transform: translateY(4px); } }
 
 /* ---------- layout: bins rail + the deck ---------- */
 main { display: block; padding: 18px 20px 110px; }
@@ -317,8 +321,8 @@ main { display: block; padding: 18px 20px 110px; }
 }
 
 /* ---------- panels & plates ---------- */
-.panel { animation: panelIn var(--t-slow) var(--e-out) both; }
-@keyframes panelIn { from { opacity: 0; } }
+/* panels don't animate themselves: a swap dresses its arrival (tab-in), and
+   a per-tab refresh calling back into showTab must not re-wash the screen */
 
 .card {
   position: relative;
@@ -738,7 +742,6 @@ details.card { padding: 0 18px 6px; }
 /* failed rows: the human line first, the machine text behind an affordance */
 .jerrsay { margin-top: 8px; font-size: 13px; color: var(--err); }
 .jerr {
-  flex: 1; min-width: 0;
   margin-top: 6px; font-size: 12px; color: var(--err);
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
   line-height: 1.5; overflow-wrap: anywhere;
@@ -748,7 +751,6 @@ details.card { padding: 0 18px 6px; }
   -webkit-line-clamp: 2; overflow: hidden; cursor: pointer;
 }
 .jerr.clamp.open { display: block; overflow: visible; }
-.jrr-toggle { margin-top: 6px; }
 .jobfiles { margin-top: 10px; display: grid; gap: 6px; }
 .jitem {
   display: flex; align-items: center; gap: 8px;
@@ -835,15 +837,22 @@ html[data-theme="light"] .overlay { background: rgba(30,29,24,.30); }
 }
 
 /* ---------- scrollbars (Chromium <121 gets a thumb below) ---------- */
-.optlist, .folderlist, .wnlist, .subtabs, textarea {
+.optlist, .folderlist, .wnlist, .subtabs, textarea, .modal {
   scrollbar-width: thin; scrollbar-color: var(--dim) transparent;
 }
 .optlist::-webkit-scrollbar, .folderlist::-webkit-scrollbar,
 .wnlist::-webkit-scrollbar, .subtabs::-webkit-scrollbar,
-textarea::-webkit-scrollbar { width: 9px; height: 9px; }
+textarea::-webkit-scrollbar, .modal::-webkit-scrollbar { width: 6px; height: 6px; }
+.optlist::-webkit-scrollbar-track, .folderlist::-webkit-scrollbar-track,
+.wnlist::-webkit-scrollbar-track, .subtabs::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track, .modal::-webkit-scrollbar-track {
+  background: transparent;
+}
 .optlist::-webkit-scrollbar-thumb, .folderlist::-webkit-scrollbar-thumb,
 .wnlist::-webkit-scrollbar-thumb, .subtabs::-webkit-scrollbar-thumb,
-textarea::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 999px; }
+textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
+  background: var(--dim); border-radius: 999px;
+}
 
 /* ---------- settings ---------- */
 .subtabs {
@@ -861,6 +870,10 @@ textarea::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 999px
 @media (hover: hover) { .stab:hover { color: var(--text); background: var(--glass-bg); } }
 .stab.active { color: var(--text); background: var(--glass-bg); border-color: var(--accent-line); }
 .subwrap { min-height: 120px; }
+/* sub-tab swaps dress like the big ones — they were the only navigation in
+   the app with no transition at all (2026-09-30) */
+.spanel-in { animation: spanelIn var(--t-fast) var(--e-out) both; }
+@keyframes spanelIn { from { opacity: 0; transform: translateY(3px); } }
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
    corners (it used to be an opaque slab that squared them off) */
@@ -890,8 +903,8 @@ textarea::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 999px
 .sw-light  { background: linear-gradient(135deg, #f0ede8 45%, #c07a16 46%, #a8670f 78%, #e7e4de); }
 .sw-dark   { background: linear-gradient(135deg, #14181d 45%, #e8a33e 46%, #f3c169 78%, #0f1216); }
 .sw-amoled { background: linear-gradient(135deg, #000 60%, #e8a33e 61%, #7e8794); }
-.g-frosted { background: linear-gradient(140deg, rgba(255,255,255,.16), rgba(255,255,255,.04)), #3a3f47; }
-.g-liquid  { background: linear-gradient(140deg, rgba(255,255,255,.4), rgba(140,160,200,.18) 55%, rgba(255,255,255,.2)), #3a3f47; }
+.g-frosted { background: linear-gradient(160deg, rgba(255,255,255,.09), rgba(255,255,255,.02) 70%), #343941; }
+.g-liquid  { background: linear-gradient(150deg, rgba(255,255,255,.5), rgba(150,170,210,.16) 42%, rgba(232,163,62,.3) 96%), #3a3f47; }
 .sw-label { font-weight: 600; }
 .sw-hint { font-size: 10.5px; color: var(--dim); text-align: center; }
 
@@ -972,8 +985,9 @@ footer .linkbtn { color: var(--accent-ink); }
   footer.meta { padding: 10px 14px 190px; }
   h2 { font-size: 14.5px; }
   .modal { max-height: 92vh; }
-  .subtabs { flex-wrap: nowrap; scrollbar-width: none; }
-  .subtabs::-webkit-scrollbar { display: none; }
+  /* six sub-tabs never fit one phone row — they wrap rather than run a
+     half-cut tab off the edge (2026-09-30 photo: "Auth" clipped) */
+  .subtabs { flex-wrap: wrap; }
   #panel-settings .modal-foot {
     position: sticky; z-index: 3;
     bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
@@ -984,6 +998,10 @@ footer .linkbtn { color: var(--accent-ink); }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
   .swatches { gap: 8px; }
   .sw-preview { width: 64px; height: 36px; }
+  /* five sub-tab pills at the desktop size ran off the right edge
+     (2026-09-30: "Auth" half-cut on a 393px phone) */
+  .subtabs { gap: 5px; }
+  .subtabs .stab { padding: 7px 10px; font-size: 12px; }
 }
 
 @media (pointer: coarse) {
@@ -994,6 +1012,15 @@ footer .linkbtn { color: var(--accent-ink); }
   .pill { min-height: 30px; }
   .optrow { min-height: 52px; }
   .subtabs .stab { min-height: 44px; }
+  /* touch has no pointer to drag a bar with — the swipe is the affordance,
+     and the custom 9px bars had overridden Android's native transient
+     overlay (2026-09-30: "the scrollbar is too big" in a phone dialog) */
+  .optlist, .folderlist, .wnlist, .subtabs, textarea, .modal {
+    scrollbar-width: none;
+  }
+  .optlist::-webkit-scrollbar, .folderlist::-webkit-scrollbar,
+  .wnlist::-webkit-scrollbar, .subtabs::-webkit-scrollbar,
+  textarea::-webkit-scrollbar, .modal::-webkit-scrollbar { display: none; }
 }
 
 /* theme switch: one 460ms wash-scoped class (set by applyTheme) */
@@ -1035,7 +1062,24 @@ html[data-host="android"][data-glass="liquid"] {
 html[data-host="android"] .overlay {
   backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(4,6,9,.72);
 }
-html[data-host="android"] .modal-foot {
+/* The phone keeps the instrument face HONEST: WebViews composite the rgba
+   but silently skip backdrop-filter, so a light translucent plate there is
+   text you can read THROUGH, blurred by nothing (2026-09-30 screenshots:
+   the transport and the dialogs). Floating surfaces that text reads over go
+   near-opaque on the phone; the browser keeps the real glass. */
+html[data-host="android"] .modal,
+html[data-host="android"] .transport,
+html[data-host="android"] .toast {
+  background: var(--glass-float);
+  background-image: none;
+  /* at 96% the blur underneath it is invisible work — the plate is the
+     material; this is also the cheapest layer on the phone's compositor */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+/* the Settings Save strip is the one foot that stays solid — content scrolls
+   UNDER it; the other dialogs' feet were never meant to be slabs (the
+   black bar behind Got it / Cancel / Delete, 2026-09-30) */
+html[data-host="android"] #panel-settings .modal-foot {
   background: var(--panel-solid);
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }

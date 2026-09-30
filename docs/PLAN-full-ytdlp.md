@@ -1197,3 +1197,28 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     "best availa…" (12.5px reading + slimmer START), and the toast lane
     math re-based on --tabbar-h. 19 new tests; suite 593 → 612, both
     orders. versionCode 57. DESIGN.md rewritten to the committed system.
+- **v0.37.1 — the device pass (five defects off the user's phone).** "the
+    scrollbar is too big in the what's new pop up, the blur isn't working
+    (look at the screenshots), changing the tab feels slow … also black bar
+    behind the confirmation button … changing submenu in settings doesn't have
+    animation." Each photo traced to a cause: (1) the custom webkit
+    scrollbar rules had overridden Android's native transient overlay with
+    always-on 9px bars that read like a desktop bar inside a phone dialog —
+    6px on desktop, hidden entirely on touch; (2) the WebView composites
+    rgba but silently skips backdrop-filter (dialogs and the transport
+    showed their content THROUGH them, crisp), so floating text-bearing
+    plates go near-opaque on the android host (--glass-float, 95–96%) with
+    no backdrop pass — the browser keeps the full glass (26px verified);
+    (3) the tab swap was serial — a .14s exit fade, THEN a .4s panel wash:
+    the next screen only STARTED once the old one had finished leaving; the
+    swap is synchronous now with one 140ms arrival lift and no event
+    dependency (measured live: 7.5ms click-to-visible, one tabIn @140ms);
+    (4) the settings sub-tabs swap with the same arrival animation; (5) the
+    android flatten rule is scoped to the settings Save strip — it had
+    painted every .modal-foot a near-black slab (the black bar behind Got
+    it / Cancel / Delete). Found on the way: the raw error text wrapped one
+    word per line in the narrow column it shared with the buttons (full
+    width now), and six sub-tabs never fit a 393px row ("Auth" half-cut) —
+    they wrap to two. Suite 612 → 620; two motion-contract tests rewritten
+    to the new truth; the phone capture rig still drops the fixed transport
+    layer (DOM + computed styles are the truth). versionCode 58.

@@ -188,28 +188,30 @@ def test_focus_keeps_the_field_above_the_sticky_bars():
 
 def test_a_tab_change_fades_through_instead_of_switching_abruptly():
     """Switching tabs was an instant `display: none` swap: no signal that the
-    screen had changed, so the app read like a page reload rather than a tab."""
-    assert ".tab-out { animation: tabOut var(--t-fast) var(--e-in) both; }" in CSS
-    assert ".tab-in  { animation: tabIn  var(--t-fast) var(--e-out) both; }" in CSS
-    out, into = _block("@keyframes tabOut"), _block("@keyframes tabIn")
-    for seg in (out, into):
-        assert "opacity" in seg
-        assert "transform" not in seg, "a tab is a content swap, not an arrival"
-        assert "height" not in seg and "max-height" not in seg
+    screen had changed. The fade stays — but v0.37.1 dropped the serial exit
+    (.14s out, then in) and the extra .4s panel wash: on a phone the next
+    screen only STARTED arriving once the old one had finished leaving."""
+    assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }" in CSS
+    assert ".tab-out" not in CSS and "@keyframes tabOut" not in CSS, \
+        "the swap waits on an exit again"
+    into = _block("@keyframes tabIn")
+    assert "opacity" in into
+    assert "translateY(4px)" in into, "the arrival is a lift, not a wash"
+    assert "height" not in into and "max-height" not in into
 
 
-def test_the_tab_fade_cannot_strand_a_blank_screen():
-    """The swap hangs off `animationend`; an event that never fires would leave
-    every panel hidden — a blank app. The row exit learned that the hard way,
-    so this one ships with the backstop."""
+def test_the_tab_swap_cannot_strand_a_blank_screen():
+    """The old swap hung off `animationend` (with a timer backstop) because the
+    exit had to finish before the entry began. v0.37.1: the swap is
+    synchronous — there is no event left to swallow, so a blank app is not a
+    state it can reach. The guards that must survive are the double-fade ones:
+    never on first paint, never on a refresh of the visible tab."""
     seg = APP.split("function showTab(")[1].split("TABS.forEach((t) => {")[0]
-    assert '"tab-out"' in seg and '"tab-in"' in seg
+    assert "animationend" not in seg, "an event can strand the swap again"
+    assert '"tab-in"' in seg
     assert "current !== target" in seg, "never fade on first paint"
-    assert "outgoing.includes(incoming)" in seg, \
+    assert "includes(incoming)" in seg, \
         "a refresh of the visible tab must not restart the fade"
-    assert "animationend" in seg and "setTimeout(swap" in seg
-    assert seg.index("animationend") < seg.index("setTimeout(swap"), \
-        "the event is the primary path; the timer is only the backstop"
 
 
 def test_reduced_motion_reaches_the_tab_fade_without_a_second_path():

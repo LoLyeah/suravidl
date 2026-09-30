@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.37.1",
+        "title": "The device pass",
+        "items": [
+            "Switching tabs is immediate now — the next screen starts the moment you tap, instead of waiting for the old one to finish leaving.",
+            "On a phone, floating bars and dialogs are solid where the screen can't blur — nothing shows through their text anymore.",
+            "The What's new card no longer draws a scrollbar on touch screens, and the Settings sub-tabs wrap onto two rows instead of running off the edge.",
+            "A failed download's raw error reads across the full width, not one word per line.",
+        ],
+    },
+    {
         "version": "0.37.0",
         "title": "The Post House",
         "items": [
@@ -103,14 +113,6 @@ ENTRIES = [
         "items": [
             "Pages that try to kick you into another app (TikTok's app link) are "
             "refused — the page stays open and your finds are kept.",
-        ],
-    },
-    {
-        "version": "0.29.0",
-        "title": "Cache button, more presets",
-        "items": [
-            "Clear the app cache with its own button — file deletes no longer touch it.",
-            "New built-in presets: MP4 1080p/720p, subtitles (sidecar or embedded), cover art.",
         ],
     },
 ]

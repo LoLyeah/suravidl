@@ -1494,11 +1494,13 @@ function jobRow(j) {
     // the human consequence leads; the engine's own dialect goes below,
     // behind the toggle (v0.37.0 — it used to be the first thing you read)
     row.append(el("div", "jerrsay", humanErr(j.error || "")));
-    const r = el("div", "jrow");
     // The whole message. A 160-char slice in a single ellipsised line cut
     // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
     // says what to do next was exactly the part that was hidden. Long text
     // starts clamped to two lines; a tap unfolds it (2026-09-27 report).
+    // v0.37.1: it reads at its own full width — it used to share one flex
+    // line with the buttons and wrapped to about one word per line on a
+    // phone (2026-09-30 photo).
     const errText = j.error || "";
     const errEl = el("div", "jerr", errText);
     if (errText.length > 90) {
@@ -1509,7 +1511,8 @@ function jobRow(j) {
         errEl.title = open ? "tap to collapse" : "tap to show the whole message";
       };
     }
-    r.append(errEl);
+    row.append(errEl);
+    const r = el("div", "jrow");
     if (errEl.classList.contains("clamp")) {
       // a visible affordance, not just a hidden cursor (v0.37.0)
       const more = el("button", "linkbtn jrr-toggle", "Show details");
@@ -2465,6 +2468,9 @@ async function loadSettings() {
 
 /* ---------- settings sub-tabs ---------- */
 function showSettingsTab(name) {
+  const incoming = $("spanel-" + name);
+  const cur = document.querySelector("#settingsTabs .stab.active");
+  const wasOn = !!cur && cur.dataset.stab === name;
   document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
     const on = b.dataset.stab === name;
     b.classList.toggle("active", on);
@@ -2476,6 +2482,13 @@ function showSettingsTab(name) {
   });
   document.querySelectorAll(".spanel").forEach((p) =>
     p.classList.toggle("hidden", p.id !== "spanel-" + name));
+  // v0.37.1: the swap dresses itself — the sub-tabs were the only navigation
+  // in the app with no transition at all (2026-09-30); a re-tap doesn't re-run
+  if (incoming && !wasOn) {
+    incoming.classList.remove("spanel-in");
+    void incoming.offsetWidth;   // restart the fade on a rapid re-switch
+    incoming.classList.add("spanel-in");
+  }
 }
 document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
   b.onclick = () => showSettingsTab(b.dataset.stab);
@@ -2493,34 +2506,20 @@ function showTab(name, opts) {
   document.body.dataset.tab = target;
   const panels = TABS.map((t) => $("panel-" + t)).filter(Boolean);
   const incoming = $("panel-" + target);
-  const outgoing = panels.filter((p) => !p.classList.contains("hidden"));
-  // A switch fades through: out, then in (the CSS owns how long, and a
-  // reduced-motion user gets it instantly). Never on first paint, and never
-  // when the target is already the visible panel — the per-tab refreshes at the
-  // end of this function call back into here and must not restart the fade.
-  let swapped = false;
-  const swap = () => {
-    if (swapped) return;
-    swapped = true;
-    panels.forEach((p) => p.classList.toggle("hidden", p !== incoming));
-    outgoing.forEach((p) => p.classList.remove("tab-out"));
-    if (incoming) {
-      incoming.classList.remove("tab-in");
-      void incoming.offsetWidth;   // restart the fade on a rapid re-switch
-      incoming.classList.add("tab-in");
-    }
-  };
-  if (incoming && outgoing.length && !outgoing.includes(incoming) &&
-      current && current !== target && !(opts && opts.instant)) {
-    const first = outgoing[0];
-    first.classList.remove("tab-in");
-    first.classList.add("tab-out");
-    first.addEventListener("animationend", swap, { once: true });
-    // a swallowed event must not leave every panel hidden: the row exit learned
-    // that the hard way, so the backstop comes with it
-    setTimeout(swap, 300);
-  } else {
-    swap();
+  // v0.37.1: the swap is immediate. It used to wait out the old screen's exit
+  // fade and then wash the new one in over .4s — on a phone the next tab only
+  // STARTED arriving after the previous one had finished leaving (2026-09-30
+  // report). The arrival fade dresses the switch; it never delays it. Never on
+  // first paint, and never when the target is already visible: the per-tab
+  // refreshes at the end of this function call back into here and must not
+  // restart the fade.
+  const switching = !!(incoming && current && current !== target &&
+    !panels.filter((p) => !p.classList.contains("hidden")).includes(incoming));
+  panels.forEach((p) => p.classList.toggle("hidden", p !== incoming));
+  if (switching) {
+    incoming.classList.remove("tab-in");
+    void incoming.offsetWidth;   // restart the fade on a rapid re-switch
+    incoming.classList.add("tab-in");
   }
   TABS.forEach((t) => {
     document.querySelectorAll(`#tabs .tab[data-tab="${t}"]`).forEach((b) => {
