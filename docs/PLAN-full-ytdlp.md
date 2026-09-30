@@ -1149,4 +1149,20 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `--accent-ink` is now #0a55a8 (5.43:1), pinned in a test; and
     `behavior: "smooth"` scrollIntoView proved inert in the stripped
     headless browser — the scroll is instant. 8 new tests; suite
-    575 → 583, both orders. versionCode 55.
+    575 → 583, both orders. versionCode 55. (Never tagged on its own —
+    it ships folded into v0.36.0.)
+- **v0.36.0 — a preset that stays.** "Kept as is, if the user wants more
+    permanent solution they can go to the settings. Maybe add presets in
+    the settings to?" The one-shot block stays one-shot; permanence is a
+    setting: Settings → Presets names one Default preset that rides every
+    NEW download. The engine layers it like every other setting — a plain
+    download rides it whole (intent + bundle); an explicit preset's intent
+    wins while the default's bundle still fills in; a quality pick beats
+    the format intent with the bundle intact; per-download fields win over
+    its values; a preset deleted later quietly stops riding (it must never
+    brick /jobs) and the select shows "no longer exists" instead of
+    falling back to none. "default_preset" joins PER_JOB_DENIED (a job may
+    not decide what every future download carries) and POST /settings
+    refuses an unknown name at the boundary. 10 new tests; suite
+    583 → 593, both orders. versionCode 56. Ships the v0.35.0 workflow
+    fixes in the same release (v0.35.0 was never tagged on its own).

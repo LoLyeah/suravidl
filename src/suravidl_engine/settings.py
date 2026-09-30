@@ -16,6 +16,9 @@ DEFAULTS = {
                                  # sites that fingerprint HTTP headers
                                  # (Facebook) need this ON TOP of cookies
     # --- tier-1 download options (see download_opts.py) -------------------
+    "default_preset": "",        # a preset name that rides every NEW download
+                                 # (Settings → Presets): permanence lives in a
+                                 # setting, not in session state (v0.36.0)
     "filename_template": "%(title).100B.%(ext)s",
     "subtitles_mode": "off",     # off | sidecar | embed
     "subtitles_langs": "en",     # comma list, e.g. "en, id" or "all"
@@ -80,6 +83,8 @@ def int_in(value, name: str, lo: int, hi: int) -> int:
 # change how many jobs run at once, or repaint the UI.
 PER_JOB_DENIED = {
     "download_dir",      # the manager's folder, not a job's business
+    "default_preset",    # app-level: a job may not decide what every future
+                         # download carries (v0.36.0)
     "raw_args_enabled",  # the raw-args SWITCH is app-level: a job may not
                          # switch the escape hatch on for itself (v0.21.2
                          # audit). `raw_args` itself stays allowed — that is
@@ -224,6 +229,8 @@ class Settings:
 
                 parse_browser(value)  # raises ValueError with the known list
             return value
+        if key == "default_preset":
+            return str(value or "").strip()[:120]
         if key == "impersonate":
             value = str(value or "").strip().lower()
             if not value:

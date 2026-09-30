@@ -2228,6 +2228,7 @@ async function loadSettings() {
     $("setGeoCountry").value = s.geo_bypass_country || "";
     $("setExtractorArgs").value = s.extractor_args || "";
     renderWhere(s.download_dir);
+    renderDefaultPreset();
     markSwatches(CURRENT);
     markSettingsDirty(false);   // the form now mirrors the server
   } catch (e) {
@@ -2400,7 +2401,60 @@ async function loadPresets() {
   renderOvPresetActions();
 }
 
+/** The default-preset select (Settings → Presets): the permanent answer to
+ *  "I always want this". It rides every NEW download; anything the download
+ *  itself says — its own preset, a quality pick, per-download fields — still
+ *  wins, the engine layers it that way (v0.36.0). */
+function renderDefaultPreset() {
+  const sel = $("defaultPreset");
+  if (!sel) return;
+  const stored = (SETTINGS_SNAPSHOT && SETTINGS_SNAPSHOT.default_preset) || "";
+  const keep = sel.value || stored;
+  sel.innerHTML = "";
+  const none = el("option", "", "none — use my settings");
+  none.value = "";
+  sel.append(none);
+  const groups = [[true, "built-in"], [false, "saved"]];
+  for (const [builtin, label] of groups) {
+    const items = (PRESETS || []).filter((p) => !!p.builtin === builtin);
+    if (!items.length) continue;
+    const group = document.createElement("optgroup");
+    group.label = label;
+    for (const p of items) {
+      const o = el("option", "", p.name +
+        (p.description ? " — " + p.description : ""));
+      o.value = p.name;
+      group.append(o);
+    }
+    sel.append(group);
+  }
+  if (keep && !Array.from(sel.options).some((o) => o.value === keep)) {
+    // the setting outlived its preset (deleted later) — say so instead of
+    // silently falling back to none
+    const gone = el("option", "", "“" + keep + "” (no longer exists)");
+    gone.value = keep;
+    sel.append(gone);
+  }
+  sel.value = keep;
+  sel.onchange = async () => {
+    const name = sel.value;
+    try {
+      const s = await api("/settings", {
+        method: "POST", body: JSON.stringify({ default_preset: name }) });
+      if (SETTINGS_SNAPSHOT) SETTINGS_SNAPSHOT.default_preset = s.default_preset;
+      toast(name
+        ? `default preset: “${name}” rides every new download`
+        : "default preset cleared — downloads use just your settings");
+    } catch (e) {
+      toast("could not save: " + e.message, "bad");
+      sel.value = stored;       // the control goes back to what is stored
+    }
+  };
+}
+
 function renderPresetList() {
+  renderDefaultPreset();        // the select keeps step with the list — save,
+                                // delete and load all land here (v0.36.0)
   const box = $("presetList");
   if (!box) return;
   box.innerHTML = "";

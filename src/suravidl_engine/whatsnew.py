@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.36.0",
+        "title": "A preset that stays",
+        "items": [
+            "Settings → Presets has a Default preset: pick one and it rides every new download — no re-applying.",
+            "Anything a download itself says still wins: its own preset, a quality pick, or This-download-only fields.",
+            "If that preset is deleted later, the setting says so instead of failing.",
+            "Also in this release: the download-end preset workflow — the armed strip on the video card, toasts that name the preset that rode, and a quiet sigh when a quality pick replaces an audio preset.",
+        ],
+    },
+    {
         "version": "0.35.0",
         "title": "Presets you can see",
         "items": [

@@ -451,6 +451,12 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.post("/settings")
     def post_settings(body: dict, _mgr: JobManager = Depends(require_auth)):
+        if "default_preset" in body:
+            name = str(body.get("default_preset") or "").strip()
+            if name and presets.get(name) is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"unknown preset: {name!r} (Settings → Presets)")
         try:
             updated = settings.update(body)
         except (ValueError, TypeError) as e:
@@ -624,6 +630,21 @@ def create_app(download_dir, auth_token: str | None = None,
             raw = s["raw_args"] or None
         preset = body.preset
         overrides = body.overrides or None
+        # v0.36.0: the DEFAULT preset (a Settings → Presets choice) is the
+        # baseline of every job that does not name its own: its options sit
+        # UNDER whatever the job itself says, and its format intent yields to
+        # an explicit pick — a per-job preset's intent, or a format chip —
+        # while the rest of its bundle keeps riding.
+        d_intent = None
+        d_patch: dict = {}
+        d_name = str(s.get("default_preset") or "").strip()
+        if d_name:
+            d_entry = presets.get(d_name)
+            if d_entry is not None:
+                # a preset deleted since cannot brick downloads: it just
+                # quietly stops riding (the Settings UI shows it as gone)
+                d_intent, d_patch = split_patch(d_entry["patch"])
+        overrides = {**d_patch, **(overrides or {})} or None
         if preset:
             entry = presets.get(preset)
             if entry is None:
@@ -637,6 +658,8 @@ def create_app(download_dir, auth_token: str | None = None,
             intent, patch = split_patch(entry["patch"])
             preset = intent
             overrides = {**(overrides or {}), **patch} or None
+        elif d_intent and not body.fmt:
+            preset = d_intent
         job = mgr.create(body.url, fmt=body.fmt,
                          extra_headers=body.headers,
                          preset=preset,

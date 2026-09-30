@@ -95,7 +95,9 @@ def test_index_is_a_four_tab_shell(tmp_path):
                     "ovPresetInfo", "ovSaveLink", "ovUpdate", "ovSaveRow",
                     "ovSaveName", "ovSaveGo", "ovSaveCancel", "ovSaveMsg",
                     # v0.35.0: the card's armed strip — what rides next
-                    "armedBar", "armedText", "armedClear"):
+                    "armedBar", "armedText", "armedClear",
+                    # v0.36.0: the default preset lives in Settings
+                    "defaultPreset"):
         assert f'id="{elem_id}"' in html, elem_id
     # the old modal shells are gone: settings and the catalogue are tabs now
     assert 'id="settingsModal"' not in html
