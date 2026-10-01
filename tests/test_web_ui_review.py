@@ -121,9 +121,10 @@ def test_settings_inputs_have_names_and_modals_announce_themselves():
                   "setGeoCountry", "optionsSearch"):
         after = HTML.split(f'id="{ident}"')[1][:300]
         assert "aria-label" in after, f"{ident} needs an accessible name"
-    # 4 dialogs: the player, the confirm sheet, the folder sheet, and the
-    # What's new card (2026-09-28)
-    assert HTML.count('role="dialog" aria-modal="true"') == 4
+    # 6 dialogs: the player, the confirm sheet, the folder sheet, the
+    # What's new card (2026-09-28) — plus the FAQ card and the tour's caption
+    # (v0.39.4); every one of them announces itself
+    assert HTML.count('role="dialog" aria-modal="true"') == 6
 
 
 def test_the_cache_has_its_own_button_and_the_deletes_do_not_touch_it():

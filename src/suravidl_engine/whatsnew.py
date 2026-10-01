@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.4",
+        "title": "The welcome mat",
+        "items": [
+            "The footer row, under the download path, gained two doors: FAQ answers the common questions \u2014 cookies, \u201cunsupported URL\u201d, missing 4K, where files go \u2014 and a short tour walks the room, replayable any time.",
+            "Probing a playlist now offers the whole thing by default (\u201call 3 \u00b7 Download playlist\u201d) instead of landing on \u201cnone picked\u201d with a dead button; un-ticking everything by hand still refuses politely.",
+        ],
+    },
+    {
         "version": "0.39.3",
         "title": "The hem",
         "items": [
@@ -86,16 +94,6 @@ ENTRIES = [
         "title": "The native glass",
         "items": [
             "On macOS the app window is no longer a painted box: it now sits on Apple's real glass material — Liquid Glass on macOS 26 and up, native vibrancy on every earlier release — and the dock icon is finally the pine mark.",
-        ],
-    },
-    {
-        "version": "0.38.3",
-        "title": "The audit and the second voice",
-        "items": [
-            "A second color scheme joins the house amber: Pine & cream, the brand's own voice — pine by day, the cream chip at night. Pick it in Settings → Appearance → Scheme.",
-            "Site badges (YouTube, X, Vimeo…) are now readable in the light theme, and a handful of dim labels, greens and state lamps got darker ink so everything clears the readability floor.",
-            "The keyboard works everywhere now: a download's title opens with Enter, the what's-new card closes with Escape or by clicking outside, and buttons that looked pressed-in but did nothing were honest again.",
-            "Smaller pass: the minimize button is a drawn icon, chips get a touch-sized press target on phones, sub-tabs and expanders announce themselves to screen readers, and the queue says it is loading.",
         ],
     },
 ]

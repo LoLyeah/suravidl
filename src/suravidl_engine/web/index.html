@@ -831,6 +831,8 @@
   <div class="footrow">
     <button id="copyDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg></span>copy path</button>
     <button id="openDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder"/></svg></span>open folder</button>
+    <button id="faqBtn" class="linkbtn" type="button">FAQ</button>
+    <button id="tourBtn" class="linkbtn" type="button">tutorial</button>
   </div>
 </footer>
 
@@ -888,6 +890,39 @@
     <div id="whatsNewList" class="wnlist"></div>
     <div class="modal-foot right">
       <button id="whatsNewDone" class="btn prime">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ: the questions this app keeps receiving (v0.39.4) -->
+<div id="faqModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="faqTitle">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="faqTitle" class="title">Questions, answered</span>
+      <span class="spacer"></span>
+      <button id="faqClose" class="btn ghost-sm">Close</button>
+    </div>
+    <div id="faqList" class="faqlist"></div>
+    <div class="modal-foot right">
+      <button id="faqDone" class="btn prime">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- the tour: a short walk over the room (v0.39.4) -->
+<div id="tourShade" class="hidden">
+  <div id="tourRing" class="tour-ring" aria-hidden="true"></div>
+  <div id="tourCard" class="tour-card" role="dialog" aria-modal="true"
+       aria-labelledby="tourTitle">
+    <div id="tourCount" class="tour-count"></div>
+    <h3 id="tourTitle" class="tour-title"></h3>
+    <p id="tourBody" class="tour-body muted"></p>
+    <div class="tour-foot">
+      <button id="tourSkip" class="linkbtn" type="button">skip</button>
+      <span class="spacer"></span>
+      <button id="tourBack" class="btn ghost-sm" type="button">Back</button>
+      <button id="tourNext" class="btn prime" type="button">Next</button>
     </div>
   </div>
 </div>

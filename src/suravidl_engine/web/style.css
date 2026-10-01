@@ -1073,6 +1073,50 @@ footer.meta {
 }
 footer .linkbtn { color: var(--accent-ink); }
 
+/* ---------- the welcome mat: FAQ + tour (v0.39.4) ---------- */
+.faqlist {
+  display: grid; gap: 0; align-content: start;
+  max-height: 56vh; overflow-y: auto; padding-right: 4px;
+}
+.faq-item { border-top: 1px solid var(--line-soft); }
+.faq-item:first-child { border-top: 0; }
+.faq-item summary {
+  cursor: pointer; padding: 10px 2px; font-weight: 600; font-size: 13.5px;
+  list-style: none; display: flex; align-items: center; gap: 10px;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+/* a drawn marker: a ringed ? that turns into a minus — characters, no emoji */
+.faq-item summary::before {
+  content: "?"; flex: none; width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--accent-line); color: var(--accent-ink);
+  display: inline-grid; place-items: center; font-size: 11px; font-weight: 700;
+}
+.faq-item[open] summary::before { content: "\2212"; }
+.faq-item p { margin: 0 0 12px 30px; font-size: 12.5px; line-height: 1.55; }
+
+#tourShade { position: fixed; inset: 0; z-index: 1400; pointer-events: none; }
+#tourShade.hidden { display: none; }
+.tour-ring {
+  position: fixed; border: 2px solid var(--accent); border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(5, 7, 10, .55);
+  pointer-events: none; transition: left .18s ease, top .18s ease,
+              width .18s ease, height .18s ease;
+}
+@media (prefers-reduced-motion: reduce) { .tour-ring { transition: none; } }
+.tour-card {
+  position: fixed; z-index: 1401; pointer-events: auto;
+  background: var(--panel, var(--glass-bg-strong)); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 16px 12px;
+  box-shadow: 0 18px 50px -12px rgba(0, 0, 0, .6);
+}
+.tour-count {
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted);
+}
+.tour-title { margin: 4px 0 6px; font-size: 15px; }
+.tour-body { font-size: 12.5px; line-height: 1.55; margin: 0 0 12px; }
+.tour-foot { display: flex; gap: 8px; align-items: center; }
+
 /* ---------- mobile: the deck at the thumb ---------- */
 @media (max-width: 899px) {
   :root { --tabbar-h: 60px; }

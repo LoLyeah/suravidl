@@ -761,7 +761,7 @@ function renderProbe(url, info) {
       box.type = "checkbox";
       box.dataset.index = String(n);
       box.title = "include item " + n;
-      box.onchange = syncPlaylistPicks;
+      box.onchange = () => syncPlaylistPicks();
       pick.append(el("span", "plnum", String(n)), box);
       tr.append(
         pick,
@@ -779,7 +779,7 @@ function renderProbe(url, info) {
                 el("td"));
       tb.append(tr);
     }
-    syncPlaylistPicks();
+    syncPlaylistPicks(false);
     return;
   }
 
@@ -953,7 +953,12 @@ function renderPlaylistState() {
     : text ? `Download ${count} picked` : "Download playlist";
 }
 
-function syncPlaylistPicks() {
+function syncPlaylistPicks(fromUser = true) {
+  // A fresh probe lands here too — and "nothing ticked yet" is not the same
+  // as "the user un-ticked everything": the first wants the whole playlist
+  // (blank field, "Download playlist"), the second wants the refusal. Only a
+  // human call may arm the trap (2026-10-02 report: fresh probes said
+  // "none picked" with a dead start button).
   const boxes = pickedBoxes();
   const shown = new Set(boxes.map((b) => Number(b.dataset.index)));
   const text = playlistFieldText();
@@ -969,7 +974,7 @@ function syncPlaylistPicks() {
     // field is the engine's word for the whole playlist, so arm the same
     // refusal the None button uses (UI review — this was the trap v0.21.2
     // closed for None, still open on the manual path)
-    if (boxes.length > 0 && !boxes.some((b) => b.checked)) PLAYLIST_NONE = true;
+    if (fromUser && boxes.length > 0 && !boxes.some((b) => b.checked)) PLAYLIST_NONE = true;
   }
   renderPlaylistState();
 }
@@ -2321,6 +2326,146 @@ function GALLERY() {
 /** Android's app folder lives under Android/data/, which no file manager will
  *  open on Android 11+ — so say where the user can actually find their files
  *  (the gallery/music copies the app adds), and keep the raw path one tap away. */
+/* ---------- the welcome mat: FAQ + tour (v0.39.4) --------------------------
+   Two quiet doors in the footer row: answers to the questions this app keeps
+   receiving, and a short walk over the parts of the room. The copy is plain
+   on purpose — nothing in here should need a manual. */
+const FAQ = [
+  ["Where do my downloads go?",
+   "The folder shown at the bottom of the screen — press Open folder next to it. On a phone, finished downloads get Open and Share buttons instead; files land in Gallery (video) or Music (audio) under suravidl."],
+  ["A link says 'unsupported URL'. What now?",
+   "Some pages cannot hand a plain link over. Play it in your browser for a second: the extension (on desktop) or the browser offer right here catches the stream, and you pick the quality here before anything downloads."],
+  ["Why does it use my browser's cookies?",
+   "Signed-in sites — private videos, member areas — only serve files to a signed-in session. The extension passes the session details for exactly the stream you picked, nothing else, and Settings → Cookies shows what is held and clears it on ask."],
+  ["Where are the cookies kept?",
+   "On this machine alone, in the app's own data folder, readable only by your user account. They never leave your devices."],
+  ["The extension finds nothing, or says the app isn't running.",
+   "Update both sides first. The app and the extension look for each other along a short row of nearby ports, so a busy port is fine. If the popup was open while the app started, press Check again."],
+  ["A site won't offer 1080p or 4K.",
+   "That is the site, not the app: some pages publish only up to a certain quality, or as separate video and audio streams — suravidl merges separate streams automatically."],
+  ["A link or a direct stream — which one do I paste?",
+   "Links go through the full lookup (playlists, subtitles, chapters and all). A direct mp4/m3u8 address skips the lookup, for anything already playing in front of you."],
+  ["How do I update?",
+   "Settings → Tools checks for a new release and installs it. The browser extension updates itself through Mozilla once the new version clears review."],
+];
+
+function openFaq() {
+  const box = $("faqList");
+  if (box && !box.childElementCount) {
+    for (const [q, a] of FAQ) {
+      const it = document.createElement("details");
+      it.className = "faq-item";
+      const s = document.createElement("summary");
+      s.textContent = q;
+      const p = el("p", "muted", a);
+      it.append(s, p);
+      box.append(it);
+    }
+  }
+  openModal($("faqModal"));
+}
+
+/* The tour points at the places a first run actually shows, so every step
+   lands even before anything has been probed. A target this device does not
+   show (the rail on a phone) is skipped silently, never pointed at thin air. */
+const TOUR = [
+  { tab: "download", sel: "#url", title: "Paste any video link",
+    body: "Any site yt-dlp knows, or a direct mp4/m3u8 stream — then press Probe." },
+  { sel: "#probeBtn", title: "Probe reads the page",
+    body: "The real formats, quality, codecs and subtitles — what the site actually offers." },
+  { sel: "#dlEmpty", title: "The deck fills up here",
+    body: "After a probe this area lists the real formats: take one, or arm a take for the transport below." },
+  { sel: "#transport", title: "START commits a take",
+    body: "The armed take rides down here. START begins the download; Studio opens the extra options." },
+  { tab: "queue", sel: "#jobs", title: "The queue",
+    body: "Progress, speed and a live receipt for everything you start." },
+  { sel: "#binsRail", title: "Filed takes",
+    body: "Finished downloads land in this rail — click one to play it." },
+  { tab: "settings", sel: "#settingsTabs", title: "Settings holds the rest",
+    body: "Cookies, tools, updates, appearance — and the yt-dlp tab lists every option the engine takes." },
+  { tab: "download", sel: ".footrow", title: "Questions live down here",
+    body: "FAQ has the common answers; this tour replays from the same row whenever you like." },
+];
+let TOUR_ON = false;
+let TOUR_STEP = 0;
+
+function tourPlace() {
+  const step = TOUR[TOUR_STEP];
+  if (!step || !TOUR_ON) return;
+  const target = document.querySelector(step.sel);
+  const r = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+  if (!r || r.width < 2 || r.height < 2) {
+    // a target this device does not show: move on, never point at nothing
+    TOUR_STEP += 1;
+    return TOUR_STEP >= TOUR.length ? tourEnd() : tourShow();
+  }
+  const ring = $("tourRing");
+  const card = $("tourCard");
+  const pad = 8;
+  ring.style.left = Math.round(r.left - pad) + "px";
+  ring.style.top = Math.round(r.top - pad) + "px";
+  ring.style.width = Math.round(r.width + pad * 2) + "px";
+  ring.style.height = Math.round(r.height + pad * 2) + "px";
+  const cw = Math.min(380, window.innerWidth - 24);
+  card.style.width = cw + "px";
+  card.style.left = Math.round(Math.min(Math.max(12, r.left), window.innerWidth - cw - 12)) + "px";
+  let y = r.bottom + 14;
+  if (y + 190 > window.innerHeight) y = Math.max(12, r.top - 200);
+  card.style.top = Math.round(y) + "px";
+}
+
+function tourShow() {
+  const step = TOUR[TOUR_STEP];
+  if (!step || !TOUR_ON) return;
+  if (step.tab) showTab(step.tab);
+  $("tourTitle").textContent = step.title;
+  $("tourBody").textContent = step.body;
+  $("tourCount").textContent = (TOUR_STEP + 1) + " of " + TOUR.length;
+  $("tourNext").textContent = TOUR_STEP === TOUR.length - 1 ? "Done" : "Next";
+  const target = document.querySelector(step.sel);
+  if (target && target.scrollIntoView) target.scrollIntoView({ block: "center" });
+  requestAnimationFrame(tourPlace);
+}
+
+function tourNext() {
+  if (TOUR_STEP >= TOUR.length - 1) return tourEnd();
+  TOUR_STEP += 1;
+  tourShow();
+}
+
+function tourBack() {
+  if (TOUR_STEP <= 0) return;
+  TOUR_STEP -= 1;
+  tourShow();
+}
+
+function tourEnd() {
+  TOUR_ON = false;
+  $("tourShade").classList.add("hidden");
+  window.removeEventListener("resize", tourPlace);
+  window.removeEventListener("scroll", tourPlace, true);
+}
+
+function startTour() {
+  TOUR_ON = true;
+  TOUR_STEP = 0;
+  $("tourShade").classList.remove("hidden");
+  window.addEventListener("resize", tourPlace);
+  window.addEventListener("scroll", tourPlace, true);
+  tourShow();
+}
+
+function wireWelcome() {
+  const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
+  on("faqBtn", openFaq);
+  on("tourBtn", startTour);
+  on("faqClose", () => closeModal($("faqModal")));
+  on("faqDone", () => closeModal($("faqModal")));
+  on("tourSkip", tourEnd);
+  on("tourBack", tourBack);
+  on("tourNext", tourNext);
+}
+
 function renderWhere(dir) {
   const d = dir || "";
   $("dlDir").textContent = d;
@@ -2937,6 +3082,10 @@ document.addEventListener("keydown", (e) => {
   if (!$("confirmModal").classList.contains("hidden")) {
     return;   // the confirm dialog handles its own Escape
   }
+  // a running tour: Escape leaves it (v0.39.4)
+  if (TOUR_ON) { tourEnd(); return; }
+  // the FAQ card answers on Escape like every dialog (v0.39.4)
+  if (!$("faqModal").classList.contains("hidden")) { closeModal($("faqModal")); return; }
   // the what's-new card: a real dialog, so Escape is its way out (v0.38.3)
   if (wnVersion) { dismissWhatsNew(wnVersion); return; }
   // only when Settings is really open: this used to close it from any tab and
@@ -3186,6 +3335,7 @@ applyTheme(CURRENT.theme, CURRENT.glass, CURRENT.accent);
 if (ANDROID()) document.documentElement.dataset.host = "android";
 renderWhere(CFG.downloadDir);
 wireCopyPath();
+wireWelcome();
 initOverrides();
 $("presetSave").onclick = saveCurrentAsPreset;
 
