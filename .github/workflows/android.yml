@@ -124,12 +124,25 @@ jobs:
           api-level: 30
           arch: x86_64
           script: gradle -p android connectedDebugAndroidTest --no-daemon
+      - name: Collect crash evidence
+        if: failure()
+        run: |
+          mkdir -p ci-artifacts
+          adb shell "find /sdcard/Android/data/com.suravidl.app /sdcard/Android/media/com.suravidl.app -name '*.txt' 2>/dev/null" > ci-artifacts/applogs-find.txt || true
+          adb pull /sdcard/Android/data/com.suravidl.app/files/logs ci-artifacts/applogs 2>/dev/null || true
+          adb pull /sdcard/Android/media/com.suravidl.app/logs ci-artifacts/applogs-media 2>/dev/null || true
+          adb logcat -d -b crash > ci-artifacts/crashbuf.txt 2>/dev/null || true
+          adb logcat -d > ci-artifacts/logcat.txt 2>/dev/null || true
+          ls -la ci-artifacts || true
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: android-test-report
-          path: android/app/build/reports/androidTests/
+          path: |
+            android/app/build/reports/androidTests/
+            ci-artifacts/
+          if-no-files-found: ignore
 
   # Reproduces the user's device class: Android 15 with 16 KB memory pages.
   # The full app-startup path (MainActivity -> EngineService -> Chaquopy ->
@@ -183,8 +196,9 @@ jobs:
         if: failure()
         run: |
           mkdir -p ci-artifacts
-          adb shell "find /sdcard/Android/data/com.suravidl.app -name '*.txt' 2>/dev/null" || true
+          adb shell "find /sdcard/Android/data/com.suravidl.app /sdcard/Android/media/com.suravidl.app -name '*.txt' 2>/dev/null" > ci-artifacts/applogs-find.txt || true
           adb pull /sdcard/Android/data/com.suravidl.app/files/logs ci-artifacts/applogs 2>/dev/null || true
+          adb pull /sdcard/Android/media/com.suravidl.app/logs ci-artifacts/applogs-media 2>/dev/null || true
           adb logcat -d -b crash > ci-artifacts/crashbuf.txt 2>/dev/null || true
           adb logcat -d > ci-artifacts/logcat.txt 2>/dev/null || true
       - name: Upload report + crash evidence
