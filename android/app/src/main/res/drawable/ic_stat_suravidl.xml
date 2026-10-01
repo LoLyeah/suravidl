@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the notification's own mark (v0.39.6): the master's take-arrow, flat white.
+
+     The status-line glyph used to be the stock Android download arrow, and
+     the big tile beside the notification was whatever icon the phone had for
+     the app. This file is drawn from assets/brand/arrow-cream.svg's path —
+     the same one the header's mark cuts out — and the engine service puts it
+     on the notification itself, so the mark on screen is always suravidl's
+     own, from the build it came with. Android tints small icons from their
+     alpha alone; the fill is the canonical white.
+
+     tests/test_v396_shelf.py pins this path against the master. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M 90 48 H 166 A 12 12 0 0 1 178 60 V 160 H 216 L 128 224 L 40 160 H 78 V 60 A 12 12 0 0 1 90 48 Z M 104 71 L 104 137 Q 104 148 113 141.6 L 157 110.4 Q 166 104 157 97.6 L 113 66.4 Q 104 60 104 71 Z" />
+</vector>

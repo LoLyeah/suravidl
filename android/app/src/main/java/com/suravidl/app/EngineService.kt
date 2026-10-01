@@ -35,6 +35,13 @@ import kotlin.concurrent.thread
  */
 class EngineService : Service() {
     private var token = ""
+
+    /** v0.39.6 — the notification's big tile is OUR pine mark, decoded from
+     *  this build's own resources, never the phone's possibly-stale copy of
+     *  the app icon. One decode, shared by both builders. */
+    private val notifLogo: android.graphics.Bitmap by lazy {
+        android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+    }
     @Volatile private var polling = true
     @Volatile private var engineError: String? = null
 
@@ -299,7 +306,8 @@ class EngineService : Service() {
             "starting engine…"
         }
         val notification = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_stat_suravidl)
+            .setLargeIcon(notifLogo)
             .setContentTitle("suravidl")
             .setContentText(text)
             .setContentIntent(openAppIntent())
@@ -326,7 +334,8 @@ class EngineService : Service() {
                                     NotificationManager.IMPORTANCE_LOW))
         }
         val n = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_stat_suravidl)
+            .setLargeIcon(notifLogo)
             .setContentTitle("suravidl")
             .setContentText("starting engine…")
             .setOngoing(true)

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.6",
+        "title": "The shelf",
+        "items": [
+            "The bottom bar stands in the flow now, like the header \u2014 on Android that is what makes it frost the content scrolling underneath instead of showing it crisp. Same glass, same pin at the thumb.",
+            "The engine notification carries suravidl\u2019s own mark at last: a white take-arrow in the status line and the pine tile beside it \u2014 drawn from this build, not the system\u2019s generic download glyph.",
+        ],
+    },
+    {
         "version": "0.39.5",
         "title": "The frost",
         "items": [
@@ -87,13 +95,6 @@ ENTRIES = [
         "title": "The straight answer",
         "items": [
             "Failure summaries no longer guess wrong: the short line follows the engine's own verdict, and unsupported links always say: open it in the browser, press play, then Scan.",
-        ],
-    },
-    {
-        "version": "0.38.5",
-        "title": "The fold",
-        "items": [
-            "A finished download's card now folds open and shut — the receipt grows and shrinks instead of popping, and once it's open the short /stor… path next to the buttons steps aside for the full one.",
         ],
     },
 ]

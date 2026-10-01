@@ -74,18 +74,6 @@
   <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span>Quit</button>
 </header>
 
-<nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
-  <button class="tab active" data-tab="download" role="tab" type="button">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl">Download</span></button>
-  <button class="tab" data-tab="queue" role="tab" type="button">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl">Queue</span>
-    <span id="queueCount" class="badge hidden"></span></button>
-  <button class="tab" data-tab="settings" role="tab" type="button">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl">Settings</span></button>
-  <button class="tab" data-tab="ytdlp" role="tab" type="button">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl">yt-dlp</span></button>
-</nav>
-
 <main id="panels">
 
   <!-- the bins rail: finished takes, desktop rooms (v0.37.0) -->
@@ -825,6 +813,18 @@
     </div>
   </section>
 </main>
+
+<nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
+  <button class="tab active" data-tab="download" role="tab" type="button">
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl">Download</span></button>
+  <button class="tab" data-tab="queue" role="tab" type="button">
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl">Queue</span>
+    <span id="queueCount" class="badge hidden"></span></button>
+  <button class="tab" data-tab="settings" role="tab" type="button">
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl">Settings</span></button>
+  <button class="tab" data-tab="ytdlp" role="tab" type="button">
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl">yt-dlp</span></button>
+</nav>
 
 <footer class="meta">
   <span id="dlWhere">downloads</span> → <code id="dlDir"></code>
