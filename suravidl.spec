@@ -59,7 +59,10 @@ exe = EXE(
     upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    # A console is for CI logs and terminal launches (kept on
+    # mac/linux); the Windows user double-clicking the app gets a GUI
+    # process instead — and every child it spawns is flat quiet.
+    console=(sys.platform != "win32"),
     icon=str(ROOT / ("assets/icon.ico" if sys.platform == "win32"
                      else "assets/logo.png")),
 )
@@ -72,7 +75,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.39.0",
+            "CFBundleShortVersionString": "0.39.1",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

@@ -15,6 +15,58 @@ import webbrowser
 from pathlib import Path
 
 
+# Windows hides consoles with this spawn flag (subprocess.CREATE_NO_WINDOW;
+# spelled out so the constant exists on every platform for the tests).
+_CREATE_NO_WINDOW = 0x08000000
+_CONSOLES_HIDDEN: list[bool] = []
+
+
+def _hidden_popen_init(orig_init):
+    """Wrap a Popen.__init__ so every child spawns without a console."""
+
+    def _init(self, *args, **kwargs):
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | _CREATE_NO_WINDOW
+        orig_init(self, *args, **kwargs)
+
+    return _init
+
+
+def _hide_child_consoles() -> None:
+    """Windows: no console windows for anything we spawn.
+
+    The build is windowed (``console=False`` in the spec), so a
+    console-subsystem child — ffmpeg during a merge, pip during a yt-dlp
+    update — would otherwise flash a black window on screen. One wrapper at
+    subprocess.Popen covers every spawner, the bundled yt-dlp's included.
+    No-op off Windows; idempotent.
+    """
+    if os.name != "nt" or _CONSOLES_HIDDEN:
+        return
+    import subprocess
+
+    _CONSOLES_HIDDEN.append(True)
+    subprocess.Popen.__init__ = _hidden_popen_init(subprocess.Popen.__init__)
+
+
+def _ensure_log_targets(log_path: Path) -> None:
+    """A windowed build boots with ``sys.stdout = None``: every print() would
+    vanish and a crash would leave no trail. Point them at a log file."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    try:
+        log_path.parent.mkdir(mode=0o700, exist_ok=True)
+        if log_path.exists() and log_path.stat().st_size > 1_000_000:
+            log_path.write_text("", encoding="utf-8")  # one boot's trail is enough
+        stream = open(log_path, "a", encoding="utf-8", errors="replace",
+                      buffering=1)
+    except OSError:
+        return
+    if sys.stdout is None:
+        sys.stdout = stream
+    if sys.stderr is None:
+        sys.stderr = stream
+
+
 def find_free_port(preferred: int) -> int:
     """Return `preferred` if bindable, else a random free port."""
     def bindable(p: int) -> bool:
@@ -572,6 +624,8 @@ def _try_tray(url: str, open_downloads: Path):
 
 
 def main() -> None:
+    _hide_child_consoles()
+    _ensure_log_targets(Path.home() / ".suravidl" / "app.log")
     p = argparse.ArgumentParser(
         description="suravidl desktop: engine + UI window (+ tray fallback)")
     p.add_argument("--port", type=int, default=8787)

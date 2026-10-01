@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.1",
+        "title": "The hush",
+        "items": [
+            "On Windows, suravidl no longer opens a console window beside the app \u2014 launches are quiet from the first double-click.",
+            "The quick black flickers go too: when yt-dlp merges a video, or a yt-dlp update runs, helper processes stay invisible.",
+            "And if something ever goes wrong at boot, the trail now lands in a log file beside the app data (app.log in the suravidl folder) instead of nowhere.",
+        ],
+    },
+    {
         "version": "0.39.0",
         "title": "The doorman",
         "items": [
@@ -85,14 +94,6 @@ ENTRIES = [
         "title": "Straight to Download",
         "items": [
             "The app opens on the Download page again \u2014 quitting and reopening no longer drops you back on whichever tab you last touched. A URL that names a tab (like a #settings bookmark) still opens it.",
-        ],
-    },
-    {
-        "version": "0.38.0",
-        "title": "Pine & cream",
-        "items": [
-            "A new mark: a big cream download arrow on a pine tile, with the play knocked out of it \u2014 it still reads at a 16px favicon, where the old blue icon turned to mush.",
-            "The header mark follows your theme: the pine tile in the light room, the cream chip at night and on AMOLED \u2014 no more one-size icon sinking into dark rooms.",
         ],
     },
 ]
