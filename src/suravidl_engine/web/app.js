@@ -61,19 +61,27 @@ function ico(name) {
 /* ---------- the human voice of an engine error ---------- */
 /** yt-dlp explains failures in its own dialect ("ERROR: unable to download
  *  video data: HTTP Error 403: Forbidden"). The first line a person reads
- *  says what it MEANS; the raw text stays one tap away (v0.37.0). */
-function humanErr(s) {
+ *  says what it MEANS; the raw text stays one tap away (v0.37.0).
+ *
+ *  The engine leads when it has a structured verdict: detail.unsupported
+ *  means "this site needs the sniffer" and must never be re-guessed into
+ *  some other story. (v0.38.6: a bare `age` alternative matched "page",
+ *  so every unsupported-URL line read as a sign-in wall — the summary and
+ *  the details disagreed, and the summary was wrong.) */
+function humanErr(s, detail) {
   s = String(s == null ? "" : s);
+  if (detail && detail.unsupported)
+    return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
   if (/HTTP Error 404|not found|does not exist/i.test(s))
     return "the site says this link does not exist (404) — check it was copied whole";
   if (/HTTP Error 403|forbidden/i.test(s))
     return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
   if (/HTTP Error 429|too many requests/i.test(s))
     return "the site is rate-limiting this address (429) — wait a bit, then try once more";
-  if (/sign ?in|log ?in|login required|private video|age/i.test(s))
+  if (/unsupported url|no (suitable )?extractor/i.test(s))
+    return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
+  if (/\bsign[ -]?in\b|\blog[ -]?in\b|login required|private video|\bage\b/i.test(s))
     return "the site wants a signed-in session — load cookies in Settings → Authentication";
-  if (/unsupported url/i.test(s))
-    return "no extractor recognises this link — try the in-app browser, or a direct media link";
   if (/timed? ?out|timeout/i.test(s))
     return "the site never answered in time — check the connection and retry";
   if (/certificate|SSL/i.test(s))
@@ -378,7 +386,7 @@ async function doProbe() {
     // the human line leads; the raw engine text sits behind "Show details"
     // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
     $("probeMsg").classList.add("hidden");
-    $("probeSay").textContent = humanErr(e.message);
+    $("probeSay").textContent = humanErr(e.message, e.detail);
     $("probeSay").className = "msg bad";
     $("probeSay").classList.remove("hidden");
     $("probeDetails").textContent = "Show details";

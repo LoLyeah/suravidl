@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.6",
+        "title": "The straight answer",
+        "items": [
+            "Failure summaries no longer guess wrong: the short line follows the engine's own verdict, and unsupported links always say: open it in the browser, press play, then Scan.",
+        ],
+    },
+    {
         "version": "0.38.5",
         "title": "The fold",
         "items": [
@@ -84,14 +91,6 @@ ENTRIES = [
         "items": [
             "The START bar blurs for real again: it rides in the page's flow now — this WebView only composites the blur for in-flow layers (and the bar can no longer sit on top of the text at the page's end).",
             "\"This download only\" opens and closes with a door now — it grows and settles instead of popping.",
-        ],
-    },
-    {
-        "version": "0.37.4",
-        "title": "The backdrop pass",
-        "items": [
-            "Every dialog now frosts the whole screen behind it — on desktop and phone alike (the flat dim veil that made the popup look blur-less is gone).",
-            "The liquid-glass material is written down properly — fill, blur, gloss and edge per style and per host, in DESIGN.md.",
         ],
     },
 ]

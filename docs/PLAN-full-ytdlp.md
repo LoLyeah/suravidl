@@ -496,7 +496,7 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `tests/test_web_motion.py`; suite **346 passed**.
     Verdict table: `docs/audits/2026-09-26-antigravity-motion.md`.
 
-- **v0.23.1 — "glass style doesn't do anything", fixed properly.** A bug
+- **v0.23.1 — the glass that did nothing, fixed properly.** A bug
     report with a screenshot: on the phone, switching Frosted/Liquid changed
     nothing. True — the Android host block turned off the blur, the gloss AND
     the highlight in one blanket rule, so both styles resolved to the same
@@ -730,7 +730,7 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     `docs/audits/2026-09-26-antigravity-sniffing.md`. Extension: 0.5.2.
 
 - **v0.24.6 — the site that beat the prefilter, and the link that went nowhere.**
-    A live report ("for <link> it still won't download") turned out to be two
+    A live report (a link that would not download) turned out to be two
     bugs, and neither was the one the plan expected.
     **1. The prefilter was deciding for the player.** The site's stream is
     `https://mp4-06.overfetch.video/1Vvp1Q5ixT-GxZcW4IToe` — no media extension,
@@ -867,8 +867,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     that a missing subtitle language skips the subtitles and the download
     still completes — both behaviours pinned by tests now.
 
-    3. *"I don't think you need to put 'video only — sound included'"* —
-    right, it read as noise on every row. A video-only row says **video
+    3. The "video only — sound included" suffix read as noise on every
+    row. A video-only row says **video
     only**; the "— no sound" suffix appears only while the sound checkbox
     is ticked. The unchecked default still pairs the site's audio, and the
     hint under the checkbox still says so.
@@ -966,7 +966,7 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     nothing else — the reversal is deliberate, and the old tests were
     rewritten to the new contract, not deleted. Unlike the file delete, the
     cache clear never refuses for a running job: nothing it deletes can be
-    a `.part` or a finished file. Second ask: "add more built in presets" —
+    a `.part` or a finished file. Second ask: more built-in presets —
     the built-ins were seven audio intents. Added: two MP4-compatibility
     format intents (`video-mp4-1080`, `video-mp4-720` — H.264+AAC preferred
     when the site has them, the app's usual capped ladder when it doesn't,
@@ -1127,9 +1127,9 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     Operate guidance: inline progressive disclosure, no modal, the
     existing control vocabulary. 9 new tests; suite 566 → 575, both
     orders. versionCode 54.
-- **v0.35.0 — the download end of the preset workflow.** "Applying for
-    preset looks good, but how about downloading the video with applied
-    presets? The ux workflow doesn't makes sense for it." Reproduced live
+- **v0.35.0 — the download end of the preset workflow.** The preset flow
+    needed its download end — applying a preset should shape the actual
+    download, not just sit in the panel. Reproduced live
     at phone width — four defects, all real: the armed set hid in the
     collapsed block below the formats table, nowhere near a download
     button; the start toast said a bare "Added to downloads" whether or
@@ -1166,10 +1166,10 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     refuses an unknown name at the boundary. 10 new tests; suite
     583 → 593, both orders. versionCode 56. Ships the v0.35.0 workflow
     fixes in the same release (v0.35.0 was never tagged on its own).
-- **v0.37.0 — The Post House (the major overhaul).** "Impeccable my app
-    suravidl UI feels generic … modern with ios like liquid glass and
-    frosted glass … easy to use for users, with advanced options for
-    enthusiasts … multi-platform … across all screen sizes." Ran the
+- **v0.37.0 — The Post House (the major overhaul).** Brief: the UI feels
+    generic — make it modern, iOS-like liquid and frosted glass, easy for
+    newcomers, advanced options for enthusiasts, multi-platform, across
+    all screen sizes. Ran the
     impeccable machinery end to end: the review found 25/40 with the
     verdict "generic shell, specific instrument"; a seeded direction round
     produced five options; the user picked The Post House (an ingest room:
@@ -1302,7 +1302,7 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     Suite 631 → 635; versionCode 63.
 
 - **v0.37.7 — the readable queue.** Device report (17:32 photo + a crop).
-    (1) "when there's a queue, the number pushes the queue button" — the
+    (1) A queue count pushed the queue button off its column — the
     phone tab is a centered column; the count badge was a flow child, so
     its height shifted the tab's icon+label up against the siblings. The
     badge is absolute on the icon's corner now (inert, zero layout
@@ -1325,8 +1325,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     (the pine tile measured 1.8:1 on graphite — it sank). Suite 637 → 644;
     versionCode 65.
 
-- **v0.38.1 — straight to Download.** Report: "After I quit, and opened the app
-    again, can you make download as the default page?" The boot restored the
+- **v0.38.1 — straight to Download.** Reopening the app should land on
+    Download, not whichever tab was last touched. The boot restored the
     last tab from localStorage (suravidl.tab) — the phone loads a fresh
     http://127.0.0.1:PORT/ each launch, so the remembered key always won. The
     restore (const + write + read) is gone: boot = hash || download. The hash
@@ -1336,8 +1336,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     Suite 644 → 647; versionCode 66.
 
 - **v0.38.2 — the receipt and the lane.** Two device reports (06:23 photo,
-    2026-10-01). (1) "Why the toast is still way above the bottom bar like
-    it's above something missing? ... make it adaptive": the phone lane was
+    2026-10-01). (1) The toast lane floated above a gap — it should adapt,
+    clearing only real furniture: the phone lane was
     pinned at bar + 84px everywhere — a value tuned for the Download
     transport, which is STICKY and only sits at the bottom once the page is
     long enough (a probed list) — so on Queue it hovered over nothing. The
@@ -1346,8 +1346,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     140px band it lifts to 8px above that furniture. Verified live at
     393x852: Queue 9px above the bar; probed Download lifts to 707 vs
     transport top 715 (inline bottom: 145px); Settings 8px above the strip.
-    (2) "in Queue when the card expand ... show us the file size and the
-    location too": the unfolded card gains a receipt (size + full saved
+    (2) An expanded Queue card should show the size and the location, not
+    just the name: the unfolded card gains a receipt (size + full saved
     path, mono, wrapping); the engine stats the real bytes — size_bytes in
     the row serializer AND in the live get()/list() copies (the in-memory
     dict never passes _row_to_job — caught live when the API answered
@@ -1376,8 +1376,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     #1a1305 ink dies; swatch previews follow the scheme. Suite 653 → 674;
     versionCode 68.
 
-- **v0.38.4 — the native glass.** "is it possible to use real MacOS liquid
-    glass material API for the MacOS ver app?" — yes, behind the page:
+- **v0.38.4 — the native glass.** Can the Mac app sit on Apple's real
+    liquid-glass material API? Yes — behind the page:
     Apple exposes Liquid Glass only to native toolkits (SwiftUI glassEffect,
     UIKit UIGlassEffect, AppKit NSGlassEffectView, macOS 26+), never to web
     content, so per-element glass stays CSS — but the SHELL can sit the
@@ -1400,9 +1400,8 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     (the spec's CFBundleShortVersionString also finally bumped). Suite
     674 → 685; versionCode 69.
 
-- **v0.38.5 — the fold.** Phone screenshot report (11:50, 2026-10-01):
-    "No animation when the card is expanding or retracting? Also when
-    expanding you don't need the /stor... Near the open button." (1) The
+- **v0.38.5 — the fold.** Phone screenshot report (11:50, 2026-10-01).
+    (1) The expanded card snapped open and shut — no fold: the
     receipt swapped via display: none → grid, which cannot animate — it
     now FOLDS: .jdetails is a persistent grid collapsing through
     grid-template-rows 0fr → 1fr (+opacity 0→1, margin-top 0→9px, .28s
@@ -1419,3 +1418,21 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     ellipsised strip yields once the receipt carries the full path
     (verified live: block when closed, none when open). Suite 685 → 691;
     versionCode 70.
+
+- **v0.38.6 — the straight answer.** Report (phone, 2026-10-01): the
+    humanized line and the "Show details" text disagreed, and the human
+    one pointed at the wrong fix. Root cause found by reproducing in real
+    JS (the tests extract humanErr and run it in node): the sign-in
+    regex's bare `age` alternative matched "page", so every "Unsupported
+    URL … no extractor for this page" read as a sign-in wall — and the
+    branch order let it win over the unsupported branch. Fix: word
+    boundaries on every alternative (`\bsign[ -]?in\b|\blog[ -]?in\b…|
+    \bage\b`), the unsupported branch ordered before the sign-in family,
+    and — the deeper repair — the engine's structured verdict now leads:
+    /probe already sends detail.unsupported + hint (auth.py), api()
+    already carries it as err.detail, so the probe pass-through calls
+    humanErr(e.message, e.detail) and a structured verdict can never be
+    re-guessed into another story. Same pass: the releases' prompt quotes
+    are gone from PLAN (commits stay as published; no force-push) and the
+    no-verbatim-quotes rule is recorded in the skill. Suite 691 → 695;
+    versionCode 71.
