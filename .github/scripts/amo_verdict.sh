@@ -47,6 +47,19 @@ if grep -qiE "took too long|timed out|timeout|still waiting" "$log"; then
     exit 0
 fi
 
+# The version was submitted, and the CLI died *polling* for its approval.
+#
+# "Waiting for approval…" is printed only after PUT addon/<id>/ created the
+# version (web-ext/lib/util/submit-addon.js), so a details-fetch error after it
+# is a Mozilla-side flake — the submission itself is done and in review. The
+# first real occurrence was a 502 Bad Gateway 115 seconds into the wait.
+if grep -q "Waiting for approval" "$log" && \
+   grep -qiE "Getting details failed|Bad Gateway|unexpected status" "$log"; then
+    echo "::notice title=Submitted to AMO::The version reached Mozilla and is in review; the status poll then failed on AMO's side — nothing left to retry."
+    echo "submitted: the version is in review; AMO's status poll failed"
+    exit 0
+fi
+
 # Fail safe: a wording we have not seen before must never be read as success.
 echo "::error title=AMO submission unclear::web-ext exited $status without a recognisable verdict — read the log above."
 echo "failed: no recognisable AMO verdict"

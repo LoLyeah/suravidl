@@ -68,6 +68,33 @@ def test_an_unfamiliar_failure_stays_a_failure():
     assert "no recognisable AMO verdict" in out
 
 
+def test_a_flake_while_polling_for_approval_is_still_submitted():
+    """The real log from 2026-10-01: validation passed, the PUT that creates
+    the version succeeded ("Waiting for approval…" is only printed after it),
+    and the CLI then died fetching the version's details from an AMO 502. The
+    submission is in review; failing the pipeline here would red it for a
+    Mozilla-side flake."""
+    log = ("Building web extension from /tmp/ffext\n"
+           "Waiting for validation...\n"
+           "Waiting for approval...\n\n"
+           "WebExtError: Getting details failed: Bad Gateway.\n"
+           "    at file:///home/runner/.npm/_npx/b04a1c8f1afa246c/node_modules/"
+           "web-ext/lib/cmd/sign.js:101:13\n")
+    code, out = _verdict(log, 1)
+    assert code == 0, out
+    assert "review" in out
+
+
+def test_a_flake_before_the_submission_stays_a_failure():
+    """The same wording during *validation* polling has not submitted anything
+    — there the fail-safe must keep failing, so the run gets retried."""
+    code, out = _verdict(
+        "Waiting for validation...\n"
+        "WebExtError: Getting details failed: Bad Gateway.\n", 1)
+    assert code == 1, out
+    assert "no recognisable AMO verdict" in out
+
+
 def test_a_401_is_never_read_as_a_timeout():
     code, out = _verdict("WebExtError: 401 Unauthorized\n", 1)
     assert code == 1
