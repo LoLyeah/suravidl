@@ -15,6 +15,7 @@
     if (c && typeof c === "object") {
       document.documentElement.dataset.theme = c.theme || "dark";
       document.documentElement.dataset.glass = c.glass || "frosted";
+      document.documentElement.dataset.accent = c.accent || "amber";
     }
     /* The Android WebView gets a lighter glass radius; a shell that cannot
        blur at all falls back to solid plates via the @supports rule in CSS. */
@@ -53,6 +54,8 @@
     <path d="M5.5 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v.5"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3.5 6.4A1.9 1.9 0 0 1 5.4 4.5h4.2l2 2.4h7A1.9 1.9 0 0 1 20.5 8.8v8.3a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12h14"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 5.6v12.8L19 12z"/></symbol>
 </svg>
@@ -67,7 +70,7 @@
   <h1>suravidl</h1>
   <span id="versions" class="meta"></span>
   <span class="spacer"></span>
-  <button id="minBtn" class="btn sm hidden" title="Minimize window">—</button>
+  <button id="minBtn" class="btn sm hidden" title="Minimize window" aria-label="Minimize window"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg></span></button>
   <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span>Quit</button>
 </header>
 
@@ -105,7 +108,7 @@
       </div>
       <div id="probeSay" class="msg hidden" role="status"></div>
       <div id="probeMsg" class="msg muted"></div>
-      <button id="probeDetails" class="linkbtn hidden" type="button">Show details</button>
+      <button id="probeDetails" class="linkbtn hidden" type="button" aria-expanded="false" aria-controls="probeMsg">Show details</button>
       <div id="browserOffer" class="audioRow hidden">
         <button id="browserOfferBtn" class="btn prime sm">Open in the browser</button>
         <span class="muted">this page has a player yt-dlp cannot read — press play there, then Scan</span>
@@ -163,7 +166,7 @@
         <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed">keep original</button>
         <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
         <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
-        <select id="audioMore" title="more audio formats">
+        <select id="audioMore" title="more audio formats" aria-label="More audio presets">
           <option value="">more formats…</option>
           <option value="audio-mp3-320">MP3 320k</option>
           <option value="audio-mp3-128">MP3 128k</option>
@@ -194,7 +197,7 @@
       </div>
       <div id="playlistRow" class="audioRow hidden">
         <span class="muted">Playlist items:</span>
-        <input id="playlistItems" type="text" spellcheck="false"
+        <input id="playlistItems" type="text" spellcheck="false" aria-label="Playlist items to download"
                placeholder="blank = all · e.g. 1-10,15"/>
         <button id="playlistBtn" class="btn prime sm">Download playlist</button>
         <button id="plAll" class="btn ghost-sm">All</button>
@@ -288,7 +291,7 @@
           <label class="lbl" for="ovClipStart">Clip — only a section</label>
           <div class="jrow">
             <input id="ovClipStart" type="text" spellcheck="false" placeholder="start 1:30"/>
-            <input id="ovClipEnd" type="text" spellcheck="false" placeholder="end 2:45"/>
+            <input id="ovClipEnd" type="text" spellcheck="false" placeholder="end 2:45" aria-label="Clip end time"/>
             <button id="ovClipClear" class="btn ghost-sm" type="button">whole video</button>
           </div>
           <span class="muted small">mm:ss or hh:mm:ss — for a 30-second highlight
@@ -332,7 +335,7 @@
   <section class="panel hidden" id="panel-queue">
     <section class="card">
       <h2>Downloads</h2>
-      <div id="jobs"></div>
+      <div id="jobs"><div class="empty muted" id="jobsInitial">Checking the queue…</div></div>
     </section>
   </section>
 
@@ -343,18 +346,18 @@
         <h2>Settings</h2>
       </div>
 
-      <div class="subtabs" id="settingsTabs">
-        <button class="stab active" data-stab="general" type="button">General</button>
-        <button class="stab" data-stab="media" type="button">Media</button>
-        <button class="stab" data-stab="presets" id="stabPresets" type="button">Presets</button>
-        <button class="stab" data-stab="network" type="button">Network</button>
-        <button class="stab" data-stab="auth" type="button">Authentication</button>
-        <button class="stab" data-stab="advanced" type="button">Advanced</button>
-        <button class="stab hidden" data-stab="device" id="tabDevice" type="button">Device</button>
+      <div class="subtabs" id="settingsTabs" role="tablist" aria-label="Settings sections">
+        <button class="stab active" data-stab="general" type="button" role="tab" aria-controls="spanel-general" aria-selected="true">General</button>
+        <button class="stab" data-stab="media" type="button" role="tab" aria-controls="spanel-media" aria-selected="false">Media</button>
+        <button class="stab" data-stab="presets" id="stabPresets" type="button" role="tab" aria-controls="spanel-presets" aria-selected="false">Presets</button>
+        <button class="stab" data-stab="network" type="button" role="tab" aria-controls="spanel-network" aria-selected="false">Network</button>
+        <button class="stab" data-stab="auth" type="button" role="tab" aria-controls="spanel-auth" aria-selected="false">Authentication</button>
+        <button class="stab" data-stab="advanced" type="button" role="tab" aria-controls="spanel-advanced" aria-selected="false">Advanced</button>
+        <button class="stab hidden" data-stab="device" id="tabDevice" type="button" role="tab" aria-controls="spanel-device" aria-selected="false">Device</button>
       </div>
 
       <div class="subwrap" id="subwrap">
-      <div class="spanel" id="spanel-general">
+      <div class="spanel" id="spanel-general" role="tabpanel">
       <div class="field">
         <label class="lbl">Appearance</label>
         <div class="swatches" id="themeSwatches">
@@ -380,6 +383,20 @@
           <button class="swatch" data-glass="liquid" type="button">
             <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
             <span class="sw-hint">glossy · heavier blur</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="lbl">Scheme</label>
+        <div class="swatches" id="schemeSwatches">
+          <button class="swatch" data-accent="amber" type="button">
+            <span class="sw-preview sw-amber"></span><span class="sw-label">Amber</span>
+            <span class="sw-hint">the house lamp</span>
+          </button>
+          <button class="swatch" data-accent="pine" type="button">
+            <span class="sw-preview sw-pine"></span><span class="sw-label">Pine &amp; cream</span>
+            <span class="sw-hint">the brand's voice</span>
           </button>
         </div>
       </div>
@@ -431,7 +448,7 @@
       </div>
       </div><!-- /spanel-general -->
 
-      <div class="spanel hidden" id="spanel-presets">
+      <div class="spanel hidden" id="spanel-presets" role="tabpanel">
         <div class="field">
           <label class="lbl" for="defaultPreset">Default preset
             <span class="muted">— rides every new download</span></label>
@@ -457,7 +474,7 @@
         </div>
       </div><!-- /spanel-presets -->
 
-      <div class="spanel hidden" id="spanel-media">
+      <div class="spanel hidden" id="spanel-media" role="tabpanel">
         <div class="field">
           <label class="lbl" for="setTemplate">Filename template</label>
           <input id="setTemplate" type="text" spellcheck="false"
@@ -567,7 +584,7 @@
         </div>
       </div><!-- /spanel-media -->
 
-      <div class="spanel hidden" id="spanel-network">
+      <div class="spanel hidden" id="spanel-network" role="tabpanel">
         <div class="field row">
           <label class="lbl" for="setFragments">Parallel fragments</label>
           <input id="setFragments" type="number" min="1" max="16"/>
@@ -600,18 +617,18 @@
         </div>
       </div><!-- /spanel-network -->
 
-      <div class="spanel hidden" id="spanel-auth">
+      <div class="spanel hidden" id="spanel-auth" role="tabpanel">
       <div class="field">
         <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
         <div class="col grow">
           <div class="jrow">
-            <input id="setCookies" type="text" spellcheck="false"
+            <input id="setCookies" type="text" spellcheck="false" aria-label="Path to cookies file"
                    placeholder="path to cookies.txt (Netscape format)"/>
             <button id="browseCookies" class="btn sm hidden" type="button">Browse…</button>
             <button id="importCookies" class="btn sm hidden" type="button">Import…</button>
           </div>
           <div class="jrow" id="browserRow">
-            <select id="setCookiesBrowser">
+            <select id="setCookiesBrowser" aria-label="Browser to take cookies from">
               <option value="">Browser cookies: off</option>
               <option value="chrome">Use cookies from Chrome</option>
               <option value="chromium">Use cookies from Chromium</option>
@@ -624,7 +641,7 @@
             </select>
           </div>
           <div class="jrow" id="impersonateRow">
-            <select id="setImpersonate">
+            <select id="setImpersonate" aria-label="Browser to impersonate">
               <option value="">Impersonate: off</option>
               <option value="chrome">Impersonate Chrome — strict bot checks (e.g. Facebook)</option>
               <option value="firefox">Impersonate Firefox</option>
@@ -645,7 +662,7 @@
 
       </div><!-- /spanel-auth -->
 
-      <div class="spanel hidden" id="spanel-advanced">
+      <div class="spanel hidden" id="spanel-advanced" role="tabpanel">
         <div class="field">
           <label class="check small" for="setRawEnabled">
             <input id="setRawEnabled" type="checkbox"/>
@@ -657,7 +674,7 @@
         </div>
       </div><!-- /spanel-advanced -->
 
-      <div class="spanel hidden" id="spanel-device">
+      <div class="spanel hidden" id="spanel-device" role="tabpanel">
       <div id="androidSection" class="field hidden">
         <label class="lbl">Android</label>
         <div class="col">
@@ -791,7 +808,7 @@
     </section>
 
     <section class="card">
-      <h2>All yt-dlp options <span id="optionsCount" class="muted small"></span></h2>
+      <h2>All yt-dlp options <span id="optionsCount" class="muted small mono"></span></h2>
       <input id="optionsSearch" type="text" spellcheck="false"
              aria-label="search yt-dlp options"
              placeholder="search — e.g. proxy, subtitle, metadata, sleep"/>

@@ -41,6 +41,8 @@
   --mark-tile: #F2E9D8;                   /* brand: the cream chip at night */
   --mark-arrow: #14493C;                  /* pine ink on the chip */
   --mark-deep: rgba(0,0,0,.45);
+  --accent-fg: #1a1305;                   /* ink on a filled accent control */
+  --accent-glow: rgba(232,163,62,.55);    /* the lamp's cast shadow */
   --ok: #4ecf83;   --ok-bg: rgba(78,207,131,.14);   --ok-line: rgba(78,207,131,.4);
   --err: #ff8078;  --err-bg: rgba(255,128,120,.13); --err-line: rgba(255,128,120,.4);
   --warn: #e8a33e; --warn-bg: rgba(232,163,62,.13); --warn-line: rgba(232,163,62,.4);
@@ -72,7 +74,9 @@ html[data-theme="light"] {
   --mark-tile: #14493C;                   /* brand: the pine tile at day */
   --mark-arrow: #F2E9D8;
   --mark-deep: rgba(20,73,60,.35);
-  --ok: #1f7a4d;   --ok-bg: rgba(31,122,77,.12);   --ok-line: rgba(31,122,77,.3);
+  --accent-fg: #1a1305;                   /* ink on a filled accent control */
+  --accent-glow: rgba(192,122,22,.55);    /* the lamp's cast shadow */
+  --ok: #1b6942;   --ok-bg: rgba(31,122,77,.12);   --ok-line: rgba(31,122,77,.3);
   --err: #b3261e;  --err-bg: rgba(179,38,30,.1);   --err-line: rgba(179,38,30,.3);
   --warn: #8a5a10; --warn-bg: rgba(138,90,16,.1);  --warn-line: rgba(138,90,16,.3);
   --pill-idle: rgba(32,29,24,.07);
@@ -103,6 +107,8 @@ html[data-theme="amoled"] {
   --mark-tile: #F2E9D8;                   /* brand: the cream chip at night */
   --mark-arrow: #14493C;                  /* pine ink on the chip */
   --mark-deep: rgba(0,0,0,.45);
+  --accent-fg: #1a1305;                   /* ink on a filled accent control */
+  --accent-glow: rgba(232,163,62,.55);    /* the lamp's cast shadow */
   --ok: #4ecf83;   --ok-bg: rgba(78,207,131,.13);   --ok-line: rgba(78,207,131,.38);
   --err: #ff8078;  --err-bg: rgba(255,128,120,.12); --err-line: rgba(255,128,120,.38);
   --warn: #e8a33e; --warn-bg: rgba(232,163,62,.12); --warn-line: rgba(232,163,62,.38);
@@ -115,6 +121,27 @@ html[data-theme="amoled"] {
   --sel: rgba(232,163,62,.34);
   --ph: #8b95a1;
   --lamp: rgba(232,163,62,.08);
+}
+
+/* ---------- the pine & cream scheme (v0.38.3) ----------
+   The brand's second voice, as a user option. Same mechanics, two tones:
+   pine by day, the cream chip at night — dark pine would sink on graphite
+   (1.8:1), the same measured swap the logo twins made. The state lights
+   (ok/err/warn) stay their own colours: they are signals, not brand. */
+html[data-accent="pine"][data-theme="light"] {
+  --accent: #14493C;  --accent2: #0e352b;
+  --accent-fg: #F2E9D8;  --accent-ink: #14493C;
+  --accent-soft: rgba(20,73,60,.12);  --accent-line: rgba(20,73,60,.35);
+  --accent-glow: rgba(20,73,60,.35);
+  --sel: rgba(20,73,60,.25);  --lamp: rgba(20,73,60,.06);
+}
+html[data-accent="pine"][data-theme="dark"],
+html[data-accent="pine"][data-theme="amoled"] {
+  --accent: #F2E9D8;  --accent2: #ffffff;
+  --accent-fg: #14493C;  --accent-ink: #F2E9D8;
+  --accent-soft: rgba(242,233,216,.14);  --accent-line: rgba(242,233,216,.45);
+  --accent-glow: rgba(242,233,216,.30);
+  --sel: rgba(242,233,216,.30);  --lamp: rgba(242,233,216,.08);
 }
 
 /* ---------- glass styles: smoked (matte) | polished (specular) ---------- */
@@ -262,10 +289,10 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; letter-spacing: .2px; 
 @media (hover: hover) { .tab:hover { color: var(--text); background: var(--glass-bg); } }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); background: var(--glass-bg); }
 .tab .tab-ico { color: var(--dim); }
-.tab.active .tab-ico { color: var(--accent); }
+.tab.active .tab-ico { color: var(--accent-ink); }
 .badge {
   min-width: 18px; padding: 1px 5px; border-radius: 999px;
-  background: var(--accent); color: #1a1305;
+  background: var(--accent); color: var(--accent-fg);
   font-size: 11px; font-weight: 700; text-align: center;
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
 }
@@ -385,8 +412,8 @@ button { font: inherit; border: 0; cursor: pointer; }
 .btn.prime {
   background: var(--accent);
   border-color: var(--accent-line);
-  color: #1a1305; font-weight: 700;
-  box-shadow: 0 10px 22px -10px rgba(232,163,62,.55), inset 0 1px 0 rgba(255,255,255,.35);
+  color: var(--accent-fg); font-weight: 700;
+  box-shadow: 0 10px 22px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.35);
 }
 @media (hover: hover) { .btn.prime:hover { background: var(--accent2); } }
 .btn.prime:disabled { opacity: .55; cursor: default; }
@@ -408,7 +435,7 @@ button { font: inherit; border: 0; cursor: pointer; }
 .ghost-sm.del { color: var(--err); }
 @media (hover: hover) { .ghost-sm.del:hover { background: var(--err-bg); border-color: var(--err-line); } }
 .btn:active, .get:active, .ghost-sm:active, .swatch:active,
-.tab:active, .stab:active { transform: scale(.97); }
+.tab:active, .stab:active, button.chip:active { transform: scale(.97); }
 .optrow:active { border-color: var(--accent-line); background: var(--glass-bg); }
 .linkbtn {
   background: none; border: 0; padding: 2px 0; color: var(--accent-ink); font-size: 12.5px;
@@ -454,7 +481,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 /* the switch: a chip that is SET, not pressed */
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 9px; border-radius: 7px;
+  padding: 3px 9px; border-radius: 8px;
   background: var(--pill-idle); border: 1px solid var(--line-soft);
   font-size: 11.5px; color: var(--muted);
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
@@ -463,7 +490,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 /* a picked chip (subtitle languages) reads as picked; state lives in
    aria-pressed so the paint and the semantics cannot drift apart */
 .chip[aria-pressed="true"] {
-  background: var(--accent); color: #1a1305; border-color: transparent;
+  background: var(--accent); color: var(--accent-fg); border-color: transparent;
 }
 .led {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
@@ -583,6 +610,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
   color: var(--livery, var(--dim));
   border-color: color-mix(in srgb, var(--livery, var(--dim)) 40%, transparent);
 }
+/* the light room: the dark-room tints wash out on light glass (1.4–2.9:1) —
+   darker brand inks keep every livery past 4.5:1 (v0.38.3 audit #1) */
+html[data-theme="light"] .card[data-livery="youtube"]   { --livery: #c5221f; }
+html[data-theme="light"] .card[data-livery="twitter"]   { --livery: #1d68c9; }
+html[data-theme="light"] .card[data-livery="vimeo"]     { --livery: #0073a8; }
+html[data-theme="light"] .card[data-livery="instagram"] { --livery: #a82782; }
+html[data-theme="light"] .card[data-livery="tiktok"]    { --livery: #077a6e; }
 
 /* the armed strip */
 #armedBar {
@@ -593,6 +627,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
   color: var(--accent-ink); font-size: 12.5px; line-height: 1.45;
 }
 #armedText { flex: 1 1 auto; cursor: pointer; overflow-wrap: anywhere; }
+#armedText:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 #armedBar .btn { flex: none; }
 
 /* the format table: switchgear rows */
@@ -721,6 +756,7 @@ details.card { padding: 0 18px 6px; }
   flex: 1 0 100%; white-space: normal; overflow: visible;
   text-overflow: clip; word-break: break-word;
 }
+.jobtitle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .job .jmeta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .job .jrow { margin-top: 9px; }
 .job .path {
@@ -949,6 +985,14 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 .sw-amoled { background: linear-gradient(135deg, #000 60%, #e8a33e 61%, #7e8794); }
 .g-frosted { background: linear-gradient(160deg, rgba(255,255,255,.09), rgba(255,255,255,.02) 70%), #343941; }
 .g-liquid  { background: linear-gradient(150deg, rgba(255,255,255,.5), rgba(150,170,210,.16) 42%, rgba(232,163,62,.3) 96%), #3a3f47; }
+/* the scheme swatches: the two voices of the house (v0.38.3) */
+.sw-amber  { background: linear-gradient(135deg, #14181d 45%, #e8a33e 46%, #f3c169 78%, #e7e4de); }
+.sw-pine   { background: linear-gradient(135deg, #14493C 45%, #F2E9D8 46%, #0e352b 78%, #e7e4de); }
+/* under pine, the theme previews wear the pine lamp, not amber */
+[data-accent="pine"] .sw-light  { background: linear-gradient(135deg, #f0ede8 45%, #14493C 46%, #0e352b 78%, #e7e4de); }
+[data-accent="pine"] .sw-dark   { background: linear-gradient(135deg, #14181d 45%, #F2E9D8 46%, #ffffff 78%, #0f1216); }
+[data-accent="pine"] .sw-amoled { background: linear-gradient(135deg, #000 60%, #F2E9D8 61%, #7e8794); }
+[data-accent="pine"] .g-liquid  { background: linear-gradient(150deg, rgba(255,255,255,.5), rgba(150,170,210,.16) 42%, rgba(242,233,216,.3) 96%), #3a3f47; }
 .sw-label { font-weight: 600; }
 .sw-hint { font-size: 10.5px; color: var(--dim); text-align: center; }
 
@@ -963,6 +1007,11 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
   cursor: pointer;
 }
 @media (hover: hover) { .optrow:hover { border-color: var(--accent-line); } }
+/* presets are read-only rows (the Delete button acts): the pointer and
+   hover affordances belong to the options browser's live rows
+   (v0.38.3 audit #11) */
+#presetList .optrow { cursor: default; }
+@media (hover: hover) { #presetList .optrow:hover { border-color: var(--line-soft); } }
 .optrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 9px; }
 #optionsList:focus-visible, #optionsList:focus { outline: none; }
 .optrow .col { flex: 1; min-width: 0; gap: 3px; }
@@ -1087,6 +1136,7 @@ footer .linkbtn { color: var(--accent-ink); }
   .btn, .btn.sm, .ghost-sm, .stab, .linkbtn, .check, .chk,
   input[type="checkbox"], .swatch, .tab { min-height: 44px; }
   .get { min-height: 44px; padding: 10px 16px; }
+  button.chip { min-height: 44px; padding: 9px 12px; }
   .qrow .btn { min-height: 44px; padding: 9px 16px; }
   .pill { min-height: 30px; }
   .optrow { min-height: 52px; }

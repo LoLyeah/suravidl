@@ -1352,3 +1352,26 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     the row serializer AND in the live get()/list() copies (the in-memory
     dict never passes _row_to_job — caught live when the API answered
     null). Suite 647 → 653; versionCode 67.
+
+- **v0.38.3 — the audit and the second voice.** agy audited the UI against
+    the impeccable + antislop rulebooks; every finding verified here before
+    code (agy's contrast numbers checked out ±0.03; one stale cross-ref
+    ignored). Fifteen fixes: light-theme site liveries get dark brand inks
+    (YouTube #c5221f, X #1d68c9, Vimeo #0073a8, IG #a82782, TikTok #077a6e —
+    all past 4.5:1); the what's-new card rides the real dialog lifecycle
+    (openModal/closeModal, Escape, backdrop); the queue title expands from
+    the keyboard (Enter/Space, aria-expanded, role=button — the tap wiring
+    kept intact for the v0.37.7 pin); "Best" no longer wears the armed lamp
+    before it is armed; the minimize button is a drawn SVG minus; the
+    active-tab icon takes --accent-ink (6.81:1 on the light bar); six
+    unnamed form controls get labels; chips hit 8px radius + 44px touch
+    target + press state under pointer:coarse; settings sub-tabs become a
+    real tablist; --ok darkens in light (#1b6942, 5.26:1); preset rows stop
+    pretending to be clickable; the error-details toggle carries
+    aria-expanded/controls; match counts pluralize in mono; the queue shows
+    "Checking the queue…" before the first poll. AND the Pine & Cream
+    scheme: data-accent="pine" in Settings → Appearance — light keeps pine
+    #14493C on cream ink (8.1:1), dark/AMOLED flip to cream on pine ink
+    (15.6:1); --accent-fg/--accent-glow tokenized first so the hardcoded
+    #1a1305 ink dies; swatch previews follow the scheme. Suite 653 → 674;
+    versionCode 68.

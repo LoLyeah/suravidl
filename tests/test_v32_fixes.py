@@ -100,11 +100,13 @@ def test_a_first_launch_gets_the_current_release_and_later_ones_whats_new():
 def test_the_card_waits_for_got_it():
     dismiss = _fn("function dismissWhatsNew", "\n\n")
     assert "if (version) updStore.set(WN.seen, version);" in dismiss
-    assert '$("whatsNewModal").classList.add("hidden");' in dismiss
+    # v0.38.3: the card rides the real dialog lifecycle (closeModal carries
+    # the exit transition; Escape and the backdrop dismiss it)
+    assert 'closeModal($("whatsNewModal"));' in dismiss
     show = _fn("function showWhatsNew", "\n\n/** Record on dismiss")
     assert '$("whatsNewDone").onclick = () => dismissWhatsNew(version);' in show
     assert '$("whatsNewClose").onclick = () => dismissWhatsNew(version);' in show
-    assert '$("whatsNewModal").classList.remove("hidden");' in show
+    assert "openModal(modal);" in show
 
 
 def test_settings_can_reopen_this_versions_notes():

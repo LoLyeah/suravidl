@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.3",
+        "title": "The audit and the second voice",
+        "items": [
+            "A second color scheme joins the house amber: Pine & cream, the brand's own voice — pine by day, the cream chip at night. Pick it in Settings → Appearance → Scheme.",
+            "Site badges (YouTube, X, Vimeo…) are now readable in the light theme, and a handful of dim labels, greens and state lamps got darker ink so everything clears the readability floor.",
+            "The keyboard works everywhere now: a download's title opens with Enter, the what's-new card closes with Escape or by clicking outside, and buttons that looked pressed-in but did nothing were honest again.",
+            "Smaller pass: the minimize button is a drawn icon, chips get a touch-sized press target on phones, sub-tabs and expanders announce themselves to screen readers, and the queue says it is loading.",
+        ],
+    },
+    {
         "version": "0.38.2",
         "title": "The receipt and the lane",
         "items": [
@@ -85,15 +95,6 @@ ENTRIES = [
         "title": "The glass stays",
         "items": [
             "The phone's frosted and liquid glass keeps its real blur — floating bars, dialogs and toasts included. (A fix earlier in this release had briefly replaced them with solid plates; that was a wrong call, and it is undone.)",
-        ],
-    },
-    {
-        "version": "0.37.1",
-        "title": "The device pass",
-        "items": [
-            "Switching tabs is immediate now — the next screen starts the moment you tap, instead of waiting for the old one to finish leaving.",
-            "The What's new card no longer draws a scrollbar on touch screens, and the Settings sub-tabs wrap onto two rows instead of running off the edge.",
-            "A failed download's raw error reads across the full width, not one word per line.",
         ],
     },
 ]

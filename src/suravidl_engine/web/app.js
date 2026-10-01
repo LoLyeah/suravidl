@@ -299,12 +299,14 @@ function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
 }
 
 /* ---------- theme / glass ---------- */
-function applyTheme(theme, glass) {
+function applyTheme(theme, glass, accent) {
   const r = document.documentElement;
   const changed = (theme && r.dataset.theme !== theme)
-    || (glass && r.dataset.glass !== glass);
+    || (glass && r.dataset.glass !== glass)
+    || (accent && r.dataset.accent !== accent);
   if (theme) r.dataset.theme = theme;
   if (glass) r.dataset.glass = glass;
+  if (accent) r.dataset.accent = accent;
   // A theme switch repaints every surface. Without this the big cards eased
   // their colours over 350ms while every button, pill and input inside them
   // snapped instantly — the UI looked torn for a third of a second (motion
@@ -321,15 +323,19 @@ function markSwatches(values) {
     b.classList.toggle("on", b.dataset.theme === values.theme));
   document.querySelectorAll("#glassSwatches .swatch").forEach((b) =>
     b.classList.toggle("on", b.dataset.glass === values.glass));
+  document.querySelectorAll("#schemeSwatches .swatch").forEach((b) =>
+    b.classList.toggle("on", b.dataset.accent === values.accent));
 }
-let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted" };
+let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted",
+                accent: CFG.accent || "amber" };
 let SETTINGS_SNAPSHOT = null;   // last /settings payload (used by the preset diff)
+let wnVersion = null;   // the version the open what's-new card belongs to
 
 async function setAppearance(patch, label) {
   try {
     const s = await api("/settings", { method: "POST", body: JSON.stringify(patch) });
-    CURRENT = { theme: s.theme, glass: s.glass };
-    applyTheme(s.theme, s.glass);
+    CURRENT = { theme: s.theme, glass: s.glass, accent: s.accent };
+    applyTheme(s.theme, s.glass, s.accent);
     markSwatches(CURRENT);
     toast(label, "info");
   } catch (e) {
@@ -793,10 +799,11 @@ function renderQualityRow(url, remembered) {
   }
   for (const q of list) {
     // what you picked for this site last time is marked, not applied: the
-    // click is still yours (M20)
+    // click is still yours (M20). No chip glows like the lamp before it is
+    // armed — "best" included (v0.38.3 audit #4: an unclicked chip read as
+    // a second START button).
     const last = remembered && q.key === remembered;
-    const btn = el("button",
-      "btn sm" + (last ? " pick" : (q.key === "best" ? " prime" : "")),
+    const btn = el("button", "btn sm" + (last ? " pick" : ""),
       last ? q.label + " · last used" : q.label);
     btn.dataset.pick = q.fmt;
     btn.title = last
@@ -1368,6 +1375,13 @@ function initOverrides() {
     clearOv();
     toast("cleared — using your settings");
   };
+  $("armedText").tabIndex = 0;
+  $("armedText").setAttribute("role", "button");
+  $("armedText").onkeydown = (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    $("armedText").onclick();   // one behaviour, two doors (v0.38.3 audit #12)
+  };
   $("armedText").onclick = () => {
     $("ovBlock").open = true;
     // instant, not smooth: a smooth scroll proved inert in the stripped-down
@@ -1483,8 +1497,22 @@ function jobRow(j) {
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
   // the title ellipsises on a phone and nothing hover-reveals it there: a
-  // tap unfolds the whole line (2026-10-01 report)
-  title.onclick = () => { title.classList.toggle("open"); };
+  // tap unfolds the whole line (2026-10-01 report). v0.38.3: it is a real
+  // button to the keyboard too — focus, Enter/Space, and the expanded state
+  // announced — while keeping the exact same click wiring.
+  title.tabIndex = 0;
+  title.setAttribute("role", "button");
+  title.setAttribute("aria-expanded", "false");
+  title.onclick = () => {
+    title.classList.toggle("open");
+    title.setAttribute("aria-expanded",
+      title.classList.contains("open") ? "true" : "false");
+  };
+  title.onkeydown = (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    title.onclick();
+  };
   top.append(title, el("span", "pill " + j.status, j.status));
   // a finished take gets the stamp (v0.37.0: completion used to be a pill
   // you never saw flip in a tab you were not on)
@@ -1536,6 +1564,7 @@ function jobRow(j) {
     // phone (2026-09-30 photo).
     const errText = j.error || "";
     const errEl = el("div", "jerr", errText);
+    errEl.id = "jerr-" + j.id;   // the details toggle names its region
     if (errText.length > 90) {
       errEl.classList.add("clamp");
       errEl.title = "tap to show the whole message";
@@ -1549,10 +1578,13 @@ function jobRow(j) {
     if (errEl.classList.contains("clamp")) {
       // a visible affordance, not just a hidden cursor (v0.37.0)
       const more = el("button", "linkbtn jrr-toggle", "Show details");
+      more.setAttribute("aria-expanded", "false");
+      more.setAttribute("aria-controls", errEl.id || "");
       more.onclick = () => {
         const open = errEl.classList.toggle("open");
         errEl.title = open ? "tap to collapse" : "tap to show the whole message";
         more.textContent = open ? "Hide details" : "Show details";
+        more.setAttribute("aria-expanded", open ? "true" : "false");
       };
       r.append(more);
     }
@@ -1841,6 +1873,9 @@ async function refreshJobs() {
     // worked (UI review)
     const stale = box.querySelector(".trouble");
     if (stale) stale.remove();
+    // the static boot line ("Checking the queue…") yields to real content
+    const boot = box.querySelector("#jobsInitial");
+    if (boot) boot.remove();
     const list = jobs.sort(
       (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     // a finish that speaks: the FIRST poll that sees a job become completed
@@ -2143,13 +2178,21 @@ function showWhatsNew(entries, version) {
   }
   $("whatsNewDone").onclick = () => dismissWhatsNew(version);
   $("whatsNewClose").onclick = () => dismissWhatsNew(version);
-  $("whatsNewModal").classList.remove("hidden");
+  // Escape and the backdrop close it like every other dialog (v0.38.3
+  // audit #2 — it used to toggle `hidden` directly, with no exit transition
+  // and no keyboard way out)
+  wnVersion = version;
+  const modal = $("whatsNewModal");
+  modal.onclick = (e) => { if (e.target === modal) dismissWhatsNew(version); };
+  openModal(modal);
+  $("whatsNewDone").focus({ preventScroll: true });
 }
 
 /** Record on dismiss: until "Got it" is pressed, the next launch asks again. */
 function dismissWhatsNew(version) {
+  wnVersion = null;
   if (version) updStore.set(WN.seen, version);
-  $("whatsNewModal").classList.add("hidden");
+  closeModal($("whatsNewModal"));
 }
 
 async function maybeShowWhatsNew() {
@@ -2518,6 +2561,7 @@ function showSettingsTab(name) {
   document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
     const on = b.dataset.stab === name;
     b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
     // the row scrolls on phones: keep the active sub-tab in view
     if (on && b.scrollIntoView) {
       try { b.scrollIntoView({ inline: "center", block: "nearest" }); }
@@ -2636,7 +2680,9 @@ function renderOptions(query) {
     box.append(row);
   }
   if (!list.length) box.append(el("div", "muted small", "nothing matches that search"));
-  $("optionsCount").textContent = q ? `${list.length} match` : `${(OPTIONS || []).length} options`;
+  $("optionsCount").textContent = q
+    ? `${list.length} match${list.length === 1 ? "" : "es"}`
+    : `${(OPTIONS || []).length} options`;
 }
 
 /** Raw arguments only matter once enabled in Settings → Advanced. */
@@ -2825,6 +2871,8 @@ document.addEventListener("keydown", (e) => {
   if (!$("confirmModal").classList.contains("hidden")) {
     return;   // the confirm dialog handles its own Escape
   }
+  // the what's-new card: a real dialog, so Escape is its way out (v0.38.3)
+  if (wnVersion) { dismissWhatsNew(wnVersion); return; }
   // only when Settings is really open: this used to close it from any tab and
   // yank the user back to Download (v0.21.1 audit)
   const panel = $("panel-settings");
@@ -2845,6 +2893,10 @@ document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
 document.querySelectorAll("#glassSwatches .swatch").forEach((b) => {
   b.onclick = () => setAppearance({ glass: b.dataset.glass },
     "Glass: " + b.querySelector(".sw-label").textContent);
+});
+document.querySelectorAll("#schemeSwatches .swatch").forEach((b) => {
+  b.onclick = () => setAppearance({ accent: b.dataset.accent },
+    "Scheme: " + b.querySelector(".sw-label").textContent);
 });
 
 function saveSettings() {
@@ -3019,9 +3071,12 @@ $("studioBtn").onclick = () => {
   $("ovBlock").open = true;
   $("ovBlock").scrollIntoView({ block: "start" });
 };
+$("probeDetails").setAttribute("aria-expanded", "false");
+$("probeDetails").setAttribute("aria-controls", "probeMsg");
 $("probeDetails").onclick = () => {
   const hidden = $("probeMsg").classList.toggle("hidden");
   $("probeDetails").textContent = hidden ? "Show details" : "Hide details";
+  $("probeDetails").setAttribute("aria-expanded", hidden ? "false" : "true");
 };
 $("audioNativeBtn").dataset.pick = "audio-native";
 $("audioM4aBtn").dataset.pick = "audio-m4a";
@@ -3060,7 +3115,7 @@ document.addEventListener("focusin", (e) => {
 
 initOptionListKeyboard();
 
-applyTheme(CURRENT.theme, CURRENT.glass);
+applyTheme(CURRENT.theme, CURRENT.glass, CURRENT.accent);
 if (ANDROID()) document.documentElement.dataset.host = "android";
 renderWhere(CFG.downloadDir);
 wireCopyPath();

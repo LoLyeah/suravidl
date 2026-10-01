@@ -386,7 +386,8 @@ def create_app(download_dir, auth_token: str | None = None,
         cfg = json.dumps({"token": auth_token or "",
                           "downloadDir": str(manager.download_dir),
                           "theme": settings.get()["theme"],
-                          "glass": settings.get()["glass"]})
+                          "glass": settings.get()["glass"],
+                          "accent": settings.get()["accent"]})
         # < and & are escaped so a download folder containing "</script>" can
         # never close the element it is inlined into (v0.21.1 audit; json.dumps
         # alone escapes quotes only)
