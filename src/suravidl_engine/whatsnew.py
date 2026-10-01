@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.5",
+        "title": "The fold",
+        "items": [
+            "A finished download's card now folds open and shut — the receipt grows and shrinks instead of popping, and once it's open the short /stor… path next to the buttons steps aside for the full one.",
+        ],
+    },
+    {
         "version": "0.38.4",
         "title": "The native glass",
         "items": [
@@ -85,16 +92,6 @@ ENTRIES = [
         "items": [
             "Every dialog now frosts the whole screen behind it — on desktop and phone alike (the flat dim veil that made the popup look blur-less is gone).",
             "The liquid-glass material is written down properly — fill, blur, gloss and edge per style and per host, in DESIGN.md.",
-        ],
-    },
-    {
-        "version": "0.37.3",
-        "title": "The steady pass",
-        "items": [
-            "The START · best bar stays at the bottom now — a tab switch used to re-anchor it to the page, leaving it stuck over the content.",
-            "Opening What's new (or any dialog) frosts the whole screen behind it — the blur reaches the backdrop, not just the plate.",
-            "The chosen tab in the bottom bar wears a squircle outline instead of a hairline.",
-            "\"best available\" keeps its whole readout on a phone.",
         ],
     },
 ]

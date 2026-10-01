@@ -774,17 +774,38 @@ details.card { padding: 0 18px 6px; }
 /* the unfolded card reads like a receipt: size + the full saved path
    (v0.38.2 report — "other than name show us the file size and the
    location too; it's expanding for a reason"). Collapsed rows keep the
-   compact ellipsised strip above; the title tap unfolds both. */
-.job:has(.jobtitle.open) .jdetails {
+   compact ellipsised strip above; the title tap unfolds both — with a
+   real fold now: the receipt collapses through grid-template-rows
+   0fr → 1fr (v0.38.5 report: "no animation when the card is expanding
+   or retracting"). A display: none swap cannot animate; this can. */
+.jdetails {
+  display: grid; grid-template-rows: 0fr;
+  margin-top: 0; opacity: 0; pointer-events: none;
+  transition: grid-template-rows .28s cubic-bezier(.2,.7,.3,1),
+              opacity .2s ease, margin-top .28s cubic-bezier(.2,.7,.3,1);
+}
+.jdetails .jdgrid {
+  overflow: hidden; min-height: 0;
   display: grid; grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 12px; margin-top: 9px; padding-top: 8px;
-  border-top: 1px dashed var(--line-soft);
+  gap: 2px 12px; padding-top: 0;
+  border-top: 1px dashed transparent;
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
   font-size: 11.5px; line-height: 1.5;
+  transition: padding-top .28s cubic-bezier(.2,.7,.3,1),
+              border-top-color .28s ease;
 }
-.jdetails { display: none; }
+.job:has(.jobtitle.open) .jdetails {
+  grid-template-rows: 1fr; margin-top: 9px; opacity: 1; pointer-events: auto;
+}
+.job:has(.jobtitle.open) .jdetails .jdgrid {
+  padding-top: 8px; border-top-color: var(--line-soft);
+}
 .jdetails .jdlbl { color: var(--dim); }
 .jdetails .jdval, .jdetails .jdpath { color: var(--text); overflow-wrap: anywhere; }
+/* the compact ellipsised path in the actions row is redundant once the
+   receipt carries the full one (v0.38.5: "when expanding you don't need
+   the /stor... near the open button") */
+.job:has(.jobtitle.open) .path { display: none; }
 .jobhint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 /* the FILED stamp — a take that landed */
 .job .stamp, .stamp {

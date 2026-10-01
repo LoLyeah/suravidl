@@ -188,4 +188,5 @@ def test_the_builder_generates_the_icns():
 def test_the_bundle_uses_it_and_carries_the_version():
     spec = (ROOT / "suravidl.spec").read_text()
     assert 'assets/icon.icns' in spec
-    assert '"CFBundleShortVersionString": "0.38.4"' in spec
+    from suravidl_engine import __version__
+    assert f'"CFBundleShortVersionString": "{__version__}"' in spec

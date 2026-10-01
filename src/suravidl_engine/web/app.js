@@ -1670,12 +1670,14 @@ function jobRow(j) {
     // us the file size and the location too — it's expanding for a reason").
     // Collapsed rows keep the compact strip; the title tap unfolds both.
     const details = el("div", "jdetails");
-    details.append(
+    const grid = el("div", "jdgrid");   // the shrinkable row the fold animates
+    grid.append(
       el("span", "jdlbl", "size"),
       el("span", "jdval", j.size_bytes != null ? humanBytes(j.size_bytes) : "—"),
       el("span", "jdlbl", "saved"),
       el("span", "jdpath", j.filepath || "—"),
     );
+    details.append(grid);
     row.append(details);
     if (j.note) row.append(el("div", "jobhint", j.note));
   }

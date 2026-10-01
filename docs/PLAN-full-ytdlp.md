@@ -1399,3 +1399,23 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     assets/icon.icns committed so the .app BUNDLE works from the repo
     (the spec's CFBundleShortVersionString also finally bumped). Suite
     674 → 685; versionCode 69.
+
+- **v0.38.5 — the fold.** Phone screenshot report (11:50, 2026-10-01):
+    "No animation when the card is expanding or retracting? Also when
+    expanding you don't need the /stor... Near the open button." (1) The
+    receipt swapped via display: none → grid, which cannot animate — it
+    now FOLDS: .jdetails is a persistent grid collapsing through
+    grid-template-rows 0fr → 1fr (+opacity 0→1, margin-top 0→9px, .28s
+    cubic-bezier(.2,.7,.3,1)), with the receipt rows wrapped in .jdgrid
+    (overflow hidden, min-height 0 — the shrinkable row the 0fr trick
+    requires); the mono type + dashed top rule moved onto .jdgrid and
+    animate in (padding-top, border-top-color). Verified: open rule
+    applies with transitions off (rows 37.5px, opacity 1); the old-headless
+    rig cannot tick transitions (no compositor — same blindness class as
+    backdrop-filter), so the tween itself is phone-verified. Chromium
+    animates grid-template-rows since 107; older WebViews degrade to
+    today's snap. Reduced-motion clamps it (global .001s rule). (2)
+    .job:has(.jobtitle.open) .path { display: none } — the compact
+    ellipsised strip yields once the receipt carries the full path
+    (verified live: block when closed, none when open). Suite 685 → 691;
+    versionCode 70.
