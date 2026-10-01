@@ -20,6 +20,7 @@ ENTRIES = [
         "items": [
             "The phone app\u2019s built-in browser refuses to be bounced: an off-site redirect or pop-up mid-hunt is stopped cold \u2014 the page and the find list stay put. A refused hop is named and one tap from following.",
             "Classic ad networks no longer load at all in there \u2014 a short deny list serves them empty, which is exactly what they deserve.",
+            "The engine no longer lets a fussy notification take it down on start: the mark it wears is dress-up, so a modern Android that dressed it differently gets a graceful fallback, not a dead engine.",
         ],
     },
     {
