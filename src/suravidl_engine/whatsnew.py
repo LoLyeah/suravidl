@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.7",
+        "title": "The tuck",
+        "items": [
+            "The minimize button tucks suravidl away instead of parking it in the Dock — on macOS a menu-bar icon keeps \"Show suravidl\" a click away, and Windows and Linux get a tray icon.",
+            "If the app ever sits still, Settings → Appearance now names the reason — for instance your system asking for reduced motion — and where to change it.",
+        ],
+    },
+    {
         "version": "0.38.6",
         "title": "The straight answer",
         "items": [
@@ -83,14 +91,6 @@ ENTRIES = [
             "A probed list no longer runs off the phone's right edge — each format row re-stacks: quality and its Take button on top, the format beneath, the size last.",
             "Toasts dock right above the bottom bar on every tab (the settings tab no longer floats them over the page).",
             "The START bar and the update popup pour denser on the phone — the readout and the dialog never share pixels with the page behind them again.",
-        ],
-    },
-    {
-        "version": "0.37.5",
-        "title": "The bar comes home",
-        "items": [
-            "The START bar blurs for real again: it rides in the page's flow now — this WebView only composites the blur for in-flow layers (and the bar can no longer sit on top of the text at the page's end).",
-            "\"This download only\" opens and closes with a door now — it grows and settles instead of popping.",
         ],
     },
 ]

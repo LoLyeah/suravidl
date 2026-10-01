@@ -74,7 +74,7 @@ def test_the_best_chip_is_not_prematurely_prime():
 # ---------- 5. the minimize button is a drawn glyph ----------
 def test_min_button_is_a_drawn_svg_with_a_name():
     btn = tag_of(HTML, "minBtn")
-    assert 'aria-label="Minimize window"' in btn
+    assert 'aria-label="Minimize to tray"' in btn
     assert ">—" not in HTML[HTML.find('id="minBtn"') - 30:HTML.find('id="minBtn"') + 200]
     assert 'id="i-minus"' in HTML
     assert 'href="#i-minus"' in HTML[HTML.find('id="minBtn"'):HTML.find('id="minBtn"') + 400]

@@ -1436,3 +1436,25 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     are gone from PLAN (commits stay as published; no force-push) and the
     no-verbatim-quotes rule is recorded in the skill. Suite 691 → 695;
     versionCode 71.
+
+- **v0.38.7 — the tuck.** Two desktop reports (2026-10-01): the window's
+    "−" should tuck the app away to the tray instead of running the
+    standard Dock minimize, and the desktop app shows no motion at all.
+    The − path is now tray-aware: on macOS the whole app hides behind an
+    NSStatusItem (SF Symbol arrow, Show suravidl / Quit suravidl; the item
+    is visible exactly while the app is tucked, driven by the app's own
+    hide/unhide notifications), and on Windows and Linux the window hides
+    behind a pystray icon. Every missing piece — no pyobjc, no pystray, no
+    icon file, a tray that refuses to start — degrades to the old plain
+    minimize; --no-tray still forces it. macOS hides at the NSApp level,
+    so the Dock icon restores the app the way Mac users expect; pystray
+    destroy/restore are thread-safe marshals in pywebview 6.2.1 (winforms
+    Invoke, GTK glib.idle_add), so the actions are safe from the API
+    thread. Motion: the page's only global kill switches are
+    prefers-reduced-motion (system-level; we follow it — that is the
+    point) and WebKit pausing transitions while the page reports itself
+    hidden. The shell now probes both ~2.5s after boot (logged as
+    SURAVIDL_MOTION), re-fronts the window once when it claims to be
+    hidden, and Settings → Appearance shows a quiet note naming whichever
+    switch is in force and where to change it. Suite 695 → 710;
+    versionCode 72.

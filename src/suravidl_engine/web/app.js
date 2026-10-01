@@ -334,6 +334,35 @@ function markSwatches(values) {
   document.querySelectorAll("#schemeSwatches .swatch").forEach((b) =>
     b.classList.toggle("on", b.dataset.accent === values.accent));
 }
+
+/* ---------- the motion note (v0.38.7) ----------
+   Two system-level switches can hold every animation still in this page:
+   the system asking for reduced motion (we follow it — that is the point),
+   or WebKit pausing transitions because the page reports itself hidden.
+   Name whichever one is in force right here, where appearance is chosen,
+   instead of leaving a still app unexplained. */
+function wireMotionNote() {
+  const note = $("motionNote");
+  if (!note) return;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const paint = () => {
+    if (reduce.matches) {
+      note.textContent = "Your system asks for reduced motion, and suravidl follows it — " +
+        "turn off \u201cReduce motion\u201d (macOS: System Settings \u2192 Accessibility \u2192 Motion) " +
+        "to see animations.";
+      note.hidden = false;
+    } else if (document.visibilityState === "hidden") {
+      note.textContent = "This window is reporting itself as not visible to the browser " +
+        "engine, which pauses animations — closing and reopening the app usually clears it.";
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+  };
+  if (reduce.addEventListener) reduce.addEventListener("change", paint);
+  document.addEventListener("visibilitychange", paint);
+  paint();
+}
 let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted",
                 accent: CFG.accent || "amber" };
 let SETTINGS_SNAPSHOT = null;   // last /settings payload (used by the preset diff)
@@ -2908,6 +2937,7 @@ document.querySelectorAll("#schemeSwatches .swatch").forEach((b) => {
   b.onclick = () => setAppearance({ accent: b.dataset.accent },
     "Scheme: " + b.querySelector(".sw-label").textContent);
 });
+wireMotionNote();
 
 function saveSettings() {
   return api("/settings", {

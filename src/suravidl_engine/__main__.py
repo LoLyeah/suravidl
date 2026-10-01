@@ -284,6 +284,251 @@ def _native_glass_ready(window):
         pass
 
 
+# ---------- the tray (v0.38.7) ----------
+# The window's own "−" button is a tray habit, not a Dock habit: on macOS
+# the whole app tucks away behind a menu-bar item ("Show suravidl" a click
+# away — the Dock icon brings it back too). Windows and Linux hide the
+# window behind a real tray icon. Every missing piece — no pyobjc, no
+# pystray, no icon file — degrades to the previous plain minimize.
+
+_TRAY: dict = {}          # the live status item / tray icon + its window
+_MOTION_SETTLE = 2.5      # seconds the window lives before the motion probe
+
+
+def _on_main(fn) -> None:
+    """Run `fn` on the AppKit main thread when we can; inline otherwise."""
+    try:
+        from PyObjCTools import AppHelper
+
+        AppHelper.callAfter(fn)
+    except Exception:  # noqa: BLE001 - tests / non-mac: call it right here
+        fn()
+
+
+def _tray_target(Foundation):
+    """The menu's action target: plain methods, worn as objc selectors."""
+
+    class _TrayTarget(Foundation.NSObject):
+        def showWindow_(self, _sender):  # noqa: N802 - the objc spelling
+            item = _TRAY.get("item")
+            if item is not None:
+                try:
+                    item.setVisible_(False)
+                except Exception:  # noqa: BLE001
+                    pass
+            appkit = _TRAY.get("AppKit")
+            if appkit is not None:
+                try:
+                    app = appkit.NSApplication.sharedApplication()
+                    app.unhide_(None)
+                    app.activateIgnoringOtherApps_(True)
+                except Exception:  # noqa: BLE001
+                    pass
+            win = _TRAY.get("window")
+            if win is not None:
+                win.show()
+
+        def quitApp_(self, _sender):  # noqa: N802
+            win = _TRAY.get("window")
+            if win is not None:
+                win.destroy()
+
+    return _TrayTarget
+
+
+def _install_tray_item(window, AppKit, Foundation):
+    """Create the macOS menu-bar item (hidden until the app tucks away)."""
+    if "item" in _TRAY:
+        return _TRAY["item"]
+    try:
+        item = (AppKit.NSStatusBar.systemStatusBar()
+                .statusItemWithLength_(AppKit.NSVariableStatusItemLength))
+        try:
+            img = AppKit.NSImage \
+                .imageWithSystemSymbolName_accessibilityDescription_(
+                    "arrow.down.circle.fill", "suravidl")
+        except Exception:  # noqa: BLE001 - AppKit without SF Symbols
+            img = None
+        if img is not None:
+            img.setTemplate_(True)   # follows the menu bar's own light/dark
+            item.button().setImage_(img)
+        else:
+            item.button().setTitle_("suravidl")
+        target = _tray_target(Foundation).alloc().init()
+        menu = AppKit.NSMenu.alloc().init()
+        show_item = AppKit.NSMenuItem.alloc() \
+            .initWithTitle_action_keyEquivalent_(
+                "Show suravidl", "showWindow:", "")
+        show_item.setTarget_(target)
+        quit_item = AppKit.NSMenuItem.alloc() \
+            .initWithTitle_action_keyEquivalent_(
+                "Quit suravidl", "quitApp:", "")
+        quit_item.setTarget_(target)
+        menu.addItem_(show_item)
+        menu.addItem_(AppKit.NSMenuItem.separatorItem())
+        menu.addItem_(quit_item)
+        item.setMenu_(menu)
+        item.setVisible_(False)
+        _TRAY.update(item=item, target=target, window=window, AppKit=AppKit)
+        # the item lives exactly as long as the app is tucked away
+        try:
+            center = Foundation.NSNotificationCenter.defaultCenter()
+            center.addObserverForName_object_queue_usingBlock_(
+                AppKit.NSApplicationDidHideNotification, None, None,
+                lambda _n: item.setVisible_(True))
+            center.addObserverForName_object_queue_usingBlock_(
+                AppKit.NSApplicationDidUnhideNotification, None, None,
+                lambda _n: item.setVisible_(False))
+        except Exception:  # noqa: BLE001 - the item still works without
+            pass
+        return item
+    except Exception:  # noqa: BLE001 - no item is not fatal
+        return None
+
+
+def _darwin_minimize_action(window):
+    """macOS "−": tuck the whole app away; the menu-bar item brings it back."""
+
+    def tuck():
+        AppKit, Foundation = _import_appkit()
+        if AppKit is None:
+            window.minimize()   # no pyobjc: exactly the old behaviour
+            return
+
+        def worker():
+            item = (_TRAY.get("item")
+                    or _install_tray_item(window, AppKit, Foundation))
+            if item is not None:
+                item.setVisible_(True)
+            # NSApp-level hide, not window.hide(): the Dock icon then
+            # restores everything the way every Mac user expects
+            AppKit.NSApplication.sharedApplication().hide_(None)
+
+        try:
+            _on_main(worker)
+        except Exception:  # noqa: BLE001 - last resort, stay useful
+            window.minimize()
+
+    return tuck
+
+
+def _make_window_tray(window):
+    """Windows/Linux: a pystray icon whose menu restores the window."""
+    try:
+        from PIL import Image
+        import pystray
+    except Exception:  # noqa: BLE001 - tray is optional
+        return None
+    icon_file = Path(__file__).parent / "web" / "icon.png"
+    if not icon_file.exists():
+        return None
+
+    def on_show(_icon, _item):
+        try:
+            window.show()
+        except Exception:  # noqa: BLE001 - the window may be gone
+            pass
+
+    def on_quit(icon, _item):
+        try:
+            icon.stop()
+        except Exception:  # noqa: BLE001
+            pass
+        window.destroy()
+
+    menu = pystray.Menu(
+        pystray.MenuItem("Show suravidl", on_show, default=True),
+        pystray.MenuItem("Quit suravidl", on_quit),
+    )
+    return pystray.Icon("suravidl", Image.open(icon_file), "suravidl", menu)
+
+
+def _tray_minimize_action(window):
+    """Windows/Linux "−": hide the window; the tray icon puts it back."""
+
+    def tuck():
+        icon = _TRAY.get("icon")
+        if icon is None:
+            icon = _make_window_tray(window)
+            if icon is not None:
+                try:
+                    icon.run_detached()
+                except Exception:  # noqa: BLE001 - no tray after all
+                    icon = None
+                else:
+                    _TRAY.update(icon=icon, window=window)
+        if icon is None:
+            window.minimize()   # no tray: exactly the old behaviour
+            return
+        try:
+            window.hide()
+        except Exception:  # noqa: BLE001
+            window.minimize()
+
+    return tuck
+
+
+def _minimize_action(window, tray_ok=True):
+    """The action behind the window's "−" button (v0.38.7)."""
+    if not tray_ok:
+        return window.minimize
+    if sys.platform == "darwin":
+        return _darwin_minimize_action(window)
+    return _tray_minimize_action(window)
+
+
+# ---------- the motion probe (v0.38.7) ----------
+# Two system-level switches can hold every animation still inside a
+# WebView: the user asking for reduced motion, and — a WebKit behaviour —
+# a page that reports itself hidden (transitions never tick while hidden).
+# The probe logs what the page sees, and re-fronts the window once when it
+# claims to be hidden: that state is sometimes stuck from launch.
+
+
+def _motion_probe(window) -> None:
+    def read():
+        try:
+            return window.evaluate_js(
+                "(function(){var m=window.matchMedia("
+                "'(prefers-reduced-motion: reduce)');"
+                "return {v: document.visibilityState, r: m.matches};})()"
+            ) or {}
+        except Exception:  # noqa: BLE001 - the page may not be up yet
+            return {}
+
+    try:
+        time.sleep(_MOTION_SETTLE)
+    except Exception:  # noqa: BLE001
+        pass
+    state = read()
+    print(f"SURAVIDL_MOTION visibilityState={state.get('v')!r} "
+          f"reduced-motion={state.get('r')!r}")
+    if state.get("v") != "hidden":
+        return
+    native = getattr(window, "native", None)
+    if native is None or not hasattr(native, "orderFront_"):
+        return
+    try:
+        _on_main(lambda: native.orderFront_(None))
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        time.sleep(_MOTION_SETTLE)
+    except Exception:  # noqa: BLE001
+        pass
+    after = read()
+    print(f"SURAVIDL_MOTION after nudge: visibilityState={after.get('v')!r}")
+
+
+def _start_motion_probe(window) -> None:
+    """Run the probe off the GUI thread: it sleeps, the app must not."""
+    try:
+        threading.Thread(target=_motion_probe, args=(window,),
+                         daemon=True).start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _try_tray(url: str, open_downloads: Path):
     """Tray icon with Open/Quit. Returns the pystray Icon or None."""
     try:
@@ -374,7 +619,9 @@ def main() -> None:
             with open(os.devnull, "wb") as sink:
                 subprocess.Popen([opener, url], stdout=sink, stderr=sink)
 
-        actions = {"minimize": window.minimize, "quit": window.destroy,
+        actions = {"minimize": _minimize_action(window,
+                                                tray_ok=not args.no_tray),
+                   "quit": window.destroy,
                    "reveal": _open_folder, "pick_file": _pick_file,
                    "open_url": _open_url}
 
@@ -386,6 +633,7 @@ def main() -> None:
     if window is not None:
         def _ready():
             _native_glass_ready(window)   # runs once the GUI loop is up
+            _start_motion_probe(window)   # v0.38.7: log the motion state
 
         try:
             webview.start(_ready)

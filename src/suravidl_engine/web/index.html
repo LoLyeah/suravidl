@@ -70,7 +70,7 @@
   <h1>suravidl</h1>
   <span id="versions" class="meta"></span>
   <span class="spacer"></span>
-  <button id="minBtn" class="btn sm hidden" title="Minimize window" aria-label="Minimize window"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg></span></button>
+  <button id="minBtn" class="btn sm hidden" title="Minimize to tray" aria-label="Minimize to tray"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg></span></button>
   <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span>Quit</button>
 </header>
 
@@ -400,6 +400,8 @@
           </button>
         </div>
       </div>
+
+      <p class="small muted" id="motionNote" hidden></p>
 
       <div class="field">
         <label class="lbl" for="setDir">Download folder</label>
