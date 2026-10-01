@@ -41,6 +41,49 @@ function kindWord(m) {
   return "Stream";
 }
 
+// A row should say what it IS, not just count. When the URL carries a
+// resolution token or a human filename, that is the name ("Big Buck Bunny
+// 2019 · 1080p"); plumbing — index, master, segment chunks — never reaches
+// the user's eyes. "Video 1, Video 2…" told nobody anything (2026-10-01).
+const GENERIC_SEG = /^(index|master|playlist|manifest|media|stream|video|out|live|main|hls|dash|chunklist|init|v|m|a)$/i;
+
+function resToken(text) {
+  let m = /(?:^|[^\d])(\d{3,4})p(?:[^\d]|$)/i.exec(text);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    if (n >= 144 && n <= 4320) return n + "p";
+  }
+  m = /(?:^|[^\w])(4k|8k)(?:[^\w]|$)/i.exec(text);
+  return m ? m[1].toUpperCase() : "";
+}
+
+function streamName(url) {
+  let u;
+  try { u = new URL(url); } catch (_) { return { name: "", res: "" }; }
+  const res = resToken(u.pathname + " " + u.search);
+  const last = u.pathname.split("/").filter(Boolean).pop() || "";
+  let seg = last;
+  try { seg = decodeURIComponent(last); } catch (_) { /* keep it raw */ }
+  let name = seg.replace(/\.[a-z0-9]{1,5}$/i, "")        // drop the file extension
+               .replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (res) {
+    const token = /^[48][kK]$/.test(res) ? res.toLowerCase() : res.replace(/p$/, "") + "p?";
+    name = name.replace(new RegExp("(^|\\s)" + token + "(\\s|$)", "i"), " ").trim();
+  }
+  const flat = /^[\d\s]+$/.test(name) || /^[\da-f]{8,}$/i.test(name);
+  if (name.length < 4 || name.length > 46 || GENERIC_SEG.test(name) || flat ||
+      /(^|\s)(seg|frag|chunk|part|slice|init)([-\s]|$)/i.test(name)) {
+    name = "";
+  }
+  return { name, res };
+}
+
+function streamLabel(m) {
+  const info = streamName(m.url);
+  const base = info.name || kindWord(m);
+  return info.res ? base + " · " + info.res : base;
+}
+
 function selectedUrl() {
   const checked = document.querySelector("#streams input:checked");
   return (checked && checked.value) || (visibleItems()[0] || {}).url || "";
@@ -143,24 +186,47 @@ function render() {
   const box = $("streams");
   box.textContent = "";
   if (many) {
-    // quiet rows, no URLs: repeated kinds get an ordinal so two playlists
-    // read as themselves (“Playlist 1”, “Playlist 2”)
-    const words = vis.map(kindWord);
+    // quiet rows, no URLs on their face: each row is named (resolution or
+    // filename when the URL offers one, the kind word when it doesn't), and
+    // an ordinal only when two names still read the same. The URL door on
+    // the right unfolds the raw link for anyone who wants it.
+    const labels = vis.map(streamLabel);
+    const counts = {};
+    for (const l of labels) counts[l] = (counts[l] || 0) + 1;
+    const seen = {};
     vis.forEach((m, i) => {
-      const row = document.createElement("label");
+      seen[labels[i]] = (seen[labels[i]] || 0) + 1;
+      const suffix = counts[labels[i]] > 1 ? " " + seen[labels[i]] : "";
+      const row = document.createElement("div");
       row.className = "stream";
+      const pick = document.createElement("label");
+      pick.className = "pickline";
       const input = document.createElement("input");
       input.type = "radio";
       input.name = "stream";
       input.value = m.url;
-      const word = kindWord(m);
-      const repeated = words.filter((w) => w === word).length > 1;
-      const txt = document.createElement("span");
-      const ordinal = repeated
-        ? " " + (words.slice(0, i + 1).filter((w) => w === word).length)
-        : "";
-      txt.textContent = word + ordinal;
-      row.append(input, txt);
+      const say = document.createElement("span");
+      say.className = "ssay";
+      say.textContent = labels[i] + suffix;
+      pick.append(input, say);
+      const raw = document.createElement("pre");
+      raw.className = "raw";
+      raw.hidden = true;
+      raw.textContent = m.url;
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "more";
+      more.textContent = "URL";
+      more.setAttribute("aria-expanded", "false");
+      more.setAttribute("aria-label", "Show the raw link — " + say.textContent);
+      more.onclick = () => {
+        const opening = raw.hidden;
+        raw.hidden = !opening;
+        row.classList.toggle("open", opening);
+        more.setAttribute("aria-expanded", String(opening));
+        if (opening && raw.scrollIntoView) raw.scrollIntoView({ block: "nearest" });
+      };
+      row.append(pick, more, raw);
       box.append(row);
     });
     const first = box.querySelector("input");

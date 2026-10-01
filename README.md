@@ -71,8 +71,11 @@ an API token on start (or takes `SURAVIDL_TOKEN`).
 Watches media requests on every page and hands the interesting ones to the
 engine with that site's cookies/UA/referer, so logged-in sites work. The
 popup keeps it simple: it names what the page is playing, and hands the
-stream over \u2014 the engine probes it (with those captured details) and the
-app's window opens on the format list, where you pick the quality. In a
+stream over — the engine probes it (with those captured details) and the
+app's window opens on the format list, where you pick the quality. When a
+page offered several streams, the chooser names each one — its resolution
+or its real filename when the URL shows one — and a small URL door on any
+row unfolds the full raw link, for when you want the details. In a
 hurry, *Quick download* takes the best quality straight away instead. The
 tab badge shows how many videos were detected.
 

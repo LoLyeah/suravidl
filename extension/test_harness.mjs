@@ -443,7 +443,10 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
         add(...c) { for (const x of c) this._s.add(x); },
         remove(...c) { for (const x of c) this._s.delete(x); },
         contains(c) { return this._s.has(c); },
+        toggle(c, on) { on ? this._s.add(c) : this._s.delete(c); },
       },
+      setAttribute(n, v) { (this._attrs = this._attrs || {})[n] = String(v); },
+      getAttribute(n) { return (this._attrs || {})[n] ?? null; },
       append(...kids) { this.children.push(...kids); },
       appendChild(k) { this.children.push(k); },
       querySelector(sel) {
@@ -548,8 +551,15 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     ok(nodes.send.disabled === true && nodes.quick.disabled === true,
        "firefox: neither door can be pressed twice");
 
-    // — two finds: the chooser appears, and the picked one is what goes —
+    // — several finds: rows named, ordinals only when names collide, and
+    //   the URL door on every row (v0.5.7) —
     ff.listeners.beforeRequest[0]({ tabId: 7, type: "media", url: "https://cdn/ff2.mp4" });
+    await settle();
+    ff.listeners.beforeRequest[0]({ tabId: 7, type: "media",
+      url: "https://cdn/big-buck-bunny/1080p/master.m3u8?tok=x" });
+    await settle();
+    ff.listeners.beforeRequest[0]({ tabId: 7, type: "media",
+      url: "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4" });
     await settle();
     nodes = installDom(mkNodes());
     try { new Function(popupSrc)(); }
@@ -558,20 +568,35 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     }
     await settle();
     await settle();
-    ok(nodes.headline.textContent === "2 streams found on this page",
-       "firefox: two finds read as two streams");
-    ok(nodes.pickgroup.hidden === false && nodes.streams.children.length === 2,
+    ok(nodes.headline.textContent === "4 streams found on this page",
+       "firefox: four finds read as four streams");
+    ok(nodes.pickgroup.hidden === false && nodes.streams.children.length === 4,
        "firefox: …and offer a chooser");
     const rows = nodes.streams.children;
-    ok(rows[0].children[0].checked === true,
+    const labelOf = (r) => r.children[0].children[1].textContent;
+    ok(rows[0].children[0].children[0].checked === true,
        "firefox: the first stream is pre-asked for");
-    ok(rows[1].children[1].textContent === "Stream 2",
-       "firefox: repeated kinds get ordinals, not URLs");
-    rows[0].children[0].checked = false;
-    rows[1].children[0].checked = true;
+    ok(labelOf(rows[0]) === "Stream 1" && labelOf(rows[1]) === "Stream 2",
+       "firefox: identical rows still get ordinals");
+    ok(labelOf(rows[2]) === "Stream · 1080p",
+       "firefox: a resolution in the URL names the row");
+    ok(labelOf(rows[3]) === "Big Buck Bunny 2019 · 720p",
+       "firefox: a real filename names the row, resolution kept");
+    // the URL door: folded by default, unfolds the raw link, folds back
+    ok(rows[2].children[2].hidden === true, "firefox: raw links start folded");
+    rows[2].children[1].onclick();
+    ok(rows[2].children[2].hidden === false &&
+       rows[2].children[2].textContent === "https://cdn/big-buck-bunny/1080p/master.m3u8?tok=x",
+       "firefox: the URL button unfolds the raw link");
+    ok(rows[2].children[1].getAttribute("aria-expanded") === "true",
+       "firefox: …and says it is open");
+    rows[2].children[1].onclick();
+    ok(rows[2].children[2].hidden === true, "firefox: and folds it back");
+    rows[0].children[0].children[0].checked = false;
+    rows[3].children[0].children[0].checked = true;
     await nodes.send.onclick();
     const p2 = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
-    ok(JSON.parse(p2.opts.body).url === "https://cdn/ff2.mp4",
+    ok(JSON.parse(p2.opts.body).url === "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4",
        "firefox: the chosen stream is the one handed over");
 
     // — engine down: one thing to fix, not a list you cannot send —

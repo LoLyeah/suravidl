@@ -69,6 +69,19 @@ def test_quick_download_rides_the_one_shot_job_route():
     assert ".ghost.wide" in CSS
 
 
+def test_chooser_rows_are_named_and_revealable():
+    """v0.5.7: "Video 1..5" told nobody anything. A row now carries a real
+    name when the URL offers one (resolution, filename) and keeps the plain
+    kind word when it does not; a URL door per row unfolds the raw link for
+    whoever wants it."""
+    assert "function streamName(" in POPUP_JS
+    assert 'base + " · " + info.res' in POPUP_JS          # the name composition
+    assert 'more.textContent = "URL"' in POPUP_JS          # the advanced door
+    assert "aria-expanded" in POPUP_JS                     # and it says its state
+    assert ".raw {" in CSS and "user-select: text" in CSS  # folded, selectable
+    assert ".pickline" in CSS                              # the row is still one tap
+
+
 def test_the_version_line_tracks_the_manifest():
     """The footer prints the extension version; a bump that misses the line
     is how a store page and its popup end up disagreeing."""
