@@ -2337,6 +2337,8 @@ const FAQ = [
    "Some pages cannot hand a plain link over. Play it in your browser for a second: the extension (on desktop) or the browser offer right here catches the stream, and you pick the quality here before anything downloads."],
   ["A page keeps bouncing me at ads.",
    "The phone app's built-in browser refuses off-site jumps and pop-ups while you hunt for a stream — the page, and the find list, stay put. If a refused hop was one you meant, tap the note on screen to follow it anyway."],
+  ["A site asks me to turn off my ad blocker.",
+   "The phone app's browser serves a few known ad networks empty, and some pages notice. In its second row there is an 'ads blocked / ads allowed' switch — flip it and reload. The off-site jump and pop-up guard keeps working either way."],
   ["Why does it use my browser's cookies?",
    "Signed-in sites — private videos, member areas — only serve files to a signed-in session. The extension passes the session details for exactly the stream you picked, nothing else, and Settings → Cookies shows what is held and clears it on ask."],
   ["Where are the cookies kept?",

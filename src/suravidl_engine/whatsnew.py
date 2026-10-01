@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.8",
+        "title": "The truce",
+        "items": [
+            "Some pages notice their ad networks served empty and refuse to run. The phone browser now has a truce switch — “ads blocked / ads allowed” in its second row: flip and reload to let the page in.",
+        ],
+    },
+    {
         "version": "0.39.7",
         "title": "The bouncer",
         "items": [
@@ -89,14 +96,6 @@ ENTRIES = [
             "Update checks work on macOS again: a packaged Mac app was asking the system for a list of trusted certificates that packaged apps never get — suravidl now brings its own, so Check now answers on the first try.",
             "The same repair reaches the link inspector \u2014 scanned video links on https verify properly on every platform.",
             "If a certificate check ever fails again, the update row explains it in plain words and opens the releases page for you.",
-        ],
-    },
-    {
-        "version": "0.38.7",
-        "title": "The tuck",
-        "items": [
-            "The minimize button tucks suravidl away instead of parking it in the Dock — on macOS a menu-bar icon keeps \"Show suravidl\" a click away, and Windows and Linux get a tray icon.",
-            "If the app ever sits still, Settings → Appearance now names the reason — for instance your system asking for reduced motion — and where to change it.",
         ],
     },
 ]

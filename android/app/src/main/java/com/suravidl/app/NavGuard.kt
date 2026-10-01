@@ -95,8 +95,14 @@ object AdHosts {
     )
 
     /** Suffix match on the host: `cdn.popads.net` is blocked, `notpopads.net`
-     *  is not. */
-    fun blocked(url: String): Boolean {
+     *  is not.
+     *
+     *  `enabled` is the truce switch (v0.39.8): a page that notices its ad
+     *  networks being served empty can refuse to run — the user's report was
+     *  exactly that worry. The browser passes the current setting in; the
+     *  list itself stays pure. */
+    fun blocked(url: String, enabled: Boolean = true): Boolean {
+        if (!enabled) return false
         val h = NavGuard.host(url) ?: return false
         return DENY.any { h == it || h.endsWith(".$it") }
     }

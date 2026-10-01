@@ -46,7 +46,7 @@ def test_popups_need_a_gesture_and_a_same_site_target():
 def test_classic_ad_hosts_load_as_empty_bodies():
     assert "object AdHosts" in NAVGUARD
     assert '"popads.net"' in NAVGUARD and '"doubleclick.net"' in NAVGUARD
-    assert "AdHosts.blocked(u)" in CLIENT
+    assert "AdHosts.blocked(u, adsBlocked())" in CLIENT
     assert "ByteArrayInputStream(ByteArray(0))" in CLIENT
 
 

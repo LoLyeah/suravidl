@@ -66,6 +66,9 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var empty: TextView
     private lateinit var handoffNote: TextView
+    /** The truce switch's state, mirrored from prefs (v0.39.8). */
+    private var adBlock = true
+    private lateinit var adsChip: android.widget.Button
     private val ui = Handler(Looper.getMainLooper())
     private var lastVersion = -1
     private var bg = MainActivity.BG_DARK
@@ -116,6 +119,8 @@ class BrowserActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
+        adBlock = getSharedPreferences("browser", MODE_PRIVATE)
+            .getBoolean("ads_blocked", true)
         buildUi()
         webView.addJavascriptInterface(SniffBridge(), "SuravidlSniff")
 
@@ -230,6 +235,8 @@ class BrowserActivity : AppCompatActivity() {
             textSize = 12.5f
         }
         row.addView(status, LinearLayout.LayoutParams(0, WRAP, 1f))
+        adsChip = chip(if (adBlock) "ads blocked" else "ads allowed") { toggleAdBlock() }
+        row.addView(adsChip)
         row.addView(chip("Scan") { scanAgain() })
         row.addView(chip("Clear list") {
             SniffLog.clear()
@@ -337,6 +344,7 @@ class BrowserActivity : AppCompatActivity() {
                     refreshIfChanged()
                 },
                 onAppLinkBlocked = { url -> reportAppLinkBlocked(url) },
+                adsBlocked = { adBlock },
                 onHopBlocked = { url -> reportHopBlocked(url) })
         }
         ua = try {
@@ -443,6 +451,24 @@ class BrowserActivity : AppCompatActivity() {
         pendingHop = url
         handoffNote.text = "hop refused (" + (NavGuard.host(url) ?: schemeLabel(url)) +
             ") — the page stays. tap to follow anyway"
+        handoffNote.visibility = View.VISIBLE
+    }
+
+    /** The truce switch (v0.39.8): a page that notices its ad networks served
+     *  empty can refuse to run. Flip and reload — the page gets its ads back;
+     *  the bounce guard (off-site hops, scripted pop-ups) stays on either
+     *  way. No surprise reload from the flip itself: a reload mid-hunt would
+     *  wipe the find list, so the note just says what to do. */
+    private fun toggleAdBlock() {
+        adBlock = !adBlock
+        getSharedPreferences("browser", MODE_PRIVATE).edit()
+            .putBoolean("ads_blocked", adBlock).apply()
+        adsChip.text = if (adBlock) "ads blocked" else "ads allowed"
+        pendingHop = null
+        handoffNote.text = if (adBlock)
+            "ads blocked again — reload (⟳) to re-block"
+        else
+            "ads allowed — reload (⟳) to let the page load fully"
         handoffNote.visibility = View.VISIBLE
     }
 

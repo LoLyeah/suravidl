@@ -30,6 +30,9 @@ class SnifferWebViewClient(
     /** A refused off-site top-level hop — named on screen, one tap from
      *  being followed anyway (v0.39.7). */
     private val onHopBlocked: (String) -> Unit,
+    /** The truce switch (v0.39.8): read per request, so flipping it applies
+     *  from the next one without a new WebView. */
+    private val adsBlocked: () -> Boolean,
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -79,7 +82,9 @@ class SnifferWebViewClient(
         }
         // The short deny list loads as an empty body: no script, no pop-up
         // farm, no tracking pixel — and no broken page either (v0.39.7).
-        if (AdHosts.blocked(u)) {
+        // Unless the user called a truce: then the page gets its ads back
+        // and keeps the bounce guard (v0.39.8).
+        if (AdHosts.blocked(u, adsBlocked())) {
             return WebResourceResponse(
                 "text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0))
             )

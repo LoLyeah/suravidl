@@ -57,6 +57,13 @@ class NavGuardTest {
     }
 
     @Test
+    fun adsBlockingCanBePardoned() {
+        assertTrue(AdHosts.blocked("https://cdn.popads.net/pop.js"))
+        assertFalse(AdHosts.blocked("https://cdn.popads.net/pop.js", enabled = false))
+        assertFalse(AdHosts.blocked("https://video.example.com/stream.mp4", enabled = false))
+    }
+
+    @Test
     fun classicAdHostsAreBlockedBySuffix() {
         assertTrue(AdHosts.blocked("https://cdn.popads.net/pop.js"))
         assertTrue(AdHosts.blocked("https://a.b.doubleclick.net/x"))
