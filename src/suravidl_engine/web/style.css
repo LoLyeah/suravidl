@@ -333,6 +333,7 @@ main { display: block; padding: 18px 20px 110px; }
   padding: 10px 12px;
   background: var(--glass-bg); border: 1px solid var(--line);
   border-radius: 10px; color: var(--text); cursor: pointer;
+  overflow: hidden;              /* nothing in the rail paints outside it */
   transition: border-color var(--t-fast) ease, background var(--t-fast) ease;
 }
 @media (hover: hover) { .bin:hover { border-color: var(--accent-line); background: var(--glass-bg-strong); } }
@@ -340,7 +341,10 @@ main { display: block; padding: 18px 20px 110px; }
   font-size: 12.5px; font-weight: 600;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.bin-meta { display: flex; gap: 8px; }
+.bin-meta {
+  display: block; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .bin-empty, .bins-empty { padding: 10px 4px; }
 
 @media (min-width: 1080px) {

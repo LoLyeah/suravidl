@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.3",
+        "title": "The hem",
+        "items": [
+            "The filed-takes rail keeps its contents inside itself now. Its file line shows just the name \u2014 a Windows path used to arrive whole, slide out of the rail and bleed through the glass onto the neighbouring card's title.",
+            "Long names shorten politely at the rail's edge, and nothing filed in the rail can paint outside it.",
+        ],
+    },
+    {
         "version": "0.39.2",
         "title": "The lantern",
         "items": [
@@ -88,14 +96,6 @@ ENTRIES = [
             "Site badges (YouTube, X, Vimeo…) are now readable in the light theme, and a handful of dim labels, greens and state lamps got darker ink so everything clears the readability floor.",
             "The keyboard works everywhere now: a download's title opens with Enter, the what's-new card closes with Escape or by clicking outside, and buttons that looked pressed-in but did nothing were honest again.",
             "Smaller pass: the minimize button is a drawn icon, chips get a touch-sized press target on phones, sub-tabs and expanders announce themselves to screen readers, and the queue says it is loading.",
-        ],
-    },
-    {
-        "version": "0.38.2",
-        "title": "The receipt and the lane",
-        "items": [
-            "Toasts and the update notice sit right above the bottom bar on tabs where nothing is docked \u2014 they only lift when your transport (or the Settings Save strip) is actually there. No more hovering over a gap.",
-            "Tap a finished download's title and the card reads like a receipt now: the file size and the full saved location, in full \u2014 not just the name.",
         ],
     },
 ]

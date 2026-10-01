@@ -44,6 +44,16 @@ function humanBytes(n) {
   return (i === 0 ? n : n.toFixed(1)) + " " + u[i];
 }
 
+/** The last segment of a path, whichever slash the platform uses. A Windows
+ *  path has no "/" at all, so the old slash-only split handed the whole path
+ *  back — the filed-takes rail printed "C:\Users\Han\Downloads\index.mp4"
+ *  on one line, and nothing clipped it: it slid out of the 236px rail, under
+ *  the queue card, and bled through the glass into the card's title row
+ *  (2026-10-02 report). */
+function baseName(p) {
+  return String(p ?? "").split(/[\\/]/).pop();
+}
+
 const ACTIVE = new Set(["queued", "downloading", "merging"]);
 let DESKTOP = false;
 let APP_INFO = null;   // /app/info payload (desktop capabilities)
@@ -1482,7 +1492,7 @@ function deleteButton(j) {
   b.prepend(ico("trash"));
   b.title = "Delete this download — the file on disk goes with it";
   b.onclick = async () => {
-    const name = j.filepath ? j.filepath.split("/").pop()
+    const name = j.filepath ? baseName(j.filepath)
       : String(j.title || j.url).slice(0, 60);
     const msg = (running ? `Stop “${name}” and delete the partial file?`
       : j.filepath ? `Delete “${name}”?`
@@ -1509,7 +1519,7 @@ function deleteButton(j) {
       // folder name that matched nothing (v0.21.2 audit).
       if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
         const names = (j.files && j.files.length ? j.files : [j.filepath || ""])
-          .map((p) => String(p).split("/").pop()).filter(Boolean);
+          .map((p) => baseName(p)).filter(Boolean);
         for (const name of names) {
           try { window.AndroidHost.deleteMediaNamed(name); }
           catch (_) { /* the row is gone either way */ }
@@ -1769,7 +1779,7 @@ function jobRow(j) {
  *  row has, applied to the entry itself (2026-09-27). */
 function jobFileItem(j, file) {
   const item = el("div", "jitem");
-  const name = String(file).split("/").pop();
+  const name = baseName(file);
   const label = el("span", "jname", name);
   label.title = file;
   item.append(label);
@@ -1861,7 +1871,7 @@ function leaveRow(node) {
 let JOB_STATE = new Map();
 
 function onFiled(j) {
-  const name = j.filepath ? String(j.filepath).split("/").pop()
+  const name = j.filepath ? baseName(j.filepath)
     : (j.title || j.url);
   const actions = [];
   if (j.filepath) {
@@ -1892,7 +1902,7 @@ function renderBins(list) {
     b.type = "button";
     b.title = j.filepath || j.url;
     b.append(el("span", "bin-title", j.title || j.url));
-    const file = j.filepath ? String(j.filepath).split("/").pop() : "";
+    const file = j.filepath ? baseName(j.filepath) : "";
     if (file) b.append(el("span", "bin-meta mono", file));
     b.onclick = () => { if (j.filepath) openPlayer(j); };
     box.append(b);
@@ -3327,7 +3337,7 @@ function openPlayer(job, file) {
   // job's own filepath (2026-09-27: playlist rows had no Play at all)
   const stream = `/jobs/${encodeURIComponent(job.id)}/stream?`;
   if (file) {
-    const name = String(file).split("/").pop();
+    const name = baseName(file);
     openPlayerSrc(job.title || "download",
       stream + "name=" + encodeURIComponent(name) +
       "&token=" + encodeURIComponent(CFG.token), extOf(name));
