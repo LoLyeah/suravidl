@@ -26,7 +26,7 @@ BG_JS = (EXT / "background.js").read_text()
 HARNESS_IDS = [
     "engine", "engineText", "found", "site", "favicon", "hostline",
     "headline", "subline", "pickgroup", "streams", "send",
-    "empty", "down", "retry", "rescan", "status", "optsLink", "ver",
+    "empty", "down", "retry", "rescan", "quick", "status", "optsLink", "ver",
 ]
 
 
@@ -52,10 +52,21 @@ def test_the_popup_loads_its_own_stylesheet_and_script():
     assert '<script src="popup.js"></script>' in HTML
 
 
-def test_the_one_button_says_where_the_choice_happens():
+def test_the_two_doors_are_named_plainly():
     assert "Choose quality in suravidl" in HTML
+    # the quick door: best quality right away, for people who don't want to pick
+    assert "Quick download — best quality" in HTML
     # the old debug view is gone: no per-row download button, no raw URLs
     assert "Download with suravidl" not in HTML
+
+
+def test_quick_download_rides_the_one_shot_job_route():
+    """Quick means: no handoff, no window — the background's sendToEngine
+    queues a best-quality job with the captured headers (v0.39.1)."""
+    assert 'type: "sendToEngine"' in POPUP_JS
+    assert "downloading it in best quality" in POPUP_JS
+    # the secondary control is one beat quieter than the amber primary
+    assert ".ghost.wide" in CSS
 
 
 def test_the_version_line_tracks_the_manifest():

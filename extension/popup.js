@@ -1,10 +1,11 @@
 // The popup is a doorman, not a download manager (v0.39.0).
 //
-// It shows what the page is playing, in plain words, and hands the find to
-// the suravidl app — where the real formats are, and where the user picks
-// the quality. No raw URLs, no per-stream download buttons: the engine
-// probes the handed-over stream itself, with the captured request headers,
-// and the window opens ready to choose.
+// It shows what the page is playing, in plain words, and offers two doors:
+// the quality route hands the find to the suravidl app (where the real
+// formats are, and where the user picks); the quick route queues the best
+// quality straight away for people who just want the file. No raw URLs, no
+// per-stream rows: the engine does the work, with the captured request
+// headers, from either door.
 //
 // Firefox's `chrome` namespace is callback-only (measured on Firefox 157):
 // every `await` here needs the promise namespace, which Firefox calls
@@ -45,34 +46,43 @@ function selectedUrl() {
   return (checked && checked.value) || (visibleItems()[0] || {}).url || "";
 }
 
-async function send(url) {
+// The two doors: "quality" hands the find over (the app opens on the format
+// list); "quick" queues the best quality right now — no window, no choosing.
+async function send(url, mode) {
   if (SENT || !url) return;
-  const btn = $("send");
+  const quick = mode === "quick";
+  const btn = quick ? $("quick") : $("send");
   btn.classList.add("busy");
-  btn.disabled = true;
+  $("send").disabled = true;
+  $("quick").disabled = true;
   status("Sending to suravidl…", "");
   let res = null;
   try {
-    res = await api.runtime.sendMessage({
-      type: "sendHandoff",
-      url,
-      urls: visibleItems().map((m) => m.url),
-      tabUrl: (TAB && TAB.url) || "",
-    });
+    res = await api.runtime.sendMessage(quick
+      ? { type: "sendToEngine", url }
+      : {
+          type: "sendHandoff",
+          url,
+          urls: visibleItems().map((m) => m.url),
+          tabUrl: (TAB && TAB.url) || "",
+        });
   } catch (e) {
     res = { ok: false, error: String(e) };
   }
   if (res && res.ok) {
     SENT = true;
     btn.classList.remove("busy");
-    status(res.mode === "job"
-      ? "✓ Sent — this suravidl build downloads it straight away."
-      : "✓ Sent — choose the quality in suravidl.", "ok");
+    status(quick
+      ? "✓ Sent — suravidl is downloading it in best quality."
+      : res.mode === "job"
+        ? "✓ Sent — this suravidl build downloads it straight away."
+        : "✓ Sent — choose the quality in suravidl.", "ok");
     // long enough for the line to be read (and announced), then get out of the way
     setTimeout(() => { try { window.close(); } catch (_) { /* not a popup */ } }, 2400);
   } else {
     btn.classList.remove("busy");
-    btn.disabled = false;
+    $("send").disabled = false;
+    $("quick").disabled = false;
     // the background's reasons are written for a console, not a person: say
     // the plain sentence, and only mark the engine unreachable when it is
     const why = (res && res.error) || "";
@@ -157,7 +167,8 @@ function render() {
     if (first) first.checked = true;
   }
 
-  $("send").onclick = () => send(selectedUrl());
+  $("send").onclick = () => send(selectedUrl(), "quality");
+  $("quick").onclick = () => send(selectedUrl(), "quick");
 }
 
 function setEngine(state) {

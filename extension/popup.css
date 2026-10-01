@@ -158,6 +158,8 @@ h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
   transition: transform .12s ease-out;
 }
 .ghost:active { transform: scale(.97); }
+.ghost.wide { width: 100%; margin-top: 8px; }   /* the quick door, one beat quieter */
+.ghost:disabled { opacity: .75; pointer-events: none; }
 @media (hover: hover) {
   .ghost:hover { background: var(--glass-bg-strong); border-color: rgba(232, 236, 240, .22); }
 }

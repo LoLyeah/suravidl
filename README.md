@@ -70,10 +70,11 @@ an API token on start (or takes `SURAVIDL_TOKEN`).
 
 Watches media requests on every page and hands the interesting ones to the
 engine with that site's cookies/UA/referer, so logged-in sites work. The
-popup keeps it simple: it names what the page is playing, and its one button
-hands the stream over \u2014 the engine probes it (with those captured
-details) and the app's window opens on the format list, where you pick the
-quality. The tab badge shows how many videos were detected.
+popup keeps it simple: it names what the page is playing, and hands the
+stream over \u2014 the engine probes it (with those captured details) and the
+app's window opens on the format list, where you pick the quality. In a
+hurry, *Quick download* takes the best quality straight away instead. The
+tab badge shows how many videos were detected.
 
 - **Firefox**: install from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/) —
   signed and reviewed by Mozilla, and it updates itself from there.
@@ -218,7 +219,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 743 tests, no network
+.venv/bin/python -m pytest tests/ -q     # 744 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

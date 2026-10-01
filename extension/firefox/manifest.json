@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "suravidl",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Detect videos on any page and send them to your local suravidl engine.",
   "permissions": ["webRequest", "webRequestBlocking", "storage", "<all_urls>"],
   "background": { "scripts": ["background.js"] },

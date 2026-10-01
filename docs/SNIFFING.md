@@ -143,6 +143,11 @@ window opens the format list, so the quality choice happens where the
 formats are real. Older engines are still served: the popup falls back to
 the old one-shot `POST /jobs` when `/handoff` answers 404.
 
+The popup's other door — *Quick download* — skips the handoff entirely:
+it queues a best-quality job through that same one-shot route (`POST
+/jobs` with the captured headers), for people who just want the file and
+no window.
+
 ## Manual checklist (only a real device can show these)
 
 1. The case this whole feature was

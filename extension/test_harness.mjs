@@ -438,7 +438,8 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     });
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
                  "headline", "subline", "pickgroup", "streams", "send",
-                 "empty", "down", "retry", "rescan", "status", "optsLink", "ver"];
+                 "empty", "down", "retry", "rescan", "quick", "status",
+                 "optsLink", "ver"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
@@ -501,6 +502,26 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     ok(/✓ Sent — choose the quality in suravidl\./.test(nodes.status.textContent),
        "firefox: and says where the quality gets chosen");
     ok(nodes.send.disabled === true, "firefox: the handoff cannot be sent twice");
+
+    // — the other door: quick download takes the best quality right away —
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    await nodes.quick.onclick();
+    const qCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const qBody = qCall && JSON.parse(qCall.opts.body);
+    ok(qBody && qBody.url === "https://cdn/ff.mp4" && qBody.headers.cookie === "sid=1",
+       "firefox: quick download queues the best quality with the captured headers");
+    ok(!!qBody && !("fmt" in qBody),
+       "firefox: …without a format, which is what \"best\" means to the engine");
+    ok(/✓ Sent — suravidl is downloading it in best quality\./.test(nodes.status.textContent),
+       "firefox: …and says the download has started");
+    ok(nodes.send.disabled === true && nodes.quick.disabled === true,
+       "firefox: neither door can be pressed twice");
 
     // — two finds: the chooser appears, and the picked one is what goes —
     ff.listeners.beforeRequest[0]({ tabId: 7, type: "media", url: "https://cdn/ff2.mp4" });
