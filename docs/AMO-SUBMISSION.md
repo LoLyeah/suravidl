@@ -1,8 +1,8 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.2` was reviewed and is on the listing. `0.5.3` — the
-fix for the add-on doing nothing on Firefox — was submitted 2026-10-01. The
-review state of every version lives on the Developer Hub:
+**Status:** `suravidl 0.5.3` — the fix for the add-on doing nothing on
+Firefox — is the current version on AMO (submitted 2026-10-01, reviewed and
+live). The review state of every version lives on the Developer Hub:
 <https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>
 
 The Firefox build is Manifest V2, which is fine: Mozilla still supports MV2

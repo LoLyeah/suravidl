@@ -11,6 +11,9 @@ extension, desktop app, Android app. It downloads anything yt-dlp understands
 [![build](https://img.shields.io/github/actions/workflow/status/LoLyeah/suravidl/ci.yml?style=for-the-badge&label=build&logo=githubactions&logoColor=white)](https://github.com/LoLyeah/suravidl/actions/workflows/ci.yml)
 [![downloads](https://img.shields.io/github/downloads/LoLyeah/suravidl/total?style=for-the-badge&label=downloads&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases)
 
+[![mozilla add-on](https://img.shields.io/amo/v/suravidl.svg)](https://addons.mozilla.org/en-US/firefox/addon/suravidl/)
+[![chrome / edge](https://img.shields.io/badge/chrome%20%2F%20edge-zip-blue.svg)](https://github.com/LoLyeah/suravidl/releases/latest/download/suravidl-extension-chrome.zip)
+
 [releases](https://github.com/LoLyeah/suravidl/releases/latest) ·
 history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
 reviews: [docs/audits/](docs/audits/)
@@ -50,8 +53,8 @@ From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 - `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first launch
   needs right-click → Open.
 - `app-release.apk` — Android (see below).
-- Extension: `suravidl-extension-chrome.zip` (load unpacked) /
-  `suravidl-extension-firefox.xpi` (see below).
+- Extension: Firefox — [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/);
+  Chrome/Edge/Brave — `suravidl-extension-chrome.zip` (load unpacked), both below.
 
 From source:
 
@@ -69,17 +72,23 @@ Watches media requests on every page and hands the interesting ones to the
 engine with that site's cookies/UA/referer, so logged-in sites work. The tab
 badge shows how many videos were detected.
 
-- **From the repo**: `chrome://extensions` → Developer mode → Load unpacked →
-  pick `extension/`. For Firefox, copy `extension/firefox/manifest.json` over
-  `extension/manifest.json` first.
-- **Install caveats, so nobody is surprised**: Chrome only loads extensions
-  from the Web Store or via *Load unpacked* in developer mode (off-store
-  `.crx` installs have been blocked since ~2019, so no packed `.crx` ships).
-  Firefox stable refuses unsigned `.xpi`; the release one works on Developer
-  Edition/Nightly, or after signing on addons.mozilla.org.
+- **Firefox**: install from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/) —
+  signed and reviewed by Mozilla, and it updates itself from there.
+- **Chrome / Edge / Brave**: download `suravidl-extension-chrome.zip` from
+  [Releases](https://github.com/LoLyeah/suravidl/releases/latest), unzip it,
+  then `chrome://extensions` → Developer mode → *Load unpacked* → the
+  unzipped folder. (Chrome takes extensions only from its Web Store or an
+  unpacked folder in developer mode; off-store `.crx` installs have been
+  blocked since ~2019 and no Web Store listing exists, so unpacked is the
+  supported route. After an update that touches the extension, re-download
+  the zip and hit *Reload* on that page.)
+- **From the repo** (working on the extension itself): the same *Load
+  unpacked* flow with `extension/` — for a Firefox copy, overwrite
+  `extension/manifest.json` with `extension/firefox/manifest.json` first
+  (that swap is exactly what the Mozilla Add-ons build does).
 - Paste the engine token once in the extension's options page — the engine's
   **Settings → Network** shows it (masked, with a Copy button) if you don't want
-  to open `~/.suravidl/token`.
+  to open `~/.suravidl/token`. The popup's footer links straight to it.
 - The media list it watches for comes from the engine (`GET /sniff/patterns`),
   so a new format is an engine update, not an extension update; a response that
   says `video/*` is picked up even when its URL looks like nothing.
@@ -206,7 +215,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 310 tests, no network
+.venv/bin/python -m pytest tests/ -q     # 718 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```
