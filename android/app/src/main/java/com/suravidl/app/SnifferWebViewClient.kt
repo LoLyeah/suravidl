@@ -27,6 +27,9 @@ class SnifferWebViewClient(
     private val onPageStart: (String) -> Unit,
     /** A refused non-web navigation — the browser says so on screen. */
     private val onAppLinkBlocked: (String) -> Unit,
+    /** A refused off-site top-level hop — named on screen, one tap from
+     *  being followed anyway (v0.39.7). */
+    private val onHopBlocked: (String) -> Unit,
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -51,9 +54,20 @@ class SnifferWebViewClient(
         view: WebView?, request: WebResourceRequest?
     ): Boolean {
         val u = request?.url?.toString() ?: return false
-        if (isWebUrl(u)) return false
-        onAppLinkBlocked(u)
-        return true
+        if (!isWebUrl(u)) {
+            onAppLinkBlocked(u)
+            return true
+        }
+        // Only the main frame can replace the page (and wipe the finds); a
+        // sub-frame navigating anywhere is ordinary site behavior.
+        if (request?.isForMainFrame == false) return false
+        // The bounce guard (v0.39.7): an off-site top-level hop — the ad
+        // redirect that emptied the list mid-hunt — never reaches the page.
+        if (NavGuard.blockReason(pageUrl(), u) != null) {
+            onHopBlocked(u)
+            return true
+        }
+        return false
     }
 
     override fun shouldInterceptRequest(
@@ -62,6 +76,13 @@ class SnifferWebViewClient(
         val u = request?.url?.toString() ?: return null
         if (SniffPatterns.matches(u)) {
             SniffLog.add(u, "request", pageUrl(), request.isForMainFrame)
+        }
+        // The short deny list loads as an empty body: no script, no pop-up
+        // farm, no tracking pixel — and no broken page either (v0.39.7).
+        if (AdHosts.blocked(u)) {
+            return WebResourceResponse(
+                "text/plain", "utf-8", java.io.ByteArrayInputStream(ByteArray(0))
+            )
         }
         return null
     }

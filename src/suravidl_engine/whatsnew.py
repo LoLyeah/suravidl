@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.7",
+        "title": "The bouncer",
+        "items": [
+            "The phone app\u2019s built-in browser refuses to be bounced: an off-site redirect or pop-up mid-hunt is stopped cold \u2014 the page and the find list stay put. A refused hop is named and one tap from following.",
+            "Classic ad networks no longer load at all in there \u2014 a short deny list serves them empty, which is exactly what they deserve.",
+        ],
+    },
+    {
         "version": "0.39.6",
         "title": "The shelf",
         "items": [
@@ -88,13 +96,6 @@ ENTRIES = [
         "items": [
             "The minimize button tucks suravidl away instead of parking it in the Dock — on macOS a menu-bar icon keeps \"Show suravidl\" a click away, and Windows and Linux get a tray icon.",
             "If the app ever sits still, Settings → Appearance now names the reason — for instance your system asking for reduced motion — and where to change it.",
-        ],
-    },
-    {
-        "version": "0.38.6",
-        "title": "The straight answer",
-        "items": [
-            "Failure summaries no longer guess wrong: the short line follows the engine's own verdict, and unsupported links always say: open it in the browser, press play, then Scan.",
         ],
     },
 ]

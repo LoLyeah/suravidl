@@ -2335,6 +2335,8 @@ const FAQ = [
    "The folder shown at the bottom of the screen — press Open folder next to it. On a phone, finished downloads get Open and Share buttons instead; files land in Gallery (video) or Music (audio) under suravidl."],
   ["A link says 'unsupported URL'. What now?",
    "Some pages cannot hand a plain link over. Play it in your browser for a second: the extension (on desktop) or the browser offer right here catches the stream, and you pick the quality here before anything downloads."],
+  ["A page keeps bouncing me at ads.",
+   "The phone app's built-in browser refuses off-site jumps and pop-ups while you hunt for a stream — the page, and the find list, stay put. If a refused hop was one you meant, tap the note on screen to follow it anyway."],
   ["Why does it use my browser's cookies?",
    "Signed-in sites — private videos, member areas — only serve files to a signed-in session. The extension passes the session details for exactly the stream you picked, nothing else, and Settings → Cookies shows what is held and clears it on ask."],
   ["Where are the cookies kept?",

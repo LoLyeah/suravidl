@@ -100,6 +100,10 @@ class BrowserActivity : AppCompatActivity() {
     /** A `target=_blank` window exists only long enough to hand its URL over. */
     private var popup: WebView? = null
 
+    /** The last off-site hop the guard refused — the note offers it back:
+     *  one tap loads it programmatically (the guard does not see this). */
+    private var pendingHop: String? = null
+
     private val ticker = object : Runnable {
         override fun run() {
             refreshIfChanged()
@@ -245,7 +249,15 @@ class BrowserActivity : AppCompatActivity() {
             setTextColor(GREY)
             setPadding(dp(12), 0, dp(12), dp(6))
             visibility = View.GONE
-            setOnClickListener { handoffNote.visibility = View.GONE }
+            // Two kinds of note land here: an app-link refusal (tap hides it)
+            // and a refused off-site hop (tap follows it anyway — the user
+            // keeps the last word over the guard, v0.39.7).
+            setOnClickListener {
+                val hop = pendingHop
+                pendingHop = null
+                handoffNote.visibility = View.GONE
+                if (hop != null) load(hop)
+            }
         }
         root.addView(handoffNote)
 
@@ -273,17 +285,38 @@ class BrowserActivity : AppCompatActivity() {
             settings.allowContentAccess = false
             setBackgroundColor(bg)
             webChromeClient = object : WebChromeClient() {
-                /** `target=_blank` has nowhere to go without tabs: load it here. */
+                /**
+                 * `target=_blank` has nowhere to go without tabs: load it here
+                 * — if it is a hop the page may make. A script-opened window is
+                 * the classic ad pop-up and is refused outright (v0.39.7): no
+                 * window, and the page — with its find list — is never
+                 * replaced. A user-gestured one is resolved through the
+                 * scratch WebView so it can be classified like any other hop;
+                 * off-site ones get the note, not the page.
+                 */
                 override fun onCreateWindow(
                     view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?
                 ): Boolean {
+                    if (!isUserGesture) {
+                        reportPopupRefused()
+                        return false
+                    }
                     val tmp = WebView(this@BrowserActivity)
                     popup = tmp
                     tmp.webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
                             v: WebView?, r: WebResourceRequest?
                         ): Boolean {
-                            r?.url?.toString()?.let { load(it) }
+                            val target = r?.url?.toString() ?: return true
+                            // a blank first frame has not named itself yet
+                            if (target.startsWith("about:")) return false
+                            if (NavGuard.host(target) == null) {
+                                reportAppLinkBlocked(target)   // schemes ride in here too
+                            } else if (NavGuard.blockReason(currentPage, target) == null) {
+                                load(target)
+                            } else {
+                                reportHopBlocked(target)
+                            }
                             destroyPopup()   // a whole Chromium until it is destroyed
                             return true
                         }
@@ -299,10 +332,12 @@ class BrowserActivity : AppCompatActivity() {
                     currentPage = url
                     if (!urlField.hasFocus()) urlField.setText(url)
                     SniffLog.clear()                    // a new page, new finds
+                    pendingHop = null
                     handoffNote.visibility = View.GONE  // its note was about the page before
                     refreshIfChanged()
                 },
-                onAppLinkBlocked = { url -> reportAppLinkBlocked(url) })
+                onAppLinkBlocked = { url -> reportAppLinkBlocked(url) },
+                onHopBlocked = { url -> reportHopBlocked(url) })
         }
         ua = try {
             webView.settings.userAgentString.orEmpty()
@@ -395,8 +430,26 @@ class BrowserActivity : AppCompatActivity() {
     /** A refused non-web link (snssdk1180://, intent://, market://…) is said
      *  out loud — the silent half-dead navigation was the bug (v0.30.0). */
     private fun reportAppLinkBlocked(url: String) {
+        pendingHop = null
         handoffNote.text = "app link refused (" + schemeLabel(url) +
             ") — only web pages load here"
+        handoffNote.visibility = View.VISIBLE
+    }
+
+    /** A refused off-site top-level hop (v0.39.7): the ad redirect that used
+     *  to take the page — and the find list — with it. Named, kept, and one
+     *  tap from being followed anyway when the hop was the user's idea. */
+    private fun reportHopBlocked(url: String) {
+        pendingHop = url
+        handoffNote.text = "hop refused (" + (NavGuard.host(url) ?: schemeLabel(url)) +
+            ") — the page stays. tap to follow anyway"
+        handoffNote.visibility = View.VISIBLE
+    }
+
+    /** A script-opened window, refused before it can name a URL. */
+    private fun reportPopupRefused() {
+        pendingHop = null
+        handoffNote.text = "pop-up refused — the page stays, the list stays"
         handoffNote.visibility = View.VISIBLE
     }
 

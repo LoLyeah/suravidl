@@ -47,8 +47,12 @@ def test_the_refusal_note_has_its_own_line_and_its_own_tag():
         "the note must say what the rule is, not just that something happened"
     assert "handoffNote.visibility = View.GONE" in BROWSER, \
         "the next real page hides the note — it was about the page before"
-    assert "setOnClickListener { handoffNote.visibility = View.GONE }" in BROWSER, \
+    # v0.39.7: the same view carries the refused-hop note too — its tap
+    # follows the hop when one is pending, and hides otherwise
+    assert "handoffNote.visibility = View.GONE" in BROWSER, \
         "tap to hide, like the sign-in hint"
+    assert "if (hop != null) load(hop)" in BROWSER, \
+        "a refused hop is one tap from being followed anyway"
 
 
 # -- 3. every door shares the one rule ---------------------------------------
