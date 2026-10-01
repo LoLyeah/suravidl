@@ -2002,6 +2002,7 @@ const updStore = {
   },
   set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* private mode */ } },
 };
+const RELEASES_LATEST = "https://github.com/LoLyeah/suravidl/releases/latest";
 let UPD_STATE = null;   // the last /update-check answer
 
 function humanSince(ts) {
@@ -2026,9 +2027,22 @@ function renderUpdateRow() {
   const when = last && last.at ? `checked ${humanSince(last.at)}` : "not checked yet";
   const err = (u && u.error) || (last && last.error) || null;
   if (err) {
+    // One error class the user can act on: a build that can't verify the
+    // server's certificate (packaged Mac apps before v0.38.8 carried no CA
+    // store). It gets plain words and the one door that fixes it; everything
+    // else stays raw — it's information, not noise.
+    const cert = /CERTIFICATE_VERIFY_FAILED|certificate verify failed/i.test(String(err));
     state.textContent = "could not check for updates";
-    meta.textContent = `${err} · ${when}`;
-    get.classList.add("hidden");
+    meta.textContent = cert
+      ? `can't verify server certificates in this build — get the newest suravidl once and checks work from there · ${when}`
+      : `${err} · ${when}`;
+    if (cert) {
+      get.textContent = "Open the releases page";
+      get.classList.remove("hidden");
+      get.onclick = () => openExternal(RELEASES_LATEST);
+    } else {
+      get.classList.add("hidden");
+    }
     skip.classList.add("hidden");
     return;
   }

@@ -3,23 +3,30 @@ import json
 import os
 import subprocess
 import sys
-import urllib.request
+from urllib.request import Request, urlopen
 
 import yt_dlp
+
+from .net import ssl_context
 
 DEFAULT_REPO = "LoLyeah/suravidl"
 
 
 def _fetch_latest_release(repo: str) -> dict:
-    """Latest release JSON from the GitHub API (token optional for private repos)."""
-    req = urllib.request.Request(
+    """Latest release JSON from the GitHub API (token optional for private repos).
+
+    `urlopen` verifies through `ssl_context()`: a packaged macOS app gets no
+    system store, and the raw call is exactly what failed there with
+    CERTIFICATE_VERIFY_FAILED.
+    """
+    req = Request(
         f"https://api.github.com/repos/{repo}/releases/latest",
         headers={"Accept": "application/vnd.github+json",
                  "User-Agent": "suravidl-update-check"})
     token = os.environ.get("SURAVIDL_GITHUB_TOKEN")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
-    with urllib.request.urlopen(req, timeout=5) as r:
+    with urlopen(req, timeout=5, context=ssl_context()) as r:
         return json.loads(r.read().decode())
 
 

@@ -1481,3 +1481,22 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     measurements — it fails on the shipped 0.5.2 source and passes on the
     fix, and now exercises the popup too. The popup gained its Options link
     (address + token) and the failure texts say where the token goes.
+
+- **v0.38.8 — the trust bundle.** The desktop app's "Check now" failed on
+    macOS with `CERTIFICATE_VERIFY_FAILED: unable to get local issuer
+    certificate`, and it was never a network problem: a packaged Mac app's
+    Python has *no discoverable CA store* — OpenSSL's compiled-in paths do
+    not exist there, and Python never consults the Keychain — so every
+    stdlib `urlopen` that verifies a real certificate dies. yt-dlp never
+    noticed (it loads certifi's own bundle), which is why downloads worked
+    while the update check failed. Reproduced on Linux by hiding the store
+    (`SSL_CERT_FILE=/nonexistent SSL_CERT_DIR=/nonexistent` → the identical
+    error). Fixed at the source: a new `suravidl_engine/net.py` builds one
+    TLS context — `ssl.create_default_context()` plus certifi's bundle
+    *added* on top (platform and corporate stores survive; nothing is
+    substituted) — and the two stdlib fetch sites (the update check, the
+    classify/direct-media probes) now pass it to `urlopen`. The PyInstaller
+    spec collects certifi's data explicitly so every frozen build carries
+    the bundle, and the update row explains a certificate failure in plain
+    words and opens the releases page instead of showing a raw error line.
+    Suite 712 → 718.

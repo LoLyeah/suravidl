@@ -22,13 +22,22 @@ try:  # impersonation: curl_cffi and its libcurl-impersonate travel along when
 except Exception:  # noqa: BLE001 - the engine works without it; Android too
     _cffi_datas, _cffi_binaries, _cffi_hidden = [], [], []
 
+try:  # TLS trust: the frozen app carries certifi's CA bundle (its absence on
+    # macOS is why the packaged app's update check failed with
+    # CERTIFICATE_VERIFY_FAILED — see suravidl_engine/net.py)
+    from PyInstaller.utils.hooks import collect_data_files
+
+    _certifi_datas = collect_data_files("certifi")
+except Exception:  # noqa: BLE001 - the engine works without it (system store)
+    _certifi_datas = []
+
 a = Analysis(
     ["scripts/entry.py"],
     pathex=[str(ROOT / "src")],
     binaries=_cffi_binaries,
     datas=[(str(ROOT / "src" / "suravidl_engine" / "web"),
-            "suravidl_engine/web")] + _cffi_datas,
-    hiddenimports=["suravidl_engine.__main__"] + _webview_hidden + _cffi_hidden,
+            "suravidl_engine/web")] + _cffi_datas + _certifi_datas,
+    hiddenimports=["suravidl_engine.__main__", "certifi"] + _webview_hidden + _cffi_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -63,7 +72,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.38.7",
+            "CFBundleShortVersionString": "0.38.8",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

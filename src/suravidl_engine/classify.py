@@ -19,6 +19,8 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from urllib.parse import urljoin, urlsplit
 
+from .net import ssl_context
+
 TIMEOUT = 10
 PEEK_BYTES = 4096
 
@@ -139,7 +141,8 @@ def _http_fetch(url, headers=None, method="GET", range_bytes=None) -> Response:
     if range_bytes:
         req.add_header("Range", f"bytes=0-{range_bytes - 1}")
     try:
-        with urlrequest.urlopen(req, timeout=TIMEOUT) as r:
+        with urlrequest.urlopen(req, timeout=TIMEOUT,
+                                context=ssl_context()) as r:
             body = r.read(range_bytes) if method == "GET" else b""
             return Response(status=getattr(r, "status", 200) or 200,
                             headers=dict(r.headers), body=body,

@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.8",
+        "title": "The trust bundle",
+        "items": [
+            "Update checks work on macOS again: a packaged Mac app was asking the system for a list of trusted certificates that packaged apps never get — suravidl now brings its own, so Check now answers on the first try.",
+            "The same repair reaches the link inspector \u2014 scanned video links on https verify properly on every platform.",
+            "If a certificate check ever fails again, the update row explains it in plain words and opens the releases page for you.",
+        ],
+    },
+    {
         "version": "0.38.7",
         "title": "The tuck",
         "items": [
@@ -82,15 +91,6 @@ ENTRIES = [
         "items": [
             "The queue count rides the Queue tab's icon corner now — a number no longer nudges the button out of line with its neighbors.",
             "Tap a queue card's title to unfold the whole line — long titles read in full instead of \u201cJapanese Wagyu\u2026\u201d.",
-        ],
-    },
-    {
-        "version": "0.37.6",
-        "title": "The board reads",
-        "items": [
-            "A probed list no longer runs off the phone's right edge — each format row re-stacks: quality and its Take button on top, the format beneath, the size last.",
-            "Toasts dock right above the bottom bar on every tab (the settings tab no longer floats them over the page).",
-            "The START bar and the update popup pour denser on the phone — the readout and the dialog never share pixels with the page behind them again.",
         ],
     },
 ]
