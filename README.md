@@ -50,8 +50,8 @@ From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 - `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first launch
   needs right-click → Open.
 - `app-release.apk` — Android (see below).
-- Extension: `suravidl-extension-chrome.crx` / `suravidl-extension-firefox.xpi`
-  (see below).
+- Extension: `suravidl-extension-chrome.zip` (load unpacked) /
+  `suravidl-extension-firefox.xpi` (see below).
 
 From source:
 
@@ -72,9 +72,9 @@ badge shows how many videos were detected.
 - **From the repo**: `chrome://extensions` → Developer mode → Load unpacked →
   pick `extension/`. For Firefox, copy `extension/firefox/manifest.json` over
   `extension/manifest.json` first.
-- **Install caveats, so nobody is surprised**: Chrome has blocked off-store
-  `.crx` installs since ~2019 (enterprise policy or Chromium builds only) — use
-  *Load unpacked*, or pin the signed ID `habomdhpjdcddccplapkncnfokpknfle`.
+- **Install caveats, so nobody is surprised**: Chrome only loads extensions
+  from the Web Store or via *Load unpacked* in developer mode (off-store
+  `.crx` installs have been blocked since ~2019, so no packed `.crx` ships).
   Firefox stable refuses unsigned `.xpi`; the release one works on Developer
   Edition/Nightly, or after signing on addons.mozilla.org.
 - Paste the engine token once in the extension's options page — the engine's
