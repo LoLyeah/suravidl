@@ -143,6 +143,11 @@ window opens the format list, so the quality choice happens where the
 formats are real. Older engines are still served: the popup falls back to
 the old one-shot `POST /jobs` when `/handoff` answers 404.
 
+The extension finds the engine on a fixed port ladder: 8787 first, then
+8788–8792 (the engine steps to the next free rung at launch and never
+moves to a random port). The address that answered is remembered, so a
+busy 8787 at app start cannot break the pairing.
+
 The popup's other door — *Quick download* — skips the handoff entirely:
 it queues a best-quality job through that same one-shot route (`POST
 /jobs` with the captured headers), for people who just want the file and

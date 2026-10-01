@@ -1,9 +1,10 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.5` — the doorman popup plus its quick-download
-door (best quality straight away, for when nobody wants to pick) — is
-submitted 2026-10-01, in review on AMO; `0.5.4` (the doorman itself) is in
-the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
+**Status:** `suravidl 0.5.6` — the port-ladder fix ("suravidl isn't
+running" while the app was open: the extension now walks the same 8787→8792
+ladder the engine sits on, and the engine never moves to a random port
+again) — is submitted 2026-10-01; `0.5.5` (quick download) and `0.5.4` (the
+doorman itself) are in the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
 Firefox) was reviewed and live before them. The review state of every
 version lives on the Developer Hub:
 <https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>

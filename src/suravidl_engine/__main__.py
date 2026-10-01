@@ -67,8 +67,21 @@ def _ensure_log_targets(log_path: Path) -> None:
         sys.stderr = stream
 
 
+_ENGINE_PORT = 8787
+_PORT_LADDER_SPAN = 5      # the engine may sit on 8787..8792 — see PORT_LADDER
+                           # in extension/background.js; a test pins both sides
+
+
+def _port_candidates(preferred: int) -> list[int]:
+    """The fixed ladder the engine is allowed to sit on: the preferred port,
+    then its neighbours. Never a random port — the extension walks the same
+    ladder to find the app (the "suravidl isn't running" bug: a busy 8787
+    used to move the engine somewhere nothing would ever look)."""
+    return list(range(preferred, preferred + _PORT_LADDER_SPAN + 1))
+
+
 def find_free_port(preferred: int) -> int:
-    """Return `preferred` if bindable, else a random free port."""
+    """First free port on the ladder, else whichever the OS offers."""
     def bindable(p: int) -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
@@ -77,9 +90,11 @@ def find_free_port(preferred: int) -> int:
             except OSError:
                 return False
 
-    if preferred != 0 and bindable(preferred):
-        return preferred
-    # resolve an ephemeral port to an actual usable number
+    if preferred != 0:
+        for p in _port_candidates(preferred):
+            if bindable(p):
+                return p
+    # port 0 asked for, or six engines on one machine: any free port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]

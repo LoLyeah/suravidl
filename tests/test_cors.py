@@ -10,13 +10,14 @@ def test_preflight_from_extension_origin_is_allowed(tmp_path):
     r = client.options(
         "/jobs",
         headers={
-            "Origin": "chrome-extension://abcdefghijklmnop",
+            "Origin": "chrome-extension://abcdefghijklmnopabcdefghijklmnop",  # real ids are 32 chars (a-p)
             "Access-Control-Request-Method": "POST",
             "Access-Control-Request-Headers": "authorization, content-type",
         },
     )
     assert r.status_code == 200, r.text
-    assert r.headers.get("access-control-allow-origin") == "chrome-extension://abcdefghijklmnop"
+    assert r.headers.get("access-control-allow-origin") == \
+        "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
     assert "authorization" in r.headers.get("access-control-allow-headers", "").lower()
 
 

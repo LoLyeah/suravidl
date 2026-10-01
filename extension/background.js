@@ -82,7 +82,9 @@ function loadPatterns() {
       }
       if (Date.now() - stored.patternsAt < 24 * 3600 * 1000) return;
       try {
-        const res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/sniff/patterns", {
+        const eng = await resolveEngine();
+        if (!eng.ok) return;
+        const res = await fetch(eng.base + "/sniff/patterns", {
           headers: { Authorization: "Bearer " + stored.engineToken },
         });
         if (!res.ok) return;
@@ -242,12 +244,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // phone hide the same fragments for the same reason. No answer (engine down) →
 // show everything: never hide something on a guess.
 async function rankWithEngine(items) {
-  const stored = await api.storage.local.get({
-    engineUrl: "http://127.0.0.1:8787",
-    engineToken: "",
-  });
+  const stored = await api.storage.local.get({ engineToken: "" });
+  const eng = await resolveEngine();
+  if (!eng.ok) return null;
   try {
-    const res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/sniff/rank", {
+    const res = await fetch(eng.base + "/sniff/rank", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -263,15 +264,16 @@ async function rankWithEngine(items) {
 }
 
 async function sendToEngine(url) {
-  const stored = await api.storage.local.get({
-    engineUrl: "http://127.0.0.1:8787",
-    engineToken: "",
-    reqHeaders: {},
-  });
+  const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
+  const eng = await resolveEngine();
+  if (!eng.ok) {
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
+             " — is the suravidl app open?" };
+  }
   let res;
   try {
-    res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/jobs", {
+    res = await fetch(eng.base + "/jobs", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -280,7 +282,8 @@ async function sendToEngine(url) {
       body: JSON.stringify({ url, headers: captured }),
     });
   } catch (e) {
-    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl +
+    RESOLVED = "";
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
              " — is the suravidl app open? (" + e + ")" };
   }
   if (res.status === 401 || res.status === 403) {
@@ -292,23 +295,71 @@ async function sendToEngine(url) {
   return { ok: true, job: await res.json() };
 }
 
+// The engine's port ladder. Keep in sync with _port_candidates() in
+// suravidl_engine/__main__.py (a test pins both): the app sits on 8787
+// unless that was busy at launch, when it walks one rung at a time — never
+// a random port, so the extension can always find it. This is the fix for
+// "suravidl isn't running" while the app visibly ran: its engine had moved
+// and the extension never looked.
+const PORT_LADDER = [8787, 8788, 8789, 8790, 8791, 8792];
+let RESOLVED = "";   // where this session already found the engine
+
+async function probeBase(base, ms = 700) {
+  // one quick /health — the only engine call that needs no token
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    const res = await fetch(base + "/health", { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body && body.ok ? { base, version: body.version || "" } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Where is the engine? The configured address first; when that address is
+// this machine, walk the port ladder too. The answer is remembered for the
+// session and — when it is not the configured address — for the next one.
+async function resolveEngine() {
+  const stored = await api.storage.local.get({
+    engineUrl: "http://127.0.0.1:8787",
+    discoveredUrl: "",
+  });
+  const configured = String(stored.engineUrl || "").replace(/\/$/, "");
+  const candidates = [RESOLVED, stored.discoveredUrl, configured];
+  let loopback = false;
+  try {
+    loopback = ["127.0.0.1", "localhost", "::1", "[::1]"]
+      .includes(new URL(configured).hostname);
+  } catch (_) { /* unparseable address: nothing local to scan */ }
+  if (loopback) {
+    for (const p of PORT_LADDER) candidates.push("http://127.0.0.1:" + p);
+  }
+  const tried = [];
+  for (const c of candidates) {
+    if (!c || tried.includes(c)) continue;
+    tried.push(c);
+    const hit = await probeBase(c);
+    if (hit) {
+      RESOLVED = hit.base;
+      if (hit.base !== configured && stored.discoveredUrl !== hit.base) {
+        api.storage.local.set({ discoveredUrl: hit.base });
+      }
+      return { ok: true, base: hit.base, version: hit.version };
+    }
+  }
+  return { ok: false, base: configured };
+}
+
 // Is the engine up? /health needs no token, so this answers even when the
 // token is not configured yet — the popup's "not running" state is about
 // the app, not about credentials.
 async function engineState() {
-  const stored = await api.storage.local.get({
-    engineUrl: "http://127.0.0.1:8787",
-    engineToken: "",
-  });
-  try {
-    const res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/health",
-                            { cache: "no-store" });
-    if (!res.ok) return { ok: false, error: "engine answered " + res.status };
-    const body = await res.json();
-    return { ok: true, version: body.version };
-  } catch (e) {
-    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl };
-  }
+  const eng = await resolveEngine();
+  if (!eng.ok) return { ok: false, error: "cannot reach the engine at " + eng.base };
+  return { ok: true, version: eng.version, url: eng.base };
 }
 
 // Hand the find over (v0.39.0): the engine probes the stream itself — with
@@ -316,15 +367,16 @@ async function engineState() {
 // the quality choice happens where the formats are real. An older engine
 // (no /handoff) falls back to the one-shot job this extension used to send.
 async function sendHandoff(url, urls, tabUrl) {
-  const stored = await api.storage.local.get({
-    engineUrl: "http://127.0.0.1:8787",
-    engineToken: "",
-    reqHeaders: {},
-  });
+  const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
+  const eng = await resolveEngine();
+  if (!eng.ok) {
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
+             " — is the suravidl app open?" };
+  }
   let res;
   try {
-    res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/handoff", {
+    res = await fetch(eng.base + "/handoff", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -334,7 +386,8 @@ async function sendHandoff(url, urls, tabUrl) {
                              tab_url: tabUrl || "" }),
     });
   } catch (e) {
-    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl +
+    RESOLVED = "";   // it moved: look again next time
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
              " — is the suravidl app open? (" + e + ")" };
   }
   if (res.status === 404 || res.status === 405) {

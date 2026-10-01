@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.2",
+        "title": "The lantern",
+        "items": [
+            "If another program is using suravidl's usual port when the app starts, the app now steps one port over instead of vanishing somewhere random \u2014 and the browser extension knows to look there.",
+            "The Firefox extension searches those neighbouring ports before it ever says \"suravidl isn't running\" \u2014 a running app is found whether it sits on its usual port or one step beside it.",
+            "Engine checks no longer depend on the exact shape of the browser's own extension address, so a browser update cannot quietly cut the popup and the app apart.",
+        ],
+    },
+    {
         "version": "0.39.1",
         "title": "The hush",
         "items": [
@@ -87,13 +96,6 @@ ENTRIES = [
         "items": [
             "Toasts and the update notice sit right above the bottom bar on tabs where nothing is docked \u2014 they only lift when your transport (or the Settings Save strip) is actually there. No more hovering over a gap.",
             "Tap a finished download's title and the card reads like a receipt now: the file size and the full saved location, in full \u2014 not just the name.",
-        ],
-    },
-    {
-        "version": "0.38.1",
-        "title": "Straight to Download",
-        "items": [
-            "The app opens on the Download page again \u2014 quitting and reopening no longer drops you back on whichever tab you last touched. A URL that names a tab (like a #settings bookmark) still opens it.",
         ],
     },
 ]

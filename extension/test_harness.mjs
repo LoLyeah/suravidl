@@ -85,6 +85,9 @@ globalThis.fetch = async (url, opts = {}) => {
       }),
     };
   }
+  if (url.endsWith("/health")) {
+    return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.2" }) };
+  }
   return { ok: false, status: 404, text: async () => "nope" };
 };
 
@@ -239,7 +242,7 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
   const ff = {
     listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [] },
     spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onMessage: null,
-    jobsStatus: 200, handoffStatus: 200, healthOk: true,
+    jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const readStore = (defaults) => {
@@ -321,10 +324,12 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
       return { ok: true, json: async () => ({ items: [], hidden: 0 }) };
     }
     if (url.endsWith("/health")) {
-      if (ff.healthOk) {
-        return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.0" }) };
+      // the engine's port ladder: ff.enginePort narrows which rung answers
+      const port = (/127\.0\.0\.1:(\d+)\//.exec(url) || [])[1] || "8787";
+      if (ff.healthOk && (!ff.enginePort || String(ff.enginePort) === port)) {
+        return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.2" }) };
       }
-      throw new Error("connect ECONNREFUSED 127.0.0.1:8787");
+      throw new Error("connect ECONNREFUSED " + url);
     }
     if (url.endsWith("/handoff")) {
       if (ff.handoffStatus === 200) {
@@ -368,7 +373,7 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     // /handoff, the engine probes them itself and the app opens on the format
     // list — the quality choice lives there, not in this popup
     const st = await sendToBg({ type: "engineState" });
-    ok(st && st.ok && st.version === "0.39.0", "firefox: engineState reads /health");
+    ok(st && st.ok && st.version === "0.39.2", "firefox: engineState reads /health");
     ff.store.reqHeaders = { "https://cdn/ff.mp4": { headers: { cookie: "sid=1" } } };
     const hand = await sendToBg({ type: "sendHandoff", url: "https://cdn/ff.mp4",
                                   urls: ["https://cdn/ff.mp4"], tabUrl: "https://site/watch" });
@@ -388,9 +393,29 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     ok(older && older.ok && older.mode === "job" && older.job.id === "J7",
        "firefox: an engine without /handoff falls back to the old one-shot job");
     ff.handoffStatus = 200;
+    // the app can move down the port ladder when its preferred port was
+    // busy at launch: the extension walks the same ladder instead of
+    // declaring a running app dead (the reported bug)
+    ff.enginePort = 8789;
+    ff.fetchCalls.length = 0;
+    const stPort = await sendToBg({ type: "engineState" });
+    ok(stPort && stPort.ok && /:8789/.test(stPort.url || ""),
+       "firefox: engineState finds the engine on a neighbouring port");
+    ok(ff.store.discoveredUrl === "http://127.0.0.1:8789",
+       "firefox: …and remembers where it found it");
+    const hPort = await sendToBg({ type: "sendHandoff", url: "https://cdn/ff.mp4",
+                                   urls: [], tabUrl: "https://site/x" });
+    const hPortCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(hPort && hPort.ok && hPortCall && /:8789/.test(hPortCall.url),
+       "firefox: the handoff follows the discovered port");
+    ff.enginePort = 0;
+
     ff.healthOk = false;
+    ff.fetchCalls.length = 0;
     const stDown = await sendToBg({ type: "engineState" });
     ok(stDown && !stDown.ok, "firefox: a dead engine reads as not running");
+    ok(ff.fetchCalls.filter((c) => c.url.endsWith("/health")).length >= 5,
+       "firefox: …after actually walking the ladder, not assuming");
     ff.healthOk = true;
 
     ff.store.engineUrl = "http://127.0.0.1:8787";

@@ -316,8 +316,10 @@ def create_app(download_dir, auth_token: str | None = None,
         CORSMiddleware,
         # both extension families talk to the engine: Chrome MV3 sends
         # `chrome-extension://<id>`, the Firefox build `moz-extension://<uuid>`
-        # (the v0.21.2 audit found the Firefox origin getting a 400 preflight)
-        allow_origin_regex=r"^(chrome-extension://[a-p]+|moz-extension://[0-9a-fA-F-]+)$",
+        # (the v0.21.2 audit found the Firefox origin getting a 400 preflight;
+        # the uuid alphabet is Firefox's to choose, so match the shape — a
+        # page cannot forge a moz-extension:// origin anyway. v0.39.2)
+        allow_origin_regex=r"^(chrome-extension://[a-p]{32}|moz-extension://[0-9a-zA-Z-]{6,64})$",
         allow_credentials=False,
         # DELETE is a real method here: `DELETE /presets/{name}`
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
