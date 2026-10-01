@@ -1375,3 +1375,27 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     (15.6:1); --accent-fg/--accent-glow tokenized first so the hardcoded
     #1a1305 ink dies; swatch previews follow the scheme. Suite 653 → 674;
     versionCode 68.
+
+- **v0.38.4 — the native glass.** "is it possible to use real MacOS liquid
+    glass material API for the MacOS ver app?" — yes, behind the page:
+    Apple exposes Liquid Glass only to native toolkits (SwiftUI glassEffect,
+    UIKit UIGlassEffect, AppKit NSGlassEffectView, macOS 26+), never to web
+    content, so per-element glass stays CSS — but the SHELL can sit the
+    whole window on the real material. _try_window now creates the darwin
+    window transparent (TypeError retry for older pywebview);
+    _native_glass_ready (the webview.start callback — window.native exists
+    only after the GUI loop is up) inserts NSGlassEffectView behind the
+    WKWebView (addSubview:positioned:relativeTo: NSWindowBelow), falls back
+    to NSVisualEffectView vibrancy (.behindWindow, UnderWindowBackground)
+    on pre-26, turns drawsBackground off (KVC), and syncs the material
+    appearance to the page theme at launch (restart to re-sync). Only on
+    success does it set data-host="darwin-glass" — the CSS rule
+    html[data-host="darwin-glass"] body { background: transparent } lets
+    the page yield (verified live: body rgb(15,18,22) → rgba(0,0,0,0),
+    plates keep their tints). pyobjc is optional: no AppKit/no native →
+    plain window, no flag. AND the dock icon: build_brand.py gains
+    build_icns() (hand-packed container — Pillow writes ICNS only on
+    macOS itself; icp4..ic10 PNG chunks from the 1024 bleed master),
+    assets/icon.icns committed so the .app BUNDLE works from the repo
+    (the spec's CFBundleShortVersionString also finally bumped). Suite
+    674 → 685; versionCode 69.

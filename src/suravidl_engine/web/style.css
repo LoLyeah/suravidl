@@ -170,6 +170,12 @@ body {
   letter-spacing: .1px;
   overflow-x: hidden;
 }
+/* ---------- the native macOS glass (v0.38.4) ----------
+   The darwin shell sits the page on Apple's real material (NSGlassEffectView
+   — Liquid Glass — on macOS 26+, NSVisualEffectView vibrancy on older
+   releases). The body steps aside; the plates keep their tints and read
+   the native blur directly. */
+html[data-host="darwin-glass"] body { background: transparent; }
 /* an app, not a document: no selection handles on taps; text you may need
    to copy opts back in below */
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

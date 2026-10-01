@@ -10,6 +10,8 @@ Requires: google-chrome (SVG render), Pillow. Run from the repo root:
     .venv/bin/python scripts/build_brand.py
 """
 from pathlib import Path
+import io
+import struct
 import subprocess
 import tempfile
 
@@ -59,6 +61,27 @@ def circle_mask(img: Image.Image) -> Image.Image:
     return out
 
 
+def build_icns(bleed: Image.Image, out: Path) -> None:
+    """The macOS dock icon: a hand-packed .icns container.
+
+    Pillow only writes ICNS on macOS itself, so the container is packed
+    here (magic + total length, then one PNG chunk per type). bleed is the
+    1024 edge-to-edge master; every size is a Lanczos resize of it.
+    """
+    kinds = {  # icon type -> pixel size (ic10 is the 512@2x master)
+        "icp4": 16, "icp5": 32, "ic07": 128, "ic08": 256, "ic09": 512,
+        "ic10": 1024,
+    }
+    chunks = b""
+    for kind, px in kinds.items():
+        buf = io.BytesIO()
+        bleed.resize((px, px), Image.Resampling.LANCZOS).save(buf, "PNG")
+        raw = buf.getvalue()
+        chunks += kind.encode() + struct.pack(">I", len(raw) + 8) + raw
+    out.write_bytes(b"icns" + struct.pack(">I", len(chunks) + 8) + chunks)
+    print(f"  {out.relative_to(ROOT)}  {sorted(kinds.values())}")
+
+
 def main() -> None:
     master = render(BRAND / "mark.svg", 1024)          # margin version
     bleed = render(BRAND / "mark-bleed.svg", 1024)     # edge-to-edge
@@ -66,6 +89,9 @@ def main() -> None:
 
     # desktop / readme logo
     save(master, ROOT / "assets" / "logo.png")
+
+    # macOS dock icon (the .app bundle's icon)
+    build_icns(bleed, ROOT / "assets" / "icon.icns")
 
     # multi-size .ico (Windows + taskbar)
     ico_sizes = [16, 24, 32, 48, 64, 128, 256]

@@ -175,12 +175,113 @@ def _load_webview():
 
 def _try_window(webview, url: str):
     """Create (but don't start) the standalone window; None if impossible."""
+    # macOS goes transparent so the native glass material can sit behind
+    # the page (v0.38.4); other platforms stay opaque.
     try:
         return webview.create_window(
             "suravidl", url, width=1100, height=780, min_size=(760, 480),
+            transparent=sys.platform == "darwin",
         )
+    except TypeError:  # an older pywebview without the transparent kwarg
+        try:
+            return webview.create_window(
+                "suravidl", url, width=1100, height=780, min_size=(760, 480))
+        except Exception:  # noqa: BLE001
+            return None
     except Exception:  # noqa: BLE001 - e.g. GTK bindings missing
         return None
+
+
+def _import_appkit():
+    """pyobjc is optional even on darwin; (None, None) means no material."""
+    try:
+        import AppKit
+        import Foundation
+
+        return AppKit, Foundation
+    except Exception:  # noqa: BLE001 - not macOS, or pyobjc missing
+        return None, None
+
+
+def _find_webview_view(root):
+    """Depth-first: the WKWebView pywebview wrapped (its own container first)."""
+    stack = [root]
+    while stack:
+        view = stack.pop(0)
+        if type(view).__name__ == "WKWebView":
+            return view
+        stack.extend(view.subviews())
+    return None
+
+
+def _install_material(window, AppKit, Foundation) -> bool:
+    """Insert a real native material behind the page content.
+
+    NSGlassEffectView is Apple's Liquid Glass material (macOS 26+). Older
+    systems get the long-established NSVisualEffectView vibrancy in
+    behind-window mode — the material the UI's 'frosted' theme imitates.
+    Returns True when a layer was actually inserted.
+    """
+    if AppKit is None:
+        return False
+    native = getattr(window, "native", None)
+    if native is None:
+        return False
+    try:
+        content = native.contentView()
+        webview_view = _find_webview_view(content)
+        if webview_view is None:
+            return False
+        glass_cls = getattr(AppKit, "NSGlassEffectView", None)
+        if glass_cls is None:
+            glass_cls = AppKit.NSVisualEffectView
+        material = glass_cls.alloc().init()
+        material.setFrame_(content.bounds())
+        if glass_cls is AppKit.NSVisualEffectView:
+            material.setMaterial_(
+                AppKit.NSVisualEffectMaterialUnderWindowBackground)
+            material.setBlendingMode_(
+                AppKit.NSVisualEffectBlendingModeBehindWindow)
+            material.setState_(AppKit.NSVisualEffectStateActive)
+        content.addSubview_positioned_relativeTo_(
+            material, AppKit.NSWindowBelow, webview_view)
+        try:
+            # the page composites over the material instead of a white box
+            webview_view.setValue_forKey_(False, "drawsBackground")
+        except Exception:  # noqa: BLE001 - private-ish KVC key
+            pass
+        try:
+            # follow the page's theme at launch (a mid-session theme switch
+            # keeps the material it was born with — restart to re-sync)
+            theme = window.evaluate_js(
+                'document.documentElement.dataset.theme') or "dark"
+            named = ("NSAppearanceNameDarkAqua"
+                     if theme in ("dark", "amoled") else "NSAppearanceNameAqua")
+            material.setAppearance_(AppKit.NSAppearance.appearanceNamed_(named))
+        except Exception:  # noqa: BLE001 - decoration, never fatal
+            pass
+        return True
+    except Exception:  # noqa: BLE001 - unknown shells: stay plain
+        return False
+
+
+def _apply_native_material(window) -> bool:
+    """macOS only: the real glass. Windows and Linux keep their own look."""
+    if sys.platform != "darwin":
+        return False
+    AppKit, Foundation = _import_appkit()
+    return _install_material(window, AppKit, Foundation)
+
+
+def _native_glass_ready(window):
+    """webview.start callback: window.native exists only after the GUI is up."""
+    try:
+        if _apply_native_material(window):
+            # the body steps aside so the native material shows through
+            window.evaluate_js(
+                'document.documentElement.dataset.host = "darwin-glass"; true')
+    except Exception:  # noqa: BLE001 - the plain window still works
+        pass
 
 
 def _try_tray(url: str, open_downloads: Path):
@@ -283,8 +384,11 @@ def main() -> None:
     print(f"suravidl running at {url}  (token: {token[:4]}…{token[-4:]})")
 
     if window is not None:
+        def _ready():
+            _native_glass_ready(window)   # runs once the GUI loop is up
+
         try:
-            webview.start()
+            webview.start(_ready)
         except Exception:  # noqa: BLE001 - fall back to the browser
             window = None
             # the window never came up (headless host, missing Qt/GTK, …):

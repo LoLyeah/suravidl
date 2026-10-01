@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.38.4",
+        "title": "The native glass",
+        "items": [
+            "On macOS the app window is no longer a painted box: it now sits on Apple's real glass material — Liquid Glass on macOS 26 and up, native vibrancy on every earlier release — and the dock icon is finally the pine mark.",
+        ],
+    },
+    {
         "version": "0.38.3",
         "title": "The audit and the second voice",
         "items": [
@@ -88,13 +95,6 @@ ENTRIES = [
             "Opening What's new (or any dialog) frosts the whole screen behind it — the blur reaches the backdrop, not just the plate.",
             "The chosen tab in the bottom bar wears a squircle outline instead of a hairline.",
             "\"best available\" keeps its whole readout on a phone.",
-        ],
-    },
-    {
-        "version": "0.37.2",
-        "title": "The glass stays",
-        "items": [
-            "The phone's frosted and liquid glass keeps its real blur — floating bars, dialogs and toasts included. (A fix earlier in this release had briefly replaced them with solid plates; that was a wrong call, and it is undone.)",
         ],
     },
 ]
