@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.5",
+        "title": "The frost",
+        "items": [
+            "The tour\u2019s caption card now wears the same frosted glass as every dialog \u2014 a real-compositor shot caught the page reading through it, and it was re-shot to prove the fix.",
+        ],
+    },
+    {
         "version": "0.39.4",
         "title": "The welcome mat",
         "items": [
@@ -87,13 +94,6 @@ ENTRIES = [
         "title": "The fold",
         "items": [
             "A finished download's card now folds open and shut — the receipt grows and shrinks instead of popping, and once it's open the short /stor… path next to the buttons steps aside for the full one.",
-        ],
-    },
-    {
-        "version": "0.38.4",
-        "title": "The native glass",
-        "items": [
-            "On macOS the app window is no longer a painted box: it now sits on Apple's real glass material — Liquid Glass on macOS 26 and up, native vibrancy on every earlier release — and the dock icon is finally the pine mark.",
         ],
     },
 ]
