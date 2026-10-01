@@ -1,10 +1,10 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.7` — readable stream rows in the chooser (each row
-names its resolution or real filename instead of "Video 1", and a URL door
-per row unfolds the raw link) — is submitted 2026-10-01; `0.5.6` (the
-port-ladder fix), `0.5.5` (quick download) and `0.5.4` (the doorman itself)
-are in the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
+**Status:** `suravidl 0.5.8` — the stream list now resets when a tab walks
+to a new page (the chooser could still offer streams from the page you had
+already left) — is submitted 2026-10-02; `0.5.7` (readable stream rows with
+a per-row raw-link door), `0.5.6` (the port-ladder fix), `0.5.5` (quick
+download) and `0.5.4` (the doorman itself) are in the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
 Firefox) was reviewed and live before them. The review state of every
 version lives on the Developer Hub:
 <https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>

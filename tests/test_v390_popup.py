@@ -82,6 +82,16 @@ def test_chooser_rows_are_named_and_revealable():
     assert ".pickline" in CSS                              # the row is still one tap
 
 
+def test_navigation_clears_the_tab_s_list():
+    """v0.5.8: finds belong to the page that asked for them. A tab walking to
+    a new page must reset its list, or the chooser offers streams from a page
+    you already left (reported live, both browsers). `changeInfo.url` is
+    present with only host permissions — proven on Firefox 157 with a probe —
+    and a url-less update (same page reloading) keeps the list."""
+    assert "chrome.tabs.onUpdated.addListener" in BG_JS
+    assert "changeInfo.url" in BG_JS
+
+
 def test_the_version_line_tracks_the_manifest():
     """The footer prints the extension version; a bump that misses the line
     is how a store page and its popup end up disagreeing."""

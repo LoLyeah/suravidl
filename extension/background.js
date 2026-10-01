@@ -210,6 +210,24 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   });
 });
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // New page, new list: the previous page's finds belong to the URL that
+  // asked for them. Reported live (2026-10-02): a tab walked from one video
+  // to the next and the chooser still offered the old streams. changeInfo.url
+  // is present only when the URL truly changed — a same-page reload keeps its
+  // list — and the extension holds host permissions for every URL it watches,
+  // so the URL is always there when it matters (no new permission: this needs
+  // the one it already has).
+  if (!changeInfo || !changeInfo.url) return;
+  update(({ tabMedia }) => {
+    if (tabMedia[tabId]) {
+      delete tabMedia[tabId];
+      if (action && action.setBadgeText) action.setBadgeText({ tabId, text: "" });
+    }
+    return { tabMedia };
+  });
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "getMedia") {
     chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, ({ tabMedia, reqHeaders }) => {

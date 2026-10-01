@@ -25,6 +25,7 @@ const store = {};
 const badge = {};
 const fetchCalls = [];
 let onRemoved = [];
+let onUpdated = [];
 let onMessage = null;
 
 globalThis.chrome = {
@@ -65,7 +66,11 @@ globalThis.chrome = {
     },
     onHeadersReceived: { addListener: (fn) => listeners.headersReceived.push(fn) },
   },
-  tabs: { onRemoved: { addListener: (fn) => onRemoved.push(fn) }, query() {} },
+  tabs: {
+    onRemoved: { addListener: (fn) => onRemoved.push(fn) },
+    onUpdated: { addListener: (fn) => onUpdated.push(fn) },
+    query() {},
+  },
   runtime: { onMessage: { addListener: (fn) => (onMessage = fn) } },
 };
 
@@ -187,6 +192,7 @@ listeners.beforeRequest.length = 0;
 listeners.beforeSendHeaders.length = 0;
 listeners.headersReceived.length = 0;
 onRemoved = [];
+onUpdated = [];
 load();                                  // a fresh service-worker generation
 await settle();
 ok(!fetchCalls.some((c) => c.url.endsWith("/sniff/patterns")),
@@ -228,6 +234,26 @@ ok(found().length === 0, "a closed tab's finds are gone");
 ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
    "another tab's finds survive it");
 
+// 7. walking the same tab to a new page empties the old list: finds belong to
+// the page that asked for them. Reported live (2026-10-02): a tab moved from
+// one video to the next, and the chooser still offered the old streams.
+listeners.beforeRequest[0]({ tabId: 9, type: "media", url: "https://cdn/old-page" });
+await settle();
+ok(((store.tabMedia || {})[9] || []).length === 1, "a page's find is kept");
+onUpdated[0](9, { status: "loading" });            // same page reloading
+await settle();
+ok(((store.tabMedia || {})[9] || []).length === 1,
+   "a status-only update (the same page reloading) keeps the list");
+onUpdated[0](9, { url: "https://newsite/watch?v=next" });
+await settle();
+ok(((store.tabMedia || {})[9] || []).length === 0, "navigating a tab empties its finds");
+ok((badge[9] || "") === "", "…and clears the tab badge with it");
+listeners.beforeRequest[0]({ tabId: 9, type: "media", url: "https://cdn/new-page" });
+await settle();
+ok(((store.tabMedia || {})[9] || []).map((m) => m.url).join() === "https://cdn/new-page",
+   "…and the new page collects its own");
+ok(badge[9] === "1", "…with a fresh count on the badge");
+
 // — the Firefox flavor -------------------------------------------------------
 // Measured on Firefox 157 while the AMO-listed 0.5.2 build was broken:
 // `chrome.*` is a callback-only shim (tabs.query / sendMessage /
@@ -241,7 +267,7 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
 {
   const ff = {
     listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [] },
-    spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onMessage: null,
+    spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onUpdated: [], onMessage: null,
     jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -287,6 +313,7 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     },
     tabs: {
       onRemoved: { addListener: (fn) => ff.onRemoved.push(fn) },
+      onUpdated: { addListener: (fn) => ff.onUpdated.push(fn) },
       query(_q, cb) {
         if (typeof cb === "function") Promise.resolve().then(() => cb([{ id: 7 }]));
         return undefined;                                  // measured: no promise
@@ -598,6 +625,16 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     const p2 = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
     ok(JSON.parse(p2.opts.body).url === "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4",
        "firefox: the chosen stream is the one handed over");
+
+    // — a tab walking to a new page resets its list (same bug, this flavor) —
+    ff.listeners.beforeRequest[0]({ tabId: 8, type: "media", url: "https://cdn/ff-old-page" });
+    await settle();
+    let ffGot = await sendToBg({ type: "getMedia", tabId: 8 });
+    ok(ffGot.items.length === 1, "firefox: a find is kept while its page is open");
+    ff.onUpdated[0](8, { url: "https://newsite/watch?v=2" });
+    await settle();
+    ffGot = await sendToBg({ type: "getMedia", tabId: 8 });
+    ok(ffGot.items.length === 0, "firefox: navigating the tab empties its finds");
 
     // — engine down: one thing to fix, not a list you cannot send —
     ff.healthOk = false;
