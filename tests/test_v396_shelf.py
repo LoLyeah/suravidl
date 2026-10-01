@@ -39,8 +39,9 @@ def test_the_bar_stands_in_flow_at_the_documents_end():
 
 def test_the_notification_carries_our_mark():
     assert "setSmallIcon(R.drawable.ic_stat_suravidl)" in KOTLIN
-    assert KOTLIN.count("setLargeIcon(notifLogo)") == 2
-    assert "stat_sys_download" not in KOTLIN
+    assert "notifLogo?.let { setLargeIcon(it) }" in KOTLIN
+    # the platform glyph survives only as the two fallbacks (v0.39.7)
+    assert KOTLIN.count("setSmallIcon(android.R.drawable.stat_sys_download)") == 2
     assert 'android:fillColor="#FFFFFFFF"' in DRAWABLE
     assert 'android:fillType="evenOdd"' in DRAWABLE
 

@@ -36,11 +36,28 @@ import kotlin.concurrent.thread
 class EngineService : Service() {
     private var token = ""
 
-    /** v0.39.6 — the notification's big tile is OUR pine mark, decoded from
-     *  this build's own resources, never the phone's possibly-stale copy of
-     *  the app icon. One decode, shared by both builders. */
-    private val notifLogo: android.graphics.Bitmap by lazy {
-        android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+    /** The notification's big tile: OUR pine mark, rasterized from this
+     *  build's own resources, never the phone's possibly-stale copy of the
+     *  app icon (v0.39.6). Rasterized through the Drawable API on purpose
+     *  (v0.39.7): on modern Android the launcher icon is an adaptive-icon
+     *  XML, which BitmapFactory cannot decode — decodeResource returns null
+     *  for it, silently. The draw is guarded too: a notification with no
+     *  big tile is fine, a dead engine is not. */
+    private val notifLogo: android.graphics.Bitmap? by lazy {
+        try {
+            val d = androidx.core.content.ContextCompat.getDrawable(this, R.mipmap.ic_launcher)
+            if (d == null) null else {
+                val side = 96
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    side, side, android.graphics.Bitmap.Config.ARGB_8888)
+                d.setBounds(0, 0, side, side)
+                d.draw(android.graphics.Canvas(bmp))
+                bmp
+            }
+        } catch (t: Throwable) {
+            Log.w(SuravidlApp.TAG, "the notification's big tile could not be drawn", t)
+            null
+        }
     }
     @Volatile private var polling = true
     @Volatile private var engineError: String? = null
@@ -305,17 +322,35 @@ class EngineService : Service() {
         } catch (_: Exception) {
             "starting engine…"
         }
-        val notification = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_suravidl)
-            .setLargeIcon(notifLogo)
-            .setContentTitle("suravidl")
-            .setContentText(text)
-            .setContentIntent(openAppIntent())
-            .setOngoing(true)
-            .build()
+        val notification = buildNotification(text, openApp = true)
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, notification)   // same id as the foreground one:
                                             // onDestroy can take it down again
+    }
+
+    /**
+     * One builder for both notification sites. The drawn mark is attempted
+     * first; if attaching it throws, the platform's download glyph takes
+     * over — and startInForeground has a plainer fallback still (v0.39.7).
+     * A dressy icon may never keep startForeground from being called: the
+     * fg-start watchdog crashes the app when a service it started does not
+     * go foreground in time, and the v0.39.6 build died exactly so on both
+     * emulators (ForegroundServiceDidNotStartInTimeException).
+     */
+    private fun buildNotification(text: String, openApp: Boolean): android.app.Notification {
+        fun dressy() = NotificationCompat.Builder(this, CHANNEL).apply {
+            setContentTitle("suravidl")
+            setContentText(text)
+            setOngoing(true)
+            notifLogo?.let { setLargeIcon(it) }
+            if (openApp) setContentIntent(openAppIntent())
+        }
+        return try {
+            dressy().setSmallIcon(R.drawable.ic_stat_suravidl).build()
+        } catch (t: Throwable) {
+            Log.w(SuravidlApp.TAG, "the drawn notification glyph failed; using the platform's", t)
+            dressy().setSmallIcon(android.R.drawable.stat_sys_download).build()
+        }
     }
 
     private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
@@ -333,13 +368,21 @@ class EngineService : Service() {
                 NotificationChannel(CHANNEL, "Downloads",
                                     NotificationManager.IMPORTANCE_LOW))
         }
-        val n = NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_suravidl)
-            .setLargeIcon(notifLogo)
-            .setContentTitle("suravidl")
-            .setContentText("starting engine…")
-            .setOngoing(true)
-            .build()
+        val n = try {
+            buildNotification("starting engine…", openApp = false)
+        } catch (t: Throwable) {
+            // the plainest notification that can exist: platform glyph, no
+            // logo, no intent. If even this fails, the outer catch stops the
+            // service honestly — but it is not going to.
+            Log.e(SuravidlApp.TAG, "no usable notification; posting the plainest one", t)
+            writeLog("notif-fallback", t)
+            NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setContentTitle("suravidl")
+                .setContentText("starting engine…")
+                .setOngoing(true)
+                .build()
+        }
         if (Build.VERSION.SDK_INT >= 29) {
             ServiceCompat.startForeground(
                 this, NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
