@@ -1,10 +1,11 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.4` — the doorman popup (the extension names what a
-page is playing and hands the find to the app, where the quality is chosen) —
-is submitted 2026-10-01, in review on AMO. `0.5.3` (the fix for the add-on
-doing nothing on Firefox) was reviewed and live before it. The review state
-of every version lives on the Developer Hub:
+**Status:** `suravidl 0.5.5` — the doorman popup plus its quick-download
+door (best quality straight away, for when nobody wants to pick) — is
+submitted 2026-10-01, in review on AMO; `0.5.4` (the doorman itself) is in
+the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
+Firefox) was reviewed and live before them. The review state of every
+version lives on the Developer Hub:
 <https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>
 
 The Firefox build is Manifest V2, which is fine: Mozilla still supports MV2
