@@ -1500,3 +1500,24 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     the bundle, and the update row explains a certificate failure in plain
     words and opens the releases page instead of showing a raw error line.
     Suite 712 → 718.
+- **v0.39.0 — the doorman (browser handoffs).** The extension popup was
+  redesigned around a measured problem: it rendered every captured stream
+  as a URL row with its own download button — a debug view no
+  non-specialist could read. It is now a doorman: it names what the page
+  is playing in plain words, offers a quiet chooser only when the page
+  really offered several streams, and one button hands the find over
+  (`POST /handoff` — the chosen stream, its siblings, the captured request
+  headers). The engine probes engine-side with those headers, holds the
+  result for a window to pick up (`GET /handoff` returns the probe and
+  never the headers), and `POST /jobs` with `handoff_id` reuses the
+  capture, so a job stays cookied without credentials passing through any
+  UI. Probe payloads are scrubbed at three layers (`probe.scrub_secrets`,
+  the API probe path, the handoff store) because yt-dlp embeds the request
+  headers and the cookie line in the info dict and in every format entry.
+  New `POST /app/focus` lets the desktop shell raise its window when a
+  handoff lands (501 off desktop). The popup carries the house tokens
+  (graphite, one lamp, smoked glass, signal amber) and ships the house
+  type pair inside the package; its contract is driven by a new
+  Firefox-shape section in `extension/test_harness.mjs` (chooser, handoff,
+  engine states, sent) plus `tests/test_v390_popup.py`; engine side
+  `tests/test_v390_handoff.py`. Suite 718 → 743.

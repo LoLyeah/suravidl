@@ -619,9 +619,34 @@ def main() -> None:
             with open(os.devnull, "wb") as sink:
                 subprocess.Popen([opener, url], stdout=sink, stderr=sink)
 
+        def _focus_window():
+            """Raise the window — a browser handoff just arrived.
+
+            Minimize-to-tray means the window can be hidden (macOS app-hide)
+            or iconified (pystray); restore covers both, and on macOS the
+            app is also activated so it comes forward over the browser the
+            user clicked in.
+            """
+            try:
+                window.restore()
+            except Exception:  # noqa: BLE001 - window may be visible already
+                pass
+            try:
+                window.show()
+            except Exception:  # noqa: BLE001
+                pass
+            if sys.platform == "darwin":
+                try:
+                    from AppKit import NSApplication  # noqa: PLC0415
+
+                    NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+                except Exception:  # noqa: BLE001 - pyobjc is best-effort
+                    pass
+
         actions = {"minimize": _minimize_action(window,
                                                 tray_ok=not args.no_tray),
                    "quit": window.destroy,
+                   "focus": _focus_window,
                    "reveal": _open_folder, "pick_file": _pick_file,
                    "open_url": _open_url}
 

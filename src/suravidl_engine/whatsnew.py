@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.0",
+        "title": "The doorman",
+        "items": [
+            "The extension got a front door: it names what a page is playing in plain words, and one button hands it to suravidl \u2014 the format list opens in the app, ready for you to pick the quality.",
+            "A page that offers several streams gets a quiet choice first (playlist or video) \u2014 not a wall of links. The extension stays a doorman; the work stays in the engine.",
+            "For this the engine catches a browser-handed stream: it reads the link itself, with the page's request details, and keeps those details engine-side \u2014 reads show the video, never the credentials.",
+            "When a handoff arrives, the suravidl window comes to the front \u2014 so the quality picker is already where you are looking.",
+        ],
+    },
+    {
         "version": "0.38.8",
         "title": "The trust bundle",
         "items": [
@@ -83,14 +93,6 @@ ENTRIES = [
         "items": [
             "A new mark: a big cream download arrow on a pine tile, with the play knocked out of it \u2014 it still reads at a 16px favicon, where the old blue icon turned to mush.",
             "The header mark follows your theme: the pine tile in the light room, the cream chip at night and on AMOLED \u2014 no more one-size icon sinking into dark rooms.",
-        ],
-    },
-    {
-        "version": "0.37.7",
-        "title": "The readable queue",
-        "items": [
-            "The queue count rides the Queue tab's icon corner now — a number no longer nudges the button out of line with its neighbors.",
-            "Tap a queue card's title to unfold the whole line — long titles read in full instead of \u201cJapanese Wagyu\u2026\u201d.",
         ],
     },
 ]

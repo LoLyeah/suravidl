@@ -19,8 +19,9 @@ from .auth import (check_auth, cookie_session, explain_download_error,
                    unsupported_error)
 from .classify import classify, patterns, rank
 from .download_opts import probe_extra_opts
+from .handoff import HandoffStore
 from .jobs import JobManager, redact_job
-from .probe import probe
+from .probe import probe, scrub_secrets
 from . import site_memory
 
 
@@ -33,6 +34,8 @@ class JobRequest(BaseModel):
     raw_args: str | None = None
     # "this download only": a validated patch over the saved settings
     overrides: dict | None = None
+    # a browser handoff's captured headers ride on the job (v0.39.0)
+    handoff_id: str | None = None
 
 
 class OpenUrlRequest(BaseModel):
@@ -51,6 +54,22 @@ class ClassifyRequest(BaseModel):
 
 class RankRequest(BaseModel):
     urls: list[str] = []
+
+
+class HandoffRequest(BaseModel):
+    """What the browser extension hands over (v0.39.0).
+
+    `url` is the stream the popup chose; `urls` are its siblings, tried in
+    order when a probe fails; `tab_url` is only a label for the reader.
+    """
+    url: str
+    urls: list[str] = []
+    headers: dict[str, str] | None = None
+    tab_url: str | None = None
+
+
+class HandoffAckRequest(BaseModel):
+    id: str = ""
 
 
 class AuthCheckRequest(BaseModel):
@@ -286,6 +305,7 @@ def default_cache_dir() -> Path:
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
                update_fn=None, update_check_fn=None,
+               handoff_probe_fn=None,
                settings_path=None, desktop_actions: dict | None = None,
                page_key: str | None = None, cache_dir=None) -> FastAPI:
     from .settings import Settings
@@ -494,6 +514,20 @@ def create_app(download_dir, auth_token: str | None = None,
     def app_minimize(_mgr: JobManager = Depends(require_auth)):
         return _window_action("minimize")
 
+    @app.post("/app/focus")
+    def app_focus(_mgr: JobManager = Depends(require_auth)):
+        """Bring the window forward — handoffs arrive while you are browsing."""
+        fn = acts.get("focus")
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="not running in a desktop app")
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001 - the shell's window is best-effort
+            raise HTTPException(status_code=502,
+                                detail=f"could not focus the window: {e}") from e
+        return {"ok": True}
+
     @app.post("/app/quit")
     def app_quit(_mgr: JobManager = Depends(require_auth)):
         return _window_action("quit")
@@ -557,27 +591,38 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail=f"could not open the browser: {e}") from e
         return {"opened": url}
 
+    def _probe_with(url: str, headers: dict | None) -> dict:
+        """ONE probe path for the UI and for browser handoffs (v0.39.0).
+
+        Same option builder either way; the site's remembered quality rides
+        along as an offer (M20): the caller marks that chip, the user still
+        decides.
+        """
+        with cookie_session(settings.get()) as cookie_opts:
+            info = probe(url, extra_headers=headers,
+                         cookie_opts=cookie_opts,
+                         extra_opts=probe_extra_opts(settings.get()))
+        site = site_memory.host_of(url)
+        if site:
+            info["site"] = site
+            info["site_quality"] = site_memory.clean(
+                settings.get().get("site_quality") or {}).get(site)
+        return scrub_secrets(info)   # a shell reads this; captures stay home
+
+    # Browser handoffs (v0.39.0): the extension's find becomes a probe here,
+    # with the captured request headers, held until a window picks it up.
+    handoffs = HandoffStore(probe_fn=handoff_probe_fn or _probe_with)
+
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
         try:
-            with cookie_session(settings.get()) as cookie_opts:
-                info = probe(body.url, extra_headers=body.headers,
-                             cookie_opts=cookie_opts,
-                             extra_opts=probe_extra_opts(settings.get()))
+            return _probe_with(body.url, body.headers)
         except Exception as e:  # noqa: BLE001 - error goes to the client
             # one explanation for every shell: the engine owns the "this looks
             # like a sign-in wall" judgement, the UI does not guess
             raise HTTPException(status_code=400,
                                 detail=(unsupported_error(str(e))
                                         or explain_download_error(str(e)))) from e
-        # the site's remembered quality rides along as an offer (M20): the UI
-        # marks that chip, the user still decides
-        site = site_memory.host_of(body.url)
-        if site:
-            info["site"] = site
-            info["site_quality"] = site_memory.clean(
-                settings.get().get("site_quality") or {}).get(site)
-        return info
 
     @app.post("/classify")
     def classify_endpoint(body: ClassifyRequest,
@@ -602,6 +647,28 @@ def create_app(download_dir, auth_token: str | None = None,
         nothing else is touched.
         """
         return rank(body.urls[:200])
+
+    @app.post("/handoff")
+    def create_handoff(body: HandoffRequest,
+                       _mgr: JobManager = Depends(require_auth)):
+        """The extension hands over a find; the probe runs here, engine-side."""
+        url = str(body.url or "").strip()
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400,
+                                detail="only http(s) links can be handed over")
+        item = handoffs.add(url, urls=body.urls,
+                            headers=body.headers, tab_url=body.tab_url)
+        return {"ok": True, "id": item["id"], "status": item["status"]}
+
+    @app.get("/handoff")
+    def list_handoffs(_mgr: JobManager = Depends(require_auth)):
+        """What a window should pick up — never the captured headers."""
+        return {"items": handoffs.list()}
+
+    @app.post("/handoff/ack")
+    def ack_handoff(body: HandoffAckRequest,
+                    _mgr: JobManager = Depends(require_auth)):
+        return {"ok": handoffs.ack(str(body.id or ""))}
 
     @app.post("/auth/check")
     def auth_check(body: AuthCheckRequest, mgr: JobManager = Depends(require_auth)):
@@ -661,8 +728,15 @@ def create_app(download_dir, auth_token: str | None = None,
             overrides = {**(overrides or {}), **patch} or None
         elif d_intent and not body.fmt:
             preset = d_intent
+        headers = body.headers
+        if body.handoff_id:
+            # a browser handoff's captured headers (cookies included) ride on
+            # the job without ever passing through the UI (v0.39.0)
+            held = handoffs.headers_for(body.handoff_id)
+            if held:
+                headers = {**held, **(headers or {})}
         job = mgr.create(body.url, fmt=body.fmt,
-                         extra_headers=body.headers,
+                         extra_headers=headers,
                          preset=preset,
                          playlist_items=body.playlist_items,
                          raw_args=raw,

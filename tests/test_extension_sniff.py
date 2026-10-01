@@ -37,9 +37,13 @@ def test_the_popup_hides_fragments_only_on_the_engines_word():
     # render() only hides what the engine actually flagged
     assert "return null" in BG and "show everything" in BG
     assert "shape[m.url] && shape[m.url].hidden" in POPUP
-    # and the user is told what was hidden, and why
-    assert "hidden — part of the playlist above" in POPUP
-    assert 'kind === "manifest" ? "playlist"' in POPUP
+    # a hidden fragment never gets a row at all (v0.39.0): the doorman lists
+    # the visible finds, and names their kinds in plain words — the old
+    # "hidden — part of the playlist above" debug note is gone with the wall
+    # of URLs it annotated
+    assert "hidden — part of the playlist above" not in POPUP
+    assert 'if (kind === "manifest") return "Playlist";' in POPUP
+    assert 'if (kind === "media") return "Video";' in POPUP
 
 
 def test_the_handoff_still_carries_the_captured_headers():

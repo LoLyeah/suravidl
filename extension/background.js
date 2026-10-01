@@ -224,6 +224,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     rankWithEngine(msg.items || []).then(sendResponse);
     return true;
   }
+  if (msg && msg.type === "engineState") {
+    engineState().then(sendResponse);
+    return true;
+  }
+  if (msg && msg.type === "sendHandoff") {
+    sendHandoff(msg.url, msg.urls, msg.tabUrl).then(sendResponse);
+    return true;
+  }
   if (msg && msg.type === "sendToEngine") {
     sendToEngine(msg.url).then(sendResponse);
     return true;
@@ -282,6 +290,65 @@ async function sendToEngine(url) {
   }
   if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
   return { ok: true, job: await res.json() };
+}
+
+// Is the engine up? /health needs no token, so this answers even when the
+// token is not configured yet — the popup's "not running" state is about
+// the app, not about credentials.
+async function engineState() {
+  const stored = await api.storage.local.get({
+    engineUrl: "http://127.0.0.1:8787",
+    engineToken: "",
+  });
+  try {
+    const res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/health",
+                            { cache: "no-store" });
+    if (!res.ok) return { ok: false, error: "engine answered " + res.status };
+    const body = await res.json();
+    return { ok: true, version: body.version };
+  } catch (e) {
+    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl };
+  }
+}
+
+// Hand the find over (v0.39.0): the engine probes the stream itself — with
+// the captured headers — and the app's window opens on the format list, so
+// the quality choice happens where the formats are real. An older engine
+// (no /handoff) falls back to the one-shot job this extension used to send.
+async function sendHandoff(url, urls, tabUrl) {
+  const stored = await api.storage.local.get({
+    engineUrl: "http://127.0.0.1:8787",
+    engineToken: "",
+    reqHeaders: {},
+  });
+  const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
+  let res;
+  try {
+    res = await fetch(stored.engineUrl.replace(/\/$/, "") + "/handoff", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + stored.engineToken,
+      },
+      body: JSON.stringify({ url, urls: urls || [], headers: captured,
+                             tab_url: tabUrl || "" }),
+    });
+  } catch (e) {
+    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl +
+             " — is the suravidl app open? (" + e + ")" };
+  }
+  if (res.status === 404 || res.status === 405) {
+    // an older engine has no /handoff: the old one-shot job is still honest
+    const old = await sendToEngine(url);
+    return old.ok ? { ok: true, mode: "job", job: old.job } : old;
+  }
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, error: "the engine refused the token (" + res.status +
+             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             "into the extension's Options (the link below)" };
+  }
+  if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
+  return { ok: true, mode: "handoff", handoff: await res.json() };
 }
 
 loadPatterns();

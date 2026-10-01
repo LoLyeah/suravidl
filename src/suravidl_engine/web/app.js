@@ -1004,6 +1004,9 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
   }
   try {
     const body = { url };
+    // a job off a browser handoff reuses the page's captured headers — they
+    // live in the engine, keyed by the handoff, and never pass through here
+    if (HANDOFF && url === HANDOFF.url) body.handoff_id = HANDOFF.id;
     if (fmt) body.fmt = fmt;
     // the audio intent only applies when no explicit format was picked
     // (yt-dlp refuses fmt + preset together)
@@ -3225,6 +3228,95 @@ initArchive();
 })();
 refreshJobs();
 setInterval(refreshJobs, 1200);
+
+/* ---------- browser handoffs (v0.39.0) -----------------------------------
+   The extension's popup hands a find to the engine; the engine probes it
+   there (with the page's captured headers) and this deck picks the result
+   up: the format list opens and the user chooses the quality — the popup
+   stays a doorman. The seen-list lives in localStorage so a reload does
+   not re-open the same handoff; the engine side keeps the item (and its
+   headers — a job started from it reuses them) until its own TTL. */
+let HANDOFF = null;               // { id, url } the deck is showing
+let HANDOFF_ANNOUNCED = new Set();  // "preparing…" already said this session
+
+function handoffSeen() {
+  try { return JSON.parse(localStorage.getItem("suravidl.handoff.seen") || "[]"); }
+  catch (_) { return []; }
+}
+function markHandoffSeen(id) {
+  const seen = handoffSeen();
+  if (!seen.includes(id)) {
+    seen.push(id);
+    try {
+      localStorage.setItem("suravidl.handoff.seen", JSON.stringify(seen.slice(-20)));
+    } catch (_) { /* private mode */ }
+  }
+}
+
+function focusWindow() {
+  // the desktop shell can raise itself; a plain browser tab just gets the
+  // content when the user looks — the engine holds the handoff either way
+  api("/app/focus", { method: "POST" }).catch(() => {});
+}
+
+async function checkHandoff() {
+  let items = [];
+  try {
+    ({ items } = await api("/handoff"));
+  } catch (_) { return; }        // no engine, or one without handoffs
+  const seen = handoffSeen();
+  const fresh = (items || []).filter((h) => !seen.includes(h.id));
+  if (!fresh.length) return;
+  const h = fresh[0];
+  if (h.status === "probing") {
+    if (!HANDOFF_ANNOUNCED.has(h.id)) {
+      HANDOFF_ANNOUNCED.add(h.id);
+      showTab("download");
+      $("url").value = h.url;
+      $("probeMsg").className = "msg muted";
+      $("probeMsg").textContent = "preparing the video your browser sent…";
+      $("probeMsg").classList.remove("hidden");
+      $("probeSay").classList.add("hidden");
+      $("probeDetails").classList.add("hidden");
+      setScopes("scan", { say: "reading the source…" });
+      $("probeBtn").classList.add("busy");
+      focusWindow();
+    }
+    return;
+  }
+  markHandoffSeen(h.id);
+  $("probeBtn").classList.remove("busy");
+  if (h.status === "ready" && h.probe) {
+    $("url").value = h.resolved_url || h.url;
+    $("probeMsg").textContent = "";
+    renderProbe($("url").value, h.probe);
+    setScopes("live", { say: "sent from your browser — pick a take" });
+    HANDOFF = { id: h.id, url: $("url").value };
+    toast("Sent from your browser — pick the quality, then take it", "info");
+    focusWindow();
+  } else {
+    // the engine probed it and it failed; say so the way any failed probe is said
+    const raw = h.error || "probe failed";
+    $("probeMsg").textContent = raw;
+    $("probeMsg").className = "msg bad mono";
+    $("probeMsg").classList.add("hidden");
+    $("probeSay").textContent = humanErr(raw);
+    $("probeSay").className = "msg bad";
+    $("probeSay").classList.remove("hidden");
+    $("probeDetails").textContent = "Show details";
+    $("probeDetails").classList.remove("hidden");
+    setScopes("bad", { say: "no readout — see the message above" });
+    $("probeCard").classList.add("hidden");
+    $("dlEmpty").classList.remove("hidden");
+    toast("the browser sent a video, but reading it failed", "bad");
+  }
+}
+
+setInterval(checkHandoff, 2600);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkHandoff();
+});
+checkHandoff();
 
 /** Play a finished download without leaving the page (the v0.22 review's #10:
  *  "check what you downloaded, before you hunt for the file"). A media element

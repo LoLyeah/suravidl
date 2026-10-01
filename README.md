@@ -69,8 +69,11 @@ an API token on start (or takes `SURAVIDL_TOKEN`).
 ## Browser extension
 
 Watches media requests on every page and hands the interesting ones to the
-engine with that site's cookies/UA/referer, so logged-in sites work. The tab
-badge shows how many videos were detected.
+engine with that site's cookies/UA/referer, so logged-in sites work. The
+popup keeps it simple: it names what the page is playing, and its one button
+hands the stream over \u2014 the engine probes it (with those captured
+details) and the app's window opens on the format list, where you pick the
+quality. The tab badge shows how many videos were detected.
 
 - **Firefox**: install from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/) —
   signed and reviewed by Mozilla, and it updates itself from there.
@@ -154,7 +157,7 @@ agrees on it:
 | a direct media URL (`.mp4`, `.m3u8`, `.mpd`) | paste it | paste or share it | `suravidl <url>` |
 | a site yt-dlp knows (1000+) | paste it | share it | `suravidl <url>` |
 | a plain `<video>` tag | paste it (generic extractor) | paste it | `suravidl <url>` |
-| a player that fetches its own stream (often JS-only, `blob:`/MSE) | extension: play, then *Download with suravidl* | **🔍 Find a video on a page** → play → **Scan** → **Download** | — |
+| a player that fetches its own stream (often JS-only, `blob:`/MSE) | extension: play, then *Choose quality in suravidl* | **🔍 Find a video on a page** → play → **Scan** → **Download** | — |
 | DRM (Widevine, PlayReady, SAMPLE-AES) | detected and refused | detected and refused | detected and refused |
 | a `blob:` inside a *cross-origin* frame | extension sees the network request | network layer only | — |
 
@@ -215,7 +218,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 718 tests, no network
+.venv/bin/python -m pytest tests/ -q     # 743 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

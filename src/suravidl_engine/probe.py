@@ -8,6 +8,24 @@ from .extract import extract_info
 MAX_ENTRIES = 500
 
 
+# yt-dlp preserves the request shape it used inside the payload it returns:
+# `http_headers` at the top and `cookies` on every format entry. Probe
+# answers are read by shells (the web UI, browser handoffs), so the captures
+# must not ride back out — they stay engine-side, for the job that reuses
+# them.
+SENSITIVE_INFO_KEYS = ("http_headers", "cookies")
+
+
+def scrub_secrets(value):
+    """Strip the capture keys from a probe payload, at any depth. Idempotent."""
+    if isinstance(value, dict):
+        return {k: scrub_secrets(v) for k, v in value.items()
+                if k not in SENSITIVE_INFO_KEYS}
+    if isinstance(value, list):
+        return [scrub_secrets(v) for v in value]
+    return value
+
+
 PROTECTED_PROBE_KEYS = (
     "skip_download", "paths", "outtmpl", "noplaylist", "extract_flat",
     "playlistend", "quiet", "no_warnings", "download", "download_archive",
@@ -47,7 +65,7 @@ def probe(url: str, extra_headers: dict | None = None,
 
     if info.get("_type") == "playlist" or info.get("entries"):
         entries = [e for e in (info.get("entries") or []) if e]
-        return {
+        return scrub_secrets({
             "playlist": True,
             "title": info.get("title"),
             "extractor": info.get("extractor"),
@@ -64,8 +82,8 @@ def probe(url: str, extra_headers: dict | None = None,
                 }
                 for i, e in enumerate(entries[:MAX_ENTRIES])
             ],
-        }
+        })
 
     out = dict(info)
     out["playlist"] = False
-    return out
+    return scrub_secrets(out)

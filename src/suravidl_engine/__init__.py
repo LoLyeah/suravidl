@@ -1,2 +1,2 @@
 """suravidl engine package."""
-__version__ = "0.38.8"
+__version__ = "0.39.0"

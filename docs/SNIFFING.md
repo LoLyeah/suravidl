@@ -128,6 +128,21 @@ of the very session that is playing.
   a shell document, and the test asserts the URL is found and *how* (`via`).
 - Both run on API 30 and on a 16 KB page-size API 36 emulator in CI.
 
+## Browser handoffs (the popup's route)
+
+The extension popup no longer sends a job; it hands the stream over and the
+engine takes it from there. `POST /handoff` carries the chosen stream, its
+siblings (candidates to fall back to, in order) and the captured request
+headers — the same list `background.js` already keeps for a page's media.
+The engine probes the stream itself, engine-side, with those headers, and
+holds the result (30 minutes, newest five) until a suravidl window picks it
+up. `GET /handoff` returns the probe — and never the headers; they stay in
+the engine, and a job started from the handoff (`"handoff_id"` on
+`POST /jobs`) reuses them, so nothing captured ever rides through a UI. The
+window opens the format list, so the quality choice happens where the
+formats are real. Older engines are still served: the popup falls back to
+the old one-shot `POST /jobs` when `/handoff` answers 404.
+
 ## Manual checklist (only a real device can show these)
 
 1. The case this whole feature was

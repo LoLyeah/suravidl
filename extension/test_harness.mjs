@@ -239,7 +239,7 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
   const ff = {
     listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [] },
     spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onMessage: null,
-    jobsStatus: 200,
+    jobsStatus: 200, handoffStatus: 200, healthOk: true,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const readStore = (defaults) => {
@@ -320,6 +320,19 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     if (url.endsWith("/sniff/rank")) {
       return { ok: true, json: async () => ({ items: [], hidden: 0 }) };
     }
+    if (url.endsWith("/health")) {
+      if (ff.healthOk) {
+        return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.0" }) };
+      }
+      throw new Error("connect ECONNREFUSED 127.0.0.1:8787");
+    }
+    if (url.endsWith("/handoff")) {
+      if (ff.handoffStatus === 200) {
+        return { ok: true, status: 200,
+                 json: async () => ({ ok: true, id: "h1", status: "probing" }) };
+      }
+      return { ok: false, status: ff.handoffStatus, text: async () => '{"detail":"gone"}' };
+    }
     if (url.endsWith("/jobs")) {
       if (ff.jobsStatus === 200) {
         return { ok: true, status: 200, json: async () => ({ id: "J7" }) };
@@ -351,6 +364,35 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     ok(ff.fetchCalls.some((c) => c.url.endsWith("/sniff/rank")),
        "firefox: rank reaches the engine through the promise namespace");
 
+    // the popup's handoff (v0.39.0): the find plus its captured headers go to
+    // /handoff, the engine probes them itself and the app opens on the format
+    // list — the quality choice lives there, not in this popup
+    const st = await sendToBg({ type: "engineState" });
+    ok(st && st.ok && st.version === "0.39.0", "firefox: engineState reads /health");
+    ff.store.reqHeaders = { "https://cdn/ff.mp4": { headers: { cookie: "sid=1" } } };
+    const hand = await sendToBg({ type: "sendHandoff", url: "https://cdn/ff.mp4",
+                                  urls: ["https://cdn/ff.mp4"], tabUrl: "https://site/watch" });
+    ok(hand && hand.ok && hand.mode === "handoff" && hand.handoff.id === "h1",
+       "firefox: sendHandoff returns the engine's handoff");
+    const hCall = ff.fetchCalls.find((c) => c.url.endsWith("/handoff"));
+    ok(hCall && hCall.opts.method === "POST", "firefox: …as a POST to /handoff");
+    const hBody = hCall && JSON.parse(hCall.opts.body);
+    ok(hBody && hBody.url === "https://cdn/ff.mp4" && hBody.tab_url === "https://site/watch",
+       "firefox: the handoff carries the stream and its tab");
+    ok(hBody && hBody.headers && hBody.headers.cookie === "sid=1",
+       "firefox: …and the captured request headers");
+    ok(String(hCall.opts.headers.Authorization).startsWith("Bearer"),
+       "firefox: …with the token");
+    ff.handoffStatus = 404;
+    const older = await sendToBg({ type: "sendHandoff", url: "https://cdn/ff.mp4" });
+    ok(older && older.ok && older.mode === "job" && older.job.id === "J7",
+       "firefox: an engine without /handoff falls back to the old one-shot job");
+    ff.handoffStatus = 200;
+    ff.healthOk = false;
+    const stDown = await sendToBg({ type: "engineState" });
+    ok(stDown && !stDown.ok, "firefox: a dead engine reads as not running");
+    ff.healthOk = true;
+
     ff.store.engineUrl = "http://127.0.0.1:8787";
     ff.store.engineToken = "t";
     const sent = await sendToBg({ type: "sendToEngine", url: "https://cdn/ff.mp4" });
@@ -365,38 +407,153 @@ ok(((store.tabMedia || {})[8] || []).some((m) => m.url === "https://cdn/tab8"),
     ok(denied && !denied.ok && /token/i.test(denied.error || ""),
        "firefox: a 401 says the token is the problem");
 
-    // and the popup script itself, against that same environment
-    const el = () => ({
-      className: "", textContent: "", title: "", onclick: null, children: [],
+    // and the popup script itself, against that same environment (v0.39.0:
+    // a doorman — plain words, a chooser only when the page offered several
+    // streams, and ONE handoff; the quality pick happens in the app)
+    const el = (tag = "div") => ({
+      tagName: tag, hidden: false, className: "", value: "", src: "",
+      checked: false, disabled: false, name: "", type: "", onclick: null, children: [],
+      classList: {
+        _s: new Set(),
+        add(...c) { for (const x of c) this._s.add(x); },
+        remove(...c) { for (const x of c) this._s.delete(x); },
+        contains(c) { return this._s.has(c); },
+      },
       append(...kids) { this.children.push(...kids); },
       appendChild(k) { this.children.push(k); },
-      _html: "",
-      set innerHTML(v) { this._html = v; if (v === "") this.children = []; },
-      get innerHTML() { return this._html; },
+      querySelector(sel) {
+        const find = (el) => {
+          for (const c of el.children || []) {
+            if (c.tagName === "input") return c;
+            const deep = find(c);
+            if (deep) return deep;
+          }
+          return null;
+        };
+        return sel.includes("input") ? find(this) : null;
+      },
+      _text: "",
+      set textContent(v) { this._text = v; if (v === "") this.children = []; },
+      get textContent() { return this._text; },
     });
-    const nodes = { list: el(), status: el(), optsLink: el() };
+    const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
+                 "headline", "subline", "pickgroup", "streams", "send",
+                 "empty", "down", "retry", "rescan", "status", "optsLink", "ver"];
+    const mkNodes = () => {
+      const nodes = {};
+      for (const id of ids) nodes[id] = el();
+      // mirrors popup.html: these start hidden and the script unhides them
+      for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon"]) {
+        nodes[id].hidden = true;
+      }
+      return nodes;
+    };
+    const installDom = (nodes) => {
+      globalThis.document = {
+        getElementById: (id) => {
+          if (!ids.includes(id)) {
+            failures.push("firefox: the popup asked for an id popup.html lacks (" + id + ")");
+          }
+          return nodes[id] || null;
+        },
+        createElement: (t) => el(t),
+        querySelector: (sel) => {
+          const m = /#([\w-]+)\s+input/.exec(sel);
+          const inputs = [];
+          const collect = (el) => {
+            for (const c of el.children || []) {
+              if (c.tagName === "input") inputs.push(c);
+              collect(c);
+            }
+          };
+          if (m && nodes[m[1]]) collect(nodes[m[1]]);
+          return sel.includes(":checked")
+            ? (inputs.find((i) => i.checked) || null)
+            : (inputs[0] || null);
+        },
+      };
+      return nodes;
+    };
     let optsOpened = false;
     browserStub.runtime.openOptionsPage = () => (optsOpened = true);
-    globalThis.document = {
-      getElementById: (id) => nodes[id] || null,
-      createElement: () => el(),
-    };
     ff.jobsStatus = 200;
+
+    // — one find: the plain flow —
+    let nodes = installDom(mkNodes());
     try { new Function(popupSrc)(); }
     catch (e) {
       failures.push("firefox: the popup script must load without throwing (" + e + ")");
     }
     await settle();
     await settle();
-    ok(nodes.list.children.length === 1, "firefox: the popup renders the found media");
-    const rowBtn = nodes.list.children[0] && nodes.list.children[0].children[2];
-    ok(rowBtn && rowBtn.textContent === "Download with suravidl",
-       "firefox: …with its download button");
-    if (rowBtn) {
-      await rowBtn.onclick();
-      ok(/^✓ sent to engine \(job J7\)$/.test(nodes.status.textContent),
-         "firefox: clicking it hands off and reports the job");
+    ok(nodes.found.hidden === false && nodes.down.hidden === true,
+       "firefox: with the engine up, the popup shows the found card");
+    ok(nodes.engine.className.includes("ok") &&
+       nodes.engineText.textContent === "engine ready",
+       "firefox: the engine chip says ready");
+    ok(nodes.headline.textContent === "Video found on this page",
+       "firefox: one find reads as one video, in plain words");
+    ok(nodes.pickgroup.hidden === true, "firefox: no chooser is forced for a single stream");
+    await nodes.send.onclick();
+    const pCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(pCall && JSON.parse(pCall.opts.body).url === "https://cdn/ff.mp4",
+       "firefox: the button hands the find to the engine");
+    ok(/✓ Sent — choose the quality in suravidl\./.test(nodes.status.textContent),
+       "firefox: and says where the quality gets chosen");
+    ok(nodes.send.disabled === true, "firefox: the handoff cannot be sent twice");
+
+    // — two finds: the chooser appears, and the picked one is what goes —
+    ff.listeners.beforeRequest[0]({ tabId: 7, type: "media", url: "https://cdn/ff2.mp4" });
+    await settle();
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
+    await settle();
+    await settle();
+    ok(nodes.headline.textContent === "2 streams found on this page",
+       "firefox: two finds read as two streams");
+    ok(nodes.pickgroup.hidden === false && nodes.streams.children.length === 2,
+       "firefox: …and offer a chooser");
+    const rows = nodes.streams.children;
+    ok(rows[0].children[0].checked === true,
+       "firefox: the first stream is pre-asked for");
+    ok(rows[1].children[1].textContent === "Stream 2",
+       "firefox: repeated kinds get ordinals, not URLs");
+    rows[0].children[0].checked = false;
+    rows[1].children[0].checked = true;
+    await nodes.send.onclick();
+    const p2 = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(JSON.parse(p2.opts.body).url === "https://cdn/ff2.mp4",
+       "firefox: the chosen stream is the one handed over");
+
+    // — engine down: one thing to fix, not a list you cannot send —
+    ff.healthOk = false;
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.down.hidden === false && nodes.found.hidden === true,
+       "firefox: a dead engine shows exactly one thing to fix");
+    ff.healthOk = true;
+
+    // — nothing playing: the plate offers its own way out —
+    ff.store.tabMedia = {};
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.empty.hidden === false && nodes.found.hidden === true,
+       "firefox: an empty page shows the nothing-playing plate");
+    ok(nodes.rescan !== null, "firefox: …with its Check again button");
+
     nodes.optsLink.onclick({ preventDefault() {} });
     ok(optsOpened, "firefox: the options link opens the options page");
   }
