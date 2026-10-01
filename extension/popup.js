@@ -1,6 +1,14 @@
 const listEl = document.getElementById("list");
 const statusEl = document.getElementById("status");
 
+// Firefox's `chrome` namespace is callback-only: `chrome.tabs.query(...)` and
+// `chrome.runtime.sendMessage(...)` return undefined there without a callback
+// (measured on Firefox 157), so `await` on them reads nothing and this popup
+// dead-ends before it renders. The promise-returning namespace in Firefox is
+// `browser`; Chrome has no `browser` and its `chrome.*` returns promises. Ask
+// whichever answers (v0.5.3).
+const api = globalThis.browser || chrome;
+
 // The engine sorts the finds into shape (playlist / fragment / plain media) and
 // says which fragments belong to a playlist that is already in the list. No
 // answer — engine not up, token not set — means show everything: a shell never
@@ -38,7 +46,7 @@ function render(items, ranking) {
     btn.onclick = async () => {
       statusEl.textContent = "sending…";
       statusEl.className = "";
-      const res = await chrome.runtime.sendMessage({ type: "sendToEngine", url: m.url });
+      const res = await api.runtime.sendMessage({ type: "sendToEngine", url: m.url });
       if (res && res.ok) {
         statusEl.textContent = "✓ sent to engine (job " + res.job.id + ")";
         statusEl.className = "ok";
@@ -59,14 +67,23 @@ function render(items, ranking) {
   }
 }
 
+// The door to the engine address + token, right where a failure sends you.
+const opts = document.getElementById("optsLink");
+if (opts) {
+  opts.onclick = (e) => {
+    e.preventDefault();
+    api.runtime.openOptionsPage();
+  };
+}
+
 (async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await api.tabs.query({ active: true, currentWindow: true });
   if (!tab) return render([]);
-  const res = await chrome.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
+  const res = await api.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
   const items = (res && res.items) || [];
   let ranking = null;
   try {
-    ranking = await chrome.runtime.sendMessage({ type: "rank", items });
+    ranking = await api.runtime.sendMessage({ type: "rank", items });
   } catch (e) {
     /* the engine is not answering — show everything */
   }

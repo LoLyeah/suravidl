@@ -20,6 +20,13 @@ const HEADER_KEEP = 100;
 const PENDING_KEEP = 200;
 const action = chrome.action || chrome.browserAction; // MV3 vs Firefox MV2
 
+// Firefox's `chrome` namespace is a callback-only shim: called without a
+// callback, `chrome.storage.local.get(...)` returns undefined there, not a
+// promise, so every `await` on it would read nothing (measured on Firefox
+// 157 — the `browser` namespace returns promises, and Chrome's `chrome.*`
+// does too; ask whichever answers, v0.5.3).
+const api = globalThis.browser || chrome;
+
 function buildRe(ext) {
   return new RegExp("\\.(" + ext.join("|") + ")(\\?|$)", "i");
 }
@@ -136,6 +143,14 @@ chrome.webRequest.onBeforeRequest.addListener(
   { urls: ["<all_urls>"] }
 );
 
+// Chrome hides Cookie/Referer/Origin from listeners unless the spec asks for
+// `extraHeaders`; Firefox refuses that exact value — it throws "Invalid
+// enumeration value" while the script is still wiring listeners, and every
+// listener declared after it (the popup's message port included) would never
+// exist. Ask only where the constant says the value is real (v0.5.3).
+const EXTRA_HEADERS = (chrome.webRequest.OnBeforeSendHeadersOptions || {})
+  .EXTRA_HEADERS ? ["extraHeaders"] : [];
+
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
     if (details.tabId < 0) return;
@@ -154,7 +169,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     }
   },
   { urls: ["<all_urls>"] },
-  ["requestHeaders", "extraHeaders"]
+  ["requestHeaders"].concat(EXTRA_HEADERS)
 );
 
 // The response decides when the name said nothing: a stream served as video/*
@@ -219,7 +234,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // phone hide the same fragments for the same reason. No answer (engine down) →
 // show everything: never hide something on a guess.
 async function rankWithEngine(items) {
-  const stored = await chrome.storage.local.get({
+  const stored = await api.storage.local.get({
     engineUrl: "http://127.0.0.1:8787",
     engineToken: "",
   });
@@ -240,7 +255,7 @@ async function rankWithEngine(items) {
 }
 
 async function sendToEngine(url) {
-  const stored = await chrome.storage.local.get({
+  const stored = await api.storage.local.get({
     engineUrl: "http://127.0.0.1:8787",
     engineToken: "",
     reqHeaders: {},
@@ -257,7 +272,13 @@ async function sendToEngine(url) {
       body: JSON.stringify({ url, headers: captured }),
     });
   } catch (e) {
-    return { ok: false, error: "engine unreachable: " + e };
+    return { ok: false, error: "cannot reach the engine at " + stored.engineUrl +
+             " — is the suravidl app open? (" + e + ")" };
+  }
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, error: "the engine refused the token (" + res.status +
+             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             "into the extension's Options (the link below)" };
   }
   if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
   return { ok: true, job: await res.json() };

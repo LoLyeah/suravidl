@@ -1,8 +1,9 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** submitted 2026-09-26 — `suravidl 0.5.2` is in review. The version's
-own page (where the review state shows):
-<https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/6516441>
+**Status:** `suravidl 0.5.2` was reviewed and is on the listing. `0.5.3` — the
+fix for the add-on doing nothing on Firefox — was submitted 2026-10-01. The
+review state of every version lives on the Developer Hub:
+<https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>
 
 The Firefox build is Manifest V2, which is fine: Mozilla still supports MV2
 alongside MV3 and has said so repeatedly (their Add-ons Policies update of June
@@ -83,8 +84,10 @@ Watching the process:
 
 Every later version goes through the same path: bump the version in **both**
 `extension/manifest.json` and `extension/firefox/manifest.json` (a test enforces
-that they match), then tag. AMO requires a version higher than the one already
-published, so the next release is enough — no manual re-listing.
+that they match), then tag — or run the `amo` workflow by hand (Actions → amo →
+Run workflow) to submit without cutting a release. AMO requires a version higher
+than the one already published, so the next release is enough — no manual
+re-listing.
 
 ## What is in the submission
 

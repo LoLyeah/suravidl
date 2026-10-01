@@ -1458,3 +1458,26 @@ Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
     hidden, and Settings → Appearance shows a quiet note naming whichever
     switch is in force and where to change it. Suite 695 → 710;
     versionCode 72.
+
+- **Extension 0.5.3 — the Firefox that never worked.** The 0.5.2 build AMO
+    approved did nothing on Firefox, and the cause was measurable: the
+    background script registered its header listener with the Chrome-only
+    `extraHeaders` spec value, and Firefox refuses that value — "Invalid
+    enumeration value" — by *throwing at the call site, mid-load*. Every
+    listener declared after it (the popup's message port included) never
+    existed; the popup sat on "loading…" forever. Chrome never noticed — it
+    accepts the flag (and needs it to see Cookie/Referer). A second, quieter
+    bug sat behind it: Firefox's `chrome.*` namespace is callback-only —
+    tabs.query, sendMessage and storage.local.get return *undefined* without a
+    callback, not a promise — so the popup's awaited queries and the
+    background's awaited storage reads never saw an answer. The promise
+    namespace is `browser`, and Chrome's `chrome.*` returns promises; both
+    now ask `globalThis.browser || chrome`. Reproduced and fixed against real
+    Firefox 157 (probe extension logging every answer to a local HTTP
+    endpoint — the old-headless rig cannot host Firefox): before,
+    background.js died at line 146 and the popup never left "loading…";
+    after, popup → handoff → engine → completed download, UA and referer
+    included. The Node harness grew a Firefox flavor shaped by those
+    measurements — it fails on the shipped 0.5.2 source and passes on the
+    fix, and now exercises the popup too. The popup gained its Options link
+    (address + token) and the failure texts say where the token goes.
