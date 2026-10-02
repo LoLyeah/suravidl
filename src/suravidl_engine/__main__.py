@@ -350,14 +350,26 @@ def _install_material(window, AppKit, Foundation) -> bool:
         if glass_cls is None:
             glass_cls = AppKit.NSVisualEffectView
         material = glass_cls.alloc().init()
-        material.setFrame_(content.bounds())
         if glass_cls is AppKit.NSVisualEffectView:
             material.setMaterial_(
                 AppKit.NSVisualEffectMaterialUnderWindowBackground)
             material.setBlendingMode_(
                 AppKit.NSVisualEffectBlendingModeBehindWindow)
             material.setState_(AppKit.NSVisualEffectStateActive)
-        content.addSubview_positioned_relativeTo_(
+        # The material must be a SIBLING of the webview, never a child:
+        # pywebview makes the WKWebView the contentView, so `content` can BE
+        # the webview — addSubview(below: self) degenerates and the glass
+        # covers the page (the "I can't see anything" report, v0.39.10's
+        # first-ever real insert). Host it in the webview's own superview.
+        host = None
+        try:
+            host = webview_view.superview()
+        except Exception:  # noqa: BLE001 - no parent: nothing to host in
+            host = None
+        if host is None:
+            return False
+        material.setFrame_(webview_view.frame())
+        host.addSubview_positioned_relativeTo_(
             material, AppKit.NSWindowBelow, webview_view)
         try:
             # the page composites over the material instead of a white box

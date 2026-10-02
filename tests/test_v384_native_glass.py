@@ -38,12 +38,19 @@ class _FakeView:
     def __init__(self, name="NSView"):
         self.name = name
         self._subviews = []
-        self.frame = None
+        self._superview = None          # v0.39.11: the material hosts here
+        self._frame = None              # AppKit exposes frame() as a method
         self.added = []
         self.kv = {}
 
     def subviews(self):
         return list(self._subviews)
+
+    def superview(self):
+        return self._superview
+
+    def frame(self):
+        return self._frame
 
     @classmethod
     def alloc(cls):
@@ -54,7 +61,7 @@ class _FakeView:
         return self
 
     def setFrame_(self, frame):
-        self.frame = frame
+        self._frame = frame
 
     def bounds(self):
         return (0, 0, 100, 100)
@@ -114,7 +121,9 @@ def _fake_appkit(with_glass=True):
 def _fake_window_with_webview():
     content = _FakeView("NSContentView")
     inner = type("WKWebView", (_FakeView,), {})()   # the class name is what's matched
+    inner.setFrame_((0, 0, 100, 100))
     content._subviews = [inner]
+    inner._superview = content
     return _FakeWindow(_FakeNative(content)), content, inner
 
 

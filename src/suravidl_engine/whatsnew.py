@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.11",
+        "title": "The sibling",
+        "items": [
+            "The glass covered the page — everything a blur. The material now hosts in the webview's own superview, framed to it, never as a child. The probe serves a real URL so the webview gets parented and the walk answers.",
+        ],
+    },
+    {
         "version": "0.39.10",
         "title": "The walkabout",
         "items": [
@@ -82,15 +89,6 @@ ENTRIES = [
             "If another program is using suravidl's usual port when the app starts, the app now steps one port over instead of vanishing somewhere random \u2014 and the browser extension knows to look there.",
             "The Firefox extension searches those neighbouring ports before it ever says \"suravidl isn't running\" \u2014 a running app is found whether it sits on its usual port or one step beside it.",
             "Engine checks no longer depend on the exact shape of the browser's own extension address, so a browser update cannot quietly cut the popup and the app apart.",
-        ],
-    },
-    {
-        "version": "0.39.1",
-        "title": "The hush",
-        "items": [
-            "On Windows, suravidl no longer opens a console window beside the app \u2014 launches are quiet from the first double-click.",
-            "The quick black flickers go too: when yt-dlp merges a video, or a yt-dlp update runs, helper processes stay invisible.",
-            "And if something ever goes wrong at boot, the trail now lands in a log file beside the app data (app.log in the suravidl folder) instead of nowhere.",
         ],
     },
 ]

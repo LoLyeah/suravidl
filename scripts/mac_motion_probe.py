@@ -232,10 +232,31 @@ def analyse(payload: dict) -> list:
 
 
 def main() -> None:
+    import http.server
+    import threading
     import webview
 
+    # serve the page over a real URL: pywebview parents the WKWebView into
+    # the window only when a navigation finishes, and an inline html load
+    # may never trigger that path — the reason the walk kept MISSing
+    class _Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = "http://127.0.0.1:%d/" % srv.server_address[1]
+
     win = webview.create_window(
-        "suravidl motion probe", html=PAGE, width=430, height=560,
+        "suravidl motion probe", url, width=430, height=560,
         transparent=sys.platform == "darwin",
     )
     spi: dict = {"wk": None, "win": None, "occ": None}
