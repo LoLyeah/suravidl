@@ -321,17 +321,28 @@ def _find_webview_view(root):
     return None
 
 
+MATERIAL_ID = "suravidl.material"   # how a dressed window is recognized
+_MATERIAL_LOCK = threading.Lock()   # at most one insert in flight, ever
+
+
 def _find_material(root):
     """A material view this window already carries, if any — idempotency by
     observation (v0.39.11). An `id()`-keyed set was the first shape, and
     CPython reuses the ids of freed objects, so a brand-new window could be
-    mistaken for a dressed one. The hierarchy does not lie."""
-    names = ("NSGlassEffectView", "NSVisualEffectView")
+    mistaken for a dressed one. The hierarchy does not lie.
+
+    v0.39.12: the match is OUR identifier, not a class name — every titled
+    NSWindow carries an NSVisualEffectView for its titlebar, and the first
+    class-name scan mistook that vibrancy for a dressed window and skipped
+    the insert (page transparent, nothing behind it)."""
     stack = [root]
     while stack:
         view = stack.pop(0)
-        if type(view).__name__ in names:
-            return view
+        try:
+            if view.identifier() == MATERIAL_ID:
+                return view
+        except Exception:  # noqa: BLE001 - cannot answer: walk on
+            pass
         try:
             stack.extend(view.subviews())
         except Exception:  # noqa: BLE001 - dead view: keep walking
@@ -348,6 +359,14 @@ def _install_material(window, AppKit, Foundation) -> bool:
     Returns True when a layer was actually inserted (or already sits
     there). Idempotent (v0.39.10): the dressing runs on every `loaded`,
     and a second layer behind the page would just stack glass.
+
+    v0.39.12, the audit: the AppKit mutations ride the main thread (view
+    allocation and addSubview off-main is how intermittent crashes and
+    silent drawing failures start); the JS reads stay on this worker
+    thread (evaluate_js marshals to the main loop and waits, so calling it
+    on that loop would deadlock); the material tracks resizes; and it
+    carries an identifier of our own — a class-name scan had mistaken the
+    titlebar's vibrancy view for a dressed window and skipped every insert.
     """
     if AppKit is None:
         return False
@@ -362,13 +381,6 @@ def _install_material(window, AppKit, Foundation) -> bool:
         glass_cls = getattr(AppKit, "NSGlassEffectView", None)
         if glass_cls is None:
             glass_cls = AppKit.NSVisualEffectView
-        material = glass_cls.alloc().init()
-        if glass_cls is AppKit.NSVisualEffectView:
-            material.setMaterial_(
-                AppKit.NSVisualEffectMaterialUnderWindowBackground)
-            material.setBlendingMode_(
-                AppKit.NSVisualEffectBlendingModeBehindWindow)
-            material.setState_(AppKit.NSVisualEffectStateActive)
         # The material must be a SIBLING of the webview, never a child:
         # pywebview makes the WKWebView the contentView, so `content` can BE
         # the webview — addSubview(below: self) degenerates and the glass
@@ -383,24 +395,74 @@ def _install_material(window, AppKit, Foundation) -> bool:
             return False
         if _find_material(host) is not None:
             return True   # dressed already — never stack a second layer
-        material.setFrame_(webview_view.frame())
-        host.addSubview_positioned_relativeTo_(
-            material, AppKit.NSWindowBelow, webview_view)
-        try:
-            # the page composites over the material instead of a white box
-            webview_view.setValue_forKey_(False, "drawsBackground")
-        except Exception:  # noqa: BLE001 - private-ish KVC key
-            pass
+        frame = webview_view.frame()
+        theme = "dark"
         try:
             # follow the page's theme at launch (a mid-session theme switch
             # keeps the material it was born with — restart to re-sync)
             theme = window.evaluate_js(
                 'document.documentElement.dataset.theme') or "dark"
-            named = ("NSAppearanceNameDarkAqua"
-                     if theme in ("dark", "amoled") else "NSAppearanceNameAqua")
-            material.setAppearance_(AppKit.NSAppearance.appearanceNamed_(named))
-        except Exception:  # noqa: BLE001 - decoration, never fatal
+        except Exception:  # noqa: BLE001 - the default stands
             pass
+        named = ("NSAppearanceNameDarkAqua"
+                 if theme in ("dark", "amoled") else "NSAppearanceNameAqua")
+        if not _MATERIAL_LOCK.acquire(blocking=False):
+            return True   # an insert is already in flight for this window
+
+        def perform():
+            """The AppKit half, on the main thread. No JS from in here: it
+            would wait on a main loop that is running this very call."""
+            try:
+                material = glass_cls.alloc().init()
+                if glass_cls is AppKit.NSVisualEffectView:
+                    material.setMaterial_(
+                        AppKit.NSVisualEffectMaterialUnderWindowBackground)
+                    material.setBlendingMode_(
+                        AppKit.NSVisualEffectBlendingModeBehindWindow)
+                    material.setState_(AppKit.NSVisualEffectStateActive)
+                try:
+                    material.setIdentifier_(MATERIAL_ID)
+                except Exception:  # noqa: BLE001 - the lock still guards us
+                    pass
+                try:
+                    # track the webview on resize: a bare NSView is not
+                    # sizable by default, and the glass used to freeze at
+                    # boot geometry while the page resized past it
+                    material.setAutoresizingMask_(
+                        getattr(AppKit, "NSViewWidthSizable", 2)
+                        | getattr(AppKit, "NSViewHeightSizable", 16))
+                except Exception:  # noqa: BLE001 - decoration
+                    pass
+                material.setFrame_(frame)
+                host.addSubview_positioned_relativeTo_(
+                    material, AppKit.NSWindowBelow, webview_view)
+                try:
+                    # the page composites over the material instead of a
+                    # white box
+                    webview_view.setValue_forKey_(False, "drawsBackground")
+                except Exception:  # noqa: BLE001 - private-ish KVC key
+                    pass
+                try:
+                    material.setAppearance_(
+                        AppKit.NSAppearance.appearanceNamed_(named))
+                except Exception:  # noqa: BLE001 - decoration, never fatal
+                    pass
+            except Exception:  # noqa: BLE001 - unknown shells: stay plain
+                pass
+            finally:
+                try:
+                    _MATERIAL_LOCK.release()
+                except Exception:  # noqa: BLE001
+                    pass
+
+        try:
+            _on_main(perform)
+        except Exception:  # noqa: BLE001 - never leave the lock held
+            try:
+                _MATERIAL_LOCK.release()
+            except Exception:  # noqa: BLE001
+                pass
+            return False
         return True
     except Exception:  # noqa: BLE001 - unknown shells: stay plain
         return False
@@ -412,6 +474,9 @@ def _apply_native_material(window) -> bool:
         return False
     AppKit, Foundation = _import_appkit()
     return _install_material(window, AppKit, Foundation)
+
+
+_CALM_DONE = False   # the flip is a once-per-process affair (v0.39.12)
 
 
 def _calm_page_visibility(window) -> bool:
@@ -427,8 +492,16 @@ def _calm_page_visibility(window) -> bool:
     `_setWindowOcclusionDetectionEnabled: NO`. PyObjC hides underscore
     selectors, so the call goes through ctypes objc_msgSend — gated by
     respondsToSelector, darwin-only, and a throw may never take the
-    window down (the v0.39.7 law)."""
-    if sys.platform != "darwin":
+    window down (the v0.39.7 law).
+
+    v0.39.12, the audit: the flip stops FUTURE occlusion tracking, but a
+    page WebKit already marked hidden stays hidden until the window is
+    ordered in again — so the flip is followed by a nudge (orderFront_), it
+    all rides the main thread (AppKit belongs there), the objc library
+    lookup walks a ladder (find_library can answer None in frozen bundles),
+    and it happens exactly once per process."""
+    global _CALM_DONE
+    if sys.platform != "darwin" or _CALM_DONE:
         return False
     try:
         native = getattr(window, "native", None)
@@ -445,13 +518,43 @@ def _calm_page_visibility(window) -> bool:
         import ctypes.util
         import objc
 
-        lib = ctypes.cdll.LoadLibrary(ctypes.util.find_library("objc"))
+        lib = None
+        for attempt in (lambda: ctypes.CDLL(None),
+                        lambda: ctypes.cdll.LoadLibrary(
+                            ctypes.util.find_library("objc") or ""),
+                        lambda: ctypes.cdll.LoadLibrary(
+                            "/usr/lib/libobjc.A.dylib")):
+            try:
+                lib = attempt()
+                break
+            except Exception:  # noqa: BLE001 - try the next address
+                lib = None
+        if lib is None:
+            return False
         send = ctypes.CFUNCTYPE(
-            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool,
+            None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool,
         )(("objc_msgSend", lib))
         reg = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_char_p)(
             ("sel_registerName", lib))
-        send(objc.pyobjc_id(wk), reg(selector.encode()), False)
+
+        def _flip():
+            global _CALM_DONE
+            try:
+                send(objc.pyobjc_id(wk), reg(selector.encode()), False)
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                _CALM_DONE = True
+            # detection off is not retroactive: make the window re-enter
+            # its own visibility evaluation
+            nudge = getattr(native, "orderFront_", None)
+            if nudge is not None:
+                try:
+                    nudge(None)
+                except Exception:  # noqa: BLE001
+                    pass
+
+        _on_main(_flip)
         return True
     except Exception:  # noqa: BLE001 - a calm attempt never kills the shell
         return False
@@ -843,12 +946,18 @@ def main() -> None:
             except Exception:  # noqa: BLE001
                 pass
             if sys.platform == "darwin":
-                try:
-                    from AppKit import NSApplication  # noqa: PLC0415
+                def _activate():
+                    """AppKit state belongs on the main thread — this runs
+                    on an HTTP worker (the audit)."""
+                    try:
+                        from AppKit import NSApplication  # noqa: PLC0415
 
-                    NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
-                except Exception:  # noqa: BLE001 - pyobjc is best-effort
-                    pass
+                        NSApplication.sharedApplication().activateIgnoringOtherApps_(
+                            True)
+                    except Exception:  # noqa: BLE001 - pyobjc is best-effort
+                        pass
+
+                _on_main(_activate)
 
         actions = {"minimize": _minimize_action(window,
                                                 tray_ok=not args.no_tray),

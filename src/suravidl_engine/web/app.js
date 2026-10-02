@@ -208,8 +208,15 @@ function syncToastLane() {
 }
 window.addEventListener("resize", syncToastLane, { passive: true });
 // capture: the phone panels can be their own scroll containers
+// the audit: measuring the docked furniture on every scroll tick forces
+// synchronous layout per frame — the lane wakes at most once per frame
+let toastLaneRaf = 0;
 window.addEventListener("scroll", () => {
-  if ($("toasts").children.length) syncToastLane();
+  if (toastLaneRaf || !$("toasts").children.length) return;
+  toastLaneRaf = requestAnimationFrame(() => {
+    toastLaneRaf = 0;
+    syncToastLane();
+  });
 }, { passive: true, capture: true });
 
 /** msg, kind ("ok" | "bad" | "info"), and optionally:
@@ -242,10 +249,20 @@ function toast(msg, kind = "ok", opts) {
   if (!(opts && opts.sticky)) setTimeout(() => dismiss(t), 4200);
   return t;
 }
+/** The motion clock. Under prefers-reduced-motion the CSS snaps in 1ms, so
+ *  a timer that exists only to cover a transition must not outlive it (the
+ *  audit: invisible overlays kept intercepting pointer events after a
+ *  "reduced" close). */
+function motionMs(ms) {
+  try {
+    return window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms;
+  } catch (e) { return ms; }
+}
 function dismiss(t) {
   if (!t.parentNode) return;
   t.classList.add("leaving");
-  setTimeout(() => t.remove(), 260);
+  setTimeout(() => t.remove(), motionMs(260));
 }
 
 /* ---------- modal transitions ---------- */
@@ -258,7 +275,7 @@ function closeModal(m) {
   m._closeTimer = setTimeout(() => {
     m.classList.remove("closing");
     m.classList.add("hidden");
-  }, 170);
+  }, motionMs(170));
 }
 
 /* ---------- clipboard ---------- */
@@ -333,7 +350,8 @@ function applyTheme(theme, glass, accent) {
   if (changed) {
     clearTimeout(applyTheme._t);
     r.classList.add("theming");
-    applyTheme._t = setTimeout(() => r.classList.remove("theming"), 460);
+    applyTheme._t = setTimeout(() => r.classList.remove("theming"),
+                               motionMs(460));
   }
 }
 function markSwatches(values) {
@@ -1560,6 +1578,9 @@ function jobRow(j) {
   title.setAttribute("aria-expanded", "false");
   title.onclick = () => {
     title.classList.toggle("open");
+    // the row carries the state too (v0.39.12): the fold hung off :has(),
+    // which older engines drop whole — the receipt could never expand there
+    row.classList.toggle("open", title.classList.contains("open"));
     title.setAttribute("aria-expanded",
       title.classList.contains("open") ? "true" : "false");
   };
@@ -1814,6 +1835,16 @@ function updateJobRow(row, j) {
   if (row.dataset.sig !== jobSig(j)) {
     const fresh = jobRow(j);
     fresh.dataset.id = j.id;
+    // the receipt's fold survives a poll-driven rebuild (the audit): a row
+    // rebuilt while its details were open used to slam shut, unanimated
+    if (row.querySelector(".jobtitle.open")) {
+      fresh.classList.add("open");
+      const ftitle = fresh.querySelector(".jobtitle");
+      if (ftitle) {
+        ftitle.classList.add("open");
+        ftitle.setAttribute("aria-expanded", "true");
+      }
+    }
     fresh.classList.add("swap");
     row.replaceWith(fresh);
     return fresh;
@@ -3251,33 +3282,53 @@ function wireBayDoor(d) {
   const body = d.querySelector(".bay-body");
   if (!body) return;
   const seal = () => { body.style.maxHeight = ""; body.style.opacity = ""; d.open = false; };
+  // one close in flight, one listener, one fallback (the audit): the old
+  // per-click guard let a second click mid-close re-run the close AND the
+  // first listener then sealed on the new transition — a slamming door
+  let closing = false;
+  let fallback = null;
+  const disarm = () => {
+    closing = false;
+    if (fallback) { clearTimeout(fallback); fallback = null; }
+    if (body._doorEnd) {
+      body.removeEventListener("transitionend", body._doorEnd);
+      body._doorEnd = null;
+    }
+  };
+  const onEnd = (fn) => {                          // never two live listeners
+    const h = (ev) => {
+      if (ev.propertyName !== "max-height") return;
+      body.removeEventListener("transitionend", h);
+      if (body._doorEnd === h) body._doorEnd = null;
+      fn();
+    };
+    body._doorEnd = h;
+    body.addEventListener("transitionend", h);
+  };
   d.querySelector("summary").addEventListener("click", (e) => {
     e.preventDefault();                            // <details> must not snap
-    if (!d.open) {                                 // open: flip first, then play
+    const wantsOpen = !d.open || closing;          // a mid-close click reverses
+    disarm();
+    if (wantsOpen) {
+      if (!d.open) {                               // from shut: start at zero
+        body.style.maxHeight = "0px";
+        void body.offsetHeight;
+      }
       d.open = true;
-      body.style.maxHeight = "0px";
-      void body.offsetHeight;
       body.style.maxHeight = body.scrollHeight + "px";
       body.style.opacity = "1";
-      body.addEventListener("transitionend", function h(ev) {
-        if (ev.propertyName !== "max-height") return;
-        body.removeEventListener("transitionend", h);
-        if (d.open) body.style.maxHeight = "none";
-      });
+      onEnd(() => { if (d.open && !closing) body.style.maxHeight = "none"; });
       return;
     }
-    let done = false;                              // close: play the door, then flip
-    const sealOnce = () => { if (!done) { done = true; seal(); } };
+    closing = true;                                // close: play the door, then flip
     body.style.maxHeight = body.scrollHeight + "px";
     void body.offsetHeight;
     body.style.maxHeight = "0px";
     body.style.opacity = "0";
-    body.addEventListener("transitionend", function h(ev) {
-      if (ev.propertyName !== "max-height") return;
-      body.removeEventListener("transitionend", h);
-      sealOnce();
-    });
-    setTimeout(sealOnce, 500);                     // a door that can never jam
+    onEnd(() => { if (closing) { closing = false; seal(); } });
+    fallback = setTimeout(() => {                  // a door that can never jam
+      if (closing) { closing = false; seal(); }
+    }, 500);
   });
 }
 wireBayDoor($("ovBlock"));
@@ -3534,14 +3585,16 @@ function openPlayerSrc(title, src, ext) {
     node.src = src;
   }
   body.append(node);
-  $("playModal").classList.remove("hidden");
+  // the lifecycle, not a class poke (the audit): a close timer still
+  // pending from 170ms ago could execute and hide the just-opened player
+  openModal($("playModal"));
 }
 
 function closePlayer() {
   // the same exit every other dialog uses, then release the media element so a
   // hidden player cannot keep playing; closing used to hard-cut (motion review)
   closeModal($("playModal"));
-  setTimeout(() => $("playBody").replaceChildren(), 180);
+  setTimeout(() => $("playBody").replaceChildren(), motionMs(180));
 }
 
 function initPlayer() {

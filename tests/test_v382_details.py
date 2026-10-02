@@ -49,8 +49,9 @@ def test_expanded_card_shows_size_and_location():
     assert '"jdetails"' in APP
     assert "humanBytes(j.size_bytes)" in APP
     assert '"jdpath"' in APP
-    # the receipt only exists while the title is unfolded
-    assert ".job:has(.jobtitle.open) .jdetails" in CSS
+    # the receipt only exists while the title is unfolded (v0.39.12: an
+    # explicit row class — `:has()` is dropped whole by older engines)
+    assert ".job.open .jdetails" in CSS
 
 
 def test_engine_reports_real_bytes(tmp_path):

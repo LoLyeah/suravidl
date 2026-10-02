@@ -233,6 +233,10 @@ a { color: var(--accent-ink); text-decoration-color: var(--accent-line); text-un
     animation-duration: .001s !important;
     animation-iteration-count: 1 !important;
     transition-duration: .001s !important;
+    /* the delay is the other half of "stop motion": staggered rows kept
+       waiting out their animation-delay after a 1ms duration (the audit) */
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
   }
   body::before { animation: none !important; }
 }
@@ -769,7 +773,7 @@ details.card { padding: 0 18px 6px; }
    the pills beside it the collapsed title can be ~30px wide, so the open
    title takes its own wrapped line (2026-10-01 report — an open title
    without the full-width basis wrapped one letter per line). */
-.jobtop:has(.jobtitle.open) { flex-wrap: wrap; }
+.job.open .jobtop { flex-wrap: wrap; }
 .jobtitle.open {
   flex: 1 0 100%; white-space: normal; overflow: visible;
   text-overflow: clip; word-break: break-word;
@@ -806,10 +810,10 @@ details.card { padding: 0 18px 6px; }
   transition: padding-top .28s cubic-bezier(.2,.7,.3,1),
               border-top-color .28s ease;
 }
-.job:has(.jobtitle.open) .jdetails {
+.job.open .jdetails {
   grid-template-rows: 1fr; margin-top: 9px; opacity: 1; pointer-events: auto;
 }
-.job:has(.jobtitle.open) .jdetails .jdgrid {
+.job.open .jdetails .jdgrid {
   padding-top: 8px; border-top-color: var(--line-soft);
 }
 .jdetails .jdlbl { color: var(--dim); }
@@ -817,7 +821,7 @@ details.card { padding: 0 18px 6px; }
 /* the compact ellipsised path in the actions row is redundant once the
    receipt carries the full one (v0.38.5: "when expanding you don't need
    the /stor... near the open button") */
-.job:has(.jobtitle.open) .path { display: none; }
+.job.open .path { display: none; }
 .jobhint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 /* the FILED stamp — a take that landed */
 .job .stamp, .stamp {
@@ -990,9 +994,11 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 .stab.active { color: var(--text); background: var(--glass-bg); border-color: var(--accent-line); }
 .subwrap { min-height: 120px; }
 /* sub-tab swaps dress like the big ones — they were the only navigation in
-   the app with no transition at all (2026-09-30) */
+   the app with no transition at all (2026-09-30). v0.39.12: opacity-only,
+   the tabIn law — a transform here is a containing block for the panel's
+   fixed transport for the length of the fade (the audit found it) */
 .spanel-in { animation: spanelIn var(--t-fast) var(--e-out) both; }
-@keyframes spanelIn { from { opacity: 0; transform: translateY(3px); } }
+@keyframes spanelIn { from { opacity: 0; } }
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
    corners (it used to be an opaque slab that squared them off) */

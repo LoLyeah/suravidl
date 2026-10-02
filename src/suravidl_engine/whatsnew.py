@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.12",
+        "title": "The comb",
+        "items": [
+            "An external audit of the motion system, confirmed finding by finding: the glass tracks resizes, macOS calls ride the main thread, the calm flips once and nudges, and the probe reports what it actually found.",
+        ],
+    },
+    {
         "version": "0.39.11",
         "title": "The sibling",
         "items": [
@@ -80,15 +87,6 @@ ENTRIES = [
         "items": [
             "The filed-takes rail keeps its contents inside itself now. Its file line shows just the name \u2014 a Windows path used to arrive whole, slide out of the rail and bleed through the glass onto the neighbouring card's title.",
             "Long names shorten politely at the rail's edge, and nothing filed in the rail can paint outside it.",
-        ],
-    },
-    {
-        "version": "0.39.2",
-        "title": "The lantern",
-        "items": [
-            "If another program is using suravidl's usual port when the app starts, the app now steps one port over instead of vanishing somewhere random \u2014 and the browser extension knows to look there.",
-            "The Firefox extension searches those neighbouring ports before it ever says \"suravidl isn't running\" \u2014 a running app is found whether it sits on its usual port or one step beside it.",
-            "Engine checks no longer depend on the exact shape of the browser's own extension address, so a browser update cannot quietly cut the popup and the app apart.",
         ],
     },
 ]

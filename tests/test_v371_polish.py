@@ -137,7 +137,9 @@ def test_settings_subtabs_swap_with_a_transition():
     assert ".spanel-in { animation: spanelIn var(--t-fast) var(--e-out) both; }" \
         in CSS
     blk = _block("@keyframes spanelIn")
-    assert "opacity" in blk and "translateY(3px)" in blk
+    # v0.39.12: opacity-only — a transform here re-anchors the panel's fixed
+    # transport for the length of the fade (the tabIn law, the audit found it)
+    assert "opacity" in blk and "transform" not in blk
     seg = APP.split("function showSettingsTab(")[1].split("/* ---------- the shell")[0]
     assert '"spanel-in"' in seg
     assert "offsetWidth" in seg, "rapid re-taps need the fade restarted"

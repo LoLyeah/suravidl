@@ -62,7 +62,7 @@ def test_a_tap_unfolds_the_whole_title():
     # collapse to ~30px and the text wrapped one letter per line (verified
     # live in the 393px harness) — basis 100% + a wrapping row fix that
     assert "flex: 1 0 100%" in open_blk, open_blk
-    assert ".jobtop:has(.jobtitle.open) { flex-wrap: wrap; }" in CSS
+    assert ".job.open .jobtop { flex-wrap: wrap; }" in CSS
     # the handler lives in jobRow and toggles the class
     assert "title.onclick" in JS
     assert 'title.classList.toggle("open")' in JS

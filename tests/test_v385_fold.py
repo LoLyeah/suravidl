@@ -43,7 +43,7 @@ def test_the_inner_wrapper_makes_the_rows_shrinkable():
 
 # ---------- 2. the compact path yields to the receipt ----------
 def test_the_compact_path_yields_when_the_card_is_open():
-    assert ".job:has(.jobtitle.open) .path { display: none; }" in CSS
+    assert ".job.open .path { display: none; }" in CSS
 
 
 # ---------- the fold respects the reduced-motion floor ----------
@@ -55,4 +55,4 @@ def test_reduced_motion_clamps_the_fold():
 def test_the_receipt_still_carries_size_and_location():
     assert '"jdpath"' in APP
     assert "humanBytes(j.size_bytes)" in APP
-    assert ".job:has(.jobtitle.open) .jdetails" in CSS
+    assert ".job.open .jdetails" in CSS

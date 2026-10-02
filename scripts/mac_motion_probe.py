@@ -119,8 +119,15 @@ def _find_webview_view(root):
 
 
 def _tx(sample_row):
-    """`matrix(1, 0, 0, 1, 220, 0)` -> 220.0 (the translateX), else None."""
-    m = re.search(r"matrix\(([^)]+)\)", str(sample_row[1] if len(sample_row) > 1 else ""))
+    """`matrix(1, 0, 0, 1, 220, 0)` -> 220.0 (the translateX), else None.
+
+    `"none"` is the identity: WebKit reports an at-rest (or never-started)
+    transform that way, and dropping those samples made a transition frozen
+    at its origin read as "not measured" instead of stuck (the audit)."""
+    val = str(sample_row[1] if len(sample_row) > 1 else "").strip()
+    if val == "none":
+        return 0.0
+    m = re.search(r"matrix\(([^)]+)\)", val)
     if not m:
         return None
     parts = [p.strip() for p in m.group(1).split(",")]
@@ -213,17 +220,22 @@ def analyse(payload: dict) -> list:
                         % (samples[flip][0] if len(samples[flip]) > 0 else 0)))
 
     verdict = "FROZEN"
-    if moved and "animating" in moved and not hidden:
+    animated = bool(moved and "animating" in moved)
+    if animated and not (vis_seq and n_hidden == len(vis_seq)):
+        # a transition that stepped through its values IS the healthy shape,
+        # even when the document was born hidden — the probe's own runs kept
+        # crying "the transition got skipped" over one that advanced 0->220
+        # (the audit: animation evidence outranks the load-transient hidden)
         verdict = "animating"
-    elif vis_seq and vis_seq[0] == "hidden" and n_vis:
-        # the probe's own first run (2026-10-02): page born hidden, later
-        # samples visible, transition already skipped — boot-window shape
+    elif (vis_seq and vis_seq[0] == "hidden" and n_vis and not animated):
+        # born hidden, flipped visible, transition never stepped: the
+        # boot-window shape (the probe's own first run, 2026-10-02)
         verdict = ("hidden at load only — the boot window was born unseen and "
                    "the load-time transition got skipped; re-run against the "
                    "running app to check the steady state")
     elif vis_seq and n_hidden == len(vis_seq):
         verdict = "FROZEN — persistently hidden (the occlusion lead confirmed)"
-    elif hidden and (moved is None or "animating" not in moved):
+    elif hidden and not animated:
         verdict = "FROZEN — WebKit thinks the page is hidden (the occlusion lead)"
     elif moved and "FROZEN" in moved and not hidden:
         verdict = "frozen while visible — not the occlusion lead; paste this back"
@@ -259,7 +271,9 @@ def main() -> None:
         "suravidl motion probe", url, width=430, height=560,
         transparent=sys.platform == "darwin",
     )
-    spi: dict = {"wk": None, "win": None, "occ": None}
+    # the keys are the ones analyse() reads — a "wk"/"spiWk" split
+    # made every run print "walk: MISS" and "?" regardless (the audit)
+    spi: dict = {"spiWk": None, "spiWin": None, "occ": None}
 
     def run() -> None:
         time.sleep(1.2)
@@ -283,11 +297,11 @@ def main() -> None:
                     time.sleep(0.5)
                 spi["views"] = views[:5]
                 if wk is not None and wk.respondsToSelector_(SPI_WK):
-                    spi["wk"] = True
+                    spi["spiWk"] = True
                 elif wk is not None:
-                    spi["wk"] = False
+                    spi["spiWk"] = False
                 if native.respondsToSelector_(SPI_WIN):
-                    spi["win"] = SPI_WIN
+                    spi["spiWin"] = SPI_WIN
         except Exception as err:  # noqa: BLE001 - the probe never dies angry
             spi["err"] = repr(err)
         time.sleep(3.2)

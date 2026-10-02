@@ -40,6 +40,8 @@ class _FakeView:
         self._subviews = []
         self._superview = None          # v0.39.11: the material hosts here
         self._frame = None              # AppKit exposes frame() as a method
+        self._ident = None              # v0.39.12: how the material is found
+        self.autoresizing = None
         self.added = []
         self.kv = {}
 
@@ -62,6 +64,15 @@ class _FakeView:
 
     def setFrame_(self, frame):
         self._frame = frame
+
+    def identifier(self):
+        return self._ident
+
+    def setIdentifier_(self, ident):
+        self._ident = ident
+
+    def setAutoresizingMask_(self, mask):
+        self.autoresizing = mask
 
     def bounds(self):
         return (0, 0, 100, 100)
