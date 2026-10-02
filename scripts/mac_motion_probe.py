@@ -82,13 +82,39 @@ def _find_webview_view(root):
         wk = objc.lookUpClass("WKWebView")
     except Exception:  # noqa: BLE001 - no bridge: the name check decides
         pass
-    stack = [root]
-    while stack:
-        view = stack.pop(0)
-        if (wk is not None and view.isKindOfClass_(wk)) or (
-                type(view).__name__ == "WKWebView"):
+
+    def _match(view):
+        return (wk is not None and view.isKindOfClass_(wk)) or (
+            type(view).__name__ == "WKWebView")
+
+    def _bfs(node):
+        stack = [node]
+        while stack:
+            view = stack.pop(0)
+            if view is not None and _match(view):
+                return view
+            try:
+                stack.extend(view.subviews())
+            except Exception:  # noqa: BLE001 - dead view: keep walking
+                pass
+        return None
+
+    view = _bfs(root)
+    if view is not None:
+        return view
+    # climb (v0.39.10): some shells keep the webview above the contentView
+    node, hops = root, 0
+    while hops < 3:
+        try:
+            node = node.superview()
+        except Exception:  # noqa: BLE001 - no parent: the walk is done
+            return None
+        if node is None:
+            return None
+        hops += 1
+        view = _bfs(node)
+        if view is not None:
             return view
-        stack.extend(view.subviews())
     return None
 
 
@@ -159,6 +185,11 @@ def analyse(payload: dict) -> list:
                      % ("VISIBLE" if occ & OCCLUSION_VISIBLE else "NOT VISIBLE",
                         occ, "on" if occ & OCCLUSION_VISIBLE else "OFF"))
     wk = payload.get("spiWk")
+    lines.append("webview walk: %s%s"
+                 % ("found" if wk is not None else "MISS",
+                    ("" if not payload.get("views")
+                     else " — views at contentView: "
+                     + ", ".join(payload.get("views")))))
     lines.append("WKWebView %s available: %s  (the candidate fix)"
                  % (SPI_WK, "YES" if wk else "no" if wk is False else "?"))
     if payload.get("spiWin"):
@@ -215,7 +246,21 @@ def main() -> None:
             native = getattr(win, "native", None)
             if native is not None:
                 spi["occ"] = int(native.occlusionState())
-                wk = _find_webview_view(native.contentView())
+                # pywebview parents the webview at first-load, not at
+                # GUI-start — walk with a retry until it shows up (v0.39.10)
+                views: list = []
+                for attempt in range(8):   # ~4s of retry
+                    wk = _find_webview_view(native.contentView())
+                    if wk is not None:
+                        break
+                    try:
+                        content = native.contentView()
+                        views = [type(content).__name__] + [
+                            type(v).__name__ for v in content.subviews()]
+                    except Exception:  # noqa: BLE001 - evidence only
+                        views = []
+                    time.sleep(0.5)
+                spi["views"] = views[:5]
                 if wk is not None and wk.respondsToSelector_(SPI_WK):
                     spi["wk"] = True
                 elif wk is not None:

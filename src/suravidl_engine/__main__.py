@@ -285,14 +285,43 @@ def _find_webview_view(root):
         wk = objc.lookUpClass("WKWebView")
     except Exception:  # noqa: BLE001 - no bridge: the name check decides
         pass
-    stack = [root]
-    while stack:
-        view = stack.pop(0)
-        if (wk is not None and view.isKindOfClass_(wk)) or (
-                type(view).__name__ == "WKWebView"):
+
+    def _match(view):
+        return (wk is not None and view.isKindOfClass_(wk)) or (
+            type(view).__name__ == "WKWebView")
+
+    def _bfs(node):
+        stack = [node]
+        while stack:
+            view = stack.pop(0)
+            if view is not None and _match(view):
+                return view
+            try:
+                stack.extend(view.subviews())
+            except Exception:  # noqa: BLE001 - dead view: keep walking
+                pass
+        return None
+
+    view = _bfs(root)
+    if view is not None:
+        return view
+    # climb (v0.39.10): some shells keep the webview above the contentView
+    node, hops = root, 0
+    while hops < 3:
+        try:
+            node = node.superview()
+        except Exception:  # noqa: BLE001 - no parent: the walk is done
+            return None
+        if node is None:
+            return None
+        hops += 1
+        view = _bfs(node)
+        if view is not None:
             return view
-        stack.extend(view.subviews())
     return None
+
+
+_ALREADY_DRESSED: set = set()   # id(native NSWindow) that already got a material
 
 
 def _install_material(window, AppKit, Foundation) -> bool:
@@ -301,7 +330,9 @@ def _install_material(window, AppKit, Foundation) -> bool:
     NSGlassEffectView is Apple's Liquid Glass material (macOS 26+). Older
     systems get the long-established NSVisualEffectView vibrancy in
     behind-window mode — the material the UI's 'frosted' theme imitates.
-    Returns True when a layer was actually inserted.
+    Returns True when a layer was actually inserted. Idempotent (v0.39.10):
+    the dressing runs on every `loaded`, and a second layer behind the page
+    would just stack glass.
     """
     if AppKit is None:
         return False
@@ -309,6 +340,8 @@ def _install_material(window, AppKit, Foundation) -> bool:
     if native is None:
         return False
     try:
+        if id(native) in _ALREADY_DRESSED:
+            return True
         content = native.contentView()
         webview_view = _find_webview_view(content)
         if webview_view is None:
@@ -341,6 +374,7 @@ def _install_material(window, AppKit, Foundation) -> bool:
             material.setAppearance_(AppKit.NSAppearance.appearanceNamed_(named))
         except Exception:  # noqa: BLE001 - decoration, never fatal
             pass
+        _ALREADY_DRESSED.add(id(native))
         return True
     except Exception:  # noqa: BLE001 - unknown shells: stay plain
         return False
@@ -397,14 +431,34 @@ def _calm_page_visibility(window) -> bool:
         return False
 
 
-def _native_glass_ready(window):
-    """webview.start callback: window.native exists only after the GUI is up."""
+def _dress(window) -> None:
+    """Calm + material, (re)applied whenever the page lands (v0.39.10).
+
+    pywebview parents the WKWebView into the window only when the FIRST
+    navigation finishes (`webView_didFinishNavigation_` ->
+    `setContentView_`), so dressing at GUI-start walked an empty hierarchy
+    and both the calm and the glass silently no-op'd — the walkabout the
+    mac probe caught. The `loaded` event is the moment the view exists;
+    it can fire again (reload), so every step is idempotent."""
     try:
         _calm_page_visibility(window)
         if _apply_native_material(window):
             # the body steps aside so the native material shows through
             window.evaluate_js(
                 'document.documentElement.dataset.host = "darwin-glass"; true')
+    except Exception:  # noqa: BLE001 - the plain window still works
+        pass
+
+
+def _native_glass_ready(window) -> None:
+    """webview.start callback: window.native exists only after the GUI is up."""
+    try:
+        # the webview is parented at first-load, not at GUI-start (v0.39.10);
+        # some shells (and the test fixtures) carry no events object at all
+        events = getattr(window, "events", None)
+        if events is not None:
+            events.loaded += lambda *_: _dress(window)
+        _dress(window)   # and once now, in case the page is already in
     except Exception:  # noqa: BLE001 - the plain window still works
         pass
 

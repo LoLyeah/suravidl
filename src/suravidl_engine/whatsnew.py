@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.10",
+        "title": "The walkabout",
+        "items": [
+            "The dressing was happening before the webview even existed in the window (pywebview parents it at first load), so the calm and the native glass silently never ran on macOS. They now wait for the page to land.",
+        ],
+    },
+    {
         "version": "0.39.9",
         "title": "The calm",
         "items": [
@@ -84,16 +91,6 @@ ENTRIES = [
             "On Windows, suravidl no longer opens a console window beside the app \u2014 launches are quiet from the first double-click.",
             "The quick black flickers go too: when yt-dlp merges a video, or a yt-dlp update runs, helper processes stay invisible.",
             "And if something ever goes wrong at boot, the trail now lands in a log file beside the app data (app.log in the suravidl folder) instead of nowhere.",
-        ],
-    },
-    {
-        "version": "0.39.0",
-        "title": "The doorman",
-        "items": [
-            "The extension got a front door: it names what a page is playing in plain words, and one button hands it to suravidl \u2014 the format list opens in the app, ready for you to pick the quality.",
-            "A page that offers several streams gets a quiet choice first (playlist or video) \u2014 not a wall of links. The extension stays a doorman; the work stays in the engine.",
-            "For this the engine catches a browser-handed stream: it reads the link itself, with the page's request details, and keeps those details engine-side \u2014 reads show the video, never the credentials.",
-            "When a handoff arrives, the suravidl window comes to the front \u2014 so the quality picker is already where you are looking.",
         ],
     },
 ]
