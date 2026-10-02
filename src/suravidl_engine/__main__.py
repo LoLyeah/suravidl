@@ -271,11 +271,25 @@ def _import_appkit():
 
 
 def _find_webview_view(root):
-    """Depth-first: the WKWebView pywebview wrapped (its own container first)."""
+    """Depth-first: the WKWebView pywebview wrapped (its own container first).
+
+    pywebview wraps WKWebView in a `WebKitHost` subclass (v6.2.1), so the
+    name check alone never matched and the native material silently never
+    inserted (caught by the mac motion probe, v0.39.9). Match the class
+    itself — isKindOfClass covers every wrapper — and keep the name check
+    as the fallback for the odd shell where the bridge can't look it up."""
+    wk = None
+    try:
+        import objc
+
+        wk = objc.lookUpClass("WKWebView")
+    except Exception:  # noqa: BLE001 - no bridge: the name check decides
+        pass
     stack = [root]
     while stack:
         view = stack.pop(0)
-        if type(view).__name__ == "WKWebView":
+        if (wk is not None and view.isKindOfClass_(wk)) or (
+                type(view).__name__ == "WKWebView"):
             return view
         stack.extend(view.subviews())
     return None
@@ -340,9 +354,53 @@ def _apply_native_material(window) -> bool:
     return _install_material(window, AppKit, Foundation)
 
 
+def _calm_page_visibility(window) -> bool:
+    """macOS only, v0.39.9 "the calm": tell WKWebView to stop deciding the
+    view is hidden.
+
+    The mac motion probe caught it: the app's page reports
+    `document.visibilityState === 'hidden'` while the OS says the window is
+    VISIBLE and rAF still ticks — and WebKit skips CSS transitions in
+    hidden documents, so every animation jumps to its end state (the v0.38.7
+    "no animation" report). The field-proven cure (the Sonoma screensaver
+    fix, liquidx/webviewscreensaver) is the WKWebView SPI
+    `_setWindowOcclusionDetectionEnabled: NO`. PyObjC hides underscore
+    selectors, so the call goes through ctypes objc_msgSend — gated by
+    respondsToSelector, darwin-only, and a throw may never take the
+    window down (the v0.39.7 law)."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        native = getattr(window, "native", None)
+        if native is None:
+            return False
+        content = native.contentView()
+        wk = _find_webview_view(content)
+        if wk is None:
+            return False
+        selector = "_setWindowOcclusionDetectionEnabled:"
+        if not wk.respondsToSelector_(selector):
+            return False
+        import ctypes
+        import ctypes.util
+        import objc
+
+        lib = ctypes.cdll.LoadLibrary(ctypes.util.find_library("objc"))
+        send = ctypes.CFUNCTYPE(
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_bool,
+        )(("objc_msgSend", lib))
+        reg = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_char_p)(
+            ("sel_registerName", lib))
+        send(objc.pyobjc_id(wk), reg(selector.encode()), False)
+        return True
+    except Exception:  # noqa: BLE001 - a calm attempt never kills the shell
+        return False
+
+
 def _native_glass_ready(window):
     """webview.start callback: window.native exists only after the GUI is up."""
     try:
+        _calm_page_visibility(window)
         if _apply_native_material(window):
             # the body steps aside so the native material shows through
             window.evaluate_js(

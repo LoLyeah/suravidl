@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.9",
+        "title": "The calm",
+        "items": [
+            "The shell stops flinching at its own window: WKWebView's occlusion detection goes off, so the page is no longer born hidden and CSS animations play on macOS. Also fixed: the native glass never actually inserted.",
+        ],
+    },
+    {
         "version": "0.39.8",
         "title": "The truce",
         "items": [
@@ -87,15 +94,6 @@ ENTRIES = [
             "A page that offers several streams gets a quiet choice first (playlist or video) \u2014 not a wall of links. The extension stays a doorman; the work stays in the engine.",
             "For this the engine catches a browser-handed stream: it reads the link itself, with the page's request details, and keeps those details engine-side \u2014 reads show the video, never the credentials.",
             "When a handoff arrives, the suravidl window comes to the front \u2014 so the quality picker is already where you are looking.",
-        ],
-    },
-    {
-        "version": "0.38.8",
-        "title": "The trust bundle",
-        "items": [
-            "Update checks work on macOS again: a packaged Mac app was asking the system for a list of trusted certificates that packaged apps never get — suravidl now brings its own, so Check now answers on the first try.",
-            "The same repair reaches the link inspector \u2014 scanned video links on https verify properly on every platform.",
-            "If a certificate check ever fails again, the update row explains it in plain words and opens the releases page for you.",
         ],
     },
 ]

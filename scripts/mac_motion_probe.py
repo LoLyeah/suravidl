@@ -38,15 +38,20 @@ html,body{margin:0;background:transparent;font:13px -apple-system,Helvetica,sans
 <script>
 const P = window.__probe = {
   visibility: document.visibilityState, hidden: document.hidden,
-  lateVisibility: null, raf: [], timers: [], samples: [],
+  raf: [], timers: [], samples: [],
 };
 const box = document.getElementById('box');
 const t0 = performance.now();
-requestAnimationFrame(function loop() {
-  P.raf.push(Math.round(performance.now() - t0));
-  if (performance.now() - t0 < 3000) requestAnimationFrame(loop);
+/* the before-state, before any class — the start point the transition needs */
+P.samples.push([0, getComputedStyle(box).transform, document.visibilityState]);
+requestAnimationFrame(function first() {
+  getComputedStyle(box).transform;   /* flush the before-style */
+  box.classList.add('go');           /* the transition starts on a settled frame */
+  requestAnimationFrame(function loop() {
+    P.raf.push(Math.round(performance.now() - t0));
+    if (performance.now() - t0 < 3000) requestAnimationFrame(loop);
+  });
 });
-box.classList.add('go');            /* the transition starts now */
 let n = 0;
 (function tick() {
   const t = Math.round(performance.now() - t0);
@@ -64,11 +69,24 @@ OCCLUSION_VISIBLE = 2  # NSWindowOcclusionStateVisible = 1 << 1
 
 
 def _find_webview_view(root):
-    """Depth-first for the WKWebView pywebview wrapped (same walk as the app)."""
+    """Depth-first for the WKWebView pywebview wrapped (same walk as the app).
+
+    pywebview wraps WKWebView in a `WebKitHost` subclass, so a bare name
+    check never matches (the probe's own SPI line printed `?` until this
+    fix). isKindOfClass covers the wrapper; the name check stays as the
+    fallback."""
+    wk = None
+    try:
+        import objc
+
+        wk = objc.lookUpClass("WKWebView")
+    except Exception:  # noqa: BLE001 - no bridge: the name check decides
+        pass
     stack = [root]
     while stack:
         view = stack.pop(0)
-        if type(view).__name__ == "WKWebView":
+        if (wk is not None and view.isKindOfClass_(wk)) or (
+                type(view).__name__ == "WKWebView"):
             return view
         stack.extend(view.subviews())
     return None
@@ -149,9 +167,31 @@ def analyse(payload: dict) -> list:
     if payload.get("err"):
         lines.append("native-side probe error: %s" % payload.get("err"))
 
+    samples = payload.get("samples") or []
+    vis_seq = [s[2] for s in samples if len(s) > 2]
+    n_hidden = sum(1 for v in vis_seq if v == "hidden")
+    n_vis = len(vis_seq) - n_hidden
+    if vis_seq:
+        flip = None
+        if vis_seq[0] == "hidden" and n_vis:
+            flip = vis_seq.index("visible")
+        lines.append("visibility over samples: hidden x%d, visible x%d%s"
+                     % (n_hidden, n_vis,
+                        "" if flip is None
+                        else " (flipped to visible at ~%dms)"
+                        % (samples[flip][0] if len(samples[flip]) > 0 else 0)))
+
     verdict = "FROZEN"
     if moved and "animating" in moved and not hidden:
         verdict = "animating"
+    elif vis_seq and vis_seq[0] == "hidden" and n_vis:
+        # the probe's own first run (2026-10-02): page born hidden, later
+        # samples visible, transition already skipped — boot-window shape
+        verdict = ("hidden at load only — the boot window was born unseen and "
+                   "the load-time transition got skipped; re-run against the "
+                   "running app to check the steady state")
+    elif vis_seq and n_hidden == len(vis_seq):
+        verdict = "FROZEN — persistently hidden (the occlusion lead confirmed)"
     elif hidden and (moved is None or "animating" not in moved):
         verdict = "FROZEN — WebKit thinks the page is hidden (the occlusion lead)"
     elif moved and "FROZEN" in moved and not hidden:
