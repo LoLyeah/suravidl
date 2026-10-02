@@ -65,6 +65,7 @@ class _FakeView:
 
     def addSubview_positioned_relativeTo_(self, sub, pos, rel):
         self.added.append((sub, pos, rel))
+        self._subviews.append(sub)   # real AppKit mutates the hierarchy too
 
     def setValue_forKey_(self, v, k):
         self.kv[k] = v
@@ -113,6 +114,18 @@ def test_the_material_is_a_sibling_hosted_in_the_webviews_parent():
     assert theme.added and theme.added[0][2] is inner   # below the webview
     assert not inner.added                              # NEVER inside it
     assert theme.added[0][0].frame() == (0, 0, 800, 600)  # the webview's frame
+
+
+def test_dressing_twice_stacks_nothing():
+    theme = _FakeView("NSThemeFrame")
+    inner = type("WKWebView", (_FakeView,), {})()
+    inner.setFrame_((0, 0, 800, 600))
+    inner._superview = theme
+    window = _FakeWindow(_FakeNative(inner))
+    assert engine_main._install_material(window, _fake_appkit(True), None) is True
+    assert len(theme.added) == 1
+    assert engine_main._install_material(window, _fake_appkit(True), None) is True
+    assert len(theme.added) == 1   # observed, not re-added
 
 
 def test_no_parent_means_no_material():

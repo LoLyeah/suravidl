@@ -321,7 +321,22 @@ def _find_webview_view(root):
     return None
 
 
-_ALREADY_DRESSED: set = set()   # id(native NSWindow) that already got a material
+def _find_material(root):
+    """A material view this window already carries, if any — idempotency by
+    observation (v0.39.11). An `id()`-keyed set was the first shape, and
+    CPython reuses the ids of freed objects, so a brand-new window could be
+    mistaken for a dressed one. The hierarchy does not lie."""
+    names = ("NSGlassEffectView", "NSVisualEffectView")
+    stack = [root]
+    while stack:
+        view = stack.pop(0)
+        if type(view).__name__ in names:
+            return view
+        try:
+            stack.extend(view.subviews())
+        except Exception:  # noqa: BLE001 - dead view: keep walking
+            pass
+    return None
 
 
 def _install_material(window, AppKit, Foundation) -> bool:
@@ -330,9 +345,9 @@ def _install_material(window, AppKit, Foundation) -> bool:
     NSGlassEffectView is Apple's Liquid Glass material (macOS 26+). Older
     systems get the long-established NSVisualEffectView vibrancy in
     behind-window mode — the material the UI's 'frosted' theme imitates.
-    Returns True when a layer was actually inserted. Idempotent (v0.39.10):
-    the dressing runs on every `loaded`, and a second layer behind the page
-    would just stack glass.
+    Returns True when a layer was actually inserted (or already sits
+    there). Idempotent (v0.39.10): the dressing runs on every `loaded`,
+    and a second layer behind the page would just stack glass.
     """
     if AppKit is None:
         return False
@@ -340,8 +355,6 @@ def _install_material(window, AppKit, Foundation) -> bool:
     if native is None:
         return False
     try:
-        if id(native) in _ALREADY_DRESSED:
-            return True
         content = native.contentView()
         webview_view = _find_webview_view(content)
         if webview_view is None:
@@ -368,6 +381,8 @@ def _install_material(window, AppKit, Foundation) -> bool:
             host = None
         if host is None:
             return False
+        if _find_material(host) is not None:
+            return True   # dressed already — never stack a second layer
         material.setFrame_(webview_view.frame())
         host.addSubview_positioned_relativeTo_(
             material, AppKit.NSWindowBelow, webview_view)
@@ -386,7 +401,6 @@ def _install_material(window, AppKit, Foundation) -> bool:
             material.setAppearance_(AppKit.NSAppearance.appearanceNamed_(named))
         except Exception:  # noqa: BLE001 - decoration, never fatal
             pass
-        _ALREADY_DRESSED.add(id(native))
         return True
     except Exception:  # noqa: BLE001 - unknown shells: stay plain
         return False

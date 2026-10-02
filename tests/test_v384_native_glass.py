@@ -80,6 +80,7 @@ class _FakeView:
 
     def addSubview_positioned_relativeTo_(self, sub, pos, rel):
         self.added.append((sub, pos, rel))
+        self._subviews.append(sub)   # real AppKit mutates the hierarchy too
 
     def setValue_forKey_(self, v, k):
         self.kv[k] = v

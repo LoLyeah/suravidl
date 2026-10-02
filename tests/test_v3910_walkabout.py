@@ -29,7 +29,7 @@ def test_the_dressing_runs_when_the_page_is_loaded():
 
 def test_the_material_is_idempotent():
     # loaded fires per navigation; dressing twice must not stack materials
-    assert "_ALREADY_DRESSED" in MAIN
+    assert "_find_material" in MAIN
 
 
 def test_the_walk_climbs_the_superview_chain():
