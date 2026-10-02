@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""The macOS motion probe — a one-minute check for the frozen-animation lead.
+
+The report (v0.38.7, still open): the desktop app's CSS animations don't
+play on the MacBook Air. The lead: WebKit pauses CSS transitions, rAF and
+DOM timers whenever it decides a view is not visible, and an alpha-0 /
+transparent window — exactly what the v0.38.4 macOS shell is — is known to
+report itself occluded.
+
+This probe answers it on the real hardware, without shipping a fix. It
+opens the SAME window recipe the app uses (transparent on darwin), runs a
+CSS transition, a rAF counter and a 100 ms timer chain for ~3 seconds, then
+prints a verdict block to paste back into the chat. The occlusion SPI
+(`_setWindowOcclusionDetectionEnabled:`) is checked for availability but
+never called — diagnose, don't treat.
+
+Run on the MacBook Air (no repo clone needed, pywebview is the only dep):
+
+    pip3 install pywebview   # if missing
+    python3 mac_motion_probe.py
+"""
+import json
+import re
+import sys
+import time
+
+RAF_WINDOW_MS = 3000
+
+PAGE = """<!doctype html><meta charset="utf-8">
+<style>
+html,body{margin:0;background:transparent;font:13px -apple-system,Helvetica,sans-serif;color:#e8e4da}
+#stage{padding:16px}
+#box{width:60px;height:60px;border-radius:14px;background:#7bb27a;
+     transform:translateX(0);transition:transform 1.4s linear}
+#box.go{transform:translateX(220px)}
+</style>
+<div id="stage"><div id="box"></div><p id="say">measuring…</p></div>
+<script>
+const P = window.__probe = {
+  visibility: document.visibilityState, hidden: document.hidden,
+  lateVisibility: null, raf: [], timers: [], samples: [],
+};
+const box = document.getElementById('box');
+const t0 = performance.now();
+requestAnimationFrame(function loop() {
+  P.raf.push(Math.round(performance.now() - t0));
+  if (performance.now() - t0 < 3000) requestAnimationFrame(loop);
+});
+box.classList.add('go');            /* the transition starts now */
+let n = 0;
+(function tick() {
+  const t = Math.round(performance.now() - t0);
+  P.timers.push(t);
+  P.samples.push([t, getComputedStyle(box).transform, document.visibilityState]);
+  if (++n < 34) setTimeout(tick, 100);
+  else document.getElementById('say').textContent = 'done — you can close this';
+})();
+</script>
+"""
+
+SPI_WK = "_setWindowOcclusionDetectionEnabled:"
+SPI_WIN = "_setOcclusionDetectionEnabled:"
+OCCLUSION_VISIBLE = 2  # NSWindowOcclusionStateVisible = 1 << 1
+
+
+def _find_webview_view(root):
+    """Depth-first for the WKWebView pywebview wrapped (same walk as the app)."""
+    stack = [root]
+    while stack:
+        view = stack.pop(0)
+        if type(view).__name__ == "WKWebView":
+            return view
+        stack.extend(view.subviews())
+    return None
+
+
+def _tx(sample_row):
+    """`matrix(1, 0, 0, 1, 220, 0)` -> 220.0 (the translateX), else None."""
+    m = re.search(r"matrix\(([^)]+)\)", str(sample_row[1] if len(sample_row) > 1 else ""))
+    if not m:
+        return None
+    parts = [p.strip() for p in m.group(1).split(",")]
+    if len(parts) < 6:
+        return None
+    try:
+        return float(parts[4])
+    except ValueError:
+        return None
+
+
+def analyse(payload: dict) -> list:
+    """Turn a collected payload into the paste-back verdict lines."""
+    lines = []
+    vis = payload.get("visibility")
+    late = payload.get("lateVisibility")
+    hidden = (vis == "hidden") or (late == "hidden") or any(
+        len(s) > 2 and s[2] == "hidden" for s in payload.get("samples") or [])
+    lines.append("visibility: %s -> late %s  (page hidden: %s)"
+                 % (vis, late, "YES" if hidden else "no"))
+
+    raf = [t for t in payload.get("raf") or [] if isinstance(t, (int, float))]
+    if len(raf) >= 5 and raf[-1] > raf[0]:
+        rate = (len(raf) - 1) * 1000.0 / (raf[-1] - raf[0])
+        lines.append("rAF: %d ticks ~ %.0f/s  (%s)"
+                     % (len(raf), rate, "alive" if rate >= 5 else "FROZEN"))
+    else:
+        lines.append("rAF: %d ticks in %dms  (FROZEN — loop never advanced)"
+                     % (len(raf), RAF_WINDOW_MS))
+
+    timers = [t for t in payload.get("timers") or [] if isinstance(t, (int, float))]
+    if len(timers) >= 5 and timers[-1] > timers[0]:
+        trate = (len(timers) - 1) * 1000.0 / (timers[-1] - timers[0])
+        lines.append("timers(100ms): %d fires ~ %.1f/s  (%s)"
+                     % (len(timers), trate,
+                        "alive" if trate >= 5 else "THROTTLED (the hidden-page shape)"))
+    else:
+        lines.append("timers(100ms): %d fires (THROTTLED)" % len(timers))
+
+    samples = payload.get("samples") or []
+    txs = [(_tx(s), s[0] if len(s) > 0 else None) for s in samples]
+    txs = [(x, t) for (x, t) in txs if x is not None]
+    moved = None
+    if len(txs) >= 3:
+        xs = [x for (x, _) in txs]
+        mid_pairs = [(xs[i], xs[i + 1], txs[i + 1][1]) for i in range(len(xs) - 2)]
+        stepped = any(b - a > 0.5 for (a, b, _) in mid_pairs)
+        jumped = xs[-1] - xs[0] > 1.0 and not stepped
+        stuck = abs(xs[-1] - xs[0]) <= 1.0
+        moved = ("animating — transform advanced %g -> %g" % (xs[0], xs[-1])
+                 if stepped else
+                 "FROZEN-THEN-JUMP — mid-samples stuck at %g, end at %g"
+                 % (xs[0], xs[-1]) if jumped else
+                 "STUCK — transform never left %g" % xs[0])
+    lines.append("CSS transition: %s" % (moved or "not measured"))
+
+    occ = payload.get("occ")
+    if occ is None:
+        lines.append("window occlusion state: n/a (native window unavailable)")
+    else:
+        lines.append("window occlusion state: %s (raw %s; VISIBLE bit %s)"
+                     % ("VISIBLE" if occ & OCCLUSION_VISIBLE else "NOT VISIBLE",
+                        occ, "on" if occ & OCCLUSION_VISIBLE else "OFF"))
+    wk = payload.get("spiWk")
+    lines.append("WKWebView %s available: %s  (the candidate fix)"
+                 % (SPI_WK, "YES" if wk else "no" if wk is False else "?"))
+    if payload.get("spiWin"):
+        lines.append("NSWindow-level spelling %s also answers: YES"
+                     % payload.get("spiWin"))
+    if payload.get("err"):
+        lines.append("native-side probe error: %s" % payload.get("err"))
+
+    verdict = "FROZEN"
+    if moved and "animating" in moved and not hidden:
+        verdict = "animating"
+    elif hidden and (moved is None or "animating" not in moved):
+        verdict = "FROZEN — WebKit thinks the page is hidden (the occlusion lead)"
+    elif moved and "FROZEN" in moved and not hidden:
+        verdict = "frozen while visible — not the occlusion lead; paste this back"
+    lines.append("VERDICT: %s" % verdict)
+    return lines
+
+
+def main() -> None:
+    import webview
+
+    win = webview.create_window(
+        "suravidl motion probe", html=PAGE, width=430, height=560,
+        transparent=sys.platform == "darwin",
+    )
+    spi: dict = {"wk": None, "win": None, "occ": None}
+
+    def run() -> None:
+        time.sleep(1.2)
+        try:
+            native = getattr(win, "native", None)
+            if native is not None:
+                spi["occ"] = int(native.occlusionState())
+                wk = _find_webview_view(native.contentView())
+                if wk is not None and wk.respondsToSelector_(SPI_WK):
+                    spi["wk"] = True
+                elif wk is not None:
+                    spi["wk"] = False
+                if native.respondsToSelector_(SPI_WIN):
+                    spi["win"] = SPI_WIN
+        except Exception as err:  # noqa: BLE001 - the probe never dies angry
+            spi["err"] = repr(err)
+        time.sleep(3.2)
+        raw = None
+        if win is not None:
+            raw = win.evaluate_js("JSON.stringify(window.__probe)")
+        raw = raw or "{}"
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            payload = {}
+        payload.update(spi)
+        print("")
+        print("---- paste everything below ----")
+        for line in analyse(payload):
+            print(line)
+        print("pywebview %s / python %s / %s"
+              % (getattr(webview, "__version__", "?"), sys.version.split()[0],
+                 sys.platform))
+        print("---- paste everything above ----")
+
+    try:
+        webview.start(run)
+    except Exception as err:  # noqa: BLE001 - e.g. no display on a headless box
+        print("couldn't open a window here (%r) — run this on the MacBook Air"
+              % (err,))
+        print("sys.platform =", sys.platform)
+
+
+if __name__ == "__main__":
+    main()
