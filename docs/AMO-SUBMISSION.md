@@ -1,12 +1,14 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.8` — the stream list now resets when a tab walks
-to a new page (the chooser could still offer streams from the page you had
-already left) — is submitted 2026-10-02; `0.5.7` (readable stream rows with
-a per-row raw-link door), `0.5.6` (the port-ladder fix), `0.5.5` (quick
-download) and `0.5.4` (the doorman itself) are in the queue beside it. `0.5.3` (the fix for the add-on doing nothing on
-Firefox) was reviewed and live before them. The review state of every
-version lives on the Developer Hub:
+**Status:** `suravidl 0.5.8` is **live on the store** (the stream list now
+resets when a tab walks to a new page, so the chooser can't offer streams
+from the page you already left). Verified 2026-10-02 against the public
+listing API (`api/v5/addons/addon/suravidl@fritzkier.com/` →
+`current_version.version = 0.5.8`); the reviewer approved it as a supersed-
+ing update, so `0.5.7` (readable stream rows with a per-row raw-link door),
+`0.5.6` (the port-ladder fix), `0.5.5` (quick download) and `0.5.4` (the
+doorman itself) are superseded by it rather than queued. The review state of
+every version lives on the Developer Hub:
 <https://addons.mozilla.org/en-US/developers/addon/suravidl/versions/>
 
 The Firefox build is Manifest V2, which is fine: Mozilla still supports MV2

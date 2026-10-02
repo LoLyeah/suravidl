@@ -109,21 +109,33 @@ desktop a left rail.
 ## 4. Milestones
 
 1. **M10a — cookie hardening** ✅ shipped v0.10.1
-2. **M10b — encryption & controls** — Android Keystore, delete-cookies, threat model
+2. **M10b — encryption & controls** ✅ shipped v0.14.0 — Android Keystore vault
+   (AES-256-GCM, non-exportable key), delete-cookies, threat model
+   (`docs/THREAT-MODEL.md`)
 3. **M11 — tabbed shell** ✅ shipped v0.16.0 (as the four-tab shell, together
    with the tier-2 curated groups; the settings sub-tabs were its first slice)
-4. **M12 — Tier-1 options** — in an order you pick (playlists · subtitles ·
-   audio-only · metadata embedding · templates · rate limits · proxy · archive ·
-   SponsorBlock), each with tests + docs
-5. **M13 — Advanced tab** — `/options` catalogue, curated groups, raw arguments
-6. **M14 — Android ffmpeg decision** — bundle a community ffmpeg build
-   (~+20–25 MB APK) → enables merging + conversion on Android, or keep the
-   documented gap (merge is desktop-only today) — *done in M11a: own 8.1.3
+4. **M12 — Tier-1 options** ✅ shipped v0.12.0 (rest of tier-1; the tier-1
+   table then closed in M18 with retries, playlist limit, quality picks,
+   Test cookies) — playlists · subtitles · audio-only · metadata embedding ·
+   templates · rate limits · proxy · archive · SponsorBlock, each with
+   tests + docs
+5. **M13 — Advanced tab** ✅ shipped v0.13.0 (`/options` catalogue, curated
+   groups, raw arguments; the phone-UX slice followed in v0.14.0)
+6. **M14 — Android ffmpeg decision** ✅ shipped (own 8.1.3
    build, 8.0 MB arm64; ffprobe followed in M18 at +2 MB via a read-only
-   configure*
-7. **M15 — polish** — per-job option overrides, presets, better empty states
-   — *done in M17; M18 closed the tier-1 table (retries, playlist limit,
-   quality picks, Test cookies)*
+   configure)
+7. **M15 — polish** ✅ shipped in M17; M18 closed the tier-1 table (retries,
+   playlist limit, quality picks, Test cookies)
+
+**Decisions on record — closed threads, not owed work:**
+
+- **Chrome Web Store: Firefox-only, standing.** The MV3 copy keeps building,
+  but Chrome blocks off-store `.crx` installs and the store listing was
+  deliberately skipped (2026-10-01).
+- **Public hosted downloader: postponed.** A public instance invites abuse
+  and attack surface; the engine stays self-hosted (2026-09).
+- **Queue reordering: deferred** (recorded with the v0.22 feature list below)
+  — it means replacing the one-thread-per-job model.
 
 Acceptance per milestone: TDD, full suite green, CI on 3 OS + 2 emulators
 (incl. the 16 KB Android 16 run), README + release notes updated.
