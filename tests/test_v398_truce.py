@@ -54,6 +54,14 @@ def test_the_faq_knows_the_truce():
     assert "ads allowed" in JS
 
 
-def test_whatsnew_has_the_truce():
-    assert '"version": "0.39.8"' in WHATSNEW
-    assert "The truce" in WHATSNEW
+def test_the_truce_entry_retired_cleanly():
+    # The truce shipped with 0.39.8 and was announced in its card. The
+    # rolling card keeps ten entries and retires the oldest — v0.40.4
+    # retired this one, so the announcement lives in git and the release
+    # notes now, and this pin retires WITH the entry (policy: a feature
+    # stays pinned by its living tests — the FAQ and ACTIVITY pins above;
+    # verbatim-entry pins age out with the list). All this test still
+    # guards is that the retirement left no half behind; the shape test
+    # (v32) covers the rest.
+    assert '"version": "0.39.8"' not in WHATSNEW
+    assert "The truce" not in WHATSNEW
