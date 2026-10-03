@@ -306,6 +306,13 @@ def test_the_subtab_arrival_drops_its_transform():
     assert "translateY(3px)" not in CSS
 
 
-def test_whatsnew_has_the_comb():
-    assert '"version": "0.39.12"' in WHATSNEW
-    assert "The comb" in WHATSNEW
+def test_the_comb_entry_retired_cleanly():
+    # The comb shipped with 0.39.12 and was announced in its card. The
+    # rolling card keeps ten entries and retires the oldest — v0.40.8
+    # retired this one, so the announcement lives in git and the release
+    # notes now, and this pin retires WITH the entry (policy: a feature
+    # stays pinned by its living tests — the audit pins in this file;
+    # verbatim-entry pins age out with the list). All this test still
+    # guards is that the retirement left no half behind.
+    assert '"version": "0.39.12"' not in WHATSNEW
+    assert "The comb" not in WHATSNEW

@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
 
 [project.optional-dependencies]
-dev = ["pytest", "httpx", "curl_cffi"]
+dev = ["pytest", "pytest-xdist", "httpx", "curl_cffi"]
 # browser impersonation for sites with strict bot checks (e.g. Facebook):
 #   pip install -e '.[impersonate]'
 impersonate = ["curl_cffi"]

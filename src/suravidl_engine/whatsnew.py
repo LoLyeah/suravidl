@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.8",
+        "title": "The swarm",
+        "items": [
+            "Everything the project checks now runs on all the machine's cores at once \u2014 the same careful checks in a fraction of the time, so fixes and features reach you sooner.",
+        ],
+    },
+    {
         "version": "0.40.7",
         "title": "The handful",
         "items": [
@@ -85,13 +92,6 @@ ENTRIES = [
         "items": [
             "On macOS the page no longer floats straight on the desktop: it sits on a near-opaque wash of its own room, so the wallpaper reads as a faint hint behind the glass instead of as the background.",
             "Toasts find their spot on the desktop too: the lane now measures what is really docked at the bottom — the transport, the settings Save strip — and tucks into the corner when nothing is.",
-        ],
-    },
-    {
-        "version": "0.39.12",
-        "title": "The comb",
-        "items": [
-            "An external audit of the motion system, confirmed finding by finding: the glass tracks resizes, macOS calls ride the main thread, the calm flips once and nudges, and the probe reports what it actually found.",
         ],
     },
 ]
