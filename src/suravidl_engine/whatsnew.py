@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.6",
+        "title": "The tally",
+        "items": [
+            "The queue shows outside the window: the Dock wears a count badge on macOS, Linux docks that speak the launcher protocol get one too, and other desktops carry the count in the window title.",
+            "A read that fails is silence \u2014 the badge holds its last truth rather than flashing a false zero.",
+        ],
+    },
+    {
         "version": "0.40.5",
         "title": "The fill",
         "items": [
@@ -83,13 +91,6 @@ ENTRIES = [
         "title": "The sibling",
         "items": [
             "The glass covered the page — everything a blur. The material now hosts in the webview's own superview, framed to it, never as a child. The probe serves a real URL so the webview gets parented and the walk answers.",
-        ],
-    },
-    {
-        "version": "0.39.10",
-        "title": "The walkabout",
-        "items": [
-            "The dressing was happening before the webview even existed in the window (pywebview parents it at first load), so the calm and the native glass silently never ran on macOS. They now wait for the page to land.",
         ],
     },
 ]

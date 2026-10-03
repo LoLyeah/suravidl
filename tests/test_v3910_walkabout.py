@@ -42,6 +42,13 @@ def test_the_probe_walks_late_and_reports_what_it_saw():
     assert "superview()" in PROBE
 
 
-def test_whatsnew_has_the_walkabout():
-    assert '"version": "0.39.10"' in WHATSNEW
-    assert "The walkabout" in WHATSNEW
+def test_the_walkabout_entry_retired_cleanly():
+    # The walkabout shipped with 0.39.10 and was announced in its card.
+    # The rolling card keeps ten entries and retires the oldest — v0.40.6
+    # retired this one, so the announcement lives in git and the release
+    # notes now, and this pin retires WITH the entry (policy: a feature
+    # stays pinned by its living tests — this file's dressing pins;
+    # verbatim-entry pins age out with the list). All this test still
+    # guards is that the retirement left no half behind.
+    assert '"version": "0.39.10"' not in WHATSNEW
+    assert "The walkabout" not in WHATSNEW

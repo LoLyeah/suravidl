@@ -837,6 +837,144 @@ def _start_motion_probe(window) -> None:
         pass
 
 
+# ---------- the tally (v0.40.6) ----------
+# The queue should be readable from outside the window: macOS paints the
+# Dock tile's badge label, Linux docks that speak Unity's LauncherEntry
+# protocol get a count, and everything else wears it in the window title.
+# A failed read is silence — never a crash, and never a zero: "unknown"
+# must not clear a truthful badge.
+
+_BADGE_EVERY = 2.5       # seconds between queue reads
+_BADGE = {"last": None}  # the last count we painted
+_BADGE_ENTRY = "suravidl.desktop"   # the launcher entry (the app's own id)
+
+
+def badge_text(active: int) -> str:
+    """The label: "" clears, small counts go verbatim, 100+ caps at 99+."""
+    if active <= 0:
+        return ""
+    if active > 99:
+        return "99+"
+    return str(active)
+
+
+def active_count(jobs) -> int:
+    """Going jobs only — the same three words the engine and the page use."""
+    from .jobs import ACTIVE_STATUSES
+
+    return sum(1 for j in jobs
+               if (j.get("status") or "") in ACTIVE_STATUSES)
+
+
+def title_for(active: int, base: str = "suravidl") -> str:
+    """The floor: the title says it where no badge exists."""
+    text = badge_text(active)
+    if not text:
+        return base
+    return f"{base} — {text} job" if active == 1 else f"{base} — {text} jobs"
+
+
+def read_active(base_url: str, token: str, timeout: float = 3.0):
+    """How many jobs are going, straight from the engine; None when the
+    answer is not knowable (engine busy, port gone, auth refused)."""
+    import json
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            base_url.rstrip("/") + "/jobs",
+            headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        jobs = data.get("jobs") if isinstance(data, dict) else None
+        if isinstance(jobs, list):
+            return active_count(jobs)
+    except Exception:  # noqa: BLE001 - a badge is never worth a crash
+        pass
+    return None
+
+
+def _set_dock_badge(text: str) -> bool:
+    """macOS: the Dock tile's own label; "" clears it (None to AppKit)."""
+    AppKit, _Foundation = _import_appkit()
+    if AppKit is None:
+        return False
+
+    def paint():
+        try:
+            AppKit.NSApplication.sharedApplication() \
+                .dockTile().setBadgeLabel_(text or None)
+        except Exception:  # noqa: BLE001 - a decoration may never crash us
+            pass
+
+    _on_main(paint)   # AppKit state rides the main thread
+    return True
+
+
+def _set_launcher_badge(active: int) -> bool:
+    """Linux docks that speak Unity's LauncherEntry protocol get a count;
+    everywhere else (no dbus bindings, no session bus, no dock) this
+    reports False and the title carries it instead."""
+    try:
+        import dbus  # noqa: PLC0415 - optional on every platform
+    except Exception:  # noqa: BLE001 - no bindings, no badge
+        return False
+    try:
+        bus = dbus.SessionBus()
+        launcher = dbus.Interface(
+            bus.get_object("com.canonical.Unity", "/"),
+            "com.canonical.Unity.LauncherEntry")
+        launcher.Update(_BADGE_ENTRY, {
+            "count": dbus.Int64(active),
+            "count-visible": dbus.Boolean(active > 0)})
+        return True
+    except Exception:  # noqa: BLE001 - no dock listening: title it is
+        return False
+
+
+def _apply_badge(window, active: int) -> None:
+    """Put the count where this platform keeps it; the title is the floor."""
+    text = badge_text(active)
+    try:
+        if sys.platform == "darwin" and _set_dock_badge(text):
+            return
+        if sys.platform.startswith("linux") and _set_launcher_badge(active):
+            return
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        window.title = title_for(active)
+    except Exception:  # noqa: BLE001 - the window may be gone
+        pass
+
+
+def _badge_once(window, base_url: str, token: str) -> None:
+    """One read, one re-dress — split out so a test can take one step."""
+    active = read_active(base_url, token)
+    if active is None or active == _BADGE["last"]:
+        return
+    _BADGE["last"] = active
+    _apply_badge(window, active)
+
+
+def _badge_watch(window, base_url: str, token: str) -> None:
+    while True:
+        try:
+            _badge_once(window, base_url, token)
+        except Exception:  # noqa: BLE001 - the watch never dies
+            pass
+        time.sleep(_BADGE_EVERY)
+
+
+def _start_badge_poller(window, base_url: str, token: str) -> None:
+    """Run the watch off the GUI thread: it sleeps, the app must not."""
+    try:
+        threading.Thread(target=_badge_watch, args=(window, base_url, token),
+                         daemon=True).start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _try_tray(url: str, open_downloads: Path):
     """Tray icon with Open/Quit. Returns the pystray Icon or None."""
     try:
@@ -975,6 +1113,7 @@ def main() -> None:
         def _ready():
             _native_glass_ready(window)   # runs once the GUI loop is up
             _start_motion_probe(window)   # v0.38.7: log the motion state
+            _start_badge_poller(window, url, token)   # v0.40.6: the tally
 
         try:
             webview.start(_ready)
