@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.3",
+        "title": "The wide view",
+        "items": [
+            "The phone's browser can ask for the desktop page now: a mobile site / desktop site switch sits beside the ads one \u2014 flip it, reload, and the site serves its full-width layout. Same session, same finds.",
+            "The switch remembers itself, so the next visit opens wide on its own.",
+        ],
+    },
+    {
         "version": "0.40.2",
         "title": "The sieve",
         "items": [
@@ -80,15 +88,6 @@ ENTRIES = [
         "title": "The truce",
         "items": [
             "Some pages notice their ad networks served empty and refuse to run. The phone browser now has a truce switch — “ads blocked / ads allowed” in its second row: flip and reload to let the page in.",
-        ],
-    },
-    {
-        "version": "0.39.7",
-        "title": "The bouncer",
-        "items": [
-            "The phone app\u2019s built-in browser refuses to be bounced: an off-site redirect or pop-up mid-hunt is stopped cold \u2014 the page and the find list stay put. A refused hop is named and one tap from following.",
-            "Classic ad networks no longer load at all in there \u2014 a short deny list serves them empty, which is exactly what they deserve.",
-            "The engine no longer lets a fussy notification take it down on start: the mark it wears is dress-up, so a modern Android that dressed it differently gets a graceful fallback, not a dead engine.",
         ],
     },
 ]

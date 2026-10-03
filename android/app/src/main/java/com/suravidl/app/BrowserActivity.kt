@@ -69,6 +69,8 @@ class BrowserActivity : AppCompatActivity() {
     /** The truce switch's state, mirrored from prefs (v0.39.8). */
     private var adBlock = true
     private lateinit var adsChip: android.widget.Button
+    private var desktopUA = false
+    private lateinit var desktopChip: android.widget.Button
     private val ui = Handler(Looper.getMainLooper())
     private var lastVersion = -1
     private var bg = MainActivity.BG_DARK
@@ -121,6 +123,8 @@ class BrowserActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
         adBlock = getSharedPreferences("browser", MODE_PRIVATE)
             .getBoolean("ads_blocked", true)
+        desktopUA = getSharedPreferences("browser", MODE_PRIVATE)
+            .getBoolean("desktop_ua", false)
         buildUi()
         webView.addJavascriptInterface(SniffBridge(), "SuravidlSniff")
 
@@ -237,6 +241,8 @@ class BrowserActivity : AppCompatActivity() {
         row.addView(status, LinearLayout.LayoutParams(0, WRAP, 1f))
         adsChip = chip(if (adBlock) "ads blocked" else "ads allowed") { toggleAdBlock() }
         row.addView(adsChip)
+        desktopChip = chip(if (desktopUA) "desktop site" else "mobile site") { toggleDesktopSite() }
+        row.addView(desktopChip)
         row.addView(chip("Scan") { scanAgain() })
         row.addView(chip("Clear list") {
             SniffLog.clear()
@@ -290,6 +296,9 @@ class BrowserActivity : AppCompatActivity() {
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            // v0.40.3: the desktop switch — a saved "desktop site" opens the
+            // page with the full-width face from the very first load
+            if (desktopUA) settings.userAgentString = DesktopUa.of(settings.userAgentString.orEmpty())
             setBackgroundColor(bg)
             webChromeClient = object : WebChromeClient() {
                 /**
@@ -469,6 +478,27 @@ class BrowserActivity : AppCompatActivity() {
             "ads blocked again — reload (⟳) to re-block"
         else
             "ads allowed — reload (⟳) to let the page load fully"
+        handoffNote.visibility = View.VISIBLE
+    }
+
+    /** The desktop switch (v0.40.3): some sites serve a cut-down page to a
+     *  phone UA. Flip and reload — the full-width page arrives; the session
+     *  (cookies) and the bounce guard are the same either way. Like the
+     *  truce switch, no surprise reload from the flip itself: it would wipe
+     *  the find list mid-hunt. */
+    private fun toggleDesktopSite() {
+        desktopUA = !desktopUA
+        getSharedPreferences("browser", MODE_PRIVATE).edit()
+            .putBoolean("desktop_ua", desktopUA).apply()
+        desktopChip.text = if (desktopUA) "desktop site" else "mobile site"
+        val s = webView.settings
+        s.userAgentString = if (desktopUA) DesktopUa.of(s.userAgentString.orEmpty()) else null
+        ua = try { s.userAgentString.orEmpty() } catch (_: Throwable) { ua }
+        pendingHop = null
+        handoffNote.text = if (desktopUA)
+            "desktop site — reload (⟳) to see the full page"
+        else
+            "mobile site — reload (⟳) to go back"
         handoffNote.visibility = View.VISIBLE
     }
 
