@@ -28,6 +28,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -229,16 +230,28 @@ class BrowserActivity : AppCompatActivity() {
         bar.addView(chip("Go") { go() })
         root.addView(bar)
 
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(8), dp(4))
-        }
+        // The status line reads on its own shelf (v0.40.11): sharing one row
+        // with five fixed-width chips squeezed it to about a character wide on
+        // narrow phones, so its words stacked letter by letter into a tall
+        // ladder and the chips floated in its middle (the 2026-10-04 shot).
         status = TextView(this).apply {
             setTextColor(GREY)
             textSize = 12.5f
+            setPadding(dp(12), dp(2), dp(12), 0)
         }
-        row.addView(status, LinearLayout.LayoutParams(0, WRAP, 1f))
+        root.addView(status, LinearLayout.LayoutParams(MATCH, WRAP))
+
+        // ...and the chips ride a rail that slides sideways when the phone is
+        // too narrow for them, so every control stays reachable instead of
+        // being squeezed off the row.
+        val chipRoll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), 0, dp(12), dp(4))
+        }
         adsChip = chip(if (adBlock) "ads blocked" else "ads allowed") { toggleAdBlock() }
         row.addView(adsChip)
         desktopChip = chip(if (desktopUA) "desktop site" else "mobile site") { toggleDesktopSite() }
@@ -249,7 +262,8 @@ class BrowserActivity : AppCompatActivity() {
             render()
         })
         row.addView(chip("Clear data") { clearBrowsingData() })
-        root.addView(row)
+        chipRoll.addView(row, ViewGroup.LayoutParams(WRAP, WRAP))
+        root.addView(chipRoll, LinearLayout.LayoutParams(MATCH, WRAP))
 
         // A page that tried to bounce the browser into its app (v0.30.0): the
         // navigation used to die silently — scheme URL stuck in the field, the

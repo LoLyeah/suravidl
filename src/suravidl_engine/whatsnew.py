@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.11",
+        "title": "The shelf",
+        "items": [
+            "The in-app find-a-video browser's status line got its own full-width row \u2014 on narrow phones five buttons used to squeeze it to one letter per line: a tall stack of letters with the buttons floating in its middle.",
+            "The button row (ads \u00b7 site \u00b7 Scan \u00b7 Clear list \u00b7 Clear data) slides sideways when your screen is too narrow, so no control runs out of reach.",
+        ],
+    },
+    {
         "version": "0.40.10",
         "title": "The mend",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "The queue has a sieve now: All / Active / Filed / Errors chips hide what you are not looking for \u2014 and when a view hides everything, a line says exactly how many are hidden, one tap from All.",
             "The chips stay out of the way until there is a queue worth filtering.",
-        ],
-    },
-    {
-        "version": "0.40.1",
-        "title": "The dial",
-        "items": [
-            "Videos with several audio languages now show a chooser in the patch bay: pick one and a video-only take pairs THAT track \u2014 the site\u2019s own pick still stands behind it if the video lacks your choice.",
-            "The formats list stopped hiding dubs: two languages of one quality are two rows now, each saying which language it is.",
         ],
     },
 ]
