@@ -7,6 +7,7 @@ import re
 import sqlite3
 import threading
 import uuid
+from collections import deque
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,15 @@ import yt_dlp
 
 from .auth import explain_download_error
 from .extract import extract_info
+
+# How many worker threads serve the queue. It equals the settings ceiling for
+# `max_concurrent` (1..4, settings.py), so a raised capacity always has a
+# worker to use; waiting jobs sit in a deque, not on a thread each (v0.40.0:
+# a 20-link batch used to park 20 sleeping threads).
+POOL_SIZE = 4
+
+# Bumped when the migration block in `_init_db` changes shape.
+SCHEMA_VERSION = 1
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -306,6 +316,10 @@ class JobManager:
         self._cap_cv = threading.Condition(threading.Lock())
         self._capacity = max(1, int(max_concurrent))
         self._active = 0
+        # queued work, FIFO: (job, fmt, extra_headers), served by the pool
+        self._pending: deque = deque()
+        # the pool itself: started at the first enqueue, lives with the engine
+        self._workers: list[threading.Thread] = []
         self.on_complete = None  # optional callable(job) run after success
         # optional callable -> context manager yielding yt-dlp cookie opts
         self._cookie_session = cookie_session
@@ -318,36 +332,52 @@ class JobManager:
     # -- persistence -------------------------------------------------------
     def _init_db(self):
         with self._db_lock:
+            if self.db_path != ":memory:":
+                # WAL: several workers write progress at once, and a reader
+                # must never be the one that waits on them; :memory: dbs
+                # have no journal to mode. A filesystem that refuses WAL is
+                # not worth a failed boot.
+                try:
+                    self._con.execute("PRAGMA journal_mode=WAL")
+                except sqlite3.Error:  # pragma: no cover - fs-dependent
+                    pass
             with self._con:
                 self._con.executescript(_SCHEMA)
-                # lightweight migration for dbs created before the headers column
-                cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
-                if "headers" not in cols:
-                    self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
-                if "preset" not in cols:
-                    self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
-                if "playlist_items" not in cols:
-                    self._con.execute(
-                        "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
-                if "raw_args" not in cols:
-                    self._con.execute("ALTER TABLE jobs ADD COLUMN raw_args TEXT")
-                if "overrides" not in cols:
-                    self._con.execute(
-                        "ALTER TABLE jobs ADD COLUMN overrides TEXT")
-                if "files" not in cols:
-                    self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
-                if "partials" not in cols:
-                    # every target yt-dlp named while downloading (v0.26.0):
-                    # a playlist cancelled between entries strands the
-                    # in-flight one's `.part` under a name `files` never
-                    # learns, and the delete could not find it
-                    self._con.execute(
-                        "ALTER TABLE jobs ADD COLUMN partials TEXT")
-                if "download_dir" not in cols:
-                    # the folder this job downloaded into: a later settings
-                    # change must not make its files undeletable (v0.21.2)
-                    self._con.execute(
-                        "ALTER TABLE jobs ADD COLUMN download_dir TEXT")
+                # versioned migration: carry any older db forward, then
+                # stamp it so the checks run at most once per database.
+                # Columns gained over time: headers/preset/playlist_items/
+                # raw_args/overrides (v0.22.0), files (v0.21.1), partials
+                # (v0.26.0), download_dir (v0.21.2).
+                version = self._con.execute("PRAGMA user_version").fetchone()[0]
+                if version < SCHEMA_VERSION:
+                    cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
+                    if "headers" not in cols:
+                        self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
+                    if "preset" not in cols:
+                        self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
+                    if "playlist_items" not in cols:
+                        self._con.execute(
+                            "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
+                    if "raw_args" not in cols:
+                        self._con.execute("ALTER TABLE jobs ADD COLUMN raw_args TEXT")
+                    if "overrides" not in cols:
+                        self._con.execute(
+                            "ALTER TABLE jobs ADD COLUMN overrides TEXT")
+                    if "files" not in cols:
+                        self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
+                    if "partials" not in cols:
+                        # every target yt-dlp named while downloading (v0.26.0):
+                        # a playlist cancelled between entries strands the
+                        # in-flight one's `.part` under a name `files` never
+                        # learns, and the delete could not find it
+                        self._con.execute(
+                            "ALTER TABLE jobs ADD COLUMN partials TEXT")
+                    if "download_dir" not in cols:
+                        # the folder this job downloaded into: a later settings
+                        # change must not make its files undeletable (v0.21.2)
+                        self._con.execute(
+                            "ALTER TABLE jobs ADD COLUMN download_dir TEXT")
+                    self._con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
                 # crash recovery: anything active when we died is interrupted
@@ -357,8 +387,25 @@ class JobManager:
                     "WHERE status IN (?, ?, ?)", ACTIVE_STATUSES,
                 )
             if scrubbed:
-                # rewrite the file so the old bytes are gone, not just the row
+                if self.db_path != ":memory:":
+                    # WAL: the pre-scrub page images still sit in the sidecar;
+                    # a truncating checkpoint brings the scrubbed pages home
+                    # and empties it, then VACUUM rewrites the file so the old
+                    # bytes are gone, not just the row.
+                    try:
+                        self._con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    except sqlite3.Error:  # pragma: no cover - fs-dependent
+                        pass
                 self._con.execute("VACUUM")
+            if self.db_path != ":memory:":
+                # the WAL sidecars hold the same private rows as the db
+                for suffix in ("-wal", "-shm"):
+                    side = Path(self.db_path + suffix)
+                    if side.exists():
+                        try:
+                            os.chmod(side, 0o600)
+                        except OSError:
+                            pass
             for row in self._con.execute("SELECT * FROM jobs"):
                 self._jobs[row["id"]] = self._row_to_job(row)
 
@@ -525,9 +572,7 @@ class JobManager:
         with self._lock:
             self._jobs[job_id] = job
         self._save(job)
-        t = threading.Thread(target=self._run, args=(job, fmt, extra_headers),
-                             daemon=True)
-        t.start()
+        self._enqueue(job, fmt, extra_headers)
         return self.get(job_id)
 
     def get(self, job_id: str) -> dict:
@@ -845,9 +890,7 @@ class JobManager:
                 job["progress"] = {"downloaded_bytes": 0, "total_bytes": None,
                                    "speed": None, "eta": None}
             self._save(job)
-            threading.Thread(target=self._run,
-                             args=(job, job.get("fmt"), job.get("headers")),
-                             daemon=True).start()
+            self._enqueue(job, job.get("fmt"), job.get("headers"))
             resumed.append(job["id"])
         return resumed
 
@@ -863,23 +906,47 @@ class JobManager:
             self._capacity = max(1, int(n))
             self._cap_cv.notify_all()
 
-    def _acquire_slot(self) -> None:
-        with self._cap_cv:
-            while self._active >= self._capacity:
-                self._cap_cv.wait()
-            self._active += 1
+    def _ensure_workers(self) -> None:
+        """Start the pool once, at the first queued job."""
+        with self._lock:
+            if self._workers:
+                return
+            for i in range(POOL_SIZE):
+                t = threading.Thread(target=self._worker_loop,
+                                     name=f"suravidl-job-{i}", daemon=True)
+                t.start()
+                self._workers.append(t)
 
-    def _release_slot(self) -> None:
+    def _enqueue(self, job: dict, fmt: str | None,
+                 extra_headers: dict | None) -> None:
+        """Hand a job to the pool: one deque entry, no thread of its own."""
+        self._ensure_workers()
         with self._cap_cv:
-            self._active -= 1
+            self._pending.append((job, fmt, extra_headers))
             self._cap_cv.notify_all()
 
-    def _run(self, job: dict, fmt: str | None, extra_headers: dict | None):
-        self._acquire_slot()
-        try:
-            self._execute(job, fmt, extra_headers)
-        finally:
-            self._release_slot()
+    def _run(self, job: dict, fmt: str | None, extra_headers: dict | None) -> None:
+        """One job, one call — the seam the pool invokes per queued item
+        (tests stub it to keep the network out of their fixtures)."""
+        self._execute(job, fmt, extra_headers)
+
+    def _worker_loop(self) -> None:
+        """One pool thread: take the next queued job when a slot is free."""
+        while True:
+            with self._cap_cv:
+                while not (self._pending
+                           and self._active < self._capacity):
+                    self._cap_cv.wait()
+                job, fmt, extra_headers = self._pending.popleft()
+                self._active += 1
+            try:
+                self._run(job, fmt, extra_headers)
+            except Exception:  # noqa: BLE001 - a worker must survive a bad job
+                pass
+            finally:
+                with self._cap_cv:
+                    self._active -= 1
+                    self._cap_cv.notify_all()
 
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued

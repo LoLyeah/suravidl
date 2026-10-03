@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -129,11 +130,24 @@ TIKTOK_FLAKE_HINT = (
     "browser instead."
 )
 
+# Query credentials that must never ride out inside an error message the
+# user reads or the row the engine persists: signed links commonly carry
+# these in the URL itself.
+_SECRET_QUERY_RE = re.compile(
+    r"(?i)([?&](?:token|auth|sig|signature|key|api[_-]?key"
+    r"|access[_-]?token|hdnts|hdnea|policy|hash)=)([^&\s\"'<>]+)")
+
+
+def scrub_secrets(text: str) -> str:
+    """Redact credential values in URL query strings, keeping the names."""
+    return _SECRET_QUERY_RE.sub(r"\1[redacted]", text)
+
 
 def explain_download_error(text: str) -> str:
     """A failure the user reads: yt-dlp's words, plus the one hint we know."""
     from .extract import is_tiktok_flake
 
+    text = scrub_secrets(text)
     if looks_like_signin_wall(text):
         return (f"{text} — this looks like the site asking for an account: "
                 "add cookies in Settings → Authentication (if some are "
@@ -158,6 +172,7 @@ def unsupported_error(text: str) -> dict | None:
     a sniffer is the way to this video, so the UI must be able to tell it
     apart from a real error (which stays a plain string).
     """
+    text = scrub_secrets(text)
     if "unsupported url" not in text.lower():
         return None
     return {"message": f"{text} — {UNSUPPORTED_HINT}",

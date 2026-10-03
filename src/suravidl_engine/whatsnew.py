@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.0",
+        "title": "The workbench",
+        "items": [
+            "Big batches stay light: the queue now runs on a small fixed team of workers instead of parking a thread per link \u2014 twenty pasted links cost the same as one, and the queue keeps its order.",
+            "The download history got sturdier: it runs in WAL mode now (parallel downloads stop stepping on each other), carries a version stamp, and upgrades older histories on first launch.",
+            "Signed links keep their secrets: token, sig and key values in URLs are now redacted from any error the app shows or stores.",
+        ],
+    },
+    {
         "version": "0.39.13",
         "title": "The shade",
         "items": [
@@ -79,14 +88,6 @@ ENTRIES = [
         "title": "The frost",
         "items": [
             "The tour\u2019s caption card now wears the same frosted glass as every dialog \u2014 a real-compositor shot caught the page reading through it, and it was re-shot to prove the fix.",
-        ],
-    },
-    {
-        "version": "0.39.4",
-        "title": "The welcome mat",
-        "items": [
-            "The footer row, under the download path, gained two doors: FAQ answers the common questions \u2014 cookies, \u201cunsupported URL\u201d, missing 4K, where files go \u2014 and a short tour walks the room, replayable any time.",
-            "Probing a playlist now offers the whole thing by default (\u201call 3 \u00b7 Download playlist\u201d) instead of landing on \u201cnone picked\u201d with a dead button; un-ticking everything by hand still refuses politely.",
         ],
     },
 ]

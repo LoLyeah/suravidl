@@ -86,19 +86,29 @@ def test_restart_scrubs_cookie_rows_from_older_versions(tmp_path):
     from suravidl_engine.jobs import JobManager
 
     db = tmp_path / "jobs.db"
+
+    def store_bytes() -> bytes:
+        # the whole store, not just the main file: with WAL on, a fresh
+        # write lives in the sidecar until a checkpoint carries it home
+        raw = b""
+        for suffix in ("", "-wal", "-shm"):
+            side = Path(str(db) + suffix)
+            raw += side.read_bytes() if side.exists() else b""
+        return raw
+
     mgr = JobManager(download_dir=tmp_path / "dl", db_path=db)
     job = mgr.create("http://example.invalid/x.mp4",
                      extra_headers={"Cookie": f"{COOKIE_NAME}={COOKIE_VALUE}"})
-    # simulate an old version: write the raw cookie straight into the db
+    # simulate an old version: write the raw cookie straight into the store
     con = sqlite3.connect(db)
     con.execute("UPDATE jobs SET headers=? WHERE id=?",
                 (f'{{"Cookie": "{COOKIE_NAME}={COOKIE_VALUE}"}}', job["id"]))
     con.commit()
     con.close()
-    assert COOKIE_VALUE.encode() in db.read_bytes()
+    assert COOKIE_VALUE.encode() in store_bytes()
 
     mgr2 = JobManager(download_dir=tmp_path / "dl", db_path=db)
-    assert COOKIE_VALUE.encode() not in db.read_bytes()
+    assert COOKIE_VALUE.encode() not in store_bytes()
     # the job survives with the cookie dropped entirely (not a placeholder)
     assert mgr2.get(job["id"])["headers"] in (None, {})
 
