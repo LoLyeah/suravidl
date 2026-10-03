@@ -1,4 +1,5 @@
-"""yt-dlp self-update via pip (venv/pip installs; frozen builds use their own)."""
+""""yt-dlp self-update: pip where pip exists, an honest no where it does not."""
+import importlib.util
 import json
 import os
 import subprocess
@@ -63,9 +64,26 @@ def check_update(current: str, repo: str = DEFAULT_REPO, fetch_fn=None) -> dict:
     }
 
 
+def updates_possible() -> bool:
+    """pip can update yt-dlp only where pip exists.
+
+    A frozen build (PyInstaller one-file, Chaquopy on Android) bundles yt-dlp
+    inside itself: there is nothing for pip to reach (v0.40.10 audit).
+    """
+    try:
+        return importlib.util.find_spec("pip") is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def self_update() -> dict:
     """Upgrade yt-dlp in this environment; safe to call again anytime."""
     before = yt_dlp.version.__version__
+    if not updates_possible():
+        return {"ok": False, "updated": False, "bundled": True,
+                "before": before, "after": before,
+                "detail": "this build bundles yt-dlp — update the app to "
+                          "update it"}
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],

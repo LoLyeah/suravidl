@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.10",
+        "title": "The mend",
+        "items": [
+            "Two fresh-eyes audits went through the whole app; the sharpest fix: trashing the leftover card of a paused-and-resumed download no longer risks the finished file.",
+            "Keyboard and touch on the deck: dialogs keep Tab inside and hand focus back, the main tabs answer to arrow keys, the day theme's focus ring is visible again, and small tap targets grew.",
+            "The raw-arguments deny list learned the flags it was missing, and a bundled build now says where yt-dlp updates come from instead of failing quietly.",
+        ],
+    },
+    {
         "version": "0.40.9",
         "title": "The front door",
         "items": [
@@ -83,15 +92,6 @@ ENTRIES = [
         "items": [
             "Videos with several audio languages now show a chooser in the patch bay: pick one and a video-only take pairs THAT track \u2014 the site\u2019s own pick still stands behind it if the video lacks your choice.",
             "The formats list stopped hiding dubs: two languages of one quality are two rows now, each saying which language it is.",
-        ],
-    },
-    {
-        "version": "0.40.0",
-        "title": "The workbench",
-        "items": [
-            "Big batches stay light: the queue now runs on a small fixed team of workers instead of parking a thread per link \u2014 twenty pasted links cost the same as one, and the queue keeps its order.",
-            "The download history got sturdier: it runs in WAL mode now (parallel downloads stop stepping on each other), carries a version stamp, and upgrades older histories on first launch.",
-            "Signed links keep their secrets: token, sig and key values in URLs are now redacted from any error the app shows or stores.",
         ],
     },
 ]

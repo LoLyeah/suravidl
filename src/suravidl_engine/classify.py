@@ -13,6 +13,7 @@ what gets *looked at*; it never decides what gets *shown*.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
 from dataclasses import dataclass, field
 from urllib import error as urlerror
@@ -41,9 +42,43 @@ HEADER_DEFAULTS = {"User-Agent": DEFAULT_UA, "Accept": "*/*"}
 # loopback, which is where the engine lives. Link-local is different: that is
 # where cloud metadata services sit, and a page that smuggles a URL into the
 # pipeline must not be able to make the engine poke one. Host *literals* only:
-# guessing at DNS would break the LAN case for no real gain.
+# guessing at DNS would break the LAN case for no real gain. Literals also
+# have spellings — `2852039166`, `0xa9.0xfe.0xa9.0xfe`, `[::ffff:…]` — so
+# they are canonicalized before the judgement (v0.40.10 audit).
 BLOCKED_HOSTS = ("metadata.google.internal", "metadata.goog")
 BLOCKED_PREFIXES = ("169.254.", "fd00:ec2")
+_LINK_LOCAL4 = ipaddress.ip_network("169.254.0.0/16")
+
+
+def _canonical_ip(host: str):
+    """The IP a literal host denotes, whatever its spelling, or None."""
+    h = host.strip("[]")
+    try:
+        return ipaddress.ip_address(h)          # plain v4/v6, ::ffff: unwraps
+    except ValueError:
+        pass
+    parts = h.split(".")
+    if len(parts) == 4:
+        try:
+            octets = []
+            for p in parts:
+                if p[:2].lower() == "0x":
+                    v = int(p, 16)
+                elif len(p) > 1 and p.startswith("0") and all(c in "01234567" for c in p):
+                    v = int(p, 8)
+                else:
+                    v = int(p, 10)
+                if not 0 <= v <= 255:
+                    raise ValueError(p)
+                octets.append(v)
+            return ipaddress.ip_address(bytes(octets))
+        except ValueError:
+            pass
+    if h.isdigit():
+        v = int(h)
+        if v <= 0xFFFFFFFF:
+            return ipaddress.ip_address(v)      # decimal dword form
+    return None
 
 
 def blocked_reason(url: str) -> str:
@@ -55,6 +90,16 @@ def blocked_reason(url: str) -> str:
         return "cloud metadata address"
     if host.startswith(BLOCKED_PREFIXES):
         return "link-local address"
+    ip = _canonical_ip(host)
+    if ip is not None:
+        if ip.version == 4 and ip in _LINK_LOCAL4:
+            return "link-local address"
+        if ip.version == 6:
+            if ip.is_link_local or (ip.ipv4_mapped is not None
+                                    and ip.ipv4_mapped in _LINK_LOCAL4):
+                return "link-local address"
+            if str(ip).startswith("fd00:ec2"):
+                return "cloud metadata address"
     return ""
 
 # The canonical prefilter list. The extension fetches it (with a baked-in

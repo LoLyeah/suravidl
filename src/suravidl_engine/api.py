@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import sys
+import threading
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
@@ -302,6 +303,13 @@ def default_cache_dir() -> Path:
     return base / "suravidl"
 
 
+# the archive rewrite (read → filter → replace) is a read-modify-write on one
+# file: one writer at a time, or a concurrent forget loses entries (the
+# archive appender is yt-dlp itself, so this locks OUR side of the pen) —
+# v0.40.10 audit
+_ARCHIVE_LOCK = threading.Lock()
+
+
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
                update_fn=None, update_check_fn=None,
@@ -459,7 +467,11 @@ def create_app(download_dir, auth_token: str | None = None,
 
         if update_check_fn:
             return update_check_fn()
-        return updater.check_update(__version__)
+        result = updater.check_update(__version__)
+        # a frozen build bundles yt-dlp and has no pip: the UI must be able to
+        # say so instead of offering an update that cannot run (v0.40.10)
+        result["bundled"] = not updater.updates_possible()
+        return result
 
     @app.get("/whats-new")
     def whats_new(_mgr: JobManager = Depends(require_auth)):
@@ -933,16 +945,17 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=400, detail="nothing to forget")
         if not archive_path or not Path(archive_path).exists():
             raise HTTPException(status_code=404, detail="no archive yet")
-        lines = _archive_lines()
-        kept = [ln for ln in lines if ln != entry]
-        removed = len(lines) - len(kept)
-        if not removed:
-            raise HTTPException(status_code=404,
-                                detail="that entry is not in the archive")
-        path = Path(archive_path)
-        tmp = path.with_name(path.name + ".tmp")
-        tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
-        os.replace(tmp, path)
+        with _ARCHIVE_LOCK:                 # read → filter → replace, one pen
+            lines = _archive_lines()
+            kept = [ln for ln in lines if ln != entry]
+            removed = len(lines) - len(kept)
+            if not removed:
+                raise HTTPException(status_code=404,
+                                    detail="that entry is not in the archive")
+            path = Path(archive_path)
+            tmp = path.with_name(path.name + ".tmp")
+            tmp.write_text("\n".join(kept) + "\n", encoding="utf-8")
+            os.replace(tmp, path)
         return {"removed": removed}
 
     @app.post("/files/clear")

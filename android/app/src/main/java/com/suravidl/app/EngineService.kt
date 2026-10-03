@@ -407,6 +407,14 @@ class EngineService : Service() {
     override fun onDestroy() {
         polling = false
         releaseWakeLock()
+        // the decrypted session cookies must not outlive the engine: a
+        // swipe-away kill (not the app's Quit path) used to leave
+        // cookies.session.txt on disk until the next launch (v0.40.10 audit;
+        // unlocking is on demand, so wiping here costs nothing)
+        try {
+            CookieVault.lockSession(this)
+        } catch (_: Throwable) {
+        }
         // the ongoing notification is ours to take down; a killed process
         // otherwise leaves it behind with nothing running (v0.21.1 audit)
         NotificationManagerCompat.from(this).cancel(NOTIF_ID)

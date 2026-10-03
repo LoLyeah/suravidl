@@ -19,6 +19,7 @@ TTL_S = 30 * 60        # one nobody opened in half an hour is stale
 MAX_KEPT = 5           # the newest handoffs; older ones roll off
 DEDUPE_S = 30          # the same stream clicked twice is one handoff
 CANDIDATES_TRIED = 3   # a probe that fails falls through to its siblings
+MAX_PROBING = 3        # handoffs arrive in bursts; probes are heavy (v0.40.10)
 
 
 class HandoffStore:
@@ -29,6 +30,7 @@ class HandoffStore:
         self._now = now
         self._lock = threading.Lock()
         self._items: dict[str, dict] = {}
+        self._probes = threading.BoundedSemaphore(MAX_PROBING)
 
     # -- writes ----------------------------------------------------------
     def add(self, url, urls=None, headers=None, tab_url=None) -> dict:
@@ -88,6 +90,12 @@ class HandoffStore:
             del self._items[hid]
 
     def _run(self, hid: str) -> None:
+        # burst control: a multi-select handoff must not start a dozen heavy
+        # probes at once (v0.40.10 audit)
+        with self._probes:
+            self._probe(hid)
+
+    def _probe(self, hid: str) -> None:
         with self._lock:
             item = self._items.get(hid)
             if not item:

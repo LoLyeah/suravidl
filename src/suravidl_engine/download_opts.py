@@ -289,6 +289,13 @@ DENIED_RAW_FLAGS: dict[str, str] = {
     "--playlist-items": "playlists are a first-class feature",
     "--no-playlist": "playlists are a first-class feature",
     "--yes-playlist": "playlists are a first-class feature",
+    # --print-to-file writes to any path the process can write; --print and
+    # the postprocessor-args family only make sense outside the app's control
+    # (v0.40.10 audit — the denylist was missing exactly these)
+    "--print": "prints instead of downloading",
+    "--print-to-file": "writes files the app does not manage",
+    "--postprocessor-args": "postprocessor arguments are app-managed",
+    "--ppa": "postprocessor arguments are app-managed",
 }
 
 DENIED_RAW_KEYS: dict[str, str] = {
@@ -313,6 +320,9 @@ DENIED_RAW_KEYS: dict[str, str] = {
     "noplaylist": "--no-playlist",
     "progress_hooks": "internal hooks",
     "postprocessor_hooks": "internal hooks",
+    "print": "--print",
+    "print_to_file": "--print-to-file",
+    "postprocessor_args": "--postprocessor-args",
 }
 
 DEFAULT_TEMPLATE = "%(title).100B.%(ext)s"
@@ -415,6 +425,10 @@ def validate_template(value: str) -> str:
         if segment in ("", ".", ".."):
             raise ValueError("filename_template cannot contain empty or "
                              "'..' path segments")
+        # a Windows drive prefix (`D:sub`) re-roots pathlib's join and escapes
+        # the download folder (v0.40.10 audit)
+        if len(segment) >= 2 and segment[1] == ":" and segment[0].isalpha():
+            raise ValueError("filename_template cannot use a drive letter")
     if "%(ext)s" not in v:
         raise ValueError("filename_template must contain %(ext)s")
     return v

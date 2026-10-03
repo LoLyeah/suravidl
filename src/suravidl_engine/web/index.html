@@ -86,7 +86,7 @@
   </aside>
 
   <!-- ============================ Download ============================ -->
-  <section class="panel" id="panel-download">
+  <section class="panel" id="panel-download" role="tabpanel" aria-labelledby="tabDownload">
     <section class="card paste-card">
       <label class="lbl" for="url">Source</label>
       <div class="paste">
@@ -98,7 +98,7 @@
       <div id="probeMsg" class="msg muted"></div>
       <button id="probeDetails" class="linkbtn hidden" type="button" aria-expanded="false" aria-controls="probeMsg">Show details</button>
       <div id="browserOffer" class="audioRow hidden">
-        <button id="browserOfferBtn" class="btn prime sm">Open in the browser</button>
+        <button id="browserOfferBtn" class="btn sm">Open in the browser</button>
         <span class="muted">this page has a player yt-dlp cannot read — press play there, then Scan</span>
       </div>
       <div id="sniffRow" class="audioRow hidden">
@@ -107,7 +107,7 @@
       </div>
       <div id="batchRow" class="audioRow hidden">
         <span class="muted" id="batchCount"></span>
-        <button id="batchBtn" class="btn prime sm">Queue all</button>
+        <button id="batchBtn" class="btn sm">Queue all</button>
       </div>
     </section>
 
@@ -325,7 +325,7 @@
   </section>
 
   <!-- ============================= Queue ============================= -->
-  <section class="panel hidden" id="panel-queue">
+  <section class="panel hidden" id="panel-queue" role="tabpanel" aria-labelledby="tabQueue">
     <section class="card">
       <h2>Downloads</h2>
       <div id="queueFilters" class="hidden" role="group" aria-label="Filter the queue">
@@ -341,7 +341,7 @@
   </section>
 
   <!-- ============================ Settings =========================== -->
-  <section class="panel hidden" id="panel-settings">
+  <section class="panel hidden" id="panel-settings" role="tabpanel" aria-labelledby="tabSettings">
     <section class="card">
       <div class="page-head">
         <h2>Settings</h2>
@@ -466,7 +466,7 @@
           <div class="jrow">
             <input id="presetName" type="text" spellcheck="false"
                    placeholder="e.g. subs-en + metadata"/>
-            <button id="presetSave" class="btn sm prime" type="button">Save preset</button>
+            <button id="presetSave" class="btn sm" type="button">Save preset</button>
           </div>
           <div class="msg" id="presetMsg"></div>
         </div>
@@ -721,7 +721,7 @@
   </section>
 
   <!-- ============================= yt-dlp ============================ -->
-  <section class="panel hidden" id="panel-ytdlp">
+  <section class="panel hidden" id="panel-ytdlp" role="tabpanel" aria-labelledby="tabYtdlp">
     <section class="card">
       <h2>yt-dlp itself</h2>
       <div class="field row">
@@ -828,14 +828,14 @@
 </main>
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
-  <button class="tab active" data-tab="download" role="tab" type="button">
+  <button class="tab active" data-tab="download" role="tab" type="button" id="tabDownload" aria-controls="panel-download" aria-selected="true" tabindex="0">
     <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl">Download</span></button>
-  <button class="tab" data-tab="queue" role="tab" type="button">
+  <button class="tab" data-tab="queue" role="tab" type="button" id="tabQueue" aria-controls="panel-queue" aria-selected="false" tabindex="-1">
     <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl">Queue</span>
     <span id="queueCount" class="badge hidden"></span></button>
-  <button class="tab" data-tab="settings" role="tab" type="button">
+  <button class="tab" data-tab="settings" role="tab" type="button" id="tabSettings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">
     <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl">Settings</span></button>
-  <button class="tab" data-tab="ytdlp" role="tab" type="button">
+  <button class="tab" data-tab="ytdlp" role="tab" type="button" id="tabYtdlp" aria-controls="panel-ytdlp" aria-selected="false" tabindex="-1">
     <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl">yt-dlp</span></button>
 </nav>
 

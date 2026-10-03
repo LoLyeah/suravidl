@@ -276,15 +276,55 @@ function dismiss(t) {
 }
 
 /* ---------- modal transitions ---------- */
+/** Everything inside `m` that can hold focus, visible ones only. */
+function modalFocusables(m) {
+  return [...m.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => !el.disabled && el.offsetParent !== null);
+}
 function openModal(m) {
   clearTimeout(m._closeTimer);
+  // a dialog is a room: focus moves in, Tab stays in, focus comes home when
+  // it closes (v0.40.10 audit — aria-modal promised this and the code let
+  // Tab wander into the page behind the overlay)
+  m._returnFocus = document.activeElement;
   m.classList.remove("hidden", "closing");
+  const first = modalFocusables(m)[0];
+  if (first) first.focus();
+  if (!m._trap) {
+    m._trap = (e) => {
+      if (e.key !== "Tab") return;
+      const open = [...document.querySelectorAll(".overlay:not(.hidden)")];
+      if (open[open.length - 1] !== m) return;   // only the top card traps
+      const f = modalFocusables(m);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (!m.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", m._trap);
+  }
 }
 function closeModal(m) {
   m.classList.add("closing");
   m._closeTimer = setTimeout(() => {
     m.classList.remove("closing");
     m.classList.add("hidden");
+    if (m._trap) {
+      document.removeEventListener("keydown", m._trap);
+      m._trap = null;
+    }
+    const back = m._returnFocus;
+    m._returnFocus = null;
+    if (back && document.contains(back)) back.focus();
   }, motionMs(170));
 }
 
@@ -461,7 +501,9 @@ async function doProbe() {
     setScopes("bad", { say: "no readout — see the message above" });
     offerBrowser(e, url);
     $("probeCard").classList.add("hidden");
-    $("dlEmpty").classList.remove("hidden");
+    // the onboarding line is for an EMPTY deck; reviving it under a failure
+    // made the page argue with itself (v0.40.10 audit)
+    $("dlEmpty").classList.add("hidden");
     // chips from the *previous* probe still carry its URL: leaving them armed
     // downloads a link the user has already replaced (v0.21.1 audit)
     $("qualityRow").classList.add("hidden");
@@ -845,6 +887,13 @@ function renderProbe(url, info) {
       box.dataset.index = String(n);
       box.title = "include item " + n;
       box.onchange = () => syncPlaylistPicks();
+      // the number half of the cell picks too: a phone should not have to
+      // hit a 14px box (v0.40.10 audit)
+      pick.onclick = (e) => {
+        if (e.target === box) return;
+        box.checked = !box.checked;
+        box.onchange();
+      };
       pick.append(el("span", "plnum", String(n)), box);
       tr.append(
         pick,
@@ -2293,6 +2342,13 @@ async function checkAppUpdate(force) {
   try {
     const u = await api("/update-check");
     UPD_STATE = u;
+    // a frozen/Android build bundles yt-dlp and has no pip — the update
+    // button must say where updates come from instead of failing (v0.40.10)
+    if (u.bundled && $("updateBtn")) {
+      $("updateBtn").disabled = true;
+      $("updateBtn").title =
+        "bundled with this build — updating suravidl updates yt-dlp";
+    }
     updStore.set(UPD.last, JSON.stringify({
       at: Date.now(), latest: u.latest || null,
       available: !!u.update_available, error: u.error || null,
@@ -3015,12 +3071,48 @@ function showTab(name, opts) {
   if (target === "ytdlp") loadOptions(false);
   if (target === "queue") refreshJobs();
   if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });
+  syncTabA11y();
   syncToastLane();
 }
 
+/* The main deck's tabs follow the same APG pattern the Settings tabs already
+   use (v0.40.10 audit): one tab stop, arrows move between tabs, aria-selected
+   and tabindex follow the active panel. */
+function syncTabA11y() {
+  const active = document.body.dataset.tab || "download";
+  document.querySelectorAll("#tabs .tab").forEach((b) => {
+    const on = b.dataset.tab === active;
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+  });
+}
 document.querySelectorAll("#tabs .tab").forEach((b) => {
   b.onclick = () => showTab(b.dataset.tab);
+  b.addEventListener("keydown", (e) => {
+    const tabs = [...document.querySelectorAll("#tabs .tab")];
+    const i = tabs.indexOf(b);
+    let t = null;
+    if (e.key === "ArrowRight") t = tabs[(i + 1) % tabs.length];
+    if (e.key === "ArrowLeft") t = tabs[(i - 1 + tabs.length) % tabs.length];
+    if (e.key === "Home") t = tabs[0];
+    if (e.key === "End") t = tabs[tabs.length - 1];
+    if (!t) return;
+    e.preventDefault();
+    t.focus();
+    showTab(t.dataset.tab);
+  });
 });
+syncTabA11y();
+
+/* The forecourt rule: an empty URL box means START is not a live control
+   (v0.40.10 audit — a scold toast was doing a disabled state's job). The
+   start-without-probe path stays a feature: only emptiness disables it. */
+function syncStartState() {
+  const empty = !$("url").value.trim();
+  $("bestBtn").disabled = empty;
+}
+$("url").addEventListener("input", syncStartState);
+syncStartState();
 
 /* ---------- yt-dlp tab: curated groups + option browser ---------- */
 let OPTIONS = null;
@@ -3262,6 +3354,11 @@ document.addEventListener("keydown", (e) => {
   if (!$("confirmModal").classList.contains("hidden")) {
     return;   // the confirm dialog handles its own Escape
   }
+  // the player and the folder sheet close themselves on Escape; without
+  // these the same press ALSO ran closeSettings() below and yanked a
+  // Settings user straight to the Download tab (v0.40.10 audit)
+  if (!$("playModal").classList.contains("hidden")) return;
+  if (!$("folderModal").classList.contains("hidden")) return;
   // a running tour: Escape leaves it (v0.39.4)
   if (TOUR_ON) { tourEnd(); return; }
   // the FAQ card answers on Escape like every dialog (v0.39.4)
@@ -3668,7 +3765,7 @@ async function checkHandoff() {
     $("probeDetails").classList.remove("hidden");
     setScopes("bad", { say: "no readout — see the message above" });
     $("probeCard").classList.add("hidden");
-    $("dlEmpty").classList.remove("hidden");
+    $("dlEmpty").classList.add("hidden");
     toast("the browser sent a video, but reading it failed", "bad");
   }
 }

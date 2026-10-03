@@ -655,13 +655,27 @@ class JobManager:
             preset = None               # a raw format asked for by name
         if "preset" in patch and "fmt" not in patch:
             fmt = None
-        return self.create(src["url"],
-                           fmt=fmt,
-                           extra_headers=patch.get("headers", src.get("headers")),
-                           preset=preset,
-                           playlist_items=src.get("playlist_items"),
-                           raw_args=patch.get("raw_args", src.get("raw_args")),
-                           overrides=overrides)
+        job = self.create(src["url"],
+                          fmt=fmt,
+                          extra_headers=patch.get("headers", src.get("headers")),
+                          preset=preset,
+                          playlist_items=src.get("playlist_items"),
+                          raw_args=patch.get("raw_args", src.get("raw_args")),
+                          overrides=overrides)
+        # The successor owns everything on disk now: the source row keeps its
+        # story (error, progress) but loses its claim on files — trashing the
+        # stale card later must not take the successor's finished download
+        # with it (v0.40.10 audit; pause→resume reproduced the data loss).
+        live = None
+        with self._lock:
+            live = self._jobs.get(src["id"])
+            if live is not None:
+                live["filepath"] = None
+                live["partials"] = None
+                live["files"] = None
+        if live is not None:
+            self._save(live)
+        return job
 
     def clear_completed(self) -> int:
         """Forget completed jobs (their files are gone after /files/clear).
@@ -716,7 +730,7 @@ class JobManager:
             except OSError:
                 continue
         raise PermissionError(
-            f"refusing to delete {path}: it is outside the download folder")
+            f"refusing to use {path}: it is outside the download folder")
 
     def _sidecars_for(self, path: Path) -> list[Path]:
         out: list[Path] = []

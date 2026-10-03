@@ -46,7 +46,7 @@ def test_whats_new_uses_the_dialog_lifecycle():
 
 def test_escape_closes_the_whats_new_card():
     i = APP.find('e.key !== "Escape"')
-    seg = APP[i:i + 700]
+    seg = APP[i:i + 1000]     # grew: v0.40.10 added the player/sheet guards
     assert "dismissWhatsNew(wnVersion)" in seg
 
 

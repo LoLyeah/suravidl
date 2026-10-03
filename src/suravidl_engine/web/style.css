@@ -73,6 +73,7 @@ html[data-theme="light"] {
   --accent-soft: rgba(192,122,22,.14);
   --accent-line: rgba(160,100,15,.32);
   --accent-ink: #6b4308;
+  --ring: #8a5410;                /* focus ring: darker than the lamp, 3:1+ on the day ground */
   --mark-tile: #14493C;                   /* brand: the pine tile at day */
   --mark-arrow: #F2E9D8;
   --mark-deep: rgba(20,73,60,.35);
@@ -244,6 +245,14 @@ a { color: var(--accent-ink); text-decoration-color: var(--accent-line); text-un
     animation-delay: 0s !important;
     transition-delay: 0s !important;
   }
+  /* a static substitute keeps state readable without motion (v0.40.10): a
+     busy control and a scanning scope stay visibly lit instead of freezing
+     dark — the wait is still legible, it just does not move */
+  .btn.busy, .scopes[data-state="scan"] .scope .led {
+    animation: none !important;
+    opacity: 1 !important;
+    box-shadow: 0 0 6px var(--accent) !important;
+  }
   body::before { animation: none !important; }
 }
 
@@ -252,7 +261,7 @@ a { color: var(--accent-ink); text-decoration-color: var(--accent-line); text-un
 .btn:focus-visible, .get:focus-visible, .stab:focus-visible,
 .linkbtn:focus-visible, .optrow:focus-visible, .tab:focus-visible,
 .swatch:focus-visible, .bin:focus-visible, .ghost-sm:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ring, var(--accent));
   outline-offset: 2px;
 }
 ::selection { background: var(--sel); color: var(--text); }
@@ -659,7 +668,7 @@ html[data-theme="light"] .card[data-livery="tiktok"]    { --livery: #077a6e; }
   color: var(--accent-ink); font-size: 12.5px; line-height: 1.45;
 }
 #armedText { flex: 1 1 auto; cursor: pointer; overflow-wrap: anywhere; }
-#armedText:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+#armedText:focus-visible { outline: 2px solid var(--ring, var(--accent)); outline-offset: 2px; border-radius: 4px; }
 #armedBar .btn { flex: none; }
 
 /* the format table: switchgear rows */
@@ -791,7 +800,7 @@ details.card { padding: 0 18px 6px; }
   flex: 1 0 100%; white-space: normal; overflow: visible;
   text-overflow: clip; word-break: break-word;
 }
-.jobtitle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.jobtitle:focus-visible { outline: 2px solid var(--ring, var(--accent)); outline-offset: 2px; border-radius: 4px; }
 .job .jmeta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 .job .jrow { margin-top: 9px; }
 .job .path {
@@ -839,7 +848,7 @@ details.card { padding: 0 18px 6px; }
 /* the FILED stamp — a take that landed */
 .job .stamp, .stamp {
   display: inline-block;
-  padding: 2px 8px; border: 1.5px solid var(--ok-line); border-radius: 4px;
+  padding: 2px 8px; border: 1.5px solid var(--ok-line); border-radius: 8px;
   color: var(--ok); font-size: 10px; font-weight: 700; letter-spacing: .18em;
   transform: rotate(-3deg);
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
@@ -1072,7 +1081,7 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
    (v0.38.3 audit #11) */
 #presetList .optrow { cursor: default; }
 @media (hover: hover) { #presetList .optrow:hover { border-color: var(--line-soft); } }
-.optrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 9px; }
+.optrow:focus-visible { outline: 2px solid var(--ring, var(--accent)); outline-offset: -2px; border-radius: 9px; }
 #optionsList:focus-visible, #optionsList:focus { outline: none; }
 .optrow .col { flex: 1; min-width: 0; gap: 3px; }
 .optname, .optrow .flag {
@@ -1261,6 +1270,10 @@ footer .linkbtn { color: var(--accent-ink); }
   .pill { min-height: 30px; }
   .optrow { min-height: 52px; }
   .subtabs .stab { min-height: 44px; }
+  /* the playlist's per-item pick: the box grows and the whole first cell is
+     the target (v0.40.10 audit — a 14px checkbox on a phone) */
+  .plpick { width: 1.6em; height: 1.6em; }
+  .fmt-q { padding-top: 10px; padding-bottom: 10px; }
   /* touch has no pointer to drag a bar with — the swipe is the affordance,
      and the custom 9px bars had overridden Android's native transient
      overlay (2026-09-30: "the scrollbar is too big" in a phone dialog) */

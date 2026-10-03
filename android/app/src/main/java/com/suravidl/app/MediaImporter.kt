@@ -78,5 +78,6 @@ object MediaImporter {
     }
 
     private val AUDIO_EXT = setOf("m4a", "mp3", "opus", "ogg", "wav", "aac", "flac")
-    private val VIDEO_EXT = setOf("mp4", "webm", "mkv", "mov", "3gp")
+    private val VIDEO_EXT = setOf("mp4", "m4v", "webm", "mov", "mkv", "avi", "flv", "wmv",
+        "ogv", "3gp")
 }

@@ -9,7 +9,7 @@ actually matters; the desktop/extension side is noted where it differs.
 | item | where (Android) | at rest | while running |
 | --- | --- | --- | --- |
 | `cookies.txt` import | `filesDir/cookies.enc` | **AES-256-GCM ciphertext**; key never leaves the Android Keystore (non-exportable) | decrypted to `filesDir/cookies.session.txt` (owner-only `0600`) so yt-dlp can read it |
-| job history | `~/.suravidl/jobs.db` (SQLite) | cookie values are **never** written; rows that carried a `Cookie` header store `<redacted>` | — |
+| job history | `~/.suravidl/jobs.db` (SQLite) | cookie values are **never** written; rows that carried a `Cookie` header store `<redacted>`; the job URL is stored as pasted — signed query strings included, because retry/resume must replay it exactly — and error text is scrubbed of query credentials | — |
 | settings | `~/.suravidl/settings.json` | never contains cookie *values* (only a path, or `<redacted>`) | — |
 | engine token | `~/.suravidl/token` | `0600`, directory `0700` | in memory; the Android app keeps it in its private `SharedPreferences` |
 | downloads | `filesDir/…` | as downloaded | — |
@@ -49,8 +49,8 @@ the ciphertext is worthless elsewhere.
 2. On engine start the vault is unlocked **only** into
    `cookies.session.txt`, owner-readable only; a stale session file from a
    crash is deleted first.
-3. On "Quit completely", on "Delete stored cookies", and on every app start
-   the session file is removed.
+3. On "Quit completely", on every app start, and whenever the engine service
+   stops — swipe-away included — the session file is removed (v0.40.10).
 4. A `cookies.txt` left by an older version is encrypted at first start
    (`migrateLegacy`) and the plaintext file deleted.
 5. The engine records only `<redacted>` in its database and API payloads, and
