@@ -609,6 +609,11 @@ def create_app(download_dir, auth_token: str | None = None,
             info["site"] = site
             info["site_quality"] = site_memory.clean(
                 settings.get().get("site_quality") or {}).get(site)
+        if info.get("formats"):
+            from .download_opts import quality_estimates
+            # v0.40.5: what each quality pick weighs — the engine owns the
+            # sum so every shell shows the same numbers
+            info["quality_estimates"] = quality_estimates(info["formats"])
         return scrub_secrets(info)   # a shell reads this; captures stay home
 
     # Browser handoffs (v0.39.0): the extension's find becomes a probe here,

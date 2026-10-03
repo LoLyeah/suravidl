@@ -71,6 +71,46 @@ QUALITY_KEYS = tuple(p["key"] for p in QUALITY_PRESETS)
 # the 720p expression" → "720", the per-site memory and the UI both use it).
 QUALITY_BY_FMT = {p["fmt"]: p["key"] for p in QUALITY_PRESETS}
 
+
+def quality_estimates(formats: list[dict]) -> dict:
+    """What each quality pick would weigh, near enough (v0.40.5).
+
+    The site's own advertised sizes, added up the way the pick works: the
+    tallest video row at or under the cap (the one yt-dlp would take) plus
+    the best separate audio row when that video carries no sound of its
+    own. A quality whose numbers are not knowable is left out — an
+    estimate that is really a guess is worse than none.
+    """
+    def size(f: dict) -> int:
+        return int(f.get("filesize") or f.get("filesize_approx") or 0)
+
+    def has_video(f: dict) -> bool:
+        return bool(f.get("vcodec")) and f.get("vcodec") != "none"
+
+    def has_audio(f: dict) -> bool:
+        return bool(f.get("acodec")) and f.get("acodec") != "none"
+
+    videos = [f for f in formats
+              if has_video(f) and f.get("height") and size(f)]
+    audios = [f for f in formats
+              if not has_video(f) and has_audio(f) and size(f)]
+    audios.sort(key=lambda f: f.get("abr") or 0, reverse=True)
+    best_audio = size(audios[0]) if audios else 0
+
+    out: dict[str, int] = {}
+    for preset in QUALITY_PRESETS:
+        key = preset["key"]
+        cap = int(key) if key.isdigit() else None
+        pool = [f for f in videos if cap is None or f["height"] <= cap]
+        if not pool:
+            continue
+        vid = max(pool, key=lambda f: f["height"])
+        total = size(vid)
+        if not has_audio(vid):
+            total += best_audio
+        out[key] = total
+    return out
+
 # A concrete stream id ("137", "140-22"): the UI builds "137+bestaudio/best"
 # for these when it pairs the site's audio, and the no-sound choice must be
 # able to name exactly the stream again.

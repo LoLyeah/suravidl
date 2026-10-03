@@ -143,6 +143,7 @@ let TAKE = { fmt: null, preset: null, label: "" };
 let AUDIO_LANG = "";
 // v0.40.4 — the marks: the media element the player modal holds, if any
 let PLAY_NODE = null;
+let QUALITY_EST = {};   // v0.40.5: per-probe sizes, keyed by quality chip
 
 function armTake(pick, label, btn) {
   if (!pick) return;
@@ -869,6 +870,7 @@ function renderProbe(url, info) {
   $("playlistRow").classList.add("hidden");
   PLAYLIST = null;
   PLAYLIST_NONE = false;
+  QUALITY_EST = info.quality_estimates || {};
   renderQualityRow(url, info.site_quality);
   renderAudioLangRow(info);
   const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
@@ -945,6 +947,15 @@ function renderQualityRow(url, remembered) {
     const last = remembered && q.key === remembered;
     const btn = el("button", "btn sm" + (last ? " pick" : ""),
       last ? q.label + " · last used" : q.label);
+    const est = QUALITY_EST[q.key];
+    if (est) {
+      // v0.40.5: what this pick will weigh — the site's own advertised
+      // sizes, added the way the pick works (engine-side, per probe)
+      const size = el("span", "qsize", " ~" + humanBytes(est));
+      size.title = "about " + humanBytes(est) +
+        " — the site's advertised sizes, added the way this pick works";
+      btn.append(size);
+    }
     btn.dataset.pick = q.fmt;
     btn.title = last
       ? "your pick for this site last time — click to arm it as the take"
@@ -3851,22 +3862,33 @@ function initFolderSheet() {
  *  review). */
 const BARE_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/\S*)?$/i;
 
-function pastedUrls() {
+function pastedTokens() {
   const text = $("url").value.trim();
-  if (!text) return [];
-  return text.split(/\s+/).filter((s) =>
+  return text ? text.split(/\s+/) : [];
+}
+
+function pastedUrls() {
+  return pastedTokens().filter((s) =>
     /^(https?|ftp|magnet):/i.test(s) || BARE_HOST.test(s));
 }
 
 function renderBatchRow() {
+  const tokens = pastedTokens();
   const urls = pastedUrls();
-  const many = urls.length > 1;
+  const junk = tokens.length - urls.length;
+  const show = tokens.length > 1 || urls.length > 1;
   const over = urls.length > 20;          // the engine's own batch ceiling
-  $("batchRow").classList.toggle("hidden", !many);
-  $("batchCount").textContent = !many ? ""
-    : over ? `${urls.length} links pasted — only 20 fit in one batch`
-    : `${urls.length} links pasted — queue them all?`;
-  $("batchBtn").disabled = over;
+  $("batchRow").classList.toggle("hidden", !show);
+  const links = `${urls.length} ${urls.length === 1 ? "link" : "links"}`;
+  // v0.40.5: a line the paste cannot use is named, not silently uncounted
+  const skipped = junk
+    ? `${junk} skipped — not ${junk === 1 ? "a link" : "links"}` : "";
+  const say = urls.length ? [links, skipped].filter(Boolean).join(" · ") : skipped;
+  $("batchCount").textContent = !show ? ""
+    : over ? `${links} pasted${skipped ? " · " + skipped : ""} — only 20 fit in one batch`
+    : urls.length > 1 ? say + " — queue them all?"
+    : say;
+  $("batchBtn").disabled = over || urls.length < 2;
 }
 
 function initBatch() {

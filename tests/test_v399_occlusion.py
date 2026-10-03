@@ -67,6 +67,13 @@ def test_the_verdict_names_the_two_hidden_shapes():
     assert "persistently hidden" in PROBE
 
 
-def test_whatsnew_has_the_calm():
-    assert '"version": "0.39.9"' in WHATSNEW
-    assert "The calm" in WHATSNEW
+def test_the_calm_entry_retired_cleanly():
+    # The calm shipped with 0.39.9 and was announced in its card. The
+    # rolling card keeps ten entries and retires the oldest — v0.40.5
+    # retired this one, so the announcement lives in git and the release
+    # notes now, and this pin retires WITH the entry (policy: a feature
+    # stays pinned by its living tests — the occlusion probes in this
+    # file; verbatim-entry pins age out with the list). All this test
+    # still guards is that the retirement left no half behind.
+    assert '"version": "0.39.9"' not in WHATSNEW
+    assert "The calm" not in WHATSNEW

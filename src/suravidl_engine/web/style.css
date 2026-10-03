@@ -574,6 +574,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 .qrow .btn .ico { width: 13px; height: 13px; }
+#qualityBtns .qsize {
+  opacity: .72; font-size: 11px; margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+}
 #playlistItems { flex: 1; min-width: 160px; }
 #playlistRow #plCount { margin-left: auto; font-size: .85em; }
 

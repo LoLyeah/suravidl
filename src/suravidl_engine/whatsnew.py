@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.5",
+        "title": "The fill",
+        "items": [
+            "Quality chips now say what each pick will weigh when the site publishes sizes \u2014 the streams' own numbers, added the way the pick works. No sizes published, no claims made.",
+            "The batch line counts out loud as you paste: how many links, and how many lines it skipped \u2014 one link is one link, and the button only appears when there is really a batch.",
+        ],
+    },
+    {
         "version": "0.40.4",
         "title": "The marks",
         "items": [
@@ -82,13 +90,6 @@ ENTRIES = [
         "title": "The walkabout",
         "items": [
             "The dressing was happening before the webview even existed in the window (pywebview parents it at first load), so the calm and the native glass silently never ran on macOS. They now wait for the page to land.",
-        ],
-    },
-    {
-        "version": "0.39.9",
-        "title": "The calm",
-        "items": [
-            "The shell stops flinching at its own window: WKWebView's occlusion detection goes off, so the page is no longer born hidden and CSS animations play on macOS. Also fixed: the native glass never actually inserted.",
         ],
     },
 ]
