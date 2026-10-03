@@ -175,7 +175,10 @@ def test_the_page_steps_aside_only_when_glass_is_real(monkeypatch):
 
 # ---------- the page side ----------
 def test_the_page_yields_to_the_native_material():
-    assert 'html[data-host="darwin-glass"] body { background: transparent; }' in CSS
+    # v0.39.13: a near-opaque wash, not full transparency — the wallpaper
+    # reads as a hint; the `transparent` fallback keeps older shells safe
+    assert ('html[data-host="darwin-glass"] body { background: '
+            'var(--darwin-wash, transparent); }') in CSS
 
 
 # ---------- the dock icon ----------

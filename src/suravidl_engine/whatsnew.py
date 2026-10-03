@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.39.13",
+        "title": "The shade",
+        "items": [
+            "On macOS the page no longer floats straight on the desktop: it sits on a near-opaque wash of its own room, so the wallpaper reads as a faint hint behind the glass instead of as the background.",
+            "Toasts find their spot on the desktop too: the lane now measures what is really docked at the bottom — the transport, the settings Save strip — and tucks into the corner when nothing is.",
+        ],
+    },
+    {
         "version": "0.39.12",
         "title": "The comb",
         "items": [
@@ -79,14 +87,6 @@ ENTRIES = [
         "items": [
             "The footer row, under the download path, gained two doors: FAQ answers the common questions \u2014 cookies, \u201cunsupported URL\u201d, missing 4K, where files go \u2014 and a short tour walks the room, replayable any time.",
             "Probing a playlist now offers the whole thing by default (\u201call 3 \u00b7 Download playlist\u201d) instead of landing on \u201cnone picked\u201d with a dead button; un-ticking everything by hand still refuses politely.",
-        ],
-    },
-    {
-        "version": "0.39.3",
-        "title": "The hem",
-        "items": [
-            "The filed-takes rail keeps its contents inside itself now. Its file line shows just the name \u2014 a Windows path used to arrive whole, slide out of the rail and bleed through the glass onto the neighbouring card's title.",
-            "Long names shorten politely at the rail's edge, and nothing filed in the rail can paint outside it.",
         ],
     },
 ]

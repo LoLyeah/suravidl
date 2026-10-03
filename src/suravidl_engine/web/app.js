@@ -183,19 +183,16 @@ async function commitTake(btn) {
 }
 
 /* ---------- toasts ---------- */
-/** Keep the phone's toast lane clear of the functional strips that are
- *  ACTUALLY docked at the bottom right now — the transport once it pins
- *  (it is sticky, so at the top of a page it is not down there), the
- *  settings Save strip once it docks. Nothing docked: the lane drops to
- *  just above the tab bar (v0.38.2 report: a fixed 84px lane hovered
- *  "above something missing" on Queue). Desktop keeps the CSS lane. */
+/** Keep the toast lane clear of the functional strips that are ACTUALLY
+ *  docked at the bottom right now — the transport once it pins (it is
+ *  sticky, so at the top of a page it is not down there), the settings
+ *  Save strip once it docks. Nothing docked: the lane falls back — just
+ *  above the tab bar on a phone, the corner on desktop. Measured at every
+ *  width (v0.39.13: the desktop's fixed lifts — 86px, 150px on Settings —
+ *  left the lane hovering "like it's floating"). */
 function syncToastLane() {
   const host = $("toasts");
   if (!host) return;
-  if (!window.matchMedia || !matchMedia("(max-width: 899px)").matches) {
-    host.style.bottom = "";
-    return;
-  }
   const vh = window.innerHeight;
   let top = Infinity;
   for (const el of document.querySelectorAll(".transport, #panel-settings .modal-foot")) {

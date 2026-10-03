@@ -25,6 +25,7 @@
 /* ---------- theme tokens ---------- */
 :root, html[data-theme="dark"] {
   --bg: #0f1216;                /* the room at night: cool graphite */
+  --darwin-wash: rgba(15,18,22,.88);   /* the native shell's page wash — v0.39.13 */
   --text: #e8eaed;
   --muted: #a8b1bd;
   --dim: #7f8a97;
@@ -58,6 +59,7 @@
 }
 html[data-theme="light"] {
   --bg: #e7e4de;                /* the room at day: brushed alu + paper tape */
+  --darwin-wash: rgba(231,228,222,.90);   /* the native shell's page wash — v0.39.13 */
   --text: #201d18;
   --muted: #5b564e;
   --dim: #655f56;
@@ -91,6 +93,7 @@ html[data-theme="light"] {
 }
 html[data-theme="amoled"] {
   --bg: #000000;                /* the room with the lights off */
+  --darwin-wash: rgba(0,0,0,.88);   /* the native shell's page wash — v0.39.13 */
   --text: #eef0f3;
   --muted: #a6aeb8;
   --dim: #7e8794;
@@ -181,9 +184,12 @@ footer.meta { order: 4; }
 /* ---------- the native macOS glass (v0.38.4) ----------
    The darwin shell sits the page on Apple's real material (NSGlassEffectView
    — Liquid Glass — on macOS 26+, NSVisualEffectView vibrancy on older
-   releases). The body steps aside; the plates keep their tints and read
-   the native blur directly. */
-html[data-host="darwin-glass"] body { background: transparent; }
+   releases). The body carries a near-opaque wash of the theme's room so the
+   desktop reads as a hint behind the glass, not as the page's background
+   (v0.39.13, first real-glass screenshot: "more solid… but still see it").
+   Alpha >= .86 keeps worst-case contrast over a bright wallpaper past
+   4.5:1; the plates keep their tints on top. */
+html[data-host="darwin-glass"] body { background: var(--darwin-wash, transparent); }
 /* an app, not a document: no selection handles on taps; text you may need
    to copy opts back in below */
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -880,7 +886,7 @@ details.card { padding: 0 18px 6px; }
 
 /* ---------- toasts ---------- */
 #toasts {
-  position: fixed; right: 16px; bottom: 86px; z-index: 60;
+  position: fixed; right: 16px; bottom: 24px; z-index: 60;
   display: flex; flex-direction: column; gap: 10px;
   width: min(430px, calc(100vw - 32px));
   pointer-events: none;
@@ -905,7 +911,9 @@ details.card { padding: 0 18px 6px; }
 .toast .toactions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; flex: none; }
 .toast .toactions .ghost-sm { white-space: nowrap; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } }
-body[data-tab="settings"] #toasts { bottom: 150px; }   /* desktop: above the sticky Save foot (phones override in the mobile block — v0.38.2) */
+/* the desktop lane used to carry fixed lifts (86px base, 150px on Settings);
+   it is measured at every width now, and nothing docked means the corner
+   (v0.39.13) */
 
 /* ---------- overlays & modals ---------- */
 .overlay {

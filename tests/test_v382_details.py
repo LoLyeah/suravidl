@@ -41,8 +41,10 @@ def test_the_phone_toast_lane_measures_instead_of_guessing():
     assert "if (r.bottom < vh - 140) continue;" in APP       # docked-only
     assert "syncToastLane();\n  $(\"toasts\").append(t);" in APP   # wired into toast()
     assert "syncToastLane();\n}" in APP                      # and into showTab's tail
-    # desktop keeps its own settings lane
-    assert 'body[data-tab="settings"] #toasts { bottom: 150px; }' in CSS
+    # the desktop's fixed lifts are gone too — the same measurement runs
+    # at every width now (v0.39.13)
+    assert 'body[data-tab="settings"] #toasts' not in CSS
+    assert "bottom: 86px" not in CSS
 
 
 def test_expanded_card_shows_size_and_location():
