@@ -975,6 +975,168 @@ def _start_badge_poller(window, base_url: str, token: str) -> None:
         pass
 
 
+# ---------- the front door (v0.40.9) ----------
+# The AppImage and the Windows exe run from wherever the user put them —
+# they show up in no menu at all. One flag puts them there: a desktop entry
+# in the user's XDG dirs on Linux (the tally's launcher id, suravidl.desktop,
+# is exactly this file's name), a Start Menu shortcut on Windows. Nothing
+# outside the user's own folders, no sudo, and installing never boots the
+# engine: this is plumbing, not a run.
+
+def app_launch_paths() -> tuple[str, str]:
+    """(target, arguments) for a menu entry that points back at this app."""
+    if os.environ.get("APPIMAGE"):
+        return os.environ["APPIMAGE"], ""          # an AppImage knows itself
+    if getattr(sys, "frozen", False):
+        return sys.executable, ""                  # the one-file build
+    return sys.executable, "-m suravidl_engine"    # a source checkout
+
+
+def desktop_entry_text(target: str, arguments: str = "") -> str:
+    """The freedesktop launcher file, written out in full."""
+    exec_line = f'"{target}"'
+    if arguments:
+        exec_line += f" {arguments}"
+    return "\n".join([
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=suravidl",
+        "Comment=Universal web video downloader",
+        f"Exec={exec_line}",
+        "Icon=suravidl",
+        "Terminal=false",
+        "Categories=AudioVideo;Network;",
+        "",
+    ])
+
+
+def _applications_dir(home: Path) -> Path:
+    return home / ".local" / "share" / "applications"
+
+
+def _icon_dir(home: Path) -> Path:
+    # the shipped tile is 128x128; it is installed as exactly that size
+    return home / ".local" / "share" / "icons" / "hicolor" / "128x128" / "apps"
+
+
+def install_desktop_entry(home: Path | None = None) -> list[Path]:
+    """Write the launcher entry + icon; returns what was written."""
+    home = home or Path.home()
+    target, arguments = app_launch_paths()
+    written: list[Path] = []
+    entry = _applications_dir(home) / "suravidl.desktop"
+    entry.parent.mkdir(parents=True, exist_ok=True)
+    entry.write_text(desktop_entry_text(target, arguments))
+    written.append(entry)
+    icon_src = Path(__file__).parent / "web" / "icon.png"
+    if icon_src.exists():
+        icon_dst = _icon_dir(home) / "suravidl.png"
+        icon_dst.parent.mkdir(parents=True, exist_ok=True)
+        icon_dst.write_bytes(icon_src.read_bytes())
+        written.append(icon_dst)
+    return written
+
+
+def remove_desktop_entry(home: Path | None = None) -> list[Path]:
+    """Take the entry + icon back out; silence when they were never there."""
+    home = home or Path.home()
+    removed: list[Path] = []
+    for path in (_applications_dir(home) / "suravidl.desktop",
+                 _icon_dir(home) / "suravidl.png"):
+        try:
+            path.unlink()
+            removed.append(path)
+        except FileNotFoundError:
+            pass
+    return removed
+
+
+def _refresh_desktop_db(apps_dir: Path) -> None:
+    """Let the desktop notice immediately; the cache is optional."""
+    import shutil
+    import subprocess
+
+    tool = shutil.which("update-desktop-database")
+    if not tool:
+        return
+    try:
+        subprocess.run([tool, str(apps_dir)], check=False,
+                       capture_output=True, timeout=10)
+    except Exception:  # noqa: BLE001 - a stale cache, nothing more
+        pass
+
+
+def _ps_quote(text) -> str:
+    """PowerShell single-quoted literal: an apostrophe doubles."""
+    return "'" + str(text).replace("'", "''") + "'"
+
+
+def windows_shortcut_command(lnk_path, target: str,
+                             arguments: str = "") -> list[str]:
+    """The PowerShell that stamps a .lnk — present on every Windows."""
+    steps = [
+        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut("
+        + _ps_quote(lnk_path) + ")",
+        "$s.TargetPath = " + _ps_quote(target),
+    ]
+    if arguments:
+        steps.append("$s.Arguments = " + _ps_quote(arguments))
+    steps.append("$s.IconLocation = " + _ps_quote(str(target) + ",0"))
+    steps.append("$s.Save()")
+    return ["powershell", "-NoProfile", "-NonInteractive",
+            "-Command", "; ".join(steps)]
+
+
+def start_menu_programs_dir(roaming) -> Path:
+    """Where per-user Start Menu shortcuts live, under %APPDATA%."""
+    return (Path(roaming) / "Microsoft" / "Windows" / "Start Menu" / "Programs")
+
+
+def _desktop_install_cli(uninstall: bool) -> int:
+    """--install-desktop / --uninstall-desktop, per platform, no engine."""
+    import subprocess
+
+    if sys.platform == "darwin":
+        print("On macOS, the dmg window puts suravidl.app in Applications —"
+              " that is already the menu. Nothing to install here.")
+        return 0
+
+    if sys.platform == "win32":
+        roaming = os.environ.get("APPDATA")
+        base = Path(roaming) if roaming else Path.home() / "AppData" / "Roaming"
+        lnk = start_menu_programs_dir(base) / "suravidl.lnk"
+        if uninstall:
+            try:
+                lnk.unlink()
+                print(f"removed {lnk}")
+            except FileNotFoundError:
+                print("suravidl is not in the Start Menu — nothing to remove.")
+            return 0
+        target, arguments = app_launch_paths()
+        lnk.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(windows_shortcut_command(lnk, target, arguments),
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            print("could not create the shortcut — creating one by hand works"
+                  " too (right-click suravidl.exe → Send to → Desktop).")
+            return 1
+        print(f"suravidl is in the Start Menu now — find it any time. ({lnk})")
+        return 0
+
+    # linux: the XDG story
+    if uninstall:
+        gone = remove_desktop_entry()
+        _refresh_desktop_db(_applications_dir(Path.home()))
+        print("suravidl left your applications menu."
+              if gone else "suravidl was not in your applications menu.")
+        return 0
+    written = install_desktop_entry()
+    _refresh_desktop_db(_applications_dir(Path.home()))
+    print("suravidl is in your applications menu now — launch it from there"
+          f" any time. ({written[0]})")
+    return 0
+
+
 def _try_tray(url: str, open_downloads: Path):
     """Tray icon with Open/Quit. Returns the pystray Icon or None."""
     try:
@@ -1033,9 +1195,17 @@ def main() -> None:
     p.add_argument("--no-window", action="store_true",
                    help="force browser mode instead of the app window")
     p.add_argument("--no-tray", action="store_true")
+    p.add_argument("--install-desktop", action="store_true",
+                   help="put suravidl in your applications menu / Start Menu")
+    p.add_argument("--uninstall-desktop", action="store_true",
+                   help="take suravidl back out of the menu")
     p.add_argument("--selftest", action="store_true",
                    help="boot, verify /health, exit (CI)")
     args = p.parse_args()
+
+    if args.install_desktop or args.uninstall_desktop:
+        # plumbing, not a run: no token, no port, no window
+        sys.exit(_desktop_install_cli(uninstall=args.uninstall_desktop))
 
     if args.selftest:
         ok = self_test(download_dir=args.download_dir, port=args.port)

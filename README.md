@@ -47,9 +47,12 @@ reviews: [docs/audits/](docs/audits/)
 
 From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 
-- `suravidl-windows-x64.exe` — double-click.
+- `suravidl-windows-x64.exe` — double-click. Run it once with
+  `--install-desktop` and it appears in your Start Menu like an installed app
+  (`--uninstall-desktop` takes it back out).
 - `suravidl-linux-x64.AppImage` — `chmod +x`, then run it (needs FUSE; otherwise
-  `--appimage-extract-and-run`).
+  `--appimage-extract-and-run`). `--install-desktop` puts it in your applications
+  menu (and lights up docks that read the launcher count).
 - `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first launch
   needs right-click → Open.
 - `app-release.apk` — Android (see below).
@@ -222,7 +225,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 867 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 876 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.9",
+        "title": "The front door",
+        "items": [
+            "suravidl can put itself in your menu now: run the release binary once with --install-desktop and it appears like an installed app \u2014 Start Menu on Windows, applications menu on Linux.",
+            "No admin rights, nothing outside your own folders, and --uninstall-desktop takes it back out; installing never starts the engine or opens a window.",
+        ],
+    },
+    {
         "version": "0.40.8",
         "title": "The swarm",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
             "Big batches stay light: the queue now runs on a small fixed team of workers instead of parking a thread per link \u2014 twenty pasted links cost the same as one, and the queue keeps its order.",
             "The download history got sturdier: it runs in WAL mode now (parallel downloads stop stepping on each other), carries a version stamp, and upgrades older histories on first launch.",
             "Signed links keep their secrets: token, sig and key values in URLs are now redacted from any error the app shows or stores.",
-        ],
-    },
-    {
-        "version": "0.39.13",
-        "title": "The shade",
-        "items": [
-            "On macOS the page no longer floats straight on the desktop: it sits on a near-opaque wash of its own room, so the wallpaper reads as a faint hint behind the glass instead of as the background.",
-            "Toasts find their spot on the desktop too: the lane now measures what is really docked at the bottom — the transport, the settings Save strip — and tucks into the corner when nothing is.",
         ],
     },
 ]
