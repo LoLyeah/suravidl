@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.2",
+        "title": "The sieve",
+        "items": [
+            "The queue has a sieve now: All / Active / Filed / Errors chips hide what you are not looking for \u2014 and when a view hides everything, a line says exactly how many are hidden, one tap from All.",
+            "The chips stay out of the way until there is a queue worth filtering.",
+        ],
+    },
+    {
         "version": "0.40.1",
         "title": "The dial",
         "items": [
@@ -81,14 +89,6 @@ ENTRIES = [
             "The phone app\u2019s built-in browser refuses to be bounced: an off-site redirect or pop-up mid-hunt is stopped cold \u2014 the page and the find list stay put. A refused hop is named and one tap from following.",
             "Classic ad networks no longer load at all in there \u2014 a short deny list serves them empty, which is exactly what they deserve.",
             "The engine no longer lets a fussy notification take it down on start: the mark it wears is dress-up, so a modern Android that dressed it differently gets a graceful fallback, not a dead engine.",
-        ],
-    },
-    {
-        "version": "0.39.6",
-        "title": "The shelf",
-        "items": [
-            "The bottom bar stands in the flow now, like the header \u2014 on Android that is what makes it frost the content scrolling underneath instead of showing it crisp. Same glass, same pin at the thumb.",
-            "The engine notification carries suravidl\u2019s own mark at last: a white take-arrow in the status line and the pine tile beside it \u2014 drawn from this build, not the system\u2019s generic download glyph.",
         ],
     },
 ]

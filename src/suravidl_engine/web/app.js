@@ -55,6 +55,14 @@ function baseName(p) {
 }
 
 const ACTIVE = new Set(["queued", "downloading", "merging"]);
+// v0.40.2 "the sieve": the queue's view filter. Filed and failed are exact
+// sets; ANY other state counts as active — a state the sieve has not met
+// yet must never vanish silently from the view that promises "in play".
+const QUEUE_BUCKETS = {
+  filed: ["completed"],
+  error: ["error", "interrupted"],
+};
+let QFILTER = "all";   // session-only: a filter that survives a reload is a trap
 let DESKTOP = false;
 let APP_INFO = null;   // /app/info payload (desktop capabilities)
 
@@ -1631,6 +1639,7 @@ function deleteButton(j) {
 
 function jobRow(j) {
   const row = el("div", "job");
+  row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   const top = el("div", "jobtop");
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
@@ -1897,6 +1906,7 @@ function jobFileItem(j, file) {
 
 /** Patch an existing row in place (smooth progress); rebuild on status change. */
 function updateJobRow(row, j) {
+  row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   if (row.dataset.sig !== jobSig(j)) {
     const fresh = jobRow(j);
     fresh.dataset.id = j.id;
@@ -1924,6 +1934,58 @@ function updateJobRow(row, j) {
   const meta = row.querySelector(".jmeta");
   if (meta) meta.replaceChildren(...metaParts(j).map((t) => el("span", "", t)));
   return row;
+}
+
+/** Which view a job belongs to (v0.40.2). Unknown states count as active:
+ *  a state the sieve has not met yet should never vanish silently. */
+function queueBucket(status) {
+  if (QUEUE_BUCKETS.filed.includes(status)) return "filed";
+  if (QUEUE_BUCKETS.error.includes(status)) return "error";
+  return "active";
+}
+
+/** Apply QFILTER to the rows on screen right now and say what got hidden,
+ *  so a filtered view never reads as an empty queue. */
+function applyQueueFilter() {
+  const box = $("jobs");
+  if (!box) return;
+  let hidden = 0;
+  for (const row of box.querySelectorAll(".job")) {
+    const show = QFILTER === "all" ||
+                 queueBucket(row.dataset.status || "") === QFILTER;
+    row.classList.toggle("hidden", !show);
+    if (!show) hidden += 1;
+  }
+  const empty = $("filterEmpty");
+  if (empty) {
+    empty.classList.toggle("hidden", hidden === 0);
+    const say = empty.querySelector(".say");
+    if (say) {
+      say.textContent = hidden === 1
+        ? "1 job hidden by this filter"
+        : hidden + " jobs hidden by this filter";
+    }
+  }
+}
+
+/** The chips row: one pick at a time, announced; "Show all" is the way back
+ *  from the counted line. */
+function wireQueueFilters() {
+  const row = $("queueFilters");
+  if (!row) return;
+  row.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-qfilter]");
+    if (!btn) return;
+    QFILTER = btn.dataset.qfilter;
+    for (const b of row.querySelectorAll("[data-qfilter]")) {
+      const on = b === btn;
+      b.classList.toggle("pick", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    applyQueueFilter();
+  });
+  const all = $("filterAll");
+  if (all) all.onclick = () => row.querySelector('[data-qfilter="all"]').click();
 }
 
 let JOBS_SEQ = 0;
@@ -2026,6 +2088,8 @@ async function refreshJobs() {
     // worked (UI review)
     const stale = box.querySelector(".trouble");
     if (stale) stale.remove();
+    // v0.40.2: the sieve's chips follow the queue's real emptiness
+    $("queueFilters").classList.toggle("hidden", !jobs.length);
     // the static boot line ("Checking the queue…") yields to real content
     const boot = box.querySelector("#jobsInitial");
     if (boot) boot.remove();
@@ -2051,6 +2115,8 @@ async function refreshJobs() {
           "Nothing in the queue. Downloads you start land here — finished ones " +
           "stay put so you can open, share or delete them."));
       }
+      const fe = $("filterEmpty");
+      if (fe) fe.classList.add("hidden");
       return;
     }
     const empty = box.querySelector(".empty");
@@ -2075,6 +2141,7 @@ async function refreshJobs() {
     box.querySelectorAll(".job").forEach((r) => {
       if (!keep.has(r.dataset.id)) leaveRow(r);
     });
+    applyQueueFilter();          // v0.40.2: a repaint keeps the view
   } catch (e) {
     if (seq !== JOBS_SEQ) return;
     JOBS_FAILS += 1;
@@ -3498,6 +3565,7 @@ initPlayer();
 initFolderSheet();
 initBatch();
 initArchive();
+wireQueueFilters();
 /* Start on Download — a quit and reopen is a fresh start, not a return to
    wherever the device was left (v0.38.1 report). The URL stays a real
    address: a hash that names a tab (#settings in a bookmark or a link)

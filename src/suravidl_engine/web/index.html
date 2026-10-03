@@ -328,7 +328,15 @@
   <section class="panel hidden" id="panel-queue">
     <section class="card">
       <h2>Downloads</h2>
+      <div id="queueFilters" class="hidden" role="group" aria-label="Filter the queue">
+        <button class="btn sm pick" data-qfilter="all" aria-pressed="true">All</button>
+        <button class="btn sm" data-qfilter="active" aria-pressed="false">Active</button>
+        <button class="btn sm" data-qfilter="filed" aria-pressed="false">Filed</button>
+        <button class="btn sm" data-qfilter="error" aria-pressed="false">Errors</button>
+      </div>
       <div id="jobs"><div class="empty muted" id="jobsInitial">Checking the queue…</div></div>
+      <div id="filterEmpty" class="hidden"><span class="muted small say"></span>
+        <button class="linkbtn" id="filterAll" type="button">Show all</button></div>
     </section>
   </section>
 

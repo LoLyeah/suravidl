@@ -758,6 +758,9 @@ details.card { padding: 0 18px 6px; }
 
 /* ---------- the render rail: job rows ---------- */
 #jobs { display: flex; flex-direction: column; gap: 12px; }
+/* v0.40.2 "the sieve": the queue's view filter */
+#queueFilters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+#filterEmpty { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
 .job {
   position: relative;
   padding: 14px 16px;
