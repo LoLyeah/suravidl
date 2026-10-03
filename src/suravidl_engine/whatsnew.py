@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.4",
+        "title": "The marks",
+        "items": [
+            "The player can set your clip now: Mark in and Mark out write the player's own clock into the clip fields \u2014 cut a section from what you are watching, not from a time typed by memory.",
+            "The marks appear for video players only; an audio file has no picture to cut from.",
+        ],
+    },
+    {
         "version": "0.40.3",
         "title": "The wide view",
         "items": [
@@ -81,13 +89,6 @@ ENTRIES = [
         "title": "The calm",
         "items": [
             "The shell stops flinching at its own window: WKWebView's occlusion detection goes off, so the page is no longer born hidden and CSS animations play on macOS. Also fixed: the native glass never actually inserted.",
-        ],
-    },
-    {
-        "version": "0.39.8",
-        "title": "The truce",
-        "items": [
-            "Some pages notice their ad networks served empty and refuse to run. The phone browser now has a truce switch — “ads blocked / ads allowed” in its second row: flip and reload to let the page in.",
         ],
     },
 ]

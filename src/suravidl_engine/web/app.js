@@ -141,6 +141,8 @@ function liveryOf(extractor) {
 let TAKE = { fmt: null, preset: null, label: "" };
 // v0.40.1 — the audio dial: "" = the site's own pick, else a language code
 let AUDIO_LANG = "";
+// v0.40.4 — the marks: the media element the player modal holds, if any
+let PLAY_NODE = null;
 
 function armTake(pick, label, btn) {
   if (!pick) return;
@@ -3718,6 +3720,9 @@ function openPlayerSrc(title, src, ext) {
     node.src = src;
   }
   body.append(node);
+  PLAY_NODE = node;            // v0.40.4: what the marks read
+  $("markIn").classList.toggle("hidden", !isVideo);
+  $("markOut").classList.toggle("hidden", !isVideo);
   // the lifecycle, not a class poke (the audit): a close timer still
   // pending from 170ms ago could execute and hide the just-opened player
   openModal($("playModal"));
@@ -3727,11 +3732,28 @@ function closePlayer() {
   // the same exit every other dialog uses, then release the media element so a
   // hidden player cannot keep playing; closing used to hard-cut (motion review)
   closeModal($("playModal"));
+  PLAY_NODE = null;            // v0.40.4: nothing left to mark
   setTimeout(() => $("playBody").replaceChildren(), motionMs(180));
+}
+
+/** v0.40.4: Mark in / Mark out — the player's own clock writes the clip
+ *  fields, so a section is cut from what you are watching instead of a
+ *  time typed from memory. */
+function markClip(which) {
+  const node = PLAY_NODE;
+  if (!node) return;
+  const t = node.currentTime;
+  if (typeof t !== "number" || !isFinite(t)) return;
+  const v = clock(t);
+  if (which === "in") $("ovClipStart").value = v;
+  else $("ovClipEnd").value = v;
+  toast(which === "in" ? "clip starts at " + v : "clip ends at " + v);
 }
 
 function initPlayer() {
   $("playClose").onclick = closePlayer;
+  $("markIn").onclick = () => markClip("in");
+  $("markOut").onclick = () => markClip("out");
   $("playModal").onclick = (e) => {
     if (e.target === $("playModal")) closePlayer();
   };
