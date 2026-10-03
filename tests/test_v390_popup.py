@@ -128,8 +128,12 @@ def test_the_background_grew_the_handoff_and_the_health_check():
     assert "res.status === 404 || res.status === 405" in BG_JS
 
 
-def test_the_chooser_is_a_named_radio_group():
-    assert 'role="radiogroup"' in HTML and 'aria-labelledby="pickLabel"' in HTML
+def test_the_chooser_is_a_named_checkbox_group():
+    # v0.39.0: the chooser arrived as a named radio group (one pick).
+    # v0.40.7: it is a named checkbox group — tick several for the quick
+    # door — still announced by its own label, with the select-all door.
+    assert 'role="group"' in HTML and 'aria-labelledby="pickLabel"' in HTML
+    assert 'id="allbtn"' in HTML
     assert ".status:empty { display: none; }" in CSS
 
 

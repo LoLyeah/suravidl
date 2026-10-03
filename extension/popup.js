@@ -7,6 +7,10 @@
 // per-stream rows: the engine does the work, with the captured request
 // headers, from either door.
 //
+// v0.40.7: the chooser is a checkbox list — tick several and the quick door
+// queues them all in one batch call; the quality door keeps its one pick
+// (the first ticked) because the app's chooser is for one stream.
+//
 // Firefox's `chrome` namespace is callback-only (measured on Firefox 157):
 // every `await` here needs the promise namespace, which Firefox calls
 // `browser`; Chrome has no `browser` and its `chrome.*` returns promises.
@@ -17,6 +21,7 @@ let TAB = null;
 let ITEMS = [];      // every find on the tab
 let RANK = null;     // the engine's shape for them (hides fragments)
 let SENT = false;
+let INPUTS = [];     // the live row checkboxes, in list order
 
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
@@ -84,9 +89,32 @@ function streamLabel(m) {
   return info.res ? base + " · " + info.res : base;
 }
 
-function selectedUrl() {
-  const checked = document.querySelector("#streams input:checked");
-  return (checked && checked.value) || (visibleItems()[0] || {}).url || "";
+function checkedUrls() {
+  return INPUTS.filter((i) => i.checked).map((i) => i.value);
+}
+
+// The quality door's pick: the first ticked row — the app's chooser is for
+// ONE stream, and the list order is the reading order.
+function primaryUrl() {
+  return checkedUrls()[0] || (visibleItems()[0] || {}).url || "";
+}
+
+// The doors re-label themselves as the ticks change: one find is a download,
+// several are a batch.
+function refreshDoors() {
+  const n = checkedUrls().length;
+  const quick = $("quick");
+  if (quick) {
+    quick.textContent = n > 1
+      ? "Queue all " + n + " at best quality"
+      : "Quick download — best quality";
+  }
+  const all = $("allbtn");
+  if (all) {
+    const every = INPUTS.length > 0 && INPUTS.every((i) => i.checked);
+    all.textContent = every ? "Select none" : "Select all";
+    all.setAttribute("aria-pressed", String(every));
+  }
 }
 
 // The two doors: "quality" hands the find over (the app opens on the format
@@ -94,6 +122,8 @@ function selectedUrl() {
 async function send(url, mode) {
   if (SENT || !url) return;
   const quick = mode === "quick";
+  const picks = quick ? checkedUrls() : [];
+  const single = !quick || picks.length <= 1;
   const btn = quick ? $("quick") : $("send");
   btn.classList.add("busy");
   $("send").disabled = true;
@@ -102,7 +132,9 @@ async function send(url, mode) {
   let res = null;
   try {
     res = await api.runtime.sendMessage(quick
-      ? { type: "sendToEngine", url }
+      ? (single
+          ? { type: "sendToEngine", url: picks[0] || url }
+          : { type: "sendBatch", urls: picks })
       : {
           type: "sendHandoff",
           url,
@@ -116,7 +148,10 @@ async function send(url, mode) {
     SENT = true;
     btn.classList.remove("busy");
     status(quick
-      ? "✓ Sent — suravidl is downloading it in best quality."
+      ? (single
+          ? "✓ Sent — suravidl is downloading it in best quality."
+          : "✓ Sent — " + res.queued + " downloading at best quality."
+            + (res.skipped ? " " + res.skipped + " skipped." : ""))
       : res.mode === "job"
         ? "✓ Sent — this suravidl build downloads it straight away."
         : "✓ Sent — choose the quality in suravidl.", "ok");
@@ -178,13 +213,14 @@ function render() {
     ? vis.length + " streams found on this page"
     : "Video found on this page";
   $("subline").textContent = many
-    ? "Pick one, then choose the quality in the suravidl app."
+    ? "Tick the ones you want — queue them all at best, or choose quality for the first in the app."
     : "The quality picker is in the app — suravidl opens ready to choose.";
 
   const group = $("pickgroup");
   group.hidden = !many;
   const box = $("streams");
   box.textContent = "";
+  INPUTS = [];
   if (many) {
     // quiet rows, no URLs on their face: each row is named (resolution or
     // filename when the URL offers one, the kind word when it doesn't), and
@@ -202,9 +238,11 @@ function render() {
       const pick = document.createElement("label");
       pick.className = "pickline";
       const input = document.createElement("input");
-      input.type = "radio";
+      input.type = "checkbox";
       input.name = "stream";
       input.value = m.url;
+      input.onchange = refreshDoors;
+      INPUTS.push(input);
       const say = document.createElement("span");
       say.className = "ssay";
       say.textContent = labels[i] + suffix;
@@ -231,10 +269,19 @@ function render() {
     });
     const first = box.querySelector("input");
     if (first) first.checked = true;
+    const all = $("allbtn");
+    if (all) {
+      all.onclick = () => {
+        const every = INPUTS.length > 0 && INPUTS.every((i) => i.checked);
+        for (const i of INPUTS) i.checked = !every;
+        refreshDoors();
+      };
+    }
   }
 
-  $("send").onclick = () => send(selectedUrl(), "quality");
-  $("quick").onclick = () => send(selectedUrl(), "quick");
+  $("send").onclick = () => send(primaryUrl(), "quality");
+  $("quick").onclick = () => send(primaryUrl(), "quick");
+  refreshDoors();
 }
 
 function setEngine(state) {

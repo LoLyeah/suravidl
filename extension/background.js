@@ -256,6 +256,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendToEngine(msg.url).then(sendResponse);
     return true;
   }
+  if (msg && msg.type === "sendBatch") {
+    sendBatchToEngine(msg.urls).then(sendResponse);
+    return true;
+  }
 });
 
 // Which of these is worth showing? The engine's answer, so the popup and the
@@ -311,6 +315,59 @@ async function sendToEngine(url) {
   }
   if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
   return { ok: true, job: await res.json() };
+}
+
+// Queue several finds at once (v0.40.7): the engine's own batch door, which
+// answers per link (`skipped`) instead of failing the lot — one bad row in
+// a handful must not cost the rest. The engine has had /jobs/batch since
+// long before /handoff; an even older one falls back to sending one by one.
+async function sendBatchToEngine(urls) {
+  const list = (urls || []).filter(Boolean).slice(0, 20);
+  if (!list.length) return { ok: false, error: "nothing to send" };
+  const stored = await api.storage.local.get({ engineToken: "" });
+  const eng = await resolveEngine();
+  if (!eng.ok) {
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
+             " — is the suravidl app open?" };
+  }
+  let res;
+  try {
+    res = await fetch(eng.base + "/jobs/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + stored.engineToken,
+      },
+      body: JSON.stringify({ urls: list }),
+    });
+  } catch (e) {
+    RESOLVED = "";   // it moved: look again next time
+    return { ok: false, error: "cannot reach the engine at " + eng.base +
+             " — is the suravidl app open? (" + e + ")" };
+  }
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, error: "the engine refused the token (" + res.status +
+             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             "into the extension's Options (the link below)" };
+  }
+  if (res.status === 404 || res.status === 405) {
+    let queued = 0;
+    for (const u of list) {
+      const one = await sendToEngine(u);
+      if (one.ok) queued += 1;
+    }
+    return queued ? { ok: true, queued, skipped: list.length - queued }
+                  : { ok: false, error: "engine " + res.status };
+  }
+  if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
+  const body = await res.json();
+  const queued = (body.jobs || []).length;
+  const skipped = (body.skipped || []).length;
+  if (!queued) {
+    const why = ((body.skipped || [])[0] || {}).error || "nothing queued";
+    return { ok: false, error: "the engine skipped every link: " + why };
+  }
+  return { ok: true, queued, skipped };
 }
 
 // The engine's port ladder. Keep in sync with _port_candidates() in
@@ -422,4 +479,46 @@ async function sendHandoff(url, urls, tabUrl) {
   return { ok: true, mode: "handoff", handoff: await res.json() };
 }
 
+// Right-click → Download with suravidl (v0.40.7): the quality door, for any
+// link, video, or page — no trip through the toolbar. The menu is rebuilt on
+// every load (MV3 workers restart; removeAll-then-create is the one pattern
+// that never trips the duplicate-id error). Firefox's canonical namespace is
+// `browser.menus` — chrome.contextMenus is not an alias there — so both are
+// tried, and a browser without either simply keeps the popup flow.
+function menuUrl(info) {
+  return (info && (info.srcUrl || info.linkUrl || info.pageUrl)) || "";
+}
+
+function installMenus() {
+  const menus = (globalThis.browser && globalThis.browser.menus) ||
+                (typeof chrome !== "undefined" && chrome.contextMenus);
+  if (!menus || !menus.create || !menus.onClicked) return;
+  try {
+    menus.removeAll(() => {
+      try {
+        menus.create({
+          id: "suravidl-download",
+          title: "Download with suravidl",
+          contexts: ["link", "video", "audio", "page"],
+        }, () => {
+          try { void (chrome.runtime && chrome.runtime.lastError); } catch (_) { /* none */ }
+        });
+      } catch (_) { /* nothing to install into */ }
+    });
+  } catch (_) { /* nothing to install into */ }
+  menus.onClicked.addListener(async (info, tab) => {
+    const url = menuUrl(info);
+    if (!url) return;
+    const res = await sendHandoff(url, [], (tab && tab.url) || (info && info.pageUrl) || "");
+    // no popup to say it in: a quiet "!" on the toolbar until the next send
+    try {
+      if (chrome.action && chrome.action.setBadgeText) {
+        chrome.action.setBadgeText(
+          res && res.ok ? { text: "" } : { text: "!" });
+      }
+    } catch (_) { /* nothing to say it on */ }
+  });
+}
+
 loadPatterns();
+installMenus();

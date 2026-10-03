@@ -20,7 +20,8 @@ const ok = (cond, what) => {
 
 // -- a chrome stub with just enough surface ---------------------------------
 const listeners = { beforeRequest: [], beforeSendHeaders: [], headersReceived: [],
-                    beforeSendHeadersSpec: null };
+                    beforeSendHeadersSpec: null, menuClicks: [] };
+const menusMade = [];
 const store = {};
 const badge = {};
 const fetchCalls = [];
@@ -30,6 +31,11 @@ let onMessage = null;
 
 globalThis.chrome = {
   action: { setBadgeText: ({ tabId, text }) => (badge[tabId] = text) },
+  contextMenus: {
+    create: (props, cb) => { menusMade.push(props); if (cb) cb(); },
+    removeAll: (cb) => { if (cb) cb(); },
+    onClicked: { addListener: (fn) => listeners.menuClicks.push(fn) },
+  },
   storage: {
     local: {
       get(defaults, cb) {
@@ -92,6 +98,15 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   if (url.endsWith("/health")) {
     return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.2" }) };
+  }
+  if (url.endsWith("/handoff")) {
+    return { ok: true, status: 200,
+             json: async () => ({ ok: true, id: "hm1", status: "probing" }) };
+  }
+  if (url.endsWith("/jobs/batch")) {
+    const list = (JSON.parse(opts.body || "{}").urls) || [];
+    return { ok: true, status: 200,
+             json: async () => ({ jobs: list.map((_, i) => ({ id: "B" + i })), skipped: [] }) };
   }
   return { ok: false, status: 404, text: async () => "nope" };
 };
@@ -254,6 +269,52 @@ ok(((store.tabMedia || {})[9] || []).map((m) => m.url).join() === "https://cdn/n
    "…and the new page collects its own");
 ok(badge[9] === "1", "…with a fresh count on the badge");
 
+// 5. right-click → Download with suravidl (v0.40.7): the menu exists after a
+// worker restart, and the deepest thing under the cursor is what gets handed
+// over — a video element beats its wrapping link beats the page
+ok(menusMade.some((m) => m.id === "suravidl-download"
+   && (m.contexts || []).includes("video") && (m.contexts || []).includes("link")
+   && (m.contexts || []).includes("audio") && (m.contexts || []).includes("page")),
+   "the context menu is installed for links, video, audio, and pages");
+ok(listeners.menuClicks.length >= 1, "…with its click listened for");
+const clickMenu = (info, tab) =>
+  listeners.menuClicks[listeners.menuClicks.length - 1](info, tab);
+fetchCalls.length = 0;
+await clickMenu({ srcUrl: "https://cdn/vid.mp4", linkUrl: "https://site/wrap",
+                  pageUrl: "https://site/p" }, { url: "https://site/p" });
+let mCall = fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+ok(mCall && JSON.parse(mCall.opts.body).url === "https://cdn/vid.mp4",
+   "a video right-click hands over the video itself");
+ok(mCall && JSON.parse(mCall.opts.body).tab_url === "https://site/p",
+   "…with the page as its tab");
+fetchCalls.length = 0;
+await clickMenu({ linkUrl: "https://cdn/linked.m3u8", pageUrl: "https://site/p" },
+                { url: "https://site/p" });
+mCall = fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+ok(mCall && JSON.parse(mCall.opts.body).url === "https://cdn/linked.m3u8",
+   "a link right-click hands over the link");
+fetchCalls.length = 0;
+await clickMenu({ pageUrl: "https://site/watch" }, { url: "https://site/watch" });
+mCall = fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+ok(mCall && JSON.parse(mCall.opts.body).url === "https://site/watch",
+   "a page right-click hands over the page's own address");
+
+// 6. the popup's quick door for several finds (v0.40.7): one batch call to
+// the engine's own batch endpoint — /jobs/batch, never N single jobs
+const batched = await new Promise((resolve) => {
+  const keep = onMessage({ type: "sendBatch",
+                           urls: ["https://cdn/a.mp4", "https://cdn/b.mp4"] }, {}, resolve);
+  ok(keep === true, "sendBatch answers asynchronously");
+});
+const batchCall = fetchCalls.filter((c) => c.url.endsWith("/jobs/batch")).pop();
+ok(batchCall && batchCall.opts.method === "POST", "the batch is a POST to /jobs/batch");
+ok(batchCall && JSON.parse(batchCall.opts.body).urls.length === 2,
+   "carrying every ticked find");
+ok(batchCall && String(batchCall.opts.headers.Authorization).startsWith("Bearer"),
+   "…with the engine token");
+ok(batched && batched.ok && batched.queued === 2,
+   "the engine's own count comes back to the popup");
+
 // — the Firefox flavor -------------------------------------------------------
 // Measured on Firefox 157 while the AMO-listed 0.5.2 build was broken:
 // `chrome.*` is a callback-only shim (tabs.query / sendMessage /
@@ -269,6 +330,7 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
     listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [] },
     spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onUpdated: [], onMessage: null,
     jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
+    batchStatus: 200, batchSkipped: false,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const readStore = (defaults) => {
@@ -328,7 +390,9 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
       openOptionsPage() {},
     },
   };
-  // the promise namespace
+  // the promise namespace — Firefox's canonical menus live here, NOT on
+  // chrome.* (measured: chrome.contextMenus is not a Firefox alias)
+  const ffMenus = { made: [], clicks: [] };
   const browserStub = {
     storage: { local: {
       get: (defaults) => Promise.resolve(readStore(defaults)),
@@ -336,6 +400,11 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
     } },
     tabs: { query: () => Promise.resolve([{ id: 7 }]) },
     runtime: { sendMessage: sendToBg, openOptionsPage() {} },
+    menus: {
+      create: (props, cb) => { ffMenus.made.push(props); if (cb) cb(); return Promise.resolve(); },
+      removeAll: (cb) => { if (cb) cb(); return Promise.resolve(); },
+      onClicked: { addListener: (fn) => ffMenus.clicks.push(fn) },
+    },
   };
 
   const saved = { chrome: globalThis.chrome, browser: globalThis.browser,
@@ -364,6 +433,18 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
                  json: async () => ({ ok: true, id: "h1", status: "probing" }) };
       }
       return { ok: false, status: ff.handoffStatus, text: async () => '{"detail":"gone"}' };
+    }
+    if (url.endsWith("/jobs/batch")) {
+      if (ff.batchStatus === 401) {
+        return { ok: false, status: 401, text: async () => '{"detail":"unauthorized"}' };
+      }
+      if (ff.batchSkipped) {
+        return { ok: true, status: 200,
+                 json: async () => ({ jobs: [], skipped: [{ url: "u0", error: "not a link" }] }) };
+      }
+      const list = (JSON.parse(opts.body || "{}").urls) || [];
+      return { ok: true, status: 200,
+               json: async () => ({ jobs: list.map((_, i) => ({ id: "B" + i })), skipped: [] }) };
     }
     if (url.endsWith("/jobs")) {
       if (ff.jobsStatus === 200) {
@@ -415,6 +496,33 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
        "firefox: …and the captured request headers");
     ok(String(hCall.opts.headers.Authorization).startsWith("Bearer"),
        "firefox: …with the token");
+
+    // right-click → Download with suravidl (v0.40.7), through the promise
+    // namespace — this must not depend on chrome.contextMenus existing
+    ok(ffMenus.made.some((m) => m.id === "suravidl-download"),
+       "firefox: the context menu installs through browser.menus");
+    ff.fetchCalls.length = 0;
+    await ffMenus.clicks[ffMenus.clicks.length - 1]({ srcUrl: "https://cdn/ffmenu.mp4" },
+                                                    { url: "https://ffsite/p" });
+    const fmCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(fmCall && JSON.parse(fmCall.opts.body).url === "https://cdn/ffmenu.mp4",
+       "firefox: a video right-click hands over the video");
+
+    // the popup's quick door for several finds (v0.40.7): one batch call,
+    // answered per-link; all-skipped and 401 both stay speakable
+    const fB = await sendToBg({ type: "sendBatch", urls: ["u1", "u2", "u3"] });
+    ok(fB && fB.ok && fB.queued === 3, "firefox: sendBatch queues every find");
+    ff.batchSkipped = true;
+    const fSkip = await sendToBg({ type: "sendBatch", urls: ["u1"] });
+    ok(fSkip && !fSkip.ok && /skipped/.test(fSkip.error || ""),
+       "firefox: a batch where every link was skipped is a failure to report");
+    ff.batchSkipped = false;
+    ff.batchStatus = 401;
+    const fDenied = await sendToBg({ type: "sendBatch", urls: ["u1"] });
+    ok(fDenied && !fDenied.ok && /token/i.test(fDenied.error || ""),
+       "firefox: a 401 on the batch says the token is the problem");
+    ff.batchStatus = 200;
+
     ff.handoffStatus = 404;
     const older = await sendToBg({ type: "sendHandoff", url: "https://cdn/ff.mp4" });
     ok(older && older.ok && older.mode === "job" && older.job.id === "J7",
@@ -494,7 +602,7 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
                  "headline", "subline", "pickgroup", "streams", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
-                 "optsLink", "ver"];
+                 "optsLink", "ver", "allbtn"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
@@ -625,6 +733,49 @@ ok(badge[9] === "1", "…with a fresh count on the badge");
     const p2 = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
     ok(JSON.parse(p2.opts.body).url === "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4",
        "firefox: the chosen stream is the one handed over");
+
+    // — v0.40.7: tick several, and the quick door takes them all in one
+    //   call — the quality door keeps its single first-ticked pick —
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    const brows = nodes.streams.children;
+    brows[1].children[0].children[0].checked = true;
+    brows[2].children[0].children[0].checked = true;
+    if (typeof brows[2].children[0].children[0].onchange === "function") {
+      brows[2].children[0].children[0].onchange();
+    }
+    ok(String(nodes.quick.textContent).startsWith("Queue all 3"),
+       "firefox: the quick door says how many it will take");
+    ff.fetchCalls.length = 0;
+    await nodes.quick.onclick();
+    const bCallFF = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs/batch")).pop();
+    const bBodyFF = bCallFF && JSON.parse(bCallFF.opts.body);
+    ok(bBodyFF && bBodyFF.urls.length === 3,
+       "firefox: quick download queues every ticked find in one call");
+    ok(bCallFF && String(bCallFF.opts.headers.Authorization).startsWith("Bearer"),
+       "firefox: …with the token");
+    ok(/✓ Sent — 3 downloading at best quality/.test(nodes.status.textContent),
+       "firefox: …and says how many are downloading");
+
+    // — select all: one press ticks every row, the door flips its label —
+    nodes = installDom(mkNodes());
+    try { new Function(popupSrc)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    nodes.allbtn.onclick();
+    ok(nodes.streams.children.every((r) => r.children[0].children[0].checked),
+       "firefox: Select all ticks every row");
+    ok(String(nodes.allbtn.textContent) === "Select none"
+       || String(nodes.allbtn.getAttribute("aria-pressed")) === "true",
+       "firefox: …and the door says what a second press will do");
 
     // — a tab walking to a new page resets its list (same bug, this flavor) —
     ff.listeners.beforeRequest[0]({ tabId: 8, type: "media", url: "https://cdn/ff-old-page" });

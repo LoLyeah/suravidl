@@ -156,6 +156,13 @@ def test_the_probe_serves_a_real_url():
     assert '"suravidl motion probe", url,' in PROBE
 
 
-def test_whatsnew_has_the_sibling():
-    assert '"version": "0.39.11"' in WHATSNEW
-    assert "The sibling" in WHATSNEW
+def test_the_sibling_entry_retired_cleanly():
+    # The sibling shipped with 0.39.11 and was announced in its card. The
+    # rolling card keeps ten entries and retires the oldest — v0.40.7
+    # retired this one, so the announcement lives in git and the release
+    # notes now, and this pin retires WITH the entry (policy: a feature
+    # stays pinned by its living tests — the material pins in this file;
+    # verbatim-entry pins age out with the list). All this test still
+    # guards is that the retirement left no half behind.
+    assert '"version": "0.39.11"' not in WHATSNEW
+    assert "The sibling" not in WHATSNEW

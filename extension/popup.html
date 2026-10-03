@@ -23,8 +23,9 @@
         <h1 id="headline"></h1>
         <p class="sub" id="subline"></p>
         <div class="pickgroup" id="pickgroup" hidden>
-          <div class="lbl" id="pickLabel">which stream</div>
-          <div class="streams" id="streams" role="radiogroup" aria-labelledby="pickLabel"></div>
+          <div class="lbl" id="pickLabel">which ones</div>
+          <div class="streams" id="streams" role="group" aria-labelledby="pickLabel"></div>
+          <button class="more" id="allbtn" type="button" aria-pressed="false">Select all</button>
         </div>
         <button class="send" id="send">Choose quality in suravidl</button>
         <button class="ghost wide" id="quick">Quick download — best quality</button>
@@ -47,7 +48,7 @@
 
     <footer>
       <a href="#" id="optsLink">Engine settings…</a>
-      <span class="ver" id="ver">v0.5.8</span>
+      <span class="ver" id="ver">v0.5.9</span>
     </footer>
     <script src="popup.js"></script>
   </body>

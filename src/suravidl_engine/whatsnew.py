@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.7",
+        "title": "The handful",
+        "items": [
+            "The extension popup's stream list is a checkbox list now \u2014 tick several finds and the quick door queues them all at best quality in one go.",
+            "Right-click any link, video, or page for \"Download with suravidl\" \u2014 straight to the app's quality picker, no trip through the toolbar.",
+        ],
+    },
+    {
         "version": "0.40.6",
         "title": "The tally",
         "items": [
@@ -84,13 +92,6 @@ ENTRIES = [
         "title": "The comb",
         "items": [
             "An external audit of the motion system, confirmed finding by finding: the glass tracks resizes, macOS calls ride the main thread, the calm flips once and nudges, and the probe reports what it actually found.",
-        ],
-    },
-    {
-        "version": "0.39.11",
-        "title": "The sibling",
-        "items": [
-            "The glass covered the page — everything a blur. The material now hosts in the webview's own superview, framed to it, never as a child. The probe serves a real URL so the webview gets parented and the walk answers.",
         ],
     },
 ]

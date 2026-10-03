@@ -35,6 +35,8 @@ jobs:
           node --check extension/background.js
           node --check extension/popup.js
           node --check extension/options.js
+      - name: Run the extension harness (background + popup, Firefox flavor included)
+        run: node extension/test_harness.mjs
       - name: Validate manifests
         run: |
           node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json')); JSON.parse(require('fs').readFileSync('extension/firefox/manifest.json')); console.log('manifests OK')"
