@@ -1,6 +1,6 @@
 ---
 name: suravidl
-description: "The Post House — an ingest room: graphite ground, smoked-glass plates, signal amber for action, scope green for state"
+description: "The Post House — an ingest room: graphite ground, smoked-glass plates, signal amber or the pine & cream voice for action, scope green for state"
 colors:
   graphite-ground: "#0f1216"
   day-room: "#e7e4de"
@@ -11,6 +11,8 @@ colors:
   signal-amber: "#e8a33e"
   lamp-full: "#f3c169"
   amber-ink: "#f0c98a"
+  pine-voice: "#14493C"
+  cream-voice: "#F2E9D8"
   scope-green: "#4ecf83"
   tally-rose: "#ff8078"
   smoked-glass: "rgba(232, 236, 240, 0.05)"
@@ -18,10 +20,11 @@ colors:
   ink-well: "rgba(4, 6, 8, 0.45)"
   panel-solid: "#14181d"
   lamp-glow: "rgba(232, 163, 62, 0.10)"
+  darwin-wash: "rgba(15, 18, 22, 0.88)"
 typography:
   title:
     fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
-    fontSize: "15px"
+    fontSize: "15.5px"
     fontWeight: 700
   body:
     fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
@@ -31,19 +34,26 @@ typography:
     letterSpacing: "0.1px"
   label:
     fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
-    fontSize: "10px"
-    fontWeight: 700
-    letterSpacing: "0.14em"
+    fontSize: "11px"
+    fontWeight: 600
+    letterSpacing: "0.09em"
   mono:
     fontFamily: "'Martian Mono', ui-monospace, Menlo, monospace"
     fontSize: "12.5px"
     fontWeight: 400
+  readout:
+    fontFamily: "'Martian Mono', ui-monospace, Menlo, monospace"
+    fontSize: "19px"
+    fontWeight: 600
+    letterSpacing: "-0.02em"
 rounded:
   sm: "8px"
   md: "9px"
   lg: "13px"
   xl: "16px"
   surface: "20px"
+  toast: "12px"
+  bay: "14px"
   pill: "999px"
 spacing:
   xs: "6px"
@@ -57,6 +67,8 @@ components:
     textColor: "#1a1305"
     rounded: "{rounded.md}"
     padding: "12px 22px"
+  button-primary-hover:
+    backgroundColor: "{colors.lamp-full}"
   button-glass:
     backgroundColor: "{colors.smoked-glass}"
     textColor: "{colors.film-white}"
@@ -92,6 +104,8 @@ showroom. Every surface is a smoked-glass instrument plate with a hairline
 edge and one inset highlight; the only warm light in the room is the practical
 lamp above the deck, and amber is what that lamp is made of: the START button,
 the active tab's underline, an LED going live, the selection you just made.
+The lamp has a second colour the user can choose — **pine & cream**, the
+brand's own voice — and nothing else in the room changes with it.
 
 The mood is calm and operational. An instrument, so numbers are the point:
 every readout — scope values, file sizes, durations, versions, paths — is set
@@ -106,13 +120,18 @@ before they are written in stack traces, and a finished download says so.
 - Smoked glass over one soft room lamp — a single radial glow, no
   background blur layer (the old three-radial aurora cost phones battery
   for decoration).
-- One action colour: signal amber, only where you press or progress. Three
-  state colours (scope green / tally rose / warm amber) only ever carry state.
+- One action light, two voices: signal amber (the house lamp) by default,
+  or the pine & cream scheme — fills, borders, glows and washes all follow
+  the accent; the three state lights (scope green / tally rose / warm
+  amber) only ever carry state and never repaint with it.
 - Two voices, both shipped with the app: Archivo for prose, Martian Mono for
   every machine readout.
 - Machine-instrument shapes: 8–14px controls, 20px floating plates; pills for
   state. Nothing sharper than 8px, nothing rounder than a pill.
 - Motion stays under half a second; reduced-motion stops it — never shortens it.
+- On macOS the room itself is Apple's real glass: the page sits on Liquid
+  Glass / vibrancy through a transparent window, behind a near-opaque wash
+  of the theme's tone — the desktop reads as a hint, never as the background.
 
 ## Colors
 
@@ -120,7 +139,9 @@ A film-lab palette: graphite ink, film-white text, and the amber of a single
 practical lamp, plus three honest state lights. The dark theme is normative;
 light and AMOLED re-value the same roles (light darkens amber to #c07a16 with
 #6b4308 as its ink so small amber text keeps 4.5:1; AMOLED sets the ground to
-true #000 and drops shadows for hairlines).
+true #000 and drops shadows for hairlines). The accent has two voices —
+signal amber and the pine & cream scheme; the state lights are signals, not
+brand, and never follow it.
 
 ### Primary
 - **Signal Amber** (#e8a33e): the action colour — the START and Probe fills,
@@ -129,6 +150,11 @@ true #000 and drops shadows for hairlines).
 - **Lamp Full** (#f3c169): amber at full — hover on the primary fill only.
 - **Amber Ink** (#f0c98a): amber as text — link buttons, readouts in an armed
   state, "this download only" markers. In light theme: #6b4308.
+- **Pine & Cream — the scheme's second voice** (scheme `pine`): the same
+  accent roles, re-valued in two tones. Light room: pine #14493C with cream
+  #F2E9D8 as its ink. Dark and AMOLED rooms flip the chip: cream #F2E9D8
+  with pine #14493C ink — dark pine sinks to 1.8:1 on graphite, the same
+  measured swap the mark's theme twins make.
 
 ### Secondary (status)
 - **Scope Green** (#4ecf83): good — completed pills, live scope LEDs, the
@@ -149,6 +175,8 @@ true #000 and drops shadows for hairlines).
   fields read as recessed.
 - **Panel Solid** (#14181d): the one honest slab — toasts and flattened
   surfaces where reading beats atmosphere.
+- **Darwin Wash** (rgba(15,18,22,.88) at night): the page's own wash on the
+  native macOS shell — the desktop shows through as a hint, never as ground.
 
 ### Named Rules
 **The One Lamp Rule.** Each plate has at most ONE filled amber control; every
@@ -158,6 +186,10 @@ or an LED. Two filled amber buttons side by side is a signal failure.
 **The Live-Light Rule.** Amber/Green/Rose never decorate: an LED is lit only
 while its state is true (live, armed, filed, refused), and glow follows power
 — lit LEDs glow faintly, dark ones don't.
+
+**The Two Voices Rule.** The scheme switch re-values the accent family alone
+— fills, hairlines, glows, the selection wash and the room lamp all ride the
+accent tokens; the neutrals and the three state lights never repaint with it.
 
 ## Typography
 
@@ -174,11 +206,12 @@ product.
 ### Hierarchy
 - **Title** (700, 15–16px): card titles and probe headings.
 - **Body** (400, 14px, line-height 1.5): controls, inputs, descriptions.
-- **Label** (700, 9.5–10px, letter-spacing .14em, uppercase): scope names,
-  card kickers, section heads — small, spaced, quiet by design.
+- **Label** (600, 10–11px, letter-spacing .09–.14em, uppercase): scope names
+  (10px), card kickers, section heads — small, spaced, quiet by design.
 - **Small** (400, 12–12.5px): hints, footnotes, counters.
-- **Readout / Mono** (400, 11.5–15px): scope readings (the largest mono in the
-  app), sizes, durations, paths, versions, error bodies, file names.
+- **Readout / Mono** (400–600, 12–19px): scope readings — the largest mono in
+  the app at 19px/600 — sizes, durations, paths, versions, error bodies,
+  file names.
 
 ### Named Rules
 **The Machine Voice Rule.** Anything a machine produced or consumes — sizes,
@@ -202,7 +235,10 @@ composites the backdrop pass in flow but not for fixed layers over scrolling
 content (device photo, 2026-10-01), and in flow the bar can never overlap
 the page's end. The patch bay ("This download only") sits under
 the deck; Settings is a tab panel with sub-tabs and a sticky Save bar that
-keeps the plate's glass and its bottom corners.
+keeps the plate's glass and its bottom corners. Under the deck's footer sits
+the meta row — the saved-to path in mono with copy / open, and the two
+doors: FAQ answers the common questions, and a replayable tour walks the
+room.
 
 Spacing stays on a compact rhythm — 6 / 10 / 14 / 18 / 22px. Cards stack with
 16px gaps; controls in a row breathe with 10–14px.
@@ -258,6 +294,16 @@ changing tokens, never surface by surface.
   the pour carries the plate. Where a WebView truly cannot blur, the
   `@supports` block turns every plate solid — a fake half-glass never
   ships.
+- **The native shell (macOS):** the window is transparent and the whole page
+  rides Apple's real material — Liquid Glass (`NSGlassEffectView`) on
+  macOS 26+, vibrancy (`NSVisualEffectView`) on older releases. The page
+  carries a near-opaque wash of the theme's tone (`--darwin-wash`: graphite
+  `rgba(15,18,22,.88)`, day-room `rgba(231,228,222,.90)`, AMOLED
+  `rgba(0,0,0,.88)`). Alpha ≥ .86 is the contrast floor — even a white
+  wallpaper spot keeps body text at 4.5:1 — and the desktop stays a blur
+  you can feel more than see. Plates keep their tints, blur and hairlines
+  on top of the wash; the material reads through, the page never sits bare
+  on it.
 - **Where it lands:** header, tab bar, cards, glass buttons, the scope
   strip, the patch bay, job rows, the transport, dialogs. A dialog's
   full-screen overlay frosts behind it too (`blur(10px) saturate(120%)`
@@ -281,6 +327,11 @@ stack, and one capture with real content passing behind the plate —
 compared by edge energy (blurred vs crisp). A build that shipped working
 blur keeps it until pixels prove otherwise.
 
+**The Wash Rule.** The page never floats bare on the native material, and
+the wash never drops below the contrast floor — deep enough that text holds
+over any wallpaper, shallow enough that the desktop stays a hint behind the
+glass.
+
 **The AMOLED Hairline Rule.** Where there is no shadow (AMOLED), borders carry
 all separation; never re-introduce grey shadows there.
 
@@ -289,9 +340,9 @@ all separation; never re-introduce grey shadows there.
 Machined plates: 8–9px for buttons and fields, 12–13px for the transport and
 toasts, 14px for the patch bay, 20px for cards, modals and the FILED stamp's
 plate family; full pills (999px) for chips, status and the progress bar. The
-app mark is a 30px rounded square (9px radius) in Signal Amber carrying the
-letterform. Borders are 1px hairlines that strengthen to accent-line on
-selection, focus or an armed state.
+app mark is a 30px rounded square (9px radius) in the theme's brand chip
+carrying the letterform. Borders are 1px hairlines that strengthen to
+accent-line on selection, focus or an armed state.
 
 ### Named Rules
 **The Nothing Sharp Rule.** If it can be touched, it is rounded ≥8px. Radii
@@ -311,8 +362,8 @@ Tactile instruments — machined glass you can press.
 The deck's one starter: a TAKE readout in mono ("best available", or the
 armed pick's label in amber ink), a Studio ghost button (opens the patch
 bay), and the START lamp — the ONE amber fill of the region. Its label echoes
-the take ("START · 720p"). Fixed above the phone tab bar; sticky at the
-deck's end on desktop. Fired = spent: the take clears, every pick unlights,
+the take ("START · 720p"). Parked sticky above the phone tab bar; sticky at
+the deck's end on desktop. Fired = spent: the take clears, every pick unlights,
 the readout returns to "best available".
 
 ### Switchgear (picks)
@@ -328,15 +379,16 @@ the deck, press START"), bad (rose LEDs + a say line pointing at the error
 above). The strip is read, not pressed.
 
 ### Buttons
-- **Primary (`.btn.prime`):** Signal Amber fill, #1a1305 text, 700, glow
-  `0 10px 22px -10px rgba(232,163,62,.55)` + inset top light. One per plate.
+- **Primary (`.btn.prime`):** the accent fill (amber by default; pine or
+  cream under the pine scheme), dark scheme ink, 700, glow
+  `0 10px 22px -10px var(--accent-glow)` + inset top light. One per plate.
 - **Glass (`.btn`):** smoked fill over blur, hairline, film-white text;
   hover lifts the fill and warms the border (hover-capable pointers only).
 - **Ghost (`.ghost-sm`):** transparent, hairline, muted; destructive variants
   carry tally rose. Row actions live here.
 - **States:** press scales to .97; busy pulses (1.1s) and refuses pointers;
-  disabled drops opacity and refuses transform; focus-visible is a 2px amber
-  outline at 2px offset — everywhere, always.
+  disabled drops opacity and refuses transform; focus-visible is a 2px
+  accent outline at 2px offset — everywhere, always.
 
 ### Job rows
 Pill + (completed) FILED stamp; title link; mono meta (size · time · site);
@@ -344,7 +396,10 @@ path line in mono; actions Play / Copy / Retry / Delete (+ "Edit & retry").
 A failed row leads with the human sentence in tally rose ("the site says this
 link does not exist (404) — check it was copied whole"); the raw engine text
 sits clamped behind "Show details". A live row's fill glides for exactly one
-poll interval (1.1s linear) so it never stalls between polls.
+poll interval (1.1s linear) so it never stalls between polls. The title folds
+open a receipt — the real bytes on disk and the saved path in mono — and the
+open state rides an explicit row class (no `:has()`), so engines without it
+still expand it.
 
 ### The FILED TAKES rail (≥1080px)
 Newest takes first: bin title + mono file name, count badge in amber. The
@@ -353,8 +408,17 @@ rail is a shelf, not a second queue — its items open the take.
 ### Toasts
 Near-opaque plate, 12px radius, a state dot (green / rose / amber), message
 13px; choices wrap under the message. Completion toasts carry actions (Play /
-Show folder) and the toast lane sits above the mobile tab bar and the
-Settings Save bar (lane math via --tabbar-h).
+Show folder). The lane is measured, never tuned: at every width it lifts
+above what is actually docked at the bottom right now — the transport once it
+pins, the settings Save strip while it is up — and falls back to just above
+the tab bar on phones and the bottom corner on desktop.
+
+### The Appearance swatches
+Three rows of tiles in Settings: theme (Light / Dark / AMOLED), glass finish
+(Frosted / Liquid) and scheme (Amber / Pine & cream). Each tile is a mini
+preview of the room it opens; the chosen one wears the accent edge with a
+soft ring, and picking re-dresses the whole room in one transition and says
+so in a toast. Under the pine scheme the theme previews wear the pine lamp.
 
 ### Named Rules
 **The Machined Press Rule.** Every control answers a press physically before
@@ -365,12 +429,17 @@ ships without a press state.
 transition-fired toast with real actions, a stamp on the row, the take in the
 bins. Nothing important settles silently in a tab nobody is watching.
 
+**The Measured Lane Rule.** A floating lane never guesses: it measures what
+is actually docked at the bottom right now and lifts above it; nothing
+docked, it falls to the host's own corner. A fixed lift tuned for one tab is
+a bug with a delay.
+
 ## Do's and Don'ts
 
 ### Do:
 - **Do** keep amber scarce and purposeful: fills only on the one action per
   plate, elsewhere hairline / glow / underline / LED.
-- **Do** give every focusable element a 2px amber `:focus-visible` ring at
+- **Do** give every focusable element a 2px accent `:focus-visible` ring at
   2px offset, and every touchable one a press state.
 - **Do** guard all hover styling in `@media (hover: hover)`; on touch screens
   the press state is the only feedback.
@@ -378,15 +447,20 @@ bins. Nothing important settles silently in a tab nobody is watching.
   the Martian Mono stack, and machine numbers at readout size on the scopes.
 - **Do** stop motion — not shorten it — under `prefers-reduced-motion`;
   infinite animations must be set to none (a .001s infinite loop is MORE
-  motion, not less).
+  motion, not less) and the delays zeroed, or staggered rows still wait out
+  their choreography.
 - **Do** keep touch targets ≥44px tall on coarse pointers
   (`@media (pointer: coarse)`) with safe-area padding at the bottom edge.
 - **Do** keep every blurred surface paired with `-webkit-backdrop-filter` and
   a solid `@supports` fallback.
+- **Do** keep the darwin wash at .86 alpha or deeper — it is the contrast
+  floor over any wallpaper, and the reason the page never sits bare on the
+  material.
 
 ### Don't:
-- **Don't** add accent hues beyond signal amber + the three state lights; a
-  second decorative hue is how this room stops reading as one instrument.
+- **Don't** add accent hues beyond the two sanctioned voices (signal amber,
+  pine & cream) and the three state lights; a third decorative hue is how
+  this room stops reading as one instrument.
 - **Don't** reintroduce gradient chrome: the only sanctioned gradient is the
   liquid glass's specular gloss (a material), never a coloured button fill.
 - **Don't** use pure black (#000) except AMOLED's ground and video
@@ -399,6 +473,8 @@ bins. Nothing important settles silently in a tab nobody is watching.
   corner on a floating surface.
 - **Don't** start a download from a pick, and don't light two picks at once —
   the transport is the only starter, and the take is one thing.
+- **Don't** let the page float bare on the native material or drop the wash
+  below the contrast floor — the desktop is a hint, never the ground.
 
 ## The mark (brand)
 
@@ -417,7 +493,8 @@ and the Android `mipmap-*` sets is generated from those masters by
     2.0:1 AMOLED); the cream chip reads like the header glow (15.6:1 / 17.4:1).
   - The header mark consumes `--mark-tile` / `--mark-arrow` from the theme
     blocks; the launcher and favicon files are the pine tile in every theme —
-    system surfaces don't follow app themes.
+    system surfaces don't follow app themes, and the accent scheme never
+    repaints the mark.
 - **Do** keep the play a knockout and the geometry untouched; **don't** recolor
   the tile to amber — amber is the instrument's signal, not the brand, and the
   mark must survive at 16px (the old blue mark did not).
