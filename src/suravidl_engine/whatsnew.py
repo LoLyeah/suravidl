@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.40.1",
+        "title": "The dial",
+        "items": [
+            "Videos with several audio languages now show a chooser in the patch bay: pick one and a video-only take pairs THAT track \u2014 the site\u2019s own pick still stands behind it if the video lacks your choice.",
+            "The formats list stopped hiding dubs: two languages of one quality are two rows now, each saying which language it is.",
+        ],
+    },
+    {
         "version": "0.40.0",
         "title": "The workbench",
         "items": [
@@ -81,13 +89,6 @@ ENTRIES = [
         "items": [
             "The bottom bar stands in the flow now, like the header \u2014 on Android that is what makes it frost the content scrolling underneath instead of showing it crisp. Same glass, same pin at the thumb.",
             "The engine notification carries suravidl\u2019s own mark at last: a white take-arrow in the status line and the pine tile beside it \u2014 drawn from this build, not the system\u2019s generic download glyph.",
-        ],
-    },
-    {
-        "version": "0.39.5",
-        "title": "The frost",
-        "items": [
-            "The tour\u2019s caption card now wears the same frosted glass as every dialog \u2014 a real-compositor shot caught the page reading through it, and it was re-shot to prove the fix.",
         ],
     },
 ]

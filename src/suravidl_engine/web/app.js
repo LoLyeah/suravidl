@@ -131,6 +131,8 @@ function liveryOf(extractor) {
  *  newest arm replaces the old), the START lamp commits it, and a commit
  *  spends the take (one-shot, like the patch bay below). */
 let TAKE = { fmt: null, preset: null, label: "" };
+// v0.40.1 — the audio dial: "" = the site's own pick, else a language code
+let AUDIO_LANG = "";
 
 function armTake(pick, label, btn) {
   if (!pick) return;
@@ -552,15 +554,68 @@ function refreshSoundLabels() {
   }
 }
 
+/** v0.40.1 "the dial": multi-language sites publish one audio format per
+ *  language (dubs). Collect the languages the probe actually found. */
+function audioLangs(info) {
+  const seen = new Map();
+  for (const f of (info.formats || [])) {
+    if (!f.format_id || hasVideo(f) || !hasAudio(f) || !f.language) continue;
+    seen.set(String(f.language), true);
+  }
+  return [...seen.keys()].sort();
+}
+
+/** The chooser offers only real languages — "auto" (the site's own pick)
+ *  first — and hides itself when there is nothing to choose. A pick the new
+ *  video does not carry is dropped back to auto. */
+function renderAudioLangRow(info) {
+  const row = $("audioLangRow");
+  const box = $("audioLangChips");
+  if (!row || !box) return;
+  const langs = audioLangs(info);
+  if (langs.length < 2) {
+    row.classList.add("hidden");
+    box.innerHTML = "";
+    AUDIO_LANG = "";
+    return;
+  }
+  if (AUDIO_LANG && !langs.includes(AUDIO_LANG)) {
+    AUDIO_LANG = "";             // gone from this video — back to auto
+  }
+  row.classList.remove("hidden");
+  box.innerHTML = "";
+  for (const val of ["", ...langs]) {
+    const on = AUDIO_LANG === val;
+    const btn = el("button", "btn sm" + (on ? " pick" : ""),
+                   val === "" ? "auto" : val);
+    btn.type = "button";
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = val === ""
+      ? "the site's own choice of audio track"
+      : "pair takes with the " + val + " audio track";
+    btn.onclick = () => {
+      AUDIO_LANG = val;
+      renderAudioLangRow(info);
+    };
+    box.append(btn);
+  }
+}
+
 /** Picking a video-only stream must not produce a silent file: pair it with
  *  the site's separate audio track when one exists (yt-dlp merges both with
  *  ffmpeg) — unless the user ticked "no sound", which is exactly the
  *  instruction not to (2026-09-27). Direct-link files have no separate
- *  audio, so they stay as-is. */
+ *  audio, so they stay as-is. v0.40.1: with the audio dial set, the pair
+ *  asks for that language first and keeps the plain pair as the second
+ *  alternative, so a video whose dub list changed under us still lands. */
 function fmtSpec(f, hasSeparateAudio) {
-  return hasSeparateAudio && hasVideo(f) && !hasAudio(f) && !$("noSound").checked
-    ? `${f.format_id}+bestaudio/best`
-    : f.format_id;
+  if (!(hasSeparateAudio && hasVideo(f) && !hasAudio(f)
+        && !$("noSound").checked)) {
+    return f.format_id;
+  }
+  const lang = String(AUDIO_LANG || "").replace(/[^A-Za-z0-9-]/g, "");
+  if (!lang) return `${f.format_id}+bestaudio/best`;
+  return `${f.format_id}+bestaudio[language=${lang}]/${f.format_id}+bestaudio/best`;
 }
 
 function sizeCell(f) {
@@ -580,12 +635,14 @@ function sizeCell(f) {
 }
 
 /** Sites announce the same stream twice (DASH + HLS, one without a size).
- *  Keep one row per real choice, preferring the copy that knows its size. */
+ *  Keep one row per real choice, preferring the copy that knows its size.
+ *  v0.40.1: a dub is a real choice — the language is part of the identity,
+ *  or two languages would collapse into one row. */
 function dedupeFormats(list) {
   const best = new Map();
   for (const f of list) {
     const key = [f.height || f.abr || 0, f.ext, f.vcodec, f.acodec,
-                 f.fps || 0, f.format_note || ""].join("|");
+                 f.fps || 0, f.format_note || "", f.language || ""].join("|");
     const prev = best.get(key);
     if (!prev) { best.set(key, f); continue; }
     const size = (x) => x.filesize || x.filesize_approx || 0;
@@ -794,6 +851,7 @@ function renderProbe(url, info) {
                 el("td"));
       tb.append(tr);
     }
+    renderAudioLangRow({});
     syncPlaylistPicks(false);
     return;
   }
@@ -802,6 +860,7 @@ function renderProbe(url, info) {
   PLAYLIST = null;
   PLAYLIST_NONE = false;
   renderQualityRow(url, info.site_quality);
+  renderAudioLangRow(info);
   const usable = (info.formats || []).filter((f) => f.ext && f.format_id);
   // a video-only pick only makes sense to pair with audio when the site
   // actually publishes a separate audio stream (YouTube does, a plain .mp4 doesn't)
@@ -822,6 +881,12 @@ function renderProbe(url, info) {
     // had separate audio says so and must not be re-labelled
     if (kind.sound) kindEl.dataset.sound = "1";
     cell.append(kindEl);
+    if (f.language) {
+      // v0.40.1: with dubs listed separately, a row must say which one it is
+      const langEl = el("div", "fmt-lang muted small", String(f.language));
+      langEl.title = "audio track language";
+      cell.append(langEl);
+    }
     tr.append(
       el("td", "fmt-q", fmtQuality(f) || "—"),
       cell,
@@ -830,7 +895,10 @@ function renderProbe(url, info) {
     const td = el("td");
     const btn = el("button", "get", "Take");
     btn.dataset.pick = fmtSpec(f, separateAudio);
-    btn.onclick = () => armTake(btn.dataset.pick, fmtQuality(f) || "this file", btn);
+    // v0.40.1: read the dial when the Take is clicked, not when the table
+    // was drawn — a pick frozen at render time ignores a later language
+    btn.onclick = () => armTake(fmtSpec(f, separateAudio),
+                                fmtQuality(f) || "this file", btn);
     td.append(btn);
     tr.append(td);
     tb.append(tr);
