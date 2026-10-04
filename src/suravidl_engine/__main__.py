@@ -150,6 +150,15 @@ def start_server(download_dir, token: str, port: int, db_path=None,
     cache home). The Android shell exports the env var before Python starts,
     so it needs no extra argument here.
     """
+    # a previous session's staged update can never be applied again (its
+    # state died with that process) — clear it before serving; this also
+    # cleans up right after a self-update on every platform that stages
+    # into the cache (v0.42.1)
+    try:
+        from .updater import sweep_stale_downloads
+        sweep_stale_downloads()
+    except Exception:  # noqa: BLE001 - housekeeping must never block a boot
+        pass
     import uvicorn
 
     from .api import create_app
@@ -1186,7 +1195,10 @@ def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
     app comes back up. Pure function — the tests pin the exact flags.
     """
     inner = (f'ping -n 3 127.0.0.1 >nul & '
-             f'"{installer}" /SILENT /SP- /NORESTART /CLOSEAPPLICATIONS')
+             f'"{installer}" /SILENT /SP- /NORESTART /CLOSEAPPLICATIONS '
+             # the staged setup is spent the moment it exits (v0.42.1):
+             # no 36 MB installer lingers in the cache after the update
+             f'& del /f /q "{installer}"')
     if relaunch:
         # single & on purpose: even a failed install brings the app back
         # rather than stranding the user; the wait is ping, not timeout,

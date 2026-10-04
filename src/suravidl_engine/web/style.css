@@ -329,13 +329,20 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
   font-size: 11px; font-weight: 700; text-align: center;
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
 }
-/* an unsaved Settings edit dots the tab */
-.tab.has-dirty .tab-lbl { position: relative; }
-.tab.has-dirty .tab-lbl::after {
+.badge.badge-in { animation: badgeIn var(--t-fast) var(--e-out) both; }
+@keyframes badgeIn { from { transform: scale(.4); opacity: 0; } }
+/* an unsaved Settings edit dots the tab — it scales in, never pops
+   (v0.42.1 motion audit: the dot blinked into being) */
+.tab .tab-lbl { position: relative; }
+.tab .tab-lbl::after {
   content: ""; position: absolute; top: -2px; right: -8px;
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--accent);
+  transform: scale(0); opacity: 0;
+  transition: transform var(--t-fast) var(--e-out),
+              opacity var(--t-fast) var(--e-out);
 }
+.tab.has-dirty .tab-lbl::after { transform: scale(1); opacity: 1; }
 /* tab swap fade (v0.37.1): the arrival dresses the switch. v0.37.3 made it
    opacity-ONLY: a transform here makes the panel a containing block for its
    `position: fixed` transport, so the bar re-anchored to the page and sat
@@ -534,6 +541,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
   background: var(--pill-idle); border: 1px solid var(--line-soft);
   font-size: 11.5px; color: var(--muted);
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
+  /* a pick glides in, it does not blink (v0.42.1 motion audit) */
+  transition: background var(--t-fast) var(--e-out),
+              color var(--t-fast) var(--e-out),
+              border-color var(--t-fast) var(--e-out);
 }
 .chip.tag { color: var(--accent-ink); border-color: var(--accent-line); background: var(--accent-soft); font-size: 10.5px; padding: 2px 7px; }
 /* a picked chip (subtitle languages) reads as picked; state lives in
@@ -671,8 +682,25 @@ html[data-theme="light"] .card[data-livery="vimeo"]     { --livery: #0073a8; }
 html[data-theme="light"] .card[data-livery="instagram"] { --livery: #a82782; }
 html[data-theme="light"] .card[data-livery="tiktok"]    { --livery: #077a6e; }
 
-/* the armed strip */
+/* the armed strip — it folds, it does not shove the table down (v0.42.1
+   motion audit: 42px of formats jumped under the cursor on every arm).
+   grid rows 0fr → 1fr, same recipe as the receipt; the clip keeps the
+   folded content out of the tab order and the a11y tree too. */
 #armedBar {
+  display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-base) var(--e-out);
+}
+#armedBar.armed-open { grid-template-rows: 1fr; }
+/* the clip is deliberately BARE — no padding, border or margin. Older grid
+   engines size a 0fr track to the item's outer minimum, so anything but a
+   bare box leaves a sliver unfolded on old WebViews; every visual belongs
+   to the strip INSIDE. */
+#armedBar .armed-clip {
+  overflow: hidden; min-height: 0; visibility: hidden;
+  transition: visibility 0s linear var(--t-base);
+}
+#armedBar.armed-open .armed-clip { visibility: visible; transition: visibility 0s; }
+#armedBar .armed-strip {
   display: flex; align-items: center; gap: 8px;
   margin: 0 0 12px; padding: 6px 6px 6px 12px;
   border: 1px dashed var(--accent-line); border-radius: 9px;
@@ -831,8 +859,8 @@ details.card { padding: 0 18px 6px; }
 .jdetails {
   display: grid; grid-template-rows: 0fr;
   margin-top: 0; opacity: 0; pointer-events: none;
-  transition: grid-template-rows .28s cubic-bezier(.2,.7,.3,1),
-              opacity .2s ease, margin-top .28s cubic-bezier(.2,.7,.3,1);
+  transition: grid-template-rows var(--t-base) var(--e-out),
+              opacity var(--t-base) var(--e-out), margin-top var(--t-base) var(--e-out);
 }
 .jdetails .jdgrid {
   overflow: hidden; min-height: 0;
@@ -841,8 +869,8 @@ details.card { padding: 0 18px 6px; }
   border-top: 1px dashed transparent;
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
   font-size: 11.5px; line-height: 1.5;
-  transition: padding-top .28s cubic-bezier(.2,.7,.3,1),
-              border-top-color .28s ease;
+  transition: padding-top var(--t-base) var(--e-out),
+              border-top-color var(--t-base) var(--e-out);
 }
 .job.open .jdetails {
   grid-template-rows: 1fr; margin-top: 9px; opacity: 1; pointer-events: auto;
@@ -970,10 +998,11 @@ html[data-theme="light"] .overlay { background: rgba(30,29,24,.30); }
   animation: modalIn var(--t-base) var(--e-out) both;
 }
 @keyframes modalIn { from { opacity: 0; transform: translateY(10px); } }
-.overlay.closing { animation: none; opacity: 0; transition: opacity var(--t-fast) ease; }
+.overlay.closing { animation: none; opacity: 0; transition: opacity var(--t-fast) var(--e-in); }
 .overlay.closing .modal {
+  /* the exit accelerates out (--e-in), it does not linger (v0.42.1) */
   animation: none; opacity: 0; transform: scale(.97) translateY(6px);
-  transition: transform var(--t-fast) ease, opacity var(--t-fast) ease;
+  transition: transform var(--t-fast) var(--e-in), opacity var(--t-fast) var(--e-in);
 }
 .modal.narrow { width: min(460px, 100%); }
 .modal.wide { max-width: 760px; }
@@ -1146,6 +1175,13 @@ footer .linkbtn { color: var(--accent-ink); }
 }
 .faq-item[open] summary::before { content: "\2212"; }
 .faq-item p { margin: 0 0 12px 30px; font-size: 12.5px; line-height: 1.55; }
+/* every answer folds like the deck's bay door (v0.42.1): the FAQ used to
+   snap open and shut while the newest door glided */
+.faq-body {
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height var(--t-base) var(--e-out), opacity var(--t-base) var(--e-out);
+}
+.faq-item[open] .faq-body { max-height: none; opacity: 1; }
 
 #tourShade { position: fixed; inset: 0; z-index: 1400; pointer-events: none; }
 #tourShade.hidden { display: none; }

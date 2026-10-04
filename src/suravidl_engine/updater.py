@@ -254,6 +254,36 @@ def _updates_dir() -> Path:
     return default_cache_dir() / "updates"
 
 
+def sweep_stale_downloads(dest_dir=None) -> int:
+    """Delete staged update files that no live download owns (v0.42.1).
+
+    A staged installer is only actionable inside the engine session that
+    staged it — the state is in-memory, so anything on disk after a
+    restart (or left by the version that just replaced itself) is an
+    orphan the UI can never apply. Best-effort; returns how many went.
+    """
+    d = Path(dest_dir) if dest_dir else _updates_dir()
+    with _DL_LOCK:
+        st = dict(_DL)
+    keep: set[str] = set()
+    if st.get("status") in ("downloading", "verifying") and st.get("name"):
+        keep = {str(st["name"]), str(st["name"]) + ".part"}
+    elif st.get("status") == "ready" and st.get("path"):
+        keep = {Path(st["path"]).name}
+    removed = 0
+    try:
+        for p in d.iterdir():
+            if p.is_file() and p.name not in keep:
+                try:
+                    p.unlink()
+                    removed += 1
+                except OSError:
+                    pass
+    except OSError:
+        return removed
+    return removed
+
+
 def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
     """Stream one asset into dest_dir/name, verifying sha256 (required).
 
@@ -360,6 +390,9 @@ def start_update_download(current: str, repo: str = DEFAULT_REPO,
                    total=0, sha256_ok=None, error=None, cancel=False)
     fetch = download_fn or download_asset
     dest = Path(dest_dir) if dest_dir else _updates_dir()
+    # whatever a previous session staged is an orphan the moment a fresh
+    # download starts — nothing else may linger beside it (v0.42.1)
+    sweep_stale_downloads(dest)
     info = check_update(current, repo, manifest_fn=manifest_fn)
     if not info.get("update_available") or not info.get("asset"):
         return _set_state(status="idle", name=None, path=None, bytes=0,

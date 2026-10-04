@@ -1022,8 +1022,16 @@ function renderQueueBadge(jobs) {
   if (!badge) return;
   const active = (jobs || []).filter((j) =>
     ["queued", "downloading", "merging"].includes(j.status)).length;
+  const was = !badge.classList.contains("hidden");
   badge.textContent = active > 9 ? "9+" : String(active);
   badge.classList.toggle("hidden", !active);
+  if (active && !was) {
+    // it appears: a quick scale-in, so a started download never just pops a
+    // number into the corner (v0.42.1)
+    badge.classList.remove("badge-in");
+    void badge.offsetWidth;
+    badge.classList.add("badge-in");
+  }
 }
 
 function playlistMode() {
@@ -1352,7 +1360,7 @@ function renderOvCount() {
   const bar = $("armedBar");
   const txt = $("armedText");
   if (!n) {
-    bar.classList.add("hidden");
+    bar.classList.remove("armed-open");
     txt.textContent = "";
   } else {
     const entry = OV.name
@@ -1363,7 +1371,7 @@ function renderOvCount() {
       : OV.name ? "“" + OV.name + "”"
         : k + " option" + (k === 1 ? "" : "s") + " set below";
     txt.textContent = "next download: " + what;
-    bar.classList.remove("hidden");
+    bar.classList.add("armed-open");
   }
   const chip = $("ovCount");
   if (!n) {
@@ -2016,8 +2024,41 @@ function applyQueueFilter() {
   for (const row of box.querySelectorAll(".job")) {
     const show = QFILTER === "all" ||
                  queueBucket(row.dataset.status || "") === QFILTER;
-    row.classList.toggle("hidden", !show);
-    if (!show) hidden += 1;
+    if (show) {
+      // a filter flipped mid-flight reverses cleanly: clear whatever the
+      // previous pass on this row started (v0.42.1)
+      if (row._hideT) { clearTimeout(row._hideT); row._hideT = 0; }
+      if (row.classList.contains("hidden") || row.classList.contains("leaving")) {
+        row.classList.remove("hidden");
+        row.classList.remove("leaving");
+        row.classList.add("swap");   // it returns: soft, like a rebuilt row
+      }
+    } else if (!row.classList.contains("hidden") && !row.classList.contains("leaving")) {
+      // rows glide out, then hide — the sieve used to jump (v0.42.1 motion
+      // audit): same exit as a dismissed job, with the reverse handled above
+      row.classList.add("leaving");
+      const settle = () => {
+        if (row._hideT) { clearTimeout(row._hideT); row._hideT = 0; }
+        const matches = QFILTER === "all" ||
+          queueBucket(row.dataset.status || "") === QFILTER;
+        if (matches) { row.classList.remove("leaving"); return; }
+        row.classList.add("hidden");
+        row.classList.remove("leaving");
+      };
+      const h = (ev) => {
+        if (ev.target !== row) return;
+        row.removeEventListener("animationend", h);
+        settle();
+      };
+      row.addEventListener("animationend", h);
+      row._hideT = setTimeout(() => {
+        row.removeEventListener("animationend", h);
+        settle();
+      }, motionMs(280));
+      hidden += 1;
+    } else {
+      hidden += 1;   // already hidden, or on its way: it still counts
+    }
   }
   const empty = $("filterEmpty");
   if (empty) {
@@ -2087,7 +2128,7 @@ function leaveRow(node) {
   node.addEventListener("animationend", (e) => {
     if (e.target === node) drop();
   });
-  setTimeout(drop, 400);
+  setTimeout(drop, motionMs(400));
 }
 
 /* ---------- a finish that speaks (v0.37.0) ---------- */
@@ -2482,10 +2523,27 @@ async function installStagedUpdate() {
   openExternal((UPD_STATE && UPD_STATE.url) || RELEASES_LATEST);
 }
 
+/* a real state change in the courier row refreshes with the house fade;
+   poll ticks (same state, new numbers) stay crisp (v0.42.1) */
+function _restartSwap(node) {
+  if (!node) return;
+  node.classList.remove("swap");
+  void node.offsetWidth;
+  node.classList.add("swap");
+}
+let UPD_LAST_BUCKET = null;
+
 /** Settings → Updates, courier edition: one row walks the whole flow. */
 function renderCourierRow(u, els, when, skipped) {
   const { state, meta, get, skip, man } = els;
   const st = UPD_DL || { status: "idle" };
+  if (UPD_LAST_BUCKET !== null && st.status !== UPD_LAST_BUCKET) {
+    // idle → downloading → ready: one house fade over the row and its meta
+    // (v0.42.1 — buttons used to hard-swap mid-poll)
+    _restartSwap(state.parentElement);
+    _restartSwap(meta);
+  }
+  UPD_LAST_BUCKET = st.status;
   state.textContent = `suravidl ${u.latest} is available`;
   const base = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
   // the skip toggle stays reachable in every resting state; the manual
@@ -2825,10 +2883,14 @@ function openFaq() {
       it.className = "faq-item";
       const s = document.createElement("summary");
       s.textContent = q;
-      const p = el("p", "muted", a);
-      it.append(s, p);
+      const wrap = document.createElement("div");
+      wrap.className = "faq-body";   // the FAQ folds like the deck's bay door
+      wrap.append(el("p", "muted", a));
+      it.append(s, wrap);
       box.append(it);
     }
+    box.querySelectorAll(".faq-item").forEach((it) =>
+      wireBayDoor(it, it.querySelector(".faq-body")));
   }
   openModal($("faqModal"));
 }
@@ -3772,8 +3834,10 @@ window.suravidlShared = (url) => {
    transition to .001s, so nothing waits there either. Programmatic opens
    (Studio, the armed strip) skip the door on purpose — they are
    "bring me there" actions. */
-function wireBayDoor(d) {
-  const body = d.querySelector(".bay-body");
+function wireBayDoor(d, bodyEl) {
+  // one door, two houses: the deck's format bay and the FAQ's answers
+  // (v0.42.1 — the FAQ snapped where the bay glided)
+  const body = bodyEl || d.querySelector(".bay-body");
   if (!body) return;
   const seal = () => { body.style.maxHeight = ""; body.style.opacity = ""; d.open = false; };
   // one close in flight, one listener, one fallback (the audit): the old
@@ -3822,7 +3886,7 @@ function wireBayDoor(d) {
     onEnd(() => { if (closing) { closing = false; seal(); } });
     fallback = setTimeout(() => {                  // a door that can never jam
       if (closing) { closing = false; seal(); }
-    }, 500);
+    }, motionMs(500));
   });
 }
 wireBayDoor($("ovBlock"));

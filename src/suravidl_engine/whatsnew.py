@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.42.1",
+        "title": "The glide",
+        "items": [
+            "Motion polish all through the app: the armed strip folds instead of pushing the formats table down, subtitle picks and tab dots glide in, and the queue's filter eases rows out instead of jumping them.",
+            "The FAQ folds like the download card; modal exits are quick where they lingered; and timer fallbacks now respect your system's reduced-motion setting everywhere.",
+            "Housekeeping: a downloaded update file is deleted the moment it is spent \u2014 right after a self-update on Windows and macOS, and on the next launch on Android.",
+        ],
+    },
+    {
         "version": "0.42.0",
         "title": "The crossing",
         "items": [
@@ -85,14 +94,6 @@ ENTRIES = [
         "items": [
             "The queue shows outside the window: the Dock wears a count badge on macOS, Linux docks that speak the launcher protocol get one too, and other desktops carry the count in the window title.",
             "A read that fails is silence \u2014 the badge holds its last truth rather than flashing a false zero.",
-        ],
-    },
-    {
-        "version": "0.40.5",
-        "title": "The fill",
-        "items": [
-            "Quality chips now say what each pick will weigh when the site publishes sizes \u2014 the streams' own numbers, added the way the pick works. No sizes published, no claims made.",
-            "The batch line counts out loud as you paste: how many links, and how many lines it skipped \u2014 one link is one link, and the button only appears when there is really a batch.",
         ],
     },
 ]

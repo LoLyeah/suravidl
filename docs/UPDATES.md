@@ -52,3 +52,18 @@ Each release carries a small `version.json` (plus `SHA256SUMS.txt`), written by
 Compare the `sha256` fields against `SHA256SUMS.txt` on the release page.
 Downloads are verified against these hashes before anything is spawned
 (installer) or handed to the system installer (APK).
+## Cleanup after an update (v0.42.1)
+
+The downloaded update file never lingers once it is spent:
+
+- **Windows**: the upgrade chain deletes the staged setup the moment the
+  installer exits — before the new version comes back up.
+- **macOS**: the swap script deletes the zip the moment the new bundle is
+  in place.
+- **Android**: the staged APK sits in the app's cache only until the next
+  launch; there is no way to run a cleanup during the system install, so
+  the app sweeps it (along with anything an interrupted session left) on
+  every start.
+- All shells: any staged file from a previous engine session is an orphan
+  by definition — the staging state lives in memory — so every boot and
+  every fresh download sweeps the update cache first.

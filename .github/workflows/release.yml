@@ -97,6 +97,7 @@ jobs:
             suravidl-apply "$WORK/installed/suravidl.app" "$WORK/update.zip" 999999
           test -f "$WORK/installed/suravidl.app/Contents/NEW"
           test ! -e "$WORK/installed/suravidl.app/Contents/OLD"
+          test ! -e "$WORK/update.zip"     # the carrier is consumed (v0.42.1)
           echo "swap dry-run ok"
           # rollback: a zip carrying no bundle must leave the app untouched
           echo nope > "$WORK/notanapp.txt"
@@ -107,6 +108,7 @@ jobs:
             exit 1
           fi
           test -f "$WORK/installed/suravidl.app/Contents/NEW"
+          test -f "$WORK/bad.zip"          # a failed swap keeps the carrier
           echo "rollback dry-run ok"
       - name: Build Windows installer
         if: matrix.os == 'windows-2022'

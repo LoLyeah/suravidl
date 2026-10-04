@@ -39,7 +39,12 @@ def test_the_buckets_keep_filed_and_failed_apart():
 def test_the_sieve_hides_rows_and_counts_what_it_hid():
     assert 'let QFILTER = "all";' in APP
     seg = _seg(APP, "function applyQueueFilter(")
-    assert 'classList.toggle("hidden"' in seg, "rows hide, they do not leave"
+    # v0.42.1 "the glide": rows leave through the house exit animation and
+    # hide when it lands — the instant toggle WAS the motion-audit finding;
+    # a filter flipped mid-flight reverses cleanly (leaving is undone)
+    assert 'classList.add("leaving")' in seg
+    assert 'classList.add("hidden")' in seg
+    assert 'classList.toggle("hidden", !show)' not in seg
     assert "filterEmpty" in seg
     assert "hidden by this filter" in seg, \
         "a filtered view must never read as an empty queue"

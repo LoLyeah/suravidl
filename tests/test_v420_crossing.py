@@ -200,6 +200,8 @@ def test_the_swap_mechanics_on_a_fixture(tmp_path):
     assert r.returncode == 0, r.stderr
     assert (installed / "Contents" / "NEW").exists(), "the swap did not land"
     assert not (installed / "Contents" / "OLD").exists(), "old bundle lingered"
+    # v0.42.1: the carrier is consumed once the swap lands
+    assert not z.exists(), "the spent update zip must be gone"
 
     bad = tmp_path / "bad.zip"
     with zipfile.ZipFile(bad, "w") as zf:
@@ -209,3 +211,6 @@ def test_the_swap_mechanics_on_a_fixture(tmp_path):
                        capture_output=True, text=True, env=env, timeout=120)
     assert r.returncode != 0, "a zip without a bundle must not report success"
     assert (installed / "Contents" / "NEW").exists(), "rollback left nothing?"
+    # v0.42.1: a failed swap keeps the carrier — the boot sweep, not the
+    # script, decides its fate once the app is back up
+    assert bad.exists(), "a failed swap keeps the carrier for a retry"

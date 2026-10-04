@@ -31,9 +31,12 @@ def test_the_strip_paints_from_the_count_that_already_updates():
     body = _fn("renderOvCount")
     assert '$("armedBar")' in body and '$("armedText")' in body
     assert "next download:" in body
-    # both branches: hidden when nothing is armed, shown otherwise
-    assert 'bar.classList.add("hidden")' in body
-    assert 'bar.classList.remove("hidden")' in body
+    # both branches: folded when nothing is armed, folded open otherwise.
+    # v0.42.1 "the glide": the strip folds through grid rows (armed-open)
+    # instead of display-toggling — same contract, it no longer shoves the
+    # formats table down (motion audit finding 2)
+    assert 'bar.classList.add("armed-open")' in body
+    assert 'bar.classList.remove("armed-open")' in body
 
 
 def test_the_strip_names_the_preset_and_its_description():

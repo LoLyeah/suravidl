@@ -50,6 +50,9 @@ if ! mv "$APP" "$OLD"; then
 fi
 if mv "$NEW" "$APP"; then
   rm -rf "$OLD"
+  # the carrier is spent once the swap lands (v0.42.1): the old app is
+  # gone and the new one runs from where it should — the zip goes too
+  rm -f "$ZIP"
 else
   mv "$OLD" "$APP"    # nothing lost: the version they had comes back
 fi
