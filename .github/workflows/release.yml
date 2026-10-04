@@ -16,7 +16,9 @@ jobs:
             files: suravidl-linux-x64.AppImage
           - os: windows-2022
             binary: suravidl.exe
-            files: suravidl-windows-x64.exe
+            files: |
+              suravidl-windows-x64.exe
+              suravidl-windows-x64-setup.exe
           - os: macos-14
             binary: suravidl
             files: suravidl-macos-arm64.dmg
@@ -76,6 +78,25 @@ jobs:
               cp dist/suravidl.exe suravidl-windows-x64.exe
               ;;
           esac
+      - name: Build Windows installer
+        if: matrix.os == 'windows-2022'
+        shell: pwsh
+        run: |
+          # pwsh keeps /D flags unmangled (msys would rewrite them)
+          $version = '${{ github.ref_name }}' -replace '^v', ''
+          if (-not $version) { $version = '0.0.0' }
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            if (Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe') {
+              $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+            } else {
+              $iscc = 'ISCC.exe'
+            }
+          }
+          & $iscc "/DAppVersion=$version" packaging/windows/suravidl.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item -Force packaging/windows/Output/suravidl-setup.exe suravidl-windows-x64-setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}
@@ -117,11 +138,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           path: dist
+      - name: Write the update manifest (version.json + SHA256SUMS)
+        run: |
+          python3 scripts/generate_release_manifest.py dist \
+              --tag "${{ github.ref_name }}" --repo "${{ github.repository }}"
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
           generate_release_notes: true
+          # PRE-RELEASE until the courier feature (installer + in-app updates)
+          # is verified on real machines — flip it back with this one line
+          prerelease: true

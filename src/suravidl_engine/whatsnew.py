@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.41.0",
+        "title": "The courier",
+        "items": [
+            "Windows gets a real installer: per-user, no admin prompts, a Start Menu entry and a proper uninstall in Windows Settings \u2014 the portable exe stays for anyone who prefers it.",
+            "The app updates itself now: check, download, verify by checksum \u2014 then one tap to install (Windows restarts into it; Android shows its own single confirmation). No more release-page trips.",
+        ],
+    },
+    {
         "version": "0.40.11",
         "title": "The shelf",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "The phone's browser can ask for the desktop page now: a mobile site / desktop site switch sits beside the ads one \u2014 flip it, reload, and the site serves its full-width layout. Same session, same finds.",
             "The switch remembers itself, so the next visit opens wide on its own.",
-        ],
-    },
-    {
-        "version": "0.40.2",
-        "title": "The sieve",
-        "items": [
-            "The queue has a sieve now: All / Active / Filed / Errors chips hide what you are not looking for \u2014 and when a view hides everything, a line says exactly how many are hidden, one tap from All.",
-            "The chips stay out of the way until there is a queue worth filtering.",
         ],
     },
 ]

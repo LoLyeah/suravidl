@@ -113,6 +113,8 @@ class EngineService : Service() {
                 // builds os.environ from the process env.
                 try {
                     Os.setenv("SURAVIDL_CACHE_DIR", cacheDir.absolutePath, true)
+                    // python engine detects the android shell by this flag
+                    Os.setenv("SURAVIDL_ANDROID", "1", true)
                 } catch (t: Throwable) {
                     Log.w(SuravidlApp.TAG, "could not export SURAVIDL_CACHE_DIR", t)
                 }

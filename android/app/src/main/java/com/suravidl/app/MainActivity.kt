@@ -338,7 +338,7 @@ class MainActivity : AppCompatActivity() {
 
     /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl,
      *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed,
-     *  galleryExport}. */
+     *  galleryExport,canInstallPackages,openInstallPermissionSettings,installApk}. */
     inner class HostBridge {
         /**
          * Does a finished download also get a Gallery/Music copy?
@@ -442,6 +442,80 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun deleteMediaNamed(name: String?): Int =
             MediaLibrary.deleteOwnCopiesNamed(this@MainActivity, name)
+
+        /**
+         * Can this app request package installations?
+         *
+         * Below API 26 there was no per-app "install unknown apps" toggle (it
+         * was a system-wide setting), so installs can always be dispatched.
+         */
+        @JavascriptInterface
+        fun canInstallPackages(): Boolean =
+            if (Build.VERSION.SDK_INT < 26) true
+            else try {
+                packageManager.canRequestPackageInstalls()
+            } catch (_: Throwable) {
+                false
+            }
+
+        /**
+         * Direct the user to the "Install unknown apps" settings screen for
+         * suravidl so they can allow updates.
+         */
+        @JavascriptInterface
+        fun openInstallPermissionSettings() {
+            runOnUiThread {
+                try {
+                    val intent = if (Build.VERSION.SDK_INT >= 26) {
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                               Uri.parse("package:$packageName"))
+                    } else {
+                        Intent(Settings.ACTION_SECURITY_SETTINGS)
+                    }
+                    startActivity(intent)
+                } catch (t: Throwable) {
+                    LogStore.write(this@MainActivity, "install-permission.log",
+                                   "could not open install settings: ${t.message}")
+                    toast("could not open install settings")
+                }
+            }
+        }
+
+        /**
+         * Launch the system package installer for an APK downloaded by the
+         * engine into cache/updates.
+         */
+        @JavascriptInterface
+        fun installApk(fileName: String) {
+            runOnUiThread {
+                if (!UpdateInstallPolicy.safeName(fileName)) {
+                    LogStore.write(this@MainActivity, "update-install.log",
+                                   "rejected unsafe apk name: $fileName")
+                    toast("invalid update file name")
+                    return@runOnUiThread
+                }
+                val apk = File(cacheDir, "updates/$fileName")
+                if (!apk.exists()) {
+                    LogStore.write(this@MainActivity, "update-install.log",
+                                   "update file missing: ${apk.absolutePath}")
+                    toast("the update file is gone — download it again")
+                    return@runOnUiThread
+                }
+                try {
+                    val uri = FileProvider.getUriForFile(
+                        this@MainActivity, "$packageName.fileprovider", apk)
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(intent)
+                } catch (t: Throwable) {
+                    LogStore.write(this@MainActivity, "update-install.log",
+                                   "installer launch failed: ${t.message}")
+                    toast("could not open the package installer")
+                }
+            }
+        }
     }
 
     private fun toast(msg: String) {

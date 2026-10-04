@@ -1179,6 +1179,59 @@ def _try_tray(url: str, open_downloads: Path):
     return pystray.Icon("suravidl", Image.open(icon_file), "suravidl", menu)
 
 
+def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
+    """The silent-upgrade invocation the courier rides (v0.41.0).
+
+    Detached cmd chain: a short wait lets THIS process die and hand back its
+    file locks, the installer runs silent (no wizard, no restart prompt, it
+    closes stragglers through the Restart Manager), and the freshly installed
+    app comes back up. Pure function — the tests pin the exact flags.
+    """
+    inner = (f'timeout /t 2 /nobreak >nul & '
+             f'"{installer}" /SILENT /SP- /NORESTART /CLOSEAPPLICATIONS')
+    if relaunch:
+        inner += f' & start "" "{relaunch}"'
+    return ["cmd.exe", "/c", inner]
+
+
+def _installed_exe() -> str | None:
+    """Where the per-user installer puts the app ("" until it ran once)."""
+    local = os.environ.get("LOCALAPPDATA", "").strip()
+    if not local:
+        return None
+    return str(Path(local) / "Programs" / "suravidl" / "suravidl.exe")
+
+
+def _make_apply_update_action(window):
+    """The desktop_actions["apply_update"] the courier's /update/apply calls.
+
+    Spawns the staged installer DETACHED (it must outlive us), then destroys
+    the window so the app exits and every lock on suravidl.exe lets go. Only
+    Windows takes this path; everywhere else it honestly refuses.
+    """
+    def _apply_update(installer_path=None) -> bool:
+        if os.name != "nt" or not installer_path:
+            return False
+        installer = str(installer_path)
+        if not Path(installer).is_file():
+            return False
+        import subprocess
+
+        cmd = _windows_apply_command(installer, _installed_exe())
+        try:
+            subprocess.Popen(
+                cmd, close_fds=True,
+                # DETACHED_PROCESS | CREATE_NO_WINDOW: the upgrade keeps
+                # running after this process (and its console) is gone
+                creationflags=0x00000008 | 0x08000000)
+        except Exception:  # noqa: BLE001 - the UI reports nothing staged ran
+            return False
+        window.destroy()   # hand the locks back; the chain does the rest
+        return True
+
+    return _apply_update
+
+
 def main() -> None:
     _hide_child_consoles()
     _ensure_log_targets(Path.home() / ".suravidl" / "app.log")
@@ -1272,7 +1325,8 @@ def main() -> None:
                    "quit": window.destroy,
                    "focus": _focus_window,
                    "reveal": _open_folder, "pick_file": _pick_file,
-                   "open_url": _open_url}
+                   "open_url": _open_url,
+                   "apply_update": _make_apply_update_action(window)}
 
     server = start_server(download_dir=args.download_dir, token=token, port=port,
                           db_path=args.db, desktop_actions=actions or None,

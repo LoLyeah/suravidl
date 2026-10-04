@@ -2297,6 +2297,13 @@ function renderUpdateRow() {
     return;
   }
   const skipped = !!u.latest && updStore.get(UPD.skipped, "") === u.latest;
+  // The courier (v0.41.0): when this build can fetch and install its own
+  // update, the row becomes the whole flow — stage it, watch it, restart
+  // into it. Builds that cannot keep the plain release-page door below.
+  if (u.update_available && u.can_apply) {
+    renderCourierRow(u, { state, meta, get, skip }, when, skipped);
+    return;
+  }
   if (u.update_available && u.url) {
     state.textContent = `suravidl ${u.latest} is available`;
     meta.textContent = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
@@ -2320,10 +2327,15 @@ function renderUpdateRow() {
 /** The one persistent notice: a toast that waits, with the three answers. */
 function showUpdateBanner(u) {
   if (document.querySelector(".toast.update")) return;   // one notice, not a stack
+  // The courier (v0.41.0): a build that can install its own update gets the
+  // one-tap door; every other build keeps the release page.
+  const prime = u.can_apply
+    ? { label: "Update now", prime: true, onClick: () => startUpdateDownload() }
+    : { label: `Get ${u.latest}`, prime: true, onClick: () => openExternal(u.url) };
   toast(`suravidl ${u.latest} is available — you have ${u.current}`, "info update", {
     sticky: true,
     actions: [
-      { label: `Get ${u.latest}`, prime: true, onClick: () => openExternal(u.url) },
+      prime,
       { label: "Later", onClick: () => {
         updStore.set(UPD.snooze, String(Date.now() + UPD.SNOOZE_MS));
         toast("I'll remind you tomorrow");
@@ -2335,6 +2347,139 @@ function showUpdateBanner(u) {
       } },
     ],
   });
+}
+
+/** The courier (v0.41.0): stage the release in-app, then install it.
+ *
+ * The engine downloads this platform's asset from the release manifest,
+ * verifies sha256, and stages it; this side watches and offers the one door
+ * that fits the shell — desktop rides the installer, Android hands the APK
+ * to the system installer (the one confirmation Android insists on), and any
+ * refusal falls back to the release page. */
+let UPD_DL = null;     // the last /update/status answer
+let UPD_POLL = 0;      // one poller at a time
+
+function updPct(st) {
+  if (!st || !st.total) return null;
+  return Math.min(100, Math.round((st.bytes / st.total) * 100));
+}
+
+async function startUpdateDownload() {
+  try {
+    UPD_DL = await api("/update/download", { method: "POST" });
+  } catch (e) {
+    toast("could not start the update: " + e.message, "bad");
+    return;
+  }
+  renderUpdateRow();
+  pollUpdateStatus();
+}
+
+function pollUpdateStatus() {
+  clearTimeout(UPD_POLL);
+  UPD_POLL = setTimeout(async () => {
+    try { UPD_DL = await api("/update/status"); } catch (_) { /* hold the last truth */ }
+    renderUpdateRow();
+    if (UPD_DL && (UPD_DL.status === "downloading" || UPD_DL.status === "verifying")) {
+      pollUpdateStatus();
+    } else if (UPD_DL && UPD_DL.status === "ready") {
+      toast("the update is downloaded and verified — restart when you're ready");
+    }
+  }, 900);
+}
+
+/** The ready-state door: installer here, system installer on Android,
+ *  release page everywhere else. */
+async function installStagedUpdate() {
+  const st = UPD_DL || {};
+  if (ANDROID() && window.AndroidHost && window.AndroidHost.installApk) {
+    try {
+      if (window.AndroidHost.canInstallPackages &&
+          !window.AndroidHost.canInstallPackages()) {
+        toast("let suravidl install updates, then tap Install again");
+        if (window.AndroidHost.openInstallPermissionSettings)
+          window.AndroidHost.openInstallPermissionSettings();
+        return;
+      }
+      window.AndroidHost.installApk(st.name);
+      return;
+    } catch (_) { /* fall through to the manual door */ }
+  }
+  if (!ANDROID() && UPD_STATE && UPD_STATE.apply_kind === "windows_installer") {
+    try {
+      const r = await api("/update/apply", { method: "POST" });
+      if (r.ok) { toast("restarting to install…"); return; }
+      toast(r.reason || "could not start the installer", "bad");
+    } catch (e) {
+      toast("could not start the installer: " + e.message, "bad");
+    }
+    return;
+  }
+  openExternal((UPD_STATE && UPD_STATE.url) || RELEASES_LATEST);
+}
+
+/** Settings → Updates, courier edition: one row walks the whole flow. */
+function renderCourierRow(u, els, when, skipped) {
+  const { state, meta, get, skip } = els;
+  const st = UPD_DL || { status: "idle" };
+  state.textContent = `suravidl ${u.latest} is available`;
+  const base = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
+  // the manual release page stays one tap away in the states that need it
+  const manual = () => {
+    skip.textContent = "Download manually";
+    skip.classList.remove("hidden");
+    skip.onclick = () => openExternal(u.url);
+  };
+  if (st.status === "downloading") {
+    const pct = updPct(st);
+    meta.textContent = "downloading… " + (pct == null
+      ? humanBytes(st.bytes || 0)
+      : pct + "% of " + humanBytes(st.total));
+    get.textContent = "Downloading…";
+    get.disabled = true;
+    get.classList.remove("hidden");
+    get.onclick = null;
+    skip.classList.add("hidden");
+  } else if (st.status === "verifying") {
+    meta.textContent = "verifying the download…";
+    get.textContent = "Verifying…";
+    get.disabled = true;
+    get.classList.remove("hidden");
+    skip.classList.add("hidden");
+  } else if (st.status === "ready") {
+    meta.textContent = `${base} · downloaded and verified`;
+    get.textContent = ANDROID() ? "Install update" : "Restart & Install";
+    get.disabled = false;
+    get.classList.remove("hidden");
+    get.onclick = installStagedUpdate;
+    skip.classList.add("hidden");
+  } else if (st.status === "failed") {
+    meta.textContent = `the download failed: ${st.error || "unknown reason"} · ${base}`;
+    get.textContent = "Try again";
+    get.disabled = false;
+    get.classList.remove("hidden");
+    get.onclick = startUpdateDownload;
+    manual();
+  } else {
+    meta.textContent = base;
+    get.textContent = `Update to ${u.latest}`;
+    get.disabled = false;
+    get.classList.remove("hidden");
+    get.onclick = startUpdateDownload;
+    manual();
+  }
+}
+
+/** Resume the row's truth after a reload: the engine remembers the stage. */
+async function syncStagedUpdate() {
+  try {
+    const st = await api("/update/status");
+    if (st && st.status !== "idle") {
+      UPD_DL = st;
+      renderUpdateRow();
+      if (st.status === "downloading") pollUpdateStatus();
+    }
+  } catch (_) { /* the row keeps its last truth */ }
 }
 
 /** force = the user pressed Check now: show the notice even if skipped/snoozed. */
@@ -2382,6 +2527,7 @@ function wireUpdateRow() {
       toast(`you're on the latest version (${UPD_STATE.current})`);
   };
   renderUpdateRow();
+  syncStagedUpdate();   // a staged download survives a page reload
 }
 
 /** Open a link outside the app shell: host bridge -> desktop opener -> browser. */

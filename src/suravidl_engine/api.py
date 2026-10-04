@@ -313,6 +313,7 @@ _ARCHIVE_LOCK = threading.Lock()
 def create_app(download_dir, auth_token: str | None = None,
                db_path=None, max_concurrent: int = 2,
                update_fn=None, update_check_fn=None,
+               update_download_fn=None,
                handoff_probe_fn=None,
                settings_path=None, desktop_actions: dict | None = None,
                page_key: str | None = None, cache_dir=None) -> FastAPI:
@@ -472,6 +473,39 @@ def create_app(download_dir, auth_token: str | None = None,
         # say so instead of offering an update that cannot run (v0.40.10)
         result["bundled"] = not updater.updates_possible()
         return result
+
+    @app.post("/update/download")
+    def update_download(_mgr: JobManager = Depends(require_auth)):
+        """Stage this platform's release asset into the engine cache."""
+        from . import updater
+
+        if update_download_fn:
+            return update_download_fn()
+        return updater.start_update_download(__version__)
+
+    @app.get("/update/status")
+    def update_status_endpoint(_mgr: JobManager = Depends(require_auth)):
+        from . import updater
+
+        return updater.update_status()
+
+    @app.post("/update/apply")
+    def update_apply(_mgr: JobManager = Depends(require_auth)):
+        """Hand the staged file to the desktop shell's applier — the shell
+        spawns the installer and shuts the app down. Android has no applier
+        here: its UI drives the system installer through the Kotlin bridge."""
+        from . import updater
+
+        act = acts.get("apply_update")
+        if not act:
+            return {"ok": False,
+                    "reason": "this build has no installer applier"}
+        st = updater.update_status()
+        if st.get("status") != "ready" or not st.get("path"):
+            return {"ok": False, "reason": "nothing staged yet"}
+        if act(st["path"]) is False:
+            return {"ok": False, "reason": "the applier refused to run"}
+        return {"ok": True, "mode": "desktop"}
 
     @app.get("/whats-new")
     def whats_new(_mgr: JobManager = Depends(require_auth)):

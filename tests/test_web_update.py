@@ -36,8 +36,10 @@ def test_the_update_notice_is_a_persistent_toast_with_choices():
     assert "Get ${u.latest}" in banner
     # exactly one notice, however many times the check runs
     assert 'document.querySelector(".toast.update")' in banner
-    # "Get it" opens the release page: nothing here installs anything
+    # the release-page door stays for builds that cannot self-install ...
     assert "openExternal(u.url)" in banner
+    # ... and a build that can gets the one-tap door instead (v0.41.0)
+    assert '"Update now"' in banner and "startUpdateDownload()" in banner
 
 
 def test_sticky_toasts_wait_and_plain_ones_do_not():

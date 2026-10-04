@@ -47,9 +47,12 @@ reviews: [docs/audits/](docs/audits/)
 
 From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 
-- `suravidl-windows-x64.exe` — double-click. Run it once with
-  `--install-desktop` and it appears in your Start Menu like an installed app
-  (`--uninstall-desktop` takes it back out).
+- `suravidl-windows-x64-setup.exe` — the installer: per-user, no admin
+  prompts, Start Menu entry and an uninstall in Windows Settings.
+- `suravidl-windows-x64.exe` — the portable exe: double-click to run; it needs
+  nothing installed. Run it once with `--install-desktop` and it appears in
+  your Start Menu like an installed app (`--uninstall-desktop` takes it back
+  out).
 - `suravidl-linux-x64.AppImage` — `chmod +x`, then run it (needs FUSE; otherwise
   `--appimage-extract-and-run`). `--install-desktop` puts it in your applications
   menu (and lights up docks that read the launcher count).
@@ -174,8 +177,10 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Updates
 
 - **yt-dlp**: one button in the UI (`POST /update`) upgrades it in place.
-- **suravidl**: `GET /update-check` compares against the newest GitHub release and
-  the UI offers a link when there is one.
+- **suravidl**: the app reads the newest release's manifest (`GET /update-check`),
+  downloads the right asset, verifies its SHA-256, and installs it in place — one
+  tap on Windows, one system confirmation on Android; every other platform keeps
+  the download link. Details: [docs/UPDATES.md](docs/UPDATES.md).
 
 ## Privacy and security
 
@@ -225,7 +230,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 903 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 932 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

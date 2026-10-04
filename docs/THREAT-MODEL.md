@@ -28,6 +28,12 @@ the ciphertext is worthless elsewhere.
   installs, "move to SD" setups): ciphertext again.
 - **Casual inspection** of the phone's filesystem with a file manager: the
   cookie value is not greppable anywhere in the app directory.
+- **Tampered self-updates** (v0.41.0): update assets are fetched over HTTPS
+  from GitHub and must match the sha256 in the release manifest before
+  anything is spawned (Windows installer) or handed to the system installer
+  (APK). Nothing installs without a user gesture — Windows needs the
+  "Restart & Install" tap, Android the OS's own confirmation — and no update
+  check carries identifiers of any kind.
 
 ## What it does NOT protect against
 
