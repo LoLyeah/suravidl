@@ -2265,6 +2265,13 @@ async function loadVersions() {
     // the yt-dlp tab shows it beside its own update button
     const yv = $("ytdlpVer");
     if (yv) yv.textContent = v.yt_dlp;
+    // a staged copy (v0.43.0) waits for the next start — say so until live
+    const st = $("ytdlpStaged");
+    if (st) {
+      st.hidden = !v.staged;
+      st.textContent = v.staged
+        ? `yt-dlp ${v.staged} is staged — restart to use it` : "";
+    }
   } catch (_) { $("versions").textContent = ""; }
 }
 
@@ -2634,9 +2641,12 @@ async function checkAppUpdate(force) {
     // a frozen/Android build bundles yt-dlp and has no pip — the update
     // button must say where updates come from instead of failing (v0.40.10)
     if (u.bundled && $("updateBtn")) {
-      $("updateBtn").disabled = true;
+      // v0.43.0: packaged builds fetch the newest release from PyPI
+      // (sha256-verified) and it applies from the next start — nothing
+      // to disable any more, the tooltip just says where it comes from
       $("updateBtn").title =
-        "bundled with this build — updating suravidl updates yt-dlp";
+        "packaged build: fetches the newest yt-dlp from PyPI, verified — " +
+        "applies on next start";
     }
     updStore.set(UPD.last, JSON.stringify({
       at: Date.now(), latest: u.latest || null,
@@ -2690,7 +2700,8 @@ function openExternal(url) {
 
 $("updateBtn").onclick = async () => {
   const ok = await askConfirm(
-    "Run yt-dlp self-update? The engine may briefly stall new jobs.",
+    "Update yt-dlp? The newest release is fetched and verified — " +
+    "packaged builds apply it on the next start.",
     { okText: "Update", danger: false });
   if (!ok) return;
   $("updateBtn").disabled = true;
@@ -2698,8 +2709,13 @@ $("updateBtn").onclick = async () => {
   $("updateBtn").textContent = "updating…";
   try {
     const r = await api("/update", { method: "POST" });
-    toast(r.updated ? `yt-dlp updated → ${r.after}` : "yt-dlp already latest");
     loadVersions();          // the tab shows the version next to this button
+    if (r.updated && r.restart)
+      toast(`yt-dlp ${r.after} is staged — restart to use it`);
+    else if (r.updated) toast(`yt-dlp updated → ${r.after}`);
+    else if (r.ok === false)
+      toast("update failed: " + (r.detail || "unknown"), "bad");
+    else toast(`yt-dlp already latest (${r.after})`);
   } catch (e) {
     toast("update failed: " + e.message, "bad");
   }

@@ -119,14 +119,18 @@ def updates_possible() -> bool:
         return False
 
 
-def self_update() -> dict:
-    """Upgrade yt-dlp in this environment; safe to call again anytime."""
+def self_update(db_path=None) -> dict:
+    """Upgrade yt-dlp — pip where it exists, the wheel path elsewhere.
+
+    v0.43.0: a packaged build (no pip to run) fetches the official wheel
+    from PyPI, verifies it, and stages it as the shadow copy that applies
+    from the next start — see suravidl_engine/ytdlp_update.py.
+    """
     before = yt_dlp.version.__version__
     if not updates_possible():
-        return {"ok": False, "updated": False, "bundled": True,
-                "before": before, "after": before,
-                "detail": "this build bundles yt-dlp — update the app to "
-                          "update it"}
+        from . import ytdlp_update
+
+        return ytdlp_update.stage_update(db_path=db_path, before=before)
     try:
         r = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],

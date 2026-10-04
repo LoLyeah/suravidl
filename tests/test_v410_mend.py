@@ -155,13 +155,20 @@ def test_ssrf_guard_canonicalizes_alternate_ip_spellings():
 
 # -- engine: updater tells the truth about bundled builds --------------------
 
-def test_updater_marks_bundled_builds_instead_of_failing_pip(monkeypatch):
-    from suravidl_engine import updater
+def test_updater_sends_bundled_builds_to_the_wheel_path(monkeypatch):
+    """v0.40.10 said "no pip, no update"; v0.43.0 gave those builds the
+    PyPI wheel path instead, so pip-absence now routes there. The bundled
+    flag keeps describing the build — it is no longer a dead end."""
+    from suravidl_engine import updater, ytdlp_update
 
     monkeypatch.setattr(updater, "updates_possible", lambda: False)
+    monkeypatch.setattr(ytdlp_update, "stage_update",
+                        lambda db_path=None, before=None: {
+                            "ok": False, "updated": False, "bundled": True,
+                            "before": before, "after": before,
+                            "detail": "couldn't reach PyPI: no network"})
     r = updater.self_update()
     assert r["ok"] is False and r["bundled"] is True
-    assert "bundles" in r["detail"] and "update the app" in r["detail"]
 
 
 def test_this_venv_can_update(monkeypatch):
@@ -359,12 +366,18 @@ def test_nothing_sharper_than_eight_px():
     assert "font-size: 11px" in more, "the 9.5px label grew to the floor"
 
 
-# -- web: bundled builds don't offer a broken update -------------------------
+# -- web: packaged builds update from PyPI now -------------------------------
 
-def test_bundled_builds_disable_the_update_button():
+def test_bundled_builds_no_longer_disable_the_update_button():
+    """v0.40.10 greyed the button while there was nothing pip could do.
+    v0.43.0 gave packaged builds the wheel path, so it stays live — the
+    tooltip only says where an update comes from now."""
     assert "u.bundled" in APPJS
-    seg = APIPY[APIPY.index('@app.get("/update-check")'):][:900]
-    assert '"bundled"' in seg
+    seg = APPJS[APPJS.index("u.bundled"):][:600]
+    assert ".disabled" not in seg
+    assert "PyPI" in seg
+    seg2 = APIPY[APIPY.index('@app.get("/update-check")'):][:900]
+    assert '"bundled"' in seg2
 
 
 # -- android: the session cookies leave with the service ---------------------

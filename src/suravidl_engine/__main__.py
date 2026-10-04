@@ -150,6 +150,15 @@ def start_server(download_dir, token: str, port: int, db_path=None,
     cache home). The Android shell exports the env var before Python starts,
     so it needs no extra argument here.
     """
+    # v0.43.0: a staged yt-dlp update (the PyPI wheel copy) must be ahead of
+    # the bundled one on sys.path BEFORE anything imports yt_dlp — the sweep
+    # right below imports the updater, and the updater imports yt_dlp.
+    try:
+        from .ytdlp_update import activate_safe
+
+        activate_safe(db_path)
+    except Exception:  # noqa: BLE001 - a boot must never fail here
+        pass
     # a previous session's staged update can never be applied again (its
     # state died with that process) — clear it before serving; this also
     # cleans up right after a self-update on every platform that stages
@@ -1295,6 +1304,15 @@ def main() -> None:
     p.add_argument("--selftest", action="store_true",
                    help="boot, verify /health, exit (CI)")
     args = p.parse_args()
+
+    # v0.43.0: a staged yt-dlp update goes ahead of the bundled copy before
+    # any lazy import can reach yt_dlp (start_server does it again; cheap)
+    try:
+        from .ytdlp_update import activate_safe
+
+        activate_safe(args.db)
+    except Exception:  # noqa: BLE001 - never block a launch
+        pass
 
     if args.install_desktop or args.uninstall_desktop:
         # plumbing, not a run: no token, no port, no window

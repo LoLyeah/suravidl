@@ -177,7 +177,9 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 
 ## Updates
 
-- **yt-dlp**: one button in the UI (`POST /update`) upgrades it in place.
+- **yt-dlp**: one button in the UI (`POST /update`) — a pip setup upgrades in
+  place; packaged builds fetch the newest release from PyPI (sha256-verified)
+  and apply it on the next start.
 - **suravidl**: the app reads the newest release's manifest (`GET /update-check`),
   downloads the right asset, verifies its SHA-256, and installs it in place — one
   tap on Windows and macOS, one system confirmation on Android; every other

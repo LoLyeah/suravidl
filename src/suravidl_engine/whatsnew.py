@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.43.0",
+        "title": "The refresh",
+        "items": [
+            "The yt-dlp button works on every build now: packaged installs (Windows, macOS, Linux, Android) fetch the newest release straight from PyPI, verify it, and apply it on the next start \u2014 no app update needed.",
+            "The newer copy is the one that runs \u2014 and if an app update ever ships something even newer, that wins instead. A staged update says \"restart to use it\" until it is live.",
+        ],
+    },
+    {
         "version": "0.42.1",
         "title": "The glide",
         "items": [
@@ -86,14 +94,6 @@ ENTRIES = [
         "items": [
             "The extension popup's stream list is a checkbox list now \u2014 tick several finds and the quick door queues them all at best quality in one go.",
             "Right-click any link, video, or page for \"Download with suravidl\" \u2014 straight to the app's quality picker, no trip through the toolbar.",
-        ],
-    },
-    {
-        "version": "0.40.6",
-        "title": "The tally",
-        "items": [
-            "The queue shows outside the window: the Dock wears a count badge on macOS, Linux docks that speak the launcher protocol get one too, and other desktops carry the count in the window title.",
-            "A read that fails is silence \u2014 the badge holds its last truth rather than flashing a false zero.",
         ],
     },
 ]

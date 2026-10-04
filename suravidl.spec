@@ -31,6 +31,16 @@ try:  # TLS trust: the frozen app carries certifi's CA bundle (its absence on
 except Exception:  # noqa: BLE001 - the engine works without it (system store)
     _certifi_datas = []
 
+try:  # yt-dlp's metadata must travel: the v0.43.0 boot compares a staged
+    # in-app update against the bundled copy by version, and without the
+    # dist-info that comparison falls back to the app-stamp heuristic
+    # (see suravidl_engine/ytdlp_update.py)
+    from PyInstaller.utils.hooks import copy_metadata
+
+    _ytdlp_meta = copy_metadata("yt-dlp")
+except Exception:  # noqa: BLE001 - the fallback still works without it
+    _ytdlp_meta = []
+
 a = Analysis(
     ["scripts/entry.py"],
     pathex=[str(ROOT / "src")],
@@ -38,7 +48,7 @@ a = Analysis(
     datas=[(str(ROOT / "src" / "suravidl_engine" / "web"),
             "suravidl_engine/web"),
            (str(ROOT / "src" / "suravidl_engine" / "macos_swap.sh"),
-            "suravidl_engine")] + _cffi_datas + _certifi_datas,
+            "suravidl_engine")] + _cffi_datas + _certifi_datas + _ytdlp_meta,
     hiddenimports=["suravidl_engine.__main__", "certifi"] + _webview_hidden + _cffi_hidden,
     hookspath=[],
     hooksconfig={},
@@ -77,7 +87,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.42.1",
+            "CFBundleShortVersionString": "0.43.0",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

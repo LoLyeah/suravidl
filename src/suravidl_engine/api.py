@@ -452,14 +452,24 @@ def create_app(download_dir, auth_token: str | None = None,
     def version(_mgr: JobManager = Depends(require_auth)):
         import yt_dlp.version
 
-        return {"engine": __version__, "yt_dlp": yt_dlp.version.__version__}
+        from . import ytdlp_update
+
+        try:
+            staged = ytdlp_update.pending_version(db_path)
+        except Exception:  # noqa: BLE001 - a hint must never 500 the tab
+            staged = None
+        return {"engine": __version__, "yt_dlp": yt_dlp.version.__version__,
+                "staged": staged}
 
     @app.post("/update")
     def update(_mgr: JobManager = Depends(require_auth)):
         from . import updater
 
-        # sync endpoint -> runs in FastAPI's worker thread; pip may take a while
-        return (update_fn or updater.self_update)()
+        # sync endpoint -> runs in FastAPI's worker thread; pip may take a
+        # while, and the wheel path downloads a few MB (v0.43.0)
+        if update_fn:
+            return update_fn()
+        return updater.self_update(db_path=db_path)
 
     @app.get("/update-check")
     def update_check(_mgr: JobManager = Depends(require_auth)):

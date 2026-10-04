@@ -67,3 +67,18 @@ The downloaded update file never lingers once it is spent:
 - All shells: any staged file from a previous engine session is an orphan
   by definition — the staging state lives in memory — so every boot and
   every fresh download sweeps the update cache first.
+
+## yt-dlp updates on packaged builds (v0.43.0)
+
+A packaged app (Windows setup, macOS app, Linux AppImage, Android APK)
+carries yt-dlp inside itself — there is no pip to run there. From v0.43.0
+the **Update yt-dlp** button on those builds fetches the official wheel
+from PyPI, verifies its sha256 against PyPI's own metadata, and unpacks it
+next to `jobs.db` (in a `ytdlp/` folder). From the next start the newer
+copy shadows the bundled one, and the tab shows "staged — restart to use
+it" until it is live.
+
+The newer copy wins **by version**, always: if an app update ever ships
+something newer than the staged copy, the stage is removed on the next
+boot. Nothing staged ever lingers as a partial: a crashed download or a
+torn extraction is swept at startup.
