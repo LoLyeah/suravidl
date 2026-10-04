@@ -2464,7 +2464,12 @@ async function installStagedUpdate() {
       return;
     }
   }
-  if (!ANDROID() && UPD_STATE && UPD_STATE.apply_kind === "windows_installer") {
+  // the desktop shells hand the staged file to /update/apply; each shell
+  // installs its own way (Windows: the silent setup; macOS: the bundle
+  // swap) — one list, so a third shell cannot be forgotten
+  const DESKTOP_APPLY_KINDS = ["windows_installer", "macos_app_zip"];
+  if (!ANDROID() && UPD_STATE &&
+      DESKTOP_APPLY_KINDS.indexOf(UPD_STATE.apply_kind) !== -1) {
     try {
       const r = await api("/update/apply", { method: "POST" });
       if (r.ok) { toast("restarting to install…"); return; }

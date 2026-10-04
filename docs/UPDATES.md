@@ -1,7 +1,7 @@
 # Updates
 
-suravidl updates itself without a release-page trip on Windows and Android;
-every other platform keeps a one-click path to the release.
+suravidl updates itself without a release-page trip on Windows, macOS and
+Android; every other platform keeps a one-click path to the release.
 
 ## The feed
 
@@ -35,8 +35,15 @@ Each release carries a small `version.json` (plus `SHA256SUMS.txt`), written by
   install is impossible for apps installed outside an MDM/root context, and
   that is by Android's design. The signing keystore is unchanged, so updates
   land in place and app data survives.
-- **macOS / Linux**: the check reports the new version and opens the release
-  page; the dmg / AppImage flows stay manual.
+- **macOS**: the app downloads `suravidl-macos-arm64.zip` (the very bundle the
+  dmg carries), verifies it, and — on "Restart & Install" — swaps the app bundle
+  in place and reopens it. Two shapes cannot self-update and get words instead:
+  a copy still running from the mounted dmg (drag it to Applications first) and
+  a folder the user cannot write. The app is unsigned (no Apple Developer ID),
+  so first installs keep the right-click → Open dance; updates after that are
+  frictionless because the app's own download carries no quarantine flag.
+- **Linux**: the check reports the new version and opens the release page; the
+  AppImage flow stays manual.
 
 ## Verifying by hand
 

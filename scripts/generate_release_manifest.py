@@ -25,6 +25,7 @@ ROLES = {
     "windows_installer": "suravidl-windows-x64-setup.exe",
     "windows_portable": "suravidl-windows-x64.exe",
     "macos_dmg": "suravidl-macos-arm64.dmg",
+    "macos_app_zip": "suravidl-macos-arm64.zip",
     "linux_appimage": "suravidl-linux-x64.AppImage",
     "android_apk": "app-release.apk",
     "firefox_xpi": "suravidl-extension-firefox.xpi",

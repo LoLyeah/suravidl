@@ -56,8 +56,9 @@ From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 - `suravidl-linux-x64.AppImage` — `chmod +x`, then run it (needs FUSE; otherwise
   `--appimage-extract-and-run`). `--install-desktop` puts it in your applications
   menu (and lights up docks that read the launcher count).
-- `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first launch
-  needs right-click → Open.
+- `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first
+  launch needs right-click → Open; after that it updates itself in place, like
+  Windows.
 - `app-release.apk` — Android (see below).
 - Extension: Firefox — [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/);
   Chrome/Edge/Brave — `suravidl-extension-chrome.zip` (load unpacked), both below.
@@ -179,8 +180,8 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 - **yt-dlp**: one button in the UI (`POST /update`) upgrades it in place.
 - **suravidl**: the app reads the newest release's manifest (`GET /update-check`),
   downloads the right asset, verifies its SHA-256, and installs it in place — one
-  tap on Windows, one system confirmation on Android; every other platform keeps
-  the download link. Details: [docs/UPDATES.md](docs/UPDATES.md).
+  tap on Windows and macOS, one system confirmation on Android; every other
+  platform keeps the download link. Details: [docs/UPDATES.md](docs/UPDATES.md).
 
 ## Privacy and security
 
@@ -230,7 +231,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 955 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 970 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

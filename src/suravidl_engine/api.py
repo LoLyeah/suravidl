@@ -517,8 +517,11 @@ def create_app(download_dir, auth_token: str | None = None,
             return {"ok": False,
                     "reason": f"{len(active)} download(s) still running; "
                               "finish or cancel them before the app restarts"}
-        if act(st["path"]) is False:
+        verdict = act(st["path"])
+        if verdict is False:
             return {"ok": False, "reason": "the applier refused to run"}
+        if isinstance(verdict, str):
+            return {"ok": False, "reason": verdict}   # the applier's words
         return {"ok": True, "mode": "desktop"}
 
     @app.get("/whats-new")

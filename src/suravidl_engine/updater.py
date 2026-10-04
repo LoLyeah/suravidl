@@ -155,9 +155,10 @@ def self_update() -> dict:
 
 MANIFEST_URL = "https://github.com/{repo}/releases/latest/download/version.json"
 
-_APPLY_KINDS = {"windows": "windows_installer", "android": "android_apk"}
+_APPLY_KINDS = {"windows": "windows_installer", "android": "android_apk",
+                "macos": "macos_app_zip"}
 _ROLE_FOR = {"windows": "windows_installer", "android": "android_apk",
-             "macos": "macos_dmg", "linux": "linux_appimage"}
+             "macos": "macos_app_zip", "linux": "linux_appimage"}
 
 
 def running_platform() -> str:
@@ -170,6 +171,49 @@ def running_platform() -> str:
     if sys.platform == "darwin":
         return "macos"
     return "linux"
+
+
+def _swap_script_path() -> Path:
+    """The bundled swap script — shipped as package data on purpose, so
+    the macOS CI job dry-runs the very file the app executes."""
+    return Path(__file__).resolve().parent / "macos_swap.sh"
+
+
+def app_bundle_from(exe) -> Path | None:
+    """The .app bundle a frozen executable lives in, if any."""
+    for parent in Path(exe).resolve().parents:
+        if parent.suffix == ".app":
+            return parent
+    return None
+
+
+def macos_apply_refusal(bundle: Path) -> str | None:
+    """Why this bundle cannot replace itself, in the user's words — or None.
+
+    A translocated copy (run straight from the mounted dmg; macOS runs it
+    from a read-only random path) and a folder the user cannot write both
+    get words up front, not a failed swap after the fact (v0.42.0).
+    """
+    p = str(bundle)
+    if "/AppTranslocation/" in p or p.startswith("/Volumes/"):
+        return ("this copy runs from the download image — drag suravidl "
+                "into Applications, then update there")
+    if not os.access(bundle.parent, os.W_OK):
+        return ("suravidl cannot replace itself in this folder — move "
+                "it somewhere you can write and try again")
+    return None
+
+
+def macos_apply_command(bundle, zip_path, pid: int) -> list[str]:
+    """The detached swap the macOS courier rides (v0.42.0).
+
+    /bin/bash runs the bundled script — it waits for THIS pid to exit,
+    extracts the new bundle beside the old one, swaps by rename, rolls
+    back on any failure, and reopens the app. Pure function — the tests
+    pin the shape.
+    """
+    return ["/bin/bash", str(_swap_script_path()), "suravidl-apply",
+            str(bundle), str(zip_path), str(int(pid))]
 
 
 def _fetch_manifest(repo: str) -> dict:

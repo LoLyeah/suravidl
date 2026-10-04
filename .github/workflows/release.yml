@@ -21,7 +21,9 @@ jobs:
               suravidl-windows-x64-setup.exe
           - os: macos-14
             binary: suravidl
-            files: suravidl-macos-arm64.dmg
+            files: |
+              suravidl-macos-arm64.dmg
+              suravidl-macos-arm64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -73,11 +75,39 @@ jobs:
               ln -s /Applications dmg_stage/Applications
               hdiutil create -volname suravidl -srcfolder dmg_stage \
                 -ov -format UDZO suravidl-macos-arm64.dmg
+              # the self-update carrier: a zip of the very same .app
+              ditto -c -k --keepParent dist/suravidl.app suravidl-macos-arm64.zip
               ;;
             windows-2022)
               cp dist/suravidl.exe suravidl-windows-x64.exe
               ;;
           esac
+      - name: Dry-run the self-update swap (macOS only)
+        if: matrix.os == 'macos-14'
+        run: |
+          set -euo pipefail
+          WORK="$(mktemp -d)"
+          mkdir -p "$WORK/installed/suravidl.app/Contents" \
+                   "$WORK/new/suravidl.app/Contents"
+          echo old > "$WORK/installed/suravidl.app/Contents/OLD"
+          echo new > "$WORK/new/suravidl.app/Contents/NEW"
+          # a real ditto zip of a fake bundle — the shape the feed ships
+          ditto -c -k --keepParent "$WORK/new/suravidl.app" "$WORK/update.zip"
+          SURAVIDL_APPLY_DRYRUN=1 bash src/suravidl_engine/macos_swap.sh \
+            suravidl-apply "$WORK/installed/suravidl.app" "$WORK/update.zip" 999999
+          test -f "$WORK/installed/suravidl.app/Contents/NEW"
+          test ! -e "$WORK/installed/suravidl.app/Contents/OLD"
+          echo "swap dry-run ok"
+          # rollback: a zip carrying no bundle must leave the app untouched
+          echo nope > "$WORK/notanapp.txt"
+          ditto -c -k "$WORK/notanapp.txt" "$WORK/bad.zip"
+          if SURAVIDL_APPLY_DRYRUN=1 bash src/suravidl_engine/macos_swap.sh \
+               suravidl-apply "$WORK/installed/suravidl.app" "$WORK/bad.zip" 999999; then
+            echo "the rollback path returned success — it must not" >&2
+            exit 1
+          fi
+          test -f "$WORK/installed/suravidl.app/Contents/NEW"
+          echo "rollback dry-run ok"
       - name: Build Windows installer
         if: matrix.os == 'windows-2022'
         shell: pwsh

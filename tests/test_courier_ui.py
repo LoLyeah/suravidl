@@ -38,7 +38,11 @@ def test_the_settings_row_walks_the_whole_flow():
 
 def test_the_ready_door_picks_the_shell():
     door = _fn("async function installStagedUpdate", "function renderCourierRow")
-    assert 'apply_kind === "windows_installer"' in door
+    # v0.42.0: the desktop list form — Windows and macOS both hand the
+    # staged file to /update/apply; one constant keeps them together
+    assert ('const DESKTOP_APPLY_KINDS = ["windows_installer", '
+            '"macos_app_zip"];') in door
+    assert "DESKTOP_APPLY_KINDS.indexOf(UPD_STATE.apply_kind) !== -1" in door
     assert "AndroidHost.installApk(st.name)" in door
     assert "AndroidHost.canInstallPackages" in door
     assert "AndroidHost.openInstallPermissionSettings" in door

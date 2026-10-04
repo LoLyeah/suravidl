@@ -1207,29 +1207,55 @@ def _installed_exe() -> str | None:
 def _make_apply_update_action(window):
     """The desktop_actions["apply_update"] the courier's /update/apply calls.
 
-    Spawns the staged installer DETACHED (it must outlive us), then destroys
-    the window so the app exits and every lock on suravidl.exe lets go. Only
-    Windows takes this path; everywhere else it honestly refuses.
+    Spawns the staged updater DETACHED (it must outlive us), then destroys
+    the window so the app exits and lets its files go — on Windows the
+    silent installer, on macOS the bundle-swap script. A refusal with a
+    REASON (a translocated or read-only copy) comes back as a string for
+    the UI to put into words; everywhere else the action honestly refuses.
     """
-    def _apply_update(installer_path=None) -> bool:
-        if os.name != "nt" or not installer_path:
+    def _apply_update(installer_path=None):
+        if not installer_path:
             return False
-        installer = str(installer_path)
-        if not Path(installer).is_file():
+        staged = str(installer_path)
+        if not Path(staged).is_file():
             return False
         import subprocess
 
-        cmd = _windows_apply_command(installer, _installed_exe())
-        try:
-            subprocess.Popen(
-                cmd, close_fds=True,
-                # DETACHED_PROCESS | CREATE_NO_WINDOW: the upgrade keeps
-                # running after this process (and its console) is gone
-                creationflags=0x00000008 | 0x08000000)
-        except Exception:  # noqa: BLE001 - the UI reports nothing staged ran
-            return False
-        window.destroy()   # hand the locks back; the chain does the rest
-        return True
+        if os.name == "nt":
+            cmd = _windows_apply_command(staged, _installed_exe())
+            try:
+                subprocess.Popen(
+                    cmd, close_fds=True,
+                    # DETACHED_PROCESS | CREATE_NO_WINDOW: the upgrade keeps
+                    # running after this process (and its console) is gone
+                    creationflags=0x00000008 | 0x08000000)
+            except Exception:  # noqa: BLE001 - the UI reports nothing staged ran
+                return False
+            window.destroy()   # hand the locks back; the chain does the rest
+            return True
+
+        if sys.platform == "darwin":
+            from .updater import (app_bundle_from, macos_apply_command,
+                                  macos_apply_refusal)
+            bundle = app_bundle_from(sys.executable)
+            if bundle is None:
+                return False
+            why = macos_apply_refusal(bundle)
+            if why:
+                return why   # the UI says this verbatim (translocated etc.)
+            cmd = macos_apply_command(bundle, staged, os.getpid())
+            try:
+                # start_new_session: the swap must keep running after we
+                # die — it IS waiting for exactly that (v0.42.0)
+                subprocess.Popen(cmd, close_fds=True, start_new_session=True,
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            except Exception:  # noqa: BLE001
+                return False
+            window.destroy()   # the script waits for this pid to go
+            return True
+
+        return False
 
     return _apply_update
 

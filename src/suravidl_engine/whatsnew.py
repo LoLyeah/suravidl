@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.42.0",
+        "title": "The crossing",
+        "items": [
+            "macOS joins the self-updating line: suravidl checks, downloads and verifies the new version \u2014 then one tap swaps the app in place and reopens it. No more dmg trips.",
+            "The swap is guarded: a copy running from the download image or a folder it cannot write says so in words, and a failed swap rolls back to the version you have.",
+        ],
+    },
+    {
         "version": "0.41.1",
         "title": "The delivery",
         "items": [
@@ -85,14 +93,6 @@ ENTRIES = [
         "items": [
             "Quality chips now say what each pick will weigh when the site publishes sizes \u2014 the streams' own numbers, added the way the pick works. No sizes published, no claims made.",
             "The batch line counts out loud as you paste: how many links, and how many lines it skipped \u2014 one link is one link, and the button only appears when there is really a batch.",
-        ],
-    },
-    {
-        "version": "0.40.4",
-        "title": "The marks",
-        "items": [
-            "The player can set your clip now: Mark in and Mark out write the player's own clock into the clip fields \u2014 cut a section from what you are watching, not from a time typed by memory.",
-            "The marks appear for video players only; an audio file has no picture to cut from.",
         ],
     },
 ]
