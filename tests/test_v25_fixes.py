@@ -89,8 +89,8 @@ def test_playlist_rows_get_an_openable_file_list():
     assert "openPlayer(j, file)" in seg, "each entry can be played in-page"
     # and the row offers the list itself, still with Delete beside it
     row = APP.split("const playlistRow = !!")[1].split("} else if (j.status ===")[0]
-    assert '"Files (" + count + ")"' in row
-    assert '"Hide files (" + count + ")"' in row
+    assert 't("Files ({n})", { n: count })' in row
+    assert 't("Hide files ({n})", { n: count })' in row
 
 
 def test_playing_a_playlist_entry_streams_by_name(tmp_path):

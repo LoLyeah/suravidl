@@ -94,7 +94,7 @@ def test_the_batch_line_names_what_it_skipped():
     seg = _seg(APP, "function renderBatchRow(")
     assert "pastedTokens()" in seg and "pastedUrls()" in seg
     assert "skipped — not" in seg, "a skipped line is named, not uncounted"
-    assert 'urls.length === 1 ? "link" : "links"' in seg, "one link is one link"
+    assert 'urls.length === 1' in seg and 't("1 link") : t("{n} links", { n: urls.length })' in seg, "one link is one link"
     assert "over || urls.length < 2" in seg, \
         "one link is not a batch — the button stays off"
     assert "only 20 fit in one batch" in seg, "the cap still speaks"

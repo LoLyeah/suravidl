@@ -139,7 +139,7 @@ def test_the_ready_notice_carries_the_door():
     assert '"Restart when' not in APP and "restart when you" not in APP
     door = _fn("function announceUpdateReady", "\n}")
     assert "installStagedUpdate" in door
-    assert 'ANDROID() ? "Install now" : "Restart & Install"' in door
+    assert 'ANDROID() ? t("Install now") : t("Restart & Install")' in door
     sync = _fn("async function syncStagedUpdate", "/** force")
     assert "announceUpdateReady()" in sync, "a reload must keep the door"
 

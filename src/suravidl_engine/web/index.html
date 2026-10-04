@@ -67,31 +67,31 @@
       <path d="M 90 48 H 166 A 12 12 0 0 1 178 60 V 160 H 216 L 128 224 L 40 160 H 78 V 60 A 12 12 0 0 1 90 48 Z M 104 71 L 104 137 Q 104 148 113 141.6 L 157 110.4 Q 166 104 157 97.6 L 113 66.4 Q 104 60 104 71 Z" fill="var(--mark-arrow)" fill-rule="evenodd"/>
     </svg>
   </div>
-  <h1>suravidl</h1>
+  <h1 data-i18n="suravidl">suravidl</h1>
   <span id="versions" class="meta"></span>
   <span class="spacer"></span>
-  <button id="minBtn" class="btn sm hidden" title="Minimize to tray" aria-label="Minimize to tray"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg></span></button>
-  <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span>Quit</button>
+  <button id="minBtn" class="btn sm hidden" title="Minimize to tray" data-i18n-title="Minimize to tray" aria-label="Minimize to tray" data-i18n-aria="Minimize to tray"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-minus"/></svg></span></button>
+  <button id="quitBtn" class="btn sm quit hidden" title="Quit suravidl" data-i18n-title="Quit suravidl"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span><span data-i18n="Quit">Quit</span></button>
 </header>
 
 <nav id="tabs" class="tabs" role="tablist" aria-label="suravidl">
   <button class="tab active" data-tab="download" role="tab" type="button" id="tabDownload" aria-controls="panel-download" aria-selected="true" tabindex="0">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl">Download</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-down"/></svg></span></span><span class="tab-lbl" data-i18n="Download">Download</span></button>
   <button class="tab" data-tab="queue" role="tab" type="button" id="tabQueue" aria-controls="panel-queue" aria-selected="false" tabindex="-1">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl">Queue</span>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stack"/></svg></span></span><span class="tab-lbl" data-i18n="Queue">Queue</span>
     <span id="queueCount" class="badge hidden"></span></button>
   <button class="tab" data-tab="settings" role="tab" type="button" id="tabSettings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl">Settings</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-tune"/></svg></span></span><span class="tab-lbl" data-i18n="Settings">Settings</span></button>
   <button class="tab" data-tab="ytdlp" role="tab" type="button" id="tabYtdlp" aria-controls="panel-ytdlp" aria-selected="false" tabindex="-1">
-    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl">yt-dlp</span></button>
+    <span class="tab-ico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cmd"/></svg></span></span><span class="tab-lbl" data-i18n="yt-dlp">yt-dlp</span></button>
 </nav>
 
 <main id="panels">
 
   <!-- the bins rail: finished takes, desktop rooms (v0.37.0) -->
-  <aside id="binsRail" class="bins" aria-label="filed takes">
+  <aside id="binsRail" class="bins" aria-label="filed takes" data-i18n-aria="filed takes">
     <div class="bins-head">
-      <span class="lbl">Filed takes</span>
+      <span class="lbl" data-i18n="Filed takes">Filed takes</span>
       <span class="meta" id="binsCount"></span>
     </div>
     <div id="binsList" class="bins-list"></div>
@@ -100,47 +100,47 @@
   <!-- ============================ Download ============================ -->
   <section class="panel" id="panel-download" role="tabpanel" aria-labelledby="tabDownload">
     <section class="card paste-card">
-      <label class="lbl" for="url">Source</label>
+      <label class="lbl" for="url" data-i18n="Source">Source</label>
       <div class="paste">
         <input id="url" type="text" spellcheck="false"
-               placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
-        <button id="probeBtn" class="btn prime">Probe</button>
+               placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link" data-i18n-ph="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
+        <button id="probeBtn" class="btn prime" data-i18n="Probe">Probe</button>
       </div>
       <div id="probeSay" class="msg hidden" role="status"></div>
       <div id="probeMsg" class="msg muted"></div>
-      <button id="probeDetails" class="linkbtn hidden" type="button" aria-expanded="false" aria-controls="probeMsg">Show details</button>
+      <button id="probeDetails" class="linkbtn hidden" type="button" aria-expanded="false" aria-controls="probeMsg" data-i18n="Show details">Show details</button>
       <div id="browserOffer" class="audioRow hidden">
-        <button id="browserOfferBtn" class="btn sm">Open in the browser</button>
-        <span class="muted">this page has a player yt-dlp cannot read — press play there, then Scan</span>
+        <button id="browserOfferBtn" class="btn sm" data-i18n="Open in the browser">Open in the browser</button>
+        <span class="muted" data-i18n="this page has a player yt-dlp cannot read — press play there, then Scan">this page has a player yt-dlp cannot read — press play there, then Scan</span>
       </div>
       <div id="sniffRow" class="audioRow hidden">
-        <button id="sniffBtn" class="btn sm"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg></span>Find a video on a page</button>
-        <span class="muted">opens a browser with a sniffer — press play, then Scan</span>
+        <button id="sniffBtn" class="btn sm"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg></span><span data-i18n="Find a video on a page">Find a video on a page</span></button>
+        <span class="muted" data-i18n="opens a browser with a sniffer — press play, then Scan">opens a browser with a sniffer — press play, then Scan</span>
       </div>
       <div id="batchRow" class="audioRow hidden">
         <span class="muted" id="batchCount"></span>
-        <button id="batchBtn" class="btn sm">Queue all</button>
+        <button id="batchBtn" class="btn sm" data-i18n="Queue all">Queue all</button>
       </div>
     </section>
 
     <!-- the scope strip: a finished probe lands here (v0.37.0) -->
-    <section class="scopes" id="scopeStrip" data-state="off" aria-label="source readout">
+    <section class="scopes" id="scopeStrip" data-state="off" aria-label="source readout" data-i18n-aria="source readout">
       <div class="scope">
-        <span class="lbl">Source</span>
+        <span class="lbl" data-i18n="Source">Source</span>
         <span class="reading" id="scopeSrc">—</span>
         <span class="led" data-led="src"></span>
       </div>
       <div class="scope">
-        <span class="lbl">Formats</span>
+        <span class="lbl" data-i18n="Formats">Formats</span>
         <span class="reading" id="scopeFmt">—</span>
         <span class="led" data-led="fmt"></span>
       </div>
       <div class="scope">
-        <span class="lbl">Largest</span>
+        <span class="lbl" data-i18n="Largest">Largest</span>
         <span class="reading" id="scopeSize">—</span>
         <span class="led" data-led="size"></span>
       </div>
-      <span class="scope-say" id="scopeSay">feed the deck a link — the probe fills these</span>
+      <span class="scope-say" id="scopeSay" data-i18n="feed the deck a link — the probe fills these">feed the deck a link — the probe fills these</span>
     </section>
 
     <section id="probeCard" class="card hidden">
@@ -156,65 +156,65 @@
           <div class="armed-strip">
             <span id="armedText"></span>
             <button id="armedClear" class="btn ghost-sm" type="button"
-                    title="clear what is armed for the next download"
-                    aria-label="clear what is armed for the next download"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span></button>
+                    title="clear what is armed for the next download" data-i18n-title="clear what is armed for the next download"
+                    aria-label="clear what is armed for the next download" data-i18n-aria="clear what is armed for the next download"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></span></button>
           </div><!-- /armed-strip -->
         </div><!-- /armed-clip -->
       </div><!-- /armedBar -->
       <div id="qualityRow" class="audioRow hidden">
-        <span class="muted">Quality:</span>
+        <span class="muted" data-i18n="Quality:">Quality:</span>
         <span id="qualityBtns" class="qrow"></span>
       </div>
       <div id="audioLangRow" class="audioRow hidden">
-        <span class="muted">Audio track:</span>
+        <span class="muted" data-i18n="Audio track:">Audio track:</span>
         <span id="audioLangChips" class="qrow"></span>
-        <span class="muted small">what a video-only take pairs when it adds sound</span>
+        <span class="muted small" data-i18n="what a video-only take pairs when it adds sound">what a video-only take pairs when it adds sound</span>
       </div>
       <div id="audioRow" class="audioRow">
-        <span class="muted">Audio only:</span>
-        <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed">keep original</button>
-        <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)">M4A</button>
-        <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps">MP3</button>
-        <select id="audioMore" title="more audio formats" aria-label="More audio presets">
-          <option value="">more formats…</option>
-          <option value="audio-mp3-320">MP3 320k</option>
-          <option value="audio-mp3-128">MP3 128k</option>
-          <option value="audio-flac">FLAC lossless</option>
-          <option value="audio-opus">Opus (native)</option>
+        <span class="muted" data-i18n="Audio only:">Audio only:</span>
+        <button id="audioNativeBtn" class="btn sm" title="keep the original stream — no conversion, no ffmpeg needed" data-i18n-title="keep the original stream — no conversion, no ffmpeg needed" data-i18n="keep original">keep original</button>
+        <button id="audioM4aBtn" class="btn sm" title="extract / convert to M4A (AAC)" data-i18n-title="extract / convert to M4A (AAC)" data-i18n="M4A">M4A</button>
+        <button id="audioMp3Btn" class="btn sm" title="extract / convert to MP3 at 192 kbps" data-i18n-title="extract / convert to MP3 at 192 kbps" data-i18n="MP3">MP3</button>
+        <select id="audioMore" title="more audio formats" data-i18n-title="more audio formats" aria-label="More audio presets" data-i18n-aria="More audio presets">
+          <option value="" data-i18n="more formats…">more formats…</option>
+          <option value="audio-mp3-320" data-i18n="MP3 320k">MP3 320k</option>
+          <option value="audio-mp3-128" data-i18n="MP3 128k">MP3 128k</option>
+          <option value="audio-flac" data-i18n="FLAC lossless">FLAC lossless</option>
+          <option value="audio-opus" data-i18n="Opus (native)">Opus (native)</option>
         </select>
       </div>
       <div id="soundRow" class="audioRow hidden">
         <label class="chk" for="noSound">
           <input id="noSound" type="checkbox"/>
-          <span>Video only — no sound</span>
+          <span data-i18n="Video only — no sound">Video only — no sound</span>
         </label>
-        <span class="muted small">when unticked, a video download gets the
+        <span class="muted small" data-i18n="when unticked, a video download gets the site’s audio added automatically">when unticked, a video download gets the
           site’s audio added automatically</span>
       </div>
       <div id="liveRow" class="audioRow hidden">
-        <span class="chip"><span class="led warn"></span>LIVE</span>
-        <span class="muted small">live stream — the download keeps recording until you cancel it</span>
+        <span class="chip"><span class="led warn"></span><span data-i18n="LIVE">LIVE</span></span>
+        <span class="muted small" data-i18n="live stream — the download keeps recording until you cancel it">live stream — the download keeps recording until you cancel it</span>
       </div>
       <div id="subsRow" class="audioRow hidden">
-        <span class="muted">Subtitles:</span>
+        <span class="muted" data-i18n="Subtitles:">Subtitles:</span>
         <span id="subsChips" class="qrow"></span>
       </div>
       <div id="chapterRow" class="audioRow hidden">
-        <span class="muted">Chapters:</span>
+        <span class="muted" data-i18n="Chapters:">Chapters:</span>
         <span id="chapterChips" class="qrow"></span>
-        <span class="muted small">click one to clip from here</span>
+        <span class="muted small" data-i18n="click one to clip from here">click one to clip from here</span>
       </div>
       <div id="playlistRow" class="audioRow hidden">
-        <span class="muted">Playlist items:</span>
-        <input id="playlistItems" type="text" spellcheck="false" aria-label="Playlist items to download"
-               placeholder="blank = all · e.g. 1-10,15"/>
-        <button id="playlistBtn" class="btn sm">Download playlist</button>
-        <button id="plAll" class="btn ghost-sm">All</button>
-        <button id="plNone" class="btn ghost-sm">None</button>
+        <span class="muted" data-i18n="Playlist items:">Playlist items:</span>
+        <input id="playlistItems" type="text" spellcheck="false" aria-label="Playlist items to download" data-i18n-aria="Playlist items to download"
+               placeholder="blank = all · e.g. 1-10,15" data-i18n-ph="blank = all · e.g. 1-10,15"/>
+        <button id="playlistBtn" class="btn sm" data-i18n="Download playlist">Download playlist</button>
+        <button id="plAll" class="btn ghost-sm" data-i18n="All">All</button>
+        <button id="plNone" class="btn ghost-sm" data-i18n="None">None</button>
         <span id="plCount" class="muted"></span>
       </div>
       <table id="formats">
-        <thead><tr><th>quality</th><th>format</th><th>size</th><th></th></tr></thead>
+        <thead><tr><th data-i18n="quality">quality</th><th data-i18n="format">format</th><th data-i18n="size">size</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </section>
@@ -222,137 +222,137 @@
     <!-- the transport: what will start, and the one starter (v0.37.0) -->
     <div id="transport" class="transport">
       <span class="take">
-        <span class="lbl">Take</span>
-        <span class="reading" id="takeSay">best available</span>
+        <span class="lbl" data-i18n="Take">Take</span>
+        <span class="reading" id="takeSay" data-i18n="best available">best available</span>
       </span>
       <button id="studioBtn" class="ghost-sm" type="button"
-              title="open the per-download patch bay">Studio</button>
-      <button id="bestBtn" class="btn prime" type="button">START · best</button>
+              title="open the per-download patch bay" data-i18n-title="open the per-download patch bay" data-i18n="Studio">Studio</button>
+      <button id="bestBtn" class="btn prime" type="button" data-i18n="START · best">START · best</button>
     </div>
 
     <!-- "This download only": a patch over the saved settings, per job -->
     <details id="ovBlock" class="card">
-      <summary>This download only <span id="ovCount" class="chip hidden"></span></summary>
+      <summary><span data-i18n="This download only ">This download only </span><span id="ovCount" class="chip hidden"></span></summary>
       <div class="bay-body" id="ovBody">
       <div class="field">
-        <label class="lbl" for="ovPreset">Preset
-          <span class="muted">— fills these fields from a saved bundle</span></label>
+        <label class="lbl" for="ovPreset"><span data-i18n="Preset ">Preset
+          </span><span class="muted" data-i18n="— fills these fields from a saved bundle">— fills these fields from a saved bundle</span></label>
         <div class="jrow">
           <select id="ovPreset"></select>
-          <button id="ovApply" class="btn sm" type="button">Apply</button>
-          <button id="ovClear" class="btn sm" type="button">Clear</button>
+          <button id="ovApply" class="btn sm" type="button" data-i18n="Apply">Apply</button>
+          <button id="ovClear" class="btn sm" type="button" data-i18n="Clear">Clear</button>
         </div>
         <div class="muted small hidden" id="ovPresetInfo"></div>
         <div class="jrow">
-          <button id="ovSaveLink" class="linkbtn" type="button">Save these options as a preset…</button>
-          <button id="ovUpdate" class="linkbtn hidden" type="button">Update</button>
+          <button id="ovSaveLink" class="linkbtn" type="button" data-i18n="Save these options as a preset…">Save these options as a preset…</button>
+          <button id="ovUpdate" class="linkbtn hidden" type="button" data-i18n="Update">Update</button>
         </div>
         <div class="jrow hidden" id="ovSaveRow">
           <input id="ovSaveName" type="text" spellcheck="false"
-                 placeholder="preset name" aria-label="preset name"/>
-          <button id="ovSaveGo" class="btn sm prime" type="button">Save</button>
-          <button id="ovSaveCancel" class="btn sm ghost-sm" type="button">Cancel</button>
+                 placeholder="preset name" data-i18n-ph="preset name" aria-label="preset name" data-i18n-aria="preset name"/>
+          <button id="ovSaveGo" class="btn sm prime" type="button" data-i18n="Save">Save</button>
+          <button id="ovSaveCancel" class="btn sm ghost-sm" type="button" data-i18n="Cancel">Cancel</button>
         </div>
         <div class="msg hidden" id="ovSaveMsg"></div>
       </div>
       <div class="grid2">
         <div class="field">
-          <label class="lbl" for="ovSubs">Subtitles</label>
+          <label class="lbl" for="ovSubs" data-i18n="Subtitles">Subtitles</label>
           <select id="ovSubs">
-            <option value="">use my settings</option>
-            <option value="off">off</option>
-            <option value="sidecar">write .srt files</option>
-            <option value="embed">embed in the video</option>
+            <option value="" data-i18n="use my settings">use my settings</option>
+            <option value="off" data-i18n="off">off</option>
+            <option value="sidecar" data-i18n="write .srt files">write .srt files</option>
+            <option value="embed" data-i18n="embed in the video">embed in the video</option>
           </select>
         </div>
         <div class="field">
-          <label class="lbl" for="ovSubLangs">Subtitle languages</label>
+          <label class="lbl" for="ovSubLangs" data-i18n="Subtitle languages">Subtitle languages</label>
           <input id="ovSubLangs" type="text" spellcheck="false" placeholder="en, id"/>
         </div>
         <div class="field">
-          <label class="lbl" for="ovSb">SponsorBlock</label>
+          <label class="lbl" for="ovSb" data-i18n="SponsorBlock">SponsorBlock</label>
           <select id="ovSb">
-            <option value="">use my settings</option>
-            <option value="off">off</option>
-            <option value="mark">mark as chapters</option>
-            <option value="remove">remove the segments</option>
+            <option value="" data-i18n="use my settings">use my settings</option>
+            <option value="off" data-i18n="off">off</option>
+            <option value="mark" data-i18n="mark as chapters">mark as chapters</option>
+            <option value="remove" data-i18n="remove the segments">remove the segments</option>
           </select>
         </div>
         <div class="field">
-          <label class="lbl" for="ovMeta">Tags</label>
+          <label class="lbl" for="ovMeta" data-i18n="Tags">Tags</label>
           <div class="col">
             <!-- three states, because a checkbox cannot say the third thing
                  that matters for one download: "off, even though my settings
                  say on" (v0.21.2 audit) -->
-            <select id="ovMeta" aria-label="embed metadata for this download">
-              <option value="">use my settings</option>
-              <option value="on">embed metadata</option>
-              <option value="off">do not embed metadata</option>
+            <select id="ovMeta" aria-label="embed metadata for this download" data-i18n-aria="embed metadata for this download">
+              <option value="" data-i18n="use my settings">use my settings</option>
+              <option value="on" data-i18n="embed metadata">embed metadata</option>
+              <option value="off" data-i18n="do not embed metadata">do not embed metadata</option>
             </select>
-            <select id="ovThumb" aria-label="embed thumbnail for this download">
-              <option value="">use my settings</option>
-              <option value="on">embed thumbnail</option>
-              <option value="off">do not embed thumbnail</option>
+            <select id="ovThumb" aria-label="embed thumbnail for this download" data-i18n-aria="embed thumbnail for this download">
+              <option value="" data-i18n="use my settings">use my settings</option>
+              <option value="on" data-i18n="embed thumbnail">embed thumbnail</option>
+              <option value="off" data-i18n="do not embed thumbnail">do not embed thumbnail</option>
             </select>
           </div>
         </div>
         <div class="field">
-          <label class="lbl" for="ovClipStart">Clip — only a section</label>
+          <label class="lbl" for="ovClipStart" data-i18n="Clip — only a section">Clip — only a section</label>
           <div class="jrow">
             <input id="ovClipStart" type="text" spellcheck="false" placeholder="start 1:30"/>
-            <input id="ovClipEnd" type="text" spellcheck="false" placeholder="end 2:45" aria-label="Clip end time"/>
-            <button id="ovClipClear" class="btn ghost-sm" type="button">whole video</button>
+            <input id="ovClipEnd" type="text" spellcheck="false" placeholder="end 2:45" aria-label="Clip end time" data-i18n-aria="Clip end time"/>
+            <button id="ovClipClear" class="btn ghost-sm" type="button" data-i18n="whole video">whole video</button>
           </div>
-          <span class="muted small">mm:ss or hh:mm:ss — for a 30-second highlight
+          <span class="muted small" data-i18n="mm:ss or hh:mm:ss — for a 30-second highlight out of a 3-hour stream">mm:ss or hh:mm:ss — for a 30-second highlight
             out of a 3-hour stream</span>
         </div>
         <div class="field">
-          <label class="lbl" for="ovContainer">Container</label>
+          <label class="lbl" for="ovContainer" data-i18n="Container">Container</label>
           <select id="ovContainer">
-            <option value="">use my settings</option>
-            <option value="mp4">MP4 — remux, plays everywhere</option>
-            <option value="mkv">MKV — remux</option>
+            <option value="" data-i18n="use my settings">use my settings</option>
+            <option value="mp4" data-i18n="MP4 — remux, plays everywhere">MP4 — remux, plays everywhere</option>
+            <option value="mkv" data-i18n="MKV — remux">MKV — remux</option>
           </select>
         </div>
         <div class="field">
-          <label class="lbl" for="ovArchive">Already downloaded before</label>
+          <label class="lbl" for="ovArchive" data-i18n="Already downloaded before">Already downloaded before</label>
           <select id="ovArchive">
-            <option value="">use my settings</option>
-            <option value="ignore">download it again anyway</option>
+            <option value="" data-i18n="use my settings">use my settings</option>
+            <option value="ignore" data-i18n="download it again anyway">download it again anyway</option>
           </select>
         </div>
       </div>
       <div class="field hidden" id="ovRawRow">
-        <label class="lbl" for="ovRaw">yt-dlp arguments for this download
-          <span class="muted">— raw args are on in Settings → Advanced</span></label>
+        <label class="lbl" for="ovRaw"><span data-i18n="yt-dlp arguments for this download ">yt-dlp arguments for this download
+          </span><span class="muted" data-i18n="— raw args are on in Settings → Advanced">— raw args are on in Settings → Advanced</span></label>
         <input id="ovRaw" type="text" spellcheck="false" placeholder="--no-mtime"/>
       </div>
-      <div class="hint" id="ovHint">These apply to the next download only; your saved
+      <div class="hint" id="ovHint" data-i18n="These apply to the next download only; your saved settings stay as they are. Save what you set here as a preset above, or manage bundles in Settings → Presets.">These apply to the next download only; your saved
         settings stay as they are. Save what you set here as a preset above,
         or manage bundles in Settings → Presets.</div>
       </div>
     </details>
 
-    <div class="empty" id="dlEmpty">
-      Paste a link above and hit <b>Probe</b> — the formats, sizes and what each
-      stream contains show up here. The <b>yt-dlp</b> tab holds the option
-      groups, the <b>Settings</b> tab your defaults and presets.
-    </div>
+    <div class="empty" id="dlEmpty"><span data-i18n=" Paste a link above and hit ">
+      Paste a link above and hit </span><b data-i18n="Probe">Probe</b><span data-i18n=" — the formats, sizes and what each stream contains show up here. The "> — the formats, sizes and what each
+      stream contains show up here. The </span><b data-i18n="yt-dlp">yt-dlp</b><span data-i18n=" tab holds the option groups, the "> tab holds the option
+      groups, the </span><b data-i18n="Settings">Settings</b><span data-i18n=" tab your defaults and presets. "> tab your defaults and presets.
+    </span></div>
   </section>
 
   <!-- ============================= Queue ============================= -->
   <section class="panel hidden" id="panel-queue" role="tabpanel" aria-labelledby="tabQueue">
     <section class="card">
-      <h2>Downloads</h2>
-      <div id="queueFilters" class="hidden" role="group" aria-label="Filter the queue">
-        <button class="btn sm pick" data-qfilter="all" aria-pressed="true">All</button>
-        <button class="btn sm" data-qfilter="active" aria-pressed="false">Active</button>
-        <button class="btn sm" data-qfilter="filed" aria-pressed="false">Filed</button>
-        <button class="btn sm" data-qfilter="error" aria-pressed="false">Errors</button>
+      <h2 data-i18n="Downloads">Downloads</h2>
+      <div id="queueFilters" class="hidden" role="group" aria-label="Filter the queue" data-i18n-aria="Filter the queue">
+        <button class="btn sm pick" data-qfilter="all" aria-pressed="true" data-i18n="All">All</button>
+        <button class="btn sm" data-qfilter="active" aria-pressed="false" data-i18n="Active">Active</button>
+        <button class="btn sm" data-qfilter="filed" aria-pressed="false" data-i18n="Filed">Filed</button>
+        <button class="btn sm" data-qfilter="error" aria-pressed="false" data-i18n="Errors">Errors</button>
       </div>
-      <div id="jobs"><div class="empty muted" id="jobsInitial">Checking the queue…</div></div>
+      <div id="jobs"><div class="empty muted" id="jobsInitial" data-i18n="Checking the queue…">Checking the queue…</div></div>
       <div id="filterEmpty" class="hidden"><span class="muted small say"></span>
-        <button class="linkbtn" id="filterAll" type="button">Show all</button></div>
+        <button class="linkbtn" id="filterAll" type="button" data-i18n="Show all">Show all</button></div>
     </section>
   </section>
 
@@ -360,321 +360,329 @@
   <section class="panel hidden" id="panel-settings" role="tabpanel" aria-labelledby="tabSettings">
     <section class="card">
       <div class="page-head">
-        <h2>Settings</h2>
+        <h2 data-i18n="Settings">Settings</h2>
       </div>
 
-      <div class="subtabs" id="settingsTabs" role="tablist" aria-label="Settings sections">
-        <button class="stab active" data-stab="general" type="button" role="tab" aria-controls="spanel-general" aria-selected="true">General</button>
-        <button class="stab" data-stab="media" type="button" role="tab" aria-controls="spanel-media" aria-selected="false">Media</button>
-        <button class="stab" data-stab="presets" id="stabPresets" type="button" role="tab" aria-controls="spanel-presets" aria-selected="false">Presets</button>
-        <button class="stab" data-stab="network" type="button" role="tab" aria-controls="spanel-network" aria-selected="false">Network</button>
-        <button class="stab" data-stab="auth" type="button" role="tab" aria-controls="spanel-auth" aria-selected="false">Authentication</button>
-        <button class="stab" data-stab="advanced" type="button" role="tab" aria-controls="spanel-advanced" aria-selected="false">Advanced</button>
-        <button class="stab hidden" data-stab="device" id="tabDevice" type="button" role="tab" aria-controls="spanel-device" aria-selected="false">Device</button>
+      <div class="subtabs" id="settingsTabs" role="tablist" aria-label="Settings sections" data-i18n-aria="Settings sections">
+        <button class="stab active" data-stab="general" type="button" role="tab" aria-controls="spanel-general" aria-selected="true" data-i18n="General">General</button>
+        <button class="stab" data-stab="media" type="button" role="tab" aria-controls="spanel-media" aria-selected="false" data-i18n="Media">Media</button>
+        <button class="stab" data-stab="presets" id="stabPresets" type="button" role="tab" aria-controls="spanel-presets" aria-selected="false" data-i18n="Presets">Presets</button>
+        <button class="stab" data-stab="network" type="button" role="tab" aria-controls="spanel-network" aria-selected="false" data-i18n="Network">Network</button>
+        <button class="stab" data-stab="auth" type="button" role="tab" aria-controls="spanel-auth" aria-selected="false" data-i18n="Authentication">Authentication</button>
+        <button class="stab" data-stab="advanced" type="button" role="tab" aria-controls="spanel-advanced" aria-selected="false" data-i18n="Advanced">Advanced</button>
+        <button class="stab hidden" data-stab="device" id="tabDevice" type="button" role="tab" aria-controls="spanel-device" aria-selected="false" data-i18n="Device">Device</button>
       </div>
 
       <div class="subwrap" id="subwrap">
       <div class="spanel" id="spanel-general" role="tabpanel">
       <div class="field">
-        <label class="lbl">Appearance</label>
+        <label class="lbl" data-i18n="Appearance">Appearance</label>
         <div class="swatches" id="themeSwatches">
           <button class="swatch" data-theme="light" type="button">
-            <span class="sw-preview sw-light"></span><span class="sw-label">Light</span>
+            <span class="sw-preview sw-light"></span><span class="sw-label" data-i18n="Light">Light</span>
           </button>
           <button class="swatch" data-theme="dark" type="button">
-            <span class="sw-preview sw-dark"></span><span class="sw-label">Dark</span>
+            <span class="sw-preview sw-dark"></span><span class="sw-label" data-i18n="Dark">Dark</span>
           </button>
           <button class="swatch" data-theme="amoled" type="button">
-            <span class="sw-preview sw-amoled"></span><span class="sw-label">AMOLED</span>
+            <span class="sw-preview sw-amoled"></span><span class="sw-label" data-i18n="AMOLED">AMOLED</span>
           </button>
         </div>
       </div>
 
       <div class="field">
-        <label class="lbl">Glass style</label>
+        <label class="lbl" data-i18n="Glass style">Glass style</label>
         <div class="swatches" id="glassSwatches">
           <button class="swatch" data-glass="frosted" type="button">
-            <span class="sw-preview g-frosted"></span><span class="sw-label">Frosted</span>
-            <span class="sw-hint">matte · cheapest</span>
+            <span class="sw-preview g-frosted"></span><span class="sw-label" data-i18n="Frosted">Frosted</span>
+            <span class="sw-hint" data-i18n="matte · cheapest">matte · cheapest</span>
           </button>
           <button class="swatch" data-glass="liquid" type="button">
-            <span class="sw-preview g-liquid"></span><span class="sw-label">Liquid</span>
-            <span class="sw-hint">glossy · heavier blur</span>
+            <span class="sw-preview g-liquid"></span><span class="sw-label" data-i18n="Liquid">Liquid</span>
+            <span class="sw-hint" data-i18n="glossy · heavier blur">glossy · heavier blur</span>
           </button>
         </div>
       </div>
 
       <div class="field">
-        <label class="lbl">Scheme</label>
+        <label class="lbl" data-i18n="Scheme">Scheme</label>
         <div class="swatches" id="schemeSwatches">
           <button class="swatch" data-accent="amber" type="button">
-            <span class="sw-preview sw-amber"></span><span class="sw-label">Amber</span>
-            <span class="sw-hint">the house lamp</span>
+            <span class="sw-preview sw-amber"></span><span class="sw-label" data-i18n="Amber">Amber</span>
+            <span class="sw-hint" data-i18n="the house lamp">the house lamp</span>
           </button>
           <button class="swatch" data-accent="pine" type="button">
-            <span class="sw-preview sw-pine"></span><span class="sw-label">Pine &amp; cream</span>
-            <span class="sw-hint">the brand's voice</span>
+            <span class="sw-preview sw-pine"></span><span class="sw-label" data-i18n="Pine &amp; cream">Pine &amp; cream</span>
+            <span class="sw-hint" data-i18n="the brand&#x27;s voice">the brand's voice</span>
           </button>
         </div>
+      </div>
+
+      <div class="field">
+        <label class="lbl" for="setLang" data-i18n="Language">Language</label>
+        <select id="setLang" aria-label="Language" data-i18n-aria="Language">
+          <option value="en" data-i18n="English">English</option>
+          <option value="id" data-i18n="Indonesia">Indonesia</option>
+        </select>
       </div>
 
       <p class="small muted" id="motionNote" hidden></p>
 
       <div class="field">
-        <label class="lbl" for="setDir">Download folder</label>
+        <label class="lbl" for="setDir" data-i18n="Download folder">Download folder</label>
         <input id="setDir" type="text" spellcheck="false"/>
       </div>
 
       <div class="field row">
-        <label class="lbl" for="setConc">Concurrent downloads</label>
+        <label class="lbl" for="setConc" data-i18n="Concurrent downloads">Concurrent downloads</label>
         <input id="setConc" type="number" min="1" max="4"/>
-        <span class="muted small">1–4 · applied live</span>
+        <span class="muted small" data-i18n="1–4 · applied live">1–4 · applied live</span>
       </div>
 
       <div class="field">
         <label class="check small" for="setReveal">
-          <input id="setReveal" type="checkbox"/>
-          Open the folder when a download finishes&nbsp;<span class="muted">(desktop app)</span>
+          <input id="setReveal" type="checkbox"/><span data-i18n=" Open the folder when a download finishes ">
+          Open the folder when a download finishes&nbsp;</span><span class="muted" data-i18n="(desktop app)">(desktop app)</span>
         </label>
       </div>
 
       <div class="field">
         <label class="check small" for="setResume">
-          <input id="setResume" type="checkbox"/>
+          <input id="setResume" type="checkbox"/><span data-i18n=" Resume interrupted downloads after a restart ">
           Resume interrupted downloads after a restart
-        </label>
+        </span></label>
       </div>
 
       <div class="field">
-        <label class="lbl">Updates</label>
+        <label class="lbl" data-i18n="Updates">Updates</label>
         <div class="updrow">
-          <span id="updState" class="small">not checked yet</span>
+          <span id="updState" class="small" data-i18n="not checked yet">not checked yet</span>
           <span class="spacer"></span>
-          <button id="updSkip" class="ghost-sm hidden" type="button">Skip this version</button>
-          <button id="updManual" class="ghost-sm hidden" type="button">Download manually</button>
-          <button id="updGet" class="btn sm hidden" type="button">Get it</button>
-          <button id="updCheck" class="btn sm" type="button">Check now</button>
+          <button id="updSkip" class="ghost-sm hidden" type="button" data-i18n="Skip this version">Skip this version</button>
+          <button id="updManual" class="ghost-sm hidden" type="button" data-i18n="Download manually">Download manually</button>
+          <button id="updGet" class="btn sm hidden" type="button" data-i18n="Get it">Get it</button>
+          <button id="updCheck" class="btn sm" type="button" data-i18n="Check now">Check now</button>
         </div>
         <div id="updMeta" class="muted small updmeta"></div>
       </div>
 
       <div class="field">
-        <label class="lbl">What's new</label>
+        <label class="lbl" data-i18n="What&#x27;s new">What's new</label>
         <div class="updrow">
-          <span class="small muted">what changed in this version</span>
+          <span class="small muted" data-i18n="what changed in this version">what changed in this version</span>
           <span class="spacer"></span>
-          <button id="wnOpen" class="btn sm" type="button">Show</button>
+          <button id="wnOpen" class="btn sm" type="button" data-i18n="Show">Show</button>
         </div>
       </div>
       </div><!-- /spanel-general -->
 
       <div class="spanel hidden" id="spanel-presets" role="tabpanel">
         <div class="field">
-          <label class="lbl" for="defaultPreset">Default preset
-            <span class="muted">— rides every new download</span></label>
+          <label class="lbl" for="defaultPreset"><span data-i18n="Default preset ">Default preset
+            </span><span class="muted" data-i18n="— rides every new download">— rides every new download</span></label>
           <select id="defaultPreset"></select>
-          <div class="hint">A download that picks its own preset or quality
+          <div class="hint" data-i18n="A download that picks its own preset or quality still wins over this one; it fills in the rest.">A download that picks its own preset or quality
             still wins over this one; it fills in the rest.</div>
         </div>
         <div class="field">
-          <label class="lbl" for="presetName">Save the current settings as a preset
-            <span class="muted">— keeps the download options that differ from
+          <label class="lbl" for="presetName"><span data-i18n="Save the current settings as a preset ">Save the current settings as a preset
+            </span><span class="muted" data-i18n="— keeps the download options that differ from the defaults (subtitles, SponsorBlock, embeds, template, network…)">— keeps the download options that differ from
             the defaults (subtitles, SponsorBlock, embeds, template, network…)</span></label>
           <div class="jrow">
             <input id="presetName" type="text" spellcheck="false"
-                   placeholder="e.g. subs-en + metadata"/>
-            <button id="presetSave" class="btn sm" type="button">Save preset</button>
+                   placeholder="e.g. subs-en + metadata" data-i18n-ph="e.g. subs-en + metadata"/>
+            <button id="presetSave" class="btn sm" type="button" data-i18n="Save preset">Save preset</button>
           </div>
           <div class="msg" id="presetMsg"></div>
         </div>
         <div class="field">
-          <label class="lbl">Presets
-            <span class="muted">— pick one on the Download tab → “This download only”</span></label>
+          <label class="lbl"><span data-i18n="Presets ">Presets
+            </span><span class="muted" data-i18n="— pick one on the Download tab → “This download only”">— pick one on the Download tab → “This download only”</span></label>
           <div id="presetList" class="optlist"></div>
         </div>
       </div><!-- /spanel-presets -->
 
       <div class="spanel hidden" id="spanel-media" role="tabpanel">
         <div class="field">
-          <label class="lbl" for="setTemplate">Filename template</label>
+          <label class="lbl" for="setTemplate" data-i18n="Filename template">Filename template</label>
           <input id="setTemplate" type="text" spellcheck="false"
                  placeholder="%(title).100B.%(ext)s"/>
-          <span class="muted small">must contain %(ext)s · example:
-            <code>%(uploader)s - %(title)s.%(ext)s</code> · a relative folder like
-            <code>channel/%(title).100B.%(ext)s</code> keeps things tidy</span>
+          <span class="muted small"><span data-i18n="must contain %(ext)s · example: ">must contain %(ext)s · example:
+            </span><code data-i18n="%(uploader)s - %(title)s.%(ext)s">%(uploader)s - %(title)s.%(ext)s</code><span data-i18n=" · a relative folder like "> · a relative folder like
+            </span><code data-i18n="channel/%(title).100B.%(ext)s">channel/%(title).100B.%(ext)s</code><span data-i18n=" keeps things tidy"> keeps things tidy</span></span>
         </div>
 
         <div class="field row">
-          <label class="lbl" for="setSubfolders">Subfolders</label>
+          <label class="lbl" for="setSubfolders" data-i18n="Subfolders">Subfolders</label>
           <select id="setSubfolders">
-            <option value="off">Off — everything in one folder</option>
-            <option value="playlist">One per playlist or channel</option>
-            <option value="site">One per site</option>
+            <option value="off" data-i18n="Off — everything in one folder">Off — everything in one folder</option>
+            <option value="playlist" data-i18n="One per playlist or channel">One per playlist or channel</option>
+            <option value="site" data-i18n="One per site">One per site</option>
           </select>
-          <span class="muted small">for playlists, courses and channels</span>
+          <span class="muted small" data-i18n="for playlists, courses and channels">for playlists, courses and channels</span>
         </div>
 
         <div class="field">
           <label class="check small" for="setLiveFromStart">
-            <input id="setLiveFromStart" type="checkbox"/>
+            <input id="setLiveFromStart" type="checkbox"/><span data-i18n=" Live streams: record from the beginning ">
             Live streams: record from the beginning
-            <span class="muted">(when the site still serves it — otherwise from
+            </span><span class="muted" data-i18n="(when the site still serves it — otherwise from the moment you hit download)">(when the site still serves it — otherwise from
               the moment you hit download)</span>
           </label>
         </div>
 
         <div class="field row">
-          <label class="lbl" for="setContainer">Preferred container</label>
+          <label class="lbl" for="setContainer" data-i18n="Preferred container">Preferred container</label>
           <select id="setContainer">
-            <option value="auto">Auto — whatever the site serves</option>
-            <option value="mp4">MP4 — plays on everything</option>
-            <option value="mkv">MKV — plays on media players</option>
+            <option value="auto" data-i18n="Auto — whatever the site serves">Auto — whatever the site serves</option>
+            <option value="mp4" data-i18n="MP4 — plays on everything">MP4 — plays on everything</option>
+            <option value="mkv" data-i18n="MKV — plays on media players">MKV — plays on media players</option>
           </select>
-          <span class="muted small">MP4 remuxes the streams without re-encoding</span>
+          <span class="muted small" data-i18n="MP4 remuxes the streams without re-encoding">MP4 remuxes the streams without re-encoding</span>
         </div>
 
         <div class="field">
           <label class="check small" for="setEmbMeta">
-            <input id="setEmbMeta" type="checkbox"/>
+            <input id="setEmbMeta" type="checkbox"/><span data-i18n=" Embed metadata (title, artist, description) ">
             Embed metadata (title, artist, description)
-          </label>
+          </span></label>
           <label class="check small" for="setEmbThumb">
-            <input id="setEmbThumb" type="checkbox"/>
-            Embed thumbnail <span class="muted">(keeps the .jpg too)</span>
+            <input id="setEmbThumb" type="checkbox"/><span data-i18n=" Embed thumbnail ">
+            Embed thumbnail </span><span class="muted" data-i18n="(keeps the .jpg too)">(keeps the .jpg too)</span>
           </label>
         </div>
 
         <div class="field row">
-          <label class="lbl" for="setSubMode">Subtitles</label>
+          <label class="lbl" for="setSubMode" data-i18n="Subtitles">Subtitles</label>
           <select id="setSubMode">
-            <option value="off">Off</option>
-            <option value="sidecar">Download as files (.vtt)</option>
-            <option value="embed">Embed into the video</option>
+            <option value="off" data-i18n="Off">Off</option>
+            <option value="sidecar" data-i18n="Download as files (.vtt)">Download as files (.vtt)</option>
+            <option value="embed" data-i18n="Embed into the video">Embed into the video</option>
           </select>
           <input id="setSubLangs" type="text" spellcheck="false"
-                 aria-label="subtitle languages, comma separated"
-                 placeholder="languages, e.g. en, id" />
+                 aria-label="subtitle languages, comma separated" data-i18n-aria="subtitle languages, comma separated"
+                 placeholder="languages, e.g. en, id" data-i18n-ph="languages, e.g. en, id" />
         </div>
         <div class="field">
           <label class="check small" for="setSubAuto">
-            <input id="setSubAuto" type="checkbox"/>
+            <input id="setSubAuto" type="checkbox"/><span data-i18n=" Include auto-generated captions ">
             Include auto-generated captions
-          </label>
+          </span></label>
           <label class="check small" for="setSubSrt">
-            <input id="setSubSrt" type="checkbox"/>
+            <input id="setSubSrt" type="checkbox"/><span data-i18n=" Convert subtitles to .srt ">
             Convert subtitles to .srt
-            <span class="muted">(TVs and most players cannot read the .vtt that
+            </span><span class="muted" data-i18n="(TVs and most players cannot read the .vtt that YouTube serves)">(TVs and most players cannot read the .vtt that
               YouTube serves)</span>
           </label>
         </div>
 
         <div class="field" id="archiveField">
-          <label class="lbl">Download archive
-            <span class="muted small" id="archiveCount"></span></label>
+          <label class="lbl"><span data-i18n="Download archive ">Download archive
+            </span><span class="muted small" id="archiveCount"></span></label>
           <div class="jrow">
-            <button id="archiveShow" class="btn sm" type="button">show entries</button>
+            <button id="archiveShow" class="btn sm" type="button" data-i18n="show entries">show entries</button>
             <input id="archiveEntry" type="text" spellcheck="false"
-                   aria-label="download-archive entry to forget"
-                   placeholder="paste an entry to forget it"/>
-            <button id="archiveForget" class="btn sm" type="button">forget</button>
+                   aria-label="download-archive entry to forget" data-i18n-aria="download-archive entry to forget"
+                   placeholder="paste an entry to forget it" data-i18n-ph="paste an entry to forget it"/>
+            <button id="archiveForget" class="btn sm" type="button" data-i18n="forget">forget</button>
           </div>
           <div id="archiveList" class="col hidden"></div>
-          <span class="muted small">with the archive on, a video that was already
+          <span class="muted small" data-i18n="with the archive on, a video that was already downloaded is skipped — forget its entry (or turn the archive off) to fetch it again">with the archive on, a video that was already
             downloaded is skipped — forget its entry (or turn the archive off)
             to fetch it again</span>
         </div>
 
         <div class="field row">
-          <label class="lbl" for="setSbMode">SponsorBlock</label>
+          <label class="lbl" for="setSbMode" data-i18n="SponsorBlock">SponsorBlock</label>
           <select id="setSbMode">
-            <option value="off">Off</option>
-            <option value="mark">Mark segments as chapters</option>
-            <option value="remove">Remove segments (re-encodes cuts)</option>
+            <option value="off" data-i18n="Off">Off</option>
+            <option value="mark" data-i18n="Mark segments as chapters">Mark segments as chapters</option>
+            <option value="remove" data-i18n="Remove segments (re-encodes cuts)">Remove segments (re-encodes cuts)</option>
           </select>
           <input id="setSbCats" type="text" spellcheck="false"
-                 aria-label="SponsorBlock categories to remove"
+                 aria-label="SponsorBlock categories to remove" data-i18n-aria="SponsorBlock categories to remove"
                  placeholder="sponsor, selfpromo"/>
         </div>
 
         <div class="field">
           <label class="check small" for="setArchive">
-            <input id="setArchive" type="checkbox"/>
+            <input id="setArchive" type="checkbox"/><span data-i18n=" Skip videos already downloaded before (archive) ">
             Skip videos already downloaded before (archive)
-          </label>
+          </span></label>
         </div>
       </div><!-- /spanel-media -->
 
       <div class="spanel hidden" id="spanel-network" role="tabpanel">
         <div class="field row">
-          <label class="lbl" for="setFragments">Parallel fragments</label>
+          <label class="lbl" for="setFragments" data-i18n="Parallel fragments">Parallel fragments</label>
           <input id="setFragments" type="number" min="1" max="16"/>
-          <span class="muted small">1–16 · faster HLS/DASH downloads</span>
+          <span class="muted small" data-i18n="1–16 · faster HLS/DASH downloads">1–16 · faster HLS/DASH downloads</span>
         </div>
         <div class="field row">
-          <label class="lbl" for="setRetries">Retries</label>
+          <label class="lbl" for="setRetries" data-i18n="Retries">Retries</label>
           <input id="setRetries" type="number" min="0" max="30"/>
-          <span class="muted small">0–30 · per download, on a flaky connection</span>
+          <span class="muted small" data-i18n="0–30 · per download, on a flaky connection">0–30 · per download, on a flaky connection</span>
         </div>
         <div class="field row">
-          <label class="lbl" for="setMaxDownloads">Playlist limit</label>
+          <label class="lbl" for="setMaxDownloads" data-i18n="Playlist limit">Playlist limit</label>
           <input id="setMaxDownloads" type="number" min="0" max="1000"/>
-          <span class="muted small">stop after N downloads · 0 = the whole list</span>
+          <span class="muted small" data-i18n="stop after N downloads · 0 = the whole list">stop after N downloads · 0 = the whole list</span>
         </div>
         <div class="field row">
-          <label class="lbl" for="setRateLimit">Speed limit</label>
-          <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)"/>
+          <label class="lbl" for="setRateLimit" data-i18n="Speed limit">Speed limit</label>
+          <input id="setRateLimit" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)" data-i18n-ph="e.g. 2M (blank = unlimited)"/>
         </div>
         <div class="field row">
-          <label class="lbl" for="setProxy">Proxy</label>
+          <label class="lbl" for="setProxy" data-i18n="Proxy">Proxy</label>
           <input id="setProxy" type="text" spellcheck="false"
                  placeholder="socks5://127.0.0.1:1080 (blank = direct)"/>
         </div>
         <div class="field row">
-          <label class="lbl">API token</label>
+          <label class="lbl" data-i18n="API token">API token</label>
           <span id="apiToken" class="muted small mono">…</span>
-          <button id="copyToken" class="btn sm" type="button">Copy</button>
-          <span class="muted small">what the browser extension sends</span>
+          <button id="copyToken" class="btn sm" type="button" data-i18n="Copy">Copy</button>
+          <span class="muted small" data-i18n="what the browser extension sends">what the browser extension sends</span>
         </div>
       </div><!-- /spanel-network -->
 
       <div class="spanel hidden" id="spanel-auth" role="tabpanel">
       <div class="field">
-        <label class="lbl">Authentication <span class="muted">— age-restricted / private videos</span></label>
+        <label class="lbl"><span data-i18n="Authentication ">Authentication </span><span class="muted" data-i18n="— age-restricted / private videos">— age-restricted / private videos</span></label>
         <div class="col grow">
           <div class="jrow">
-            <input id="setCookies" type="text" spellcheck="false" aria-label="Path to cookies file"
-                   placeholder="path to cookies.txt (Netscape format)"/>
-            <button id="browseCookies" class="btn sm hidden" type="button">Browse…</button>
-            <button id="importCookies" class="btn sm hidden" type="button">Import…</button>
+            <input id="setCookies" type="text" spellcheck="false" aria-label="Path to cookies file" data-i18n-aria="Path to cookies file"
+                   placeholder="path to cookies.txt (Netscape format)" data-i18n-ph="path to cookies.txt (Netscape format)"/>
+            <button id="browseCookies" class="btn sm hidden" type="button" data-i18n="Browse…">Browse…</button>
+            <button id="importCookies" class="btn sm hidden" type="button" data-i18n="Import…">Import…</button>
           </div>
           <div class="jrow" id="browserRow">
-            <select id="setCookiesBrowser" aria-label="Browser to take cookies from">
-              <option value="">Browser cookies: off</option>
-              <option value="chrome">Use cookies from Chrome</option>
-              <option value="chromium">Use cookies from Chromium</option>
-              <option value="firefox">Use cookies from Firefox</option>
-              <option value="edge">Use cookies from Edge</option>
-              <option value="brave">Use cookies from Brave</option>
-              <option value="opera">Use cookies from Opera</option>
-              <option value="vivaldi">Use cookies from Vivaldi</option>
-              <option value="safari">Use cookies from Safari</option>
+            <select id="setCookiesBrowser" aria-label="Browser to take cookies from" data-i18n-aria="Browser to take cookies from">
+              <option value="" data-i18n="Browser cookies: off">Browser cookies: off</option>
+              <option value="chrome" data-i18n="Use cookies from Chrome">Use cookies from Chrome</option>
+              <option value="chromium" data-i18n="Use cookies from Chromium">Use cookies from Chromium</option>
+              <option value="firefox" data-i18n="Use cookies from Firefox">Use cookies from Firefox</option>
+              <option value="edge" data-i18n="Use cookies from Edge">Use cookies from Edge</option>
+              <option value="brave" data-i18n="Use cookies from Brave">Use cookies from Brave</option>
+              <option value="opera" data-i18n="Use cookies from Opera">Use cookies from Opera</option>
+              <option value="vivaldi" data-i18n="Use cookies from Vivaldi">Use cookies from Vivaldi</option>
+              <option value="safari" data-i18n="Use cookies from Safari">Use cookies from Safari</option>
             </select>
           </div>
           <div class="jrow" id="impersonateRow">
-            <select id="setImpersonate" aria-label="Browser to impersonate">
-              <option value="">Impersonate: off</option>
-              <option value="chrome">Impersonate Chrome — strict bot checks (e.g. Facebook)</option>
-              <option value="firefox">Impersonate Firefox</option>
-              <option value="safari">Impersonate Safari</option>
-              <option value="edge">Impersonate Edge</option>
+            <select id="setImpersonate" aria-label="Browser to impersonate" data-i18n-aria="Browser to impersonate">
+              <option value="" data-i18n="Impersonate: off">Impersonate: off</option>
+              <option value="chrome" data-i18n="Impersonate Chrome — strict bot checks (e.g. Facebook)">Impersonate Chrome — strict bot checks (e.g. Facebook)</option>
+              <option value="firefox" data-i18n="Impersonate Firefox">Impersonate Firefox</option>
+              <option value="safari" data-i18n="Impersonate Safari">Impersonate Safari</option>
+              <option value="edge" data-i18n="Impersonate Edge">Impersonate Edge</option>
             </select>
           </div>
-          <span id="authHint" class="muted small">Sign in to YouTube in your browser and export a cookies.txt,
+          <span id="authHint" class="muted small" data-i18n="Sign in to YouTube in your browser and export a cookies.txt, or read the cookies straight from a browser (close it first). On Android, use Import. Instagram sessions expire in hours — re-export when a download asks for a sign-in. Impersonation is for sites that fingerprint the browser; the desktop builds include it.">Sign in to YouTube in your browser and export a cookies.txt,
             or read the cookies straight from a browser (close it first). On Android, use Import.
             Instagram sessions expire in hours — re-export when a download asks for a sign-in.
             Impersonation is for sites that fingerprint the browser; the desktop builds include it.</span>
           <div class="jrow">
-            <button id="testCookies" class="btn sm" type="button">Test cookies</button>
+            <button id="testCookies" class="btn sm" type="button" data-i18n="Test cookies">Test cookies</button>
             <span id="cookiesMsg" class="msg muted small"></span>
           </div>
         </div>
@@ -685,43 +693,43 @@
       <div class="spanel hidden" id="spanel-advanced" role="tabpanel">
         <div class="field">
           <label class="check small" for="setRawEnabled">
-            <input id="setRawEnabled" type="checkbox"/>
-            Enable raw yt-dlp arguments <span class="muted">(power users — off by default)</span>
+            <input id="setRawEnabled" type="checkbox"/><span data-i18n=" Enable raw yt-dlp arguments ">
+            Enable raw yt-dlp arguments </span><span class="muted" data-i18n="(power users — off by default)">(power users — off by default)</span>
           </label>
-          <span class="muted small">The literal “every feature” switch. Once it is on,
-            the arguments field in the <button id="optionsBtn" class="linkbtn" type="button">yt-dlp tab →</button>
-            becomes editable, and every option yt-dlp supports can be browsed there.</span>
+          <span class="muted small"><span data-i18n="The literal “every feature” switch. Once it is on, the arguments field in the ">The literal “every feature” switch. Once it is on,
+            the arguments field in the </span><button id="optionsBtn" class="linkbtn" type="button" data-i18n="yt-dlp tab →">yt-dlp tab →</button><span data-i18n=" becomes editable, and every option yt-dlp supports can be browsed there.">
+            becomes editable, and every option yt-dlp supports can be browsed there.</span></span>
         </div>
       </div><!-- /spanel-advanced -->
 
       <div class="spanel hidden" id="spanel-device" role="tabpanel">
       <div id="androidSection" class="field hidden">
-        <label class="lbl">Android</label>
+        <label class="lbl" data-i18n="Android">Android</label>
         <div class="col">
-          <button id="batteryBtn" class="btn sm" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-battery"/></svg></span>Battery settings — allow background downloads</button>
-          <button id="quitAppBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-power"/></svg></span>Quit completely <span class="muted">(frees memory)</span></button>
+          <button id="batteryBtn" class="btn sm" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-battery"/></svg></span><span data-i18n="Battery settings — allow background downloads">Battery settings — allow background downloads</span></button>
+          <button id="quitAppBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-power"/></svg></span><span data-i18n="Quit completely ">Quit completely </span><span class="muted" data-i18n="(frees memory)">(frees memory)</span></button>
         </div>
       </div>
       <div id="vaultSection" class="field hidden">
-        <label class="lbl">Cookies on this device</label>
+        <label class="lbl" data-i18n="Cookies on this device">Cookies on this device</label>
         <div class="col">
-          <span id="vaultStatus" class="muted small">checking…</span>
-          <button id="deleteCookiesBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete stored cookies</button>
+          <span id="vaultStatus" class="muted small" data-i18n="checking…">checking…</span>
+          <button id="deleteCookiesBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span><span data-i18n="Delete stored cookies">Delete stored cookies</span></button>
         </div>
-        <span class="muted small">Imported cookies are encrypted with a key that only this
+        <span class="muted small" data-i18n="Imported cookies are encrypted with a key that only this device holds (Android Keystore). A readable copy exists only while the app is running, and is removed when you quit or delete them.">Imported cookies are encrypted with a key that only this
           device holds (Android Keystore). A readable copy exists only while the app is
           running, and is removed when you quit or delete them.</span>
       </div>
       <div id="storageSection" class="field hidden">
-        <label class="lbl">Downloaded files</label>
+        <label class="lbl" data-i18n="Downloaded files">Downloaded files</label>
         <div class="col">
-          <span id="storageInfo" class="muted small">checking…</span>
-          <span id="storageCache" class="muted small">checking…</span>
-          <button id="clearAppCopiesBtn" class="btn sm danger hidden" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete app copies — keep Gallery/Music</button>
-          <button id="clearDownloadsBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Delete downloaded files</button>
-          <button id="clearCacheBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span>Clear app cache</button>
+          <span id="storageInfo" class="muted small" data-i18n="checking…">checking…</span>
+          <span id="storageCache" class="muted small" data-i18n="checking…">checking…</span>
+          <button id="clearAppCopiesBtn" class="btn sm danger hidden" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span><span data-i18n="Delete app copies — keep Gallery/Music">Delete app copies — keep Gallery/Music</span></button>
+          <button id="clearDownloadsBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span><span data-i18n="Delete downloaded files">Delete downloaded files</span></button>
+          <button id="clearCacheBtn" class="btn sm danger" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trash"/></svg></span><span data-i18n="Clear app cache">Clear app cache</span></button>
         </div>
-        <span class="muted small">Downloads land in the app's own folder, which a file
+        <span class="muted small" data-i18n="Downloads land in the app&#x27;s own folder, which a file manager cannot open. &quot;Delete app copies&quot; frees that folder and keeps the Gallery/Music copy you can open; &quot;Delete downloaded files&quot; removes both. &quot;Clear app cache&quot; frees only the player data yt-dlp re-fetches — no download is touched.">Downloads land in the app's own folder, which a file
           manager cannot open. "Delete app copies" frees that folder and keeps the
           Gallery/Music copy you can open; "Delete downloaded files" removes both.
           "Clear app cache" frees only the player data yt-dlp re-fetches — no
@@ -731,7 +739,7 @@
       </div><!-- /subwrap -->
 
       <div class="modal-foot">
-        <button id="setSave" class="btn prime">Save</button>
+        <button id="setSave" class="btn prime" data-i18n="Save">Save</button>
         <span id="setMsg" class="muted small"></span>
       </div>
     </section>
@@ -740,20 +748,20 @@
   <!-- ============================= yt-dlp ============================ -->
   <section class="panel hidden" id="panel-ytdlp" role="tabpanel" aria-labelledby="tabYtdlp">
     <section class="card">
-      <h2>yt-dlp itself</h2>
+      <h2 data-i18n="yt-dlp itself">yt-dlp itself</h2>
       <div class="field row">
-        <span class="small muted">Installed: <b id="ytdlpVer">…</b>
+        <span class="small muted"><span data-i18n="Installed: ">Installed: </span><b id="ytdlpVer">…</b>
           <span id="ytdlpSrc" class="muted"></span></span>
         <span class="spacer"></span>
-        <button id="updateBtn" class="btn sm" title="Update yt-dlp">Update yt-dlp</button>
+        <button id="updateBtn" class="btn sm" title="Update yt-dlp" data-i18n-title="Update yt-dlp" data-i18n="Update yt-dlp">Update yt-dlp</button>
       </div>
       <div class="field row" id="ytdlpRemoveRow" hidden>
         <span class="small muted" id="ytdlpRemoveHint"></span>
         <span class="spacer"></span>
         <button id="removeBtn" class="btn sm"
-          title="Delete the copy downloaded from PyPI — suravidl falls back to the yt-dlp bundled with the app">Remove downloaded copy</button>
+          title="Delete the copy downloaded from PyPI — suravidl falls back to the yt-dlp bundled with the app" data-i18n-title="Delete the copy downloaded from PyPI — suravidl falls back to the yt-dlp bundled with the app" data-i18n="Remove downloaded copy">Remove downloaded copy</button>
       </div>
-      <p class="muted small">Updates the downloader itself: a pip setup upgrades
+      <p class="muted small" data-i18n="Updates the downloader itself: a pip setup upgrades in place, and packaged builds fetch the newest release from PyPI (verified) and apply it on the next start. It is what knows the sites — the engine around it rarely changes. New jobs may wait a moment while it runs.">Updates the downloader itself: a pip setup upgrades
         in place, and packaged builds fetch the newest release from PyPI
         (verified) and apply it on the next start. It is what knows the sites —
         the engine around it rarely changes. New jobs may wait a moment while
@@ -762,105 +770,105 @@
     </section>
 
     <section class="card">
-      <h2>Curated options</h2>
-      <p class="muted small">Named switches for the options that come up most —
+      <h2 data-i18n="Curated options">Curated options</h2>
+      <p class="muted small" data-i18n="Named switches for the options that come up most — no syntax to remember. They apply to downloads, and the network ones to probing too, so a restricted video can still be listed.">Named switches for the options that come up most —
         no syntax to remember. They apply to downloads, and the network ones to
         probing too, so a restricted video can still be listed.</p>
 
       <div class="grid2">
         <div class="field">
-          <label class="lbl">Verbosity</label>
+          <label class="lbl" data-i18n="Verbosity">Verbosity</label>
           <label class="check small" for="setVerbose">
-            <input id="setVerbose" type="checkbox"/>
-            Verbose log <span class="muted">(yt-dlp's full log — debugging)</span>
+            <input id="setVerbose" type="checkbox"/><span data-i18n=" Verbose log ">
+            Verbose log </span><span class="muted" data-i18n="(yt-dlp&#x27;s full log — debugging)">(yt-dlp's full log — debugging)</span>
           </label>
         </div>
 
         <div class="field">
-          <label class="lbl" for="setIpVersion">Workaround: IP version</label>
+          <label class="lbl" for="setIpVersion" data-i18n="Workaround: IP version">Workaround: IP version</label>
           <select id="setIpVersion">
-            <option value="auto">Automatic</option>
-            <option value="ipv4">IPv4 only</option>
-            <option value="ipv6">IPv6 only</option>
+            <option value="auto" data-i18n="Automatic">Automatic</option>
+            <option value="ipv4" data-i18n="IPv4 only">IPv4 only</option>
+            <option value="ipv6" data-i18n="IPv6 only">IPv6 only</option>
           </select>
-          <span class="muted small">IPv4-only fixes downloads that stall or reset
+          <span class="muted small" data-i18n="IPv4-only fixes downloads that stall or reset on a network with broken IPv6.">IPv4-only fixes downloads that stall or reset
             on a network with broken IPv6.</span>
         </div>
 
         <div class="field">
           <label class="check small" for="setNoCheckCerts">
-            <input id="setNoCheckCerts" type="checkbox"/>
-            Skip TLS certificate checks <span class="muted">(for a TLS-inspecting proxy)</span>
+            <input id="setNoCheckCerts" type="checkbox"/><span data-i18n=" Skip TLS certificate checks ">
+            Skip TLS certificate checks </span><span class="muted" data-i18n="(for a TLS-inspecting proxy)">(for a TLS-inspecting proxy)</span>
           </label>
         </div>
 
         <div class="field">
-          <label class="lbl" for="setSleepRequests">Workaround: pause between requests</label>
+          <label class="lbl" for="setSleepRequests" data-i18n="Workaround: pause between requests">Workaround: pause between requests</label>
           <input id="setSleepRequests" type="number" min="0" max="30" step="0.5"/>
-          <span class="muted small">seconds (0–30) · gentler on sites that rate-limit</span>
+          <span class="muted small" data-i18n="seconds (0–30) · gentler on sites that rate-limit">seconds (0–30) · gentler on sites that rate-limit</span>
         </div>
 
         <div class="field">
-          <label class="lbl">Geo</label>
+          <label class="lbl" data-i18n="Geo">Geo</label>
           <label class="check small" for="setGeoBypass">
-            <input id="setGeoBypass" type="checkbox"/>
+            <input id="setGeoBypass" type="checkbox"/><span data-i18n=" Bypass “not available in your country” ">
             Bypass “not available in your country”
-          </label>
+          </span></label>
           <input id="setGeoCountry" type="text" maxlength="2" spellcheck="false"
-                 aria-label="country code to check availability from"
-                 placeholder="country code, e.g. ID (blank = auto)"/>
+                 aria-label="country code to check availability from" data-i18n-aria="country code to check availability from"
+                 placeholder="country code, e.g. ID (blank = auto)" data-i18n-ph="country code, e.g. ID (blank = auto)"/>
         </div>
 
         <div class="field">
-          <label class="lbl" for="setExtractorArgs">Extractor arguments</label>
+          <label class="lbl" for="setExtractorArgs" data-i18n="Extractor arguments">Extractor arguments</label>
           <input id="setExtractorArgs" type="text" spellcheck="false"
                  placeholder="youtube:player_client=web_safari"/>
-          <span class="muted small">per-site tweaks as <code>extractor:key=value</code>,
-            several separated by <code>;</code></span>
+          <span class="muted small"><span data-i18n="per-site tweaks as ">per-site tweaks as </span><code data-i18n="extractor:key=value">extractor:key=value</code><span data-i18n=", several separated by ">,
+            several separated by </span><code>;</code></span>
         </div>
       </div>
     </section>
 
     <section class="card" id="rawSection">
-      <h2>Raw yt-dlp arguments</h2>
+      <h2 data-i18n="Raw yt-dlp arguments">Raw yt-dlp arguments</h2>
       <div id="rawOffHint" class="field hidden">
-        <span class="muted small">Off — enable “raw yt-dlp arguments” in
+        <span class="muted small" data-i18n="Off — enable “raw yt-dlp arguments” in Settings → Advanced to edit them.">Off — enable “raw yt-dlp arguments” in
           Settings → Advanced to edit them.</span>
       </div>
       <div id="rawEditor" class="field">
-        <label class="lbl" for="setRawArgs">Arguments</label>
+        <label class="lbl" for="setRawArgs" data-i18n="Arguments">Arguments</label>
         <textarea id="setRawArgs" rows="3" spellcheck="false"
           placeholder='--no-mtime --embed-chapters'></textarea>
-        <span class="muted small">Applied to every download. Flags the engine owns are
-          refused (playlists, cookies, archive, <code>--exec</code>…). Click an option
-          below to add it.</span>
+        <span class="muted small"><span data-i18n="Applied to every download. Flags the engine owns are refused (playlists, cookies, archive, ">Applied to every download. Flags the engine owns are
+          refused (playlists, cookies, archive, </span><code data-i18n="--exec">--exec</code><span data-i18n="…). Click an option below to add it.">…). Click an option
+          below to add it.</span></span>
       </div>
     </section>
 
     <section class="card">
-      <h2>All yt-dlp options <span id="optionsCount" class="muted small mono"></span></h2>
+      <h2><span data-i18n="All yt-dlp options ">All yt-dlp options </span><span id="optionsCount" class="muted small mono"></span></h2>
       <input id="optionsSearch" type="text" spellcheck="false"
-             aria-label="search yt-dlp options"
-             placeholder="search — e.g. proxy, subtitle, metadata, sleep"/>
+             aria-label="search yt-dlp options" data-i18n-aria="search yt-dlp options"
+             placeholder="search — e.g. proxy, subtitle, metadata, sleep" data-i18n-ph="search — e.g. proxy, subtitle, metadata, sleep"/>
       <div id="optionsList" class="optlist"></div>
-      <span class="muted small">Read from the yt-dlp actually installed, so the list
+      <span class="muted small" data-i18n="Read from the yt-dlp actually installed, so the list can never go stale. Click an option to add it to the raw arguments above.">Read from the yt-dlp actually installed, so the list
         can never go stale. Click an option to add it to the raw arguments above.</span>
     </section>
 
     <div class="foot-row">
-      <button id="ytdlpSave" class="btn prime">Save</button>
+      <button id="ytdlpSave" class="btn prime" data-i18n="Save">Save</button>
       <span id="ytdlpMsg" class="muted small"></span>
     </div>
   </section>
 </main>
 
 <footer class="meta">
-  <span id="dlWhere">downloads</span> → <code id="dlDir"></code>
+  <span id="dlWhere" data-i18n="downloads">downloads</span> → <code id="dlDir"></code>
   <div class="footrow">
-    <button id="copyDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg></span>copy path</button>
-    <button id="openDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder"/></svg></span>open folder</button>
-    <button id="faqBtn" class="linkbtn" type="button">FAQ</button>
-    <button id="tourBtn" class="linkbtn" type="button">tutorial</button>
+    <button id="copyDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-copy"/></svg></span><span data-i18n="copy path">copy path</span></button>
+    <button id="openDir" class="linkbtn" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-folder"/></svg></span><span data-i18n="open folder">open folder</span></button>
+    <button id="faqBtn" class="linkbtn" type="button" data-i18n="FAQ">FAQ</button>
+    <button id="tourBtn" class="linkbtn" type="button" data-i18n="tutorial">tutorial</button>
   </div>
 </footer>
 
@@ -873,8 +881,8 @@
   <div class="modal glass narrow">
     <div id="confirmMsg" class="confirm-msg"></div>
     <div class="modal-foot right">
-      <button id="confirmNo" class="btn">Cancel</button>
-      <button id="confirmYes" class="btn danger">Confirm</button>
+      <button id="confirmNo" class="btn" data-i18n="Cancel">Cancel</button>
+      <button id="confirmYes" class="btn danger" data-i18n="Confirm">Confirm</button>
     </div>
   </div>
 </div>
@@ -885,9 +893,9 @@
      aria-labelledby="folderTitle">
   <div class="modal glass">
     <div class="modal-head">
-      <span id="folderTitle" class="title">downloads</span>
+      <span id="folderTitle" class="title" data-i18n="downloads">downloads</span>
       <span class="spacer"></span>
-      <button id="folderClose" class="btn ghost-sm">Close</button>
+      <button id="folderClose" class="btn ghost-sm" data-i18n="Close">Close</button>
     </div>
     <div id="folderList" class="folderlist"></div>
   </div>
@@ -901,10 +909,10 @@
       <span id="playTitle" class="title"></span>
       <span class="spacer"></span>
       <button id="markIn" class="btn ghost-sm hidden" type="button"
-              title="write the player's clock into the clip start">Mark in</button>
+              title="write the player's clock into the clip start" data-i18n-title="write the player&#x27;s clock into the clip start" data-i18n="Mark in">Mark in</button>
       <button id="markOut" class="btn ghost-sm hidden" type="button"
-              title="write the player's clock into the clip end">Mark out</button>
-      <button id="playClose" class="btn ghost-sm">Close</button>
+              title="write the player's clock into the clip end" data-i18n-title="write the player&#x27;s clock into the clip end" data-i18n="Mark out">Mark out</button>
+      <button id="playClose" class="btn ghost-sm" data-i18n="Close">Close</button>
     </div>
     <div id="playBody"></div>
   </div>
@@ -915,13 +923,13 @@
      aria-labelledby="whatsNewTitle">
   <div class="modal glass">
     <div class="modal-head">
-      <span id="whatsNewTitle" class="title">What's new</span>
+      <span id="whatsNewTitle" class="title" data-i18n="What&#x27;s new">What's new</span>
       <span class="spacer"></span>
-      <button id="whatsNewClose" class="btn ghost-sm">Close</button>
+      <button id="whatsNewClose" class="btn ghost-sm" data-i18n="Close">Close</button>
     </div>
     <div id="whatsNewList" class="wnlist"></div>
     <div class="modal-foot right">
-      <button id="whatsNewDone" class="btn prime">Got it</button>
+      <button id="whatsNewDone" class="btn prime" data-i18n="Got it">Got it</button>
     </div>
   </div>
 </div>
@@ -931,13 +939,13 @@
      aria-labelledby="faqTitle">
   <div class="modal glass">
     <div class="modal-head">
-      <span id="faqTitle" class="title">Questions, answered</span>
+      <span id="faqTitle" class="title" data-i18n="Questions, answered">Questions, answered</span>
       <span class="spacer"></span>
-      <button id="faqClose" class="btn ghost-sm">Close</button>
+      <button id="faqClose" class="btn ghost-sm" data-i18n="Close">Close</button>
     </div>
     <div id="faqList" class="faqlist"></div>
     <div class="modal-foot right">
-      <button id="faqDone" class="btn prime">Got it</button>
+      <button id="faqDone" class="btn prime" data-i18n="Got it">Got it</button>
     </div>
   </div>
 </div>
@@ -951,10 +959,10 @@
     <h3 id="tourTitle" class="tour-title"></h3>
     <p id="tourBody" class="tour-body muted"></p>
     <div class="tour-foot">
-      <button id="tourSkip" class="linkbtn" type="button">skip</button>
+      <button id="tourSkip" class="linkbtn" type="button" data-i18n="skip">skip</button>
       <span class="spacer"></span>
-      <button id="tourBack" class="btn ghost-sm" type="button">Back</button>
-      <button id="tourNext" class="btn prime" type="button">Next</button>
+      <button id="tourBack" class="btn ghost-sm" type="button" data-i18n="Back">Back</button>
+      <button id="tourNext" class="btn prime" type="button" data-i18n="Next">Next</button>
     </div>
   </div>
 </div>

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.44.0",
+        "title": "The phrasebook",
+        "items": [
+            "The whole interface speaks Bahasa Indonesia now \u2014 switch in Settings \u2192 Appearance \u2192 Language and every button, tab, toast and confirmation answers in Indonesian on the spot. English stays the default.",
+            "Also fixed: a faint 1px line sat above the top bar on desktop windows once you scrolled to the top. The bar meets the window chrome cleanly now.",
+        ],
+    },
+    {
         "version": "0.43.4",
         "title": "The level",
         "items": [
@@ -88,14 +96,6 @@ ENTRIES = [
         "items": [
             "Windows gets a real installer: per-user, no admin prompts, a Start Menu entry and a proper uninstall in Windows Settings \u2014 the portable exe stays for anyone who prefers it.",
             "The app updates itself now: check, download, verify by checksum \u2014 then one tap to install (Windows restarts into it; Android shows its own single confirmation). No more release-page trips.",
-        ],
-    },
-    {
-        "version": "0.40.11",
-        "title": "The shelf",
-        "items": [
-            "The in-app find-a-video browser's status line got its own full-width row \u2014 on narrow phones five buttons used to squeeze it to one letter per line: a tall stack of letters with the buttons floating in its middle.",
-            "The button row (ads \u00b7 site \u00b7 Scan \u00b7 Clear list \u00b7 Clear data) slides sideways when your screen is too narrow, so no control runs out of reach.",
         ],
     },
 ]

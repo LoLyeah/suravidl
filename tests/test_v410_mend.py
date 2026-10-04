@@ -330,7 +330,7 @@ def test_main_tabs_follow_the_apg_pattern():
 # -- web: a failed probe must not revive the onboarding ----------------------
 
 def test_a_failed_probe_does_not_revive_the_onboarding():
-    i = APPJS.index("probe failed: ")
+    i = APPJS.index('t("probe failed: {msg}"')
     seg = APPJS[i:i + 1600]
     assert 'dlEmpty' in seg
     assert 'dlEmpty").classList.remove("hidden")' not in APPJS, \

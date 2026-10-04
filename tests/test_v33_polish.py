@@ -42,7 +42,7 @@ def test_a_failed_probe_reads_as_an_error_in_machine_voice():
 
 def test_sub_minute_durations_never_read_zero():
     """`Math.round(8 / 60) + " min"` = "0 min" — seen on the HLS fixture."""
-    assert 'info.duration < 60 ? "<1 min"' in APP
+    assert "info.duration < 60" in APP and 't("<1 min")' in APP
     assert '" · " + Math.round(info.duration / 60) + " min" : ""' not in APP, \
         "the old one-liner still rounds an 8-second clip to \"0 min\""
 

@@ -43,7 +43,7 @@ def test_the_phone_toast_lane_measures_instead_of_guessing():
     assert "function syncToastLane()" in APP
     assert '".transport, #panel-settings .modal-foot"' in APP
     assert "if (r.bottom < vh - 140) continue;" in APP       # docked-only
-    assert "syncToastLane();\n  $(\"toasts\").append(t);" in APP   # wired into toast()
+    assert "syncToastLane();\n  $(\"toasts\").append(box);" in APP   # wired into toast()
     assert "syncToastLane();\n}" in APP                      # and into showTab's tail
     # the desktop's fixed lifts are gone too — the same measurement runs
     # at every width now (v0.39.13)

@@ -146,7 +146,7 @@ def test_armed_text_is_keyboard_operable():
 
 # ---------- 13. honest grammar, steady machine numbers ----------
 def test_option_search_pluralizes_and_reads_tabular():
-    assert '${list.length} match${list.length === 1 ? "" : "es"}' in APP
+    assert 'list.length === 1 ? t("1 match") : t("{n} matches", { n: list.length })' in APP
     assert 'class="muted small mono"' in tag_of(HTML, "optionsCount")
 
 

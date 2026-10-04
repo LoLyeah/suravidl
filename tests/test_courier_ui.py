@@ -26,7 +26,7 @@ def _fn(name, end_marker):
 def test_the_settings_row_walks_the_whole_flow():
     row = APP[APP.index("function renderCourierRow"):
               APP.index("/** Resume the row's truth after a reload")]
-    for token in ("Update to ${u.latest}", "startUpdateDownload",
+    for token in ('t("Update to {v}", { v: u.latest })', "startUpdateDownload",
                   "Downloading\u2026", "Verifying\u2026", "Restart & Install",
                   "Install update", "installStagedUpdate", "Try again"):
         assert token in row, token
@@ -64,7 +64,7 @@ def test_a_staged_download_resumes_after_a_reload():
 def test_the_banner_offers_the_one_tap_when_it_can():
     banner = _fn("function showUpdateBanner", "/** force")
     assert '"Update now"' in banner and "startUpdateDownload()" in banner
-    assert "Get ${u.latest}" in banner, "the release-page fallback stays"
+    assert 't("Get {v}", { v: u.latest })' in banner, "the release-page fallback stays"
 
 
 def test_the_js_and_the_kotlin_agree_on_bridge_names():

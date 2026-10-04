@@ -69,13 +69,13 @@ def test_the_storage_row_and_the_delete_dialog_cannot_disagree():
     assert "refreshStorageInfo = show" in APP, "the row is never wired for re-read"
     # re-read on tab open (alongside the settings load) and after the trash button
     assert 'if (target === "settings" && refreshStorageInfo) refreshStorageInfo();' in APP
-    after_delete = APP.split("toast(r.deleted")[1][:400].split("refreshJobs();", 1)[1]
+    after_delete = APP.split("toast(r.deleted")[1][:800].split("refreshJobs();", 1)[1]
     assert "if (refreshStorageInfo) refreshStorageInfo();" in after_delete
     # and no destructive dialog over an empty folder — both delete buttons run
     # the one flow, which re-reads the folder and refuses before asking
     flow = APP.split("const clearFiles = async (keepGallery)")[1]
     before_dialog = flow.split("askConfirm")[0]
-    assert 'toast("nothing to delete")' in before_dialog
+    assert 'toast(t("nothing to delete"))' in before_dialog
     assert "s.files === 0" in before_dialog
     assert '$("clearDownloadsBtn").onclick = () => clearFiles(false)' in APP
     assert '$("clearAppCopiesBtn").onclick = () => clearFiles(true)' in APP
@@ -146,5 +146,5 @@ def test_the_cache_has_its_own_button_and_the_deletes_do_not_touch_it():
     assert "cacheBytes" not in flow, "the file path must not reason about the cache"
     # a cache-only clear asks with a verb that fits it and a promise it keeps
     cache_flow = APP.split('$("clearCacheBtn").onclick')[1][:800]
-    assert 'okText: "Clear"' in cache_flow
+    assert 'okText: t("Clear")' in cache_flow
     assert "nothing downloaded is touched" in cache_flow

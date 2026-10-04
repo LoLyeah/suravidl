@@ -97,7 +97,8 @@ def test_the_verdicts_are_truthful():
 
 # ---------- 2. the wiring pins ----------
 def test_the_probe_passes_the_structured_verdict_through():
-    assert "humanErr(e.message, e.detail)" in APP
+    assert "showProbeFailure(e.message, e.detail, url)" in APP
+    assert "t(humanErr(msg, detail))" in APP
 
 
 def test_unsupported_is_classified_before_the_signin_family():

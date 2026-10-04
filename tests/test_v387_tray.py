@@ -439,6 +439,9 @@ def test_motion_note_reads_both_switches_and_is_wired():
     fn = APP[APP.find("function wireMotionNote"):]
     fn = fn[:fn.find("\nfunction ")]
     assert "prefers-reduced-motion" in fn
-    assert "visibilityState" in fn
-    assert "Reduce motion" in fn
+    assert "visibilitychange" in fn
+    note = APP[APP.find("function paintMotionNote"):]
+    note = note[:note.find("\nfunction ")]
+    assert "visibilityState" in note
+    assert "Reduce motion" in note
     assert "addEventListener" in fn

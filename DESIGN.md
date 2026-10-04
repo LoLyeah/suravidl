@@ -257,7 +257,9 @@ starts it (the armed take lives on the transport, not in a collapsed block).
 ## Elevation & Depth
 
 Ambient soft-lift over one room lamp. Depth is carried by translucency first —
-smoked glass plates with a 1px inset highlight (the glass's wet edge) — and by
+smoked glass plates with a 1px inset highlight (the glass's wet edge
+— skipped on the window-top bar, v0.44.0: it met the native chrome as a 1px
+seam, not a bevel) — and by
 one deep diffuse shadow (dark: `0 26px 60px rgba(0,0,0,.55), 0 2px 10px
 rgba(0,0,0,.35)`) that lifts the plate family off the room. Shadows are
 ambient, never structural. On AMOLED the shadow drops to none and hairlines

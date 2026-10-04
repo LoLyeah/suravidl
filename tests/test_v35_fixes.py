@@ -52,7 +52,7 @@ def test_the_strip_names_the_preset_and_its_description():
 def test_the_start_toast_names_the_preset_that_rode():
     body = _fn("startJob")
     assert "with preset “" in body
-    assert '") + note, "info"' in body
+    assert ')) + note, "info"' in body
 
 
 def test_a_format_pick_that_drops_an_intent_says_so():

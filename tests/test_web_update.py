@@ -33,7 +33,7 @@ def test_the_update_notice_is_a_persistent_toast_with_choices():
     banner = _fn("function showUpdateBanner", "\n/** force")
     assert "sticky: true" in banner, "the notice must wait for an answer"
     assert "Skip this version" in banner and "Later" in banner
-    assert "Get ${u.latest}" in banner
+    assert 't("Get {v}", { v: u.latest })' in banner
     # exactly one notice, however many times the check runs
     assert 'document.querySelector(".toast.update")' in banner
     # the release-page door stays for builds that cannot self-install ...
@@ -54,9 +54,9 @@ def test_skip_and_remember_are_per_device_and_survive_a_restart():
     assert 'snooze: "suravidl.upd.snooze"' in APP
     assert "SNOOZE_MS: 24 * 60 * 60 * 1000" in APP, "Later must mean a day, not forever"
     # 'Later' writes the deadline, 'Skip' writes the version
-    later = _fn('{ label: "Later"', "},")
+    later = _fn('{ label: t("Later")', "},")
     assert "Date.now() + UPD.SNOOZE_MS" in later
-    skip = _fn('{ label: "Skip this version"', "},")
+    skip = _fn('{ label: t("Skip this version")', "},")
     assert "updStore.set(UPD.skipped, u.latest)" in skip
 
 
@@ -87,5 +87,5 @@ def test_the_settings_row_always_answers_the_button():
 
 def test_the_notice_survives_being_dismissed_by_a_choice():
     """Skipping hides the notice now and keeps the row honest afterwards."""
-    skip = _fn('{ label: "Skip this version"', "},")
+    skip = _fn('{ label: t("Skip this version")', "},")
     assert "renderUpdateRow()" in skip

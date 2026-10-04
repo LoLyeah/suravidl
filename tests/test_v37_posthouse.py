@@ -83,7 +83,9 @@ def test_chips_arm_a_take_and_never_start():
 
 
 def test_the_transport_says_what_it_will_start():
-    assert '"START · "' in APP, "the lamp does not name the take"
+    assert 't("START · {label}", { label: t(TAKE.label || "take") })' in APP, \
+        "the lamp does not name the take"
+    assert "START · best" in APP
     assert "function renderTake(" in APP and "takeSay" in _fn("renderTake")
 
 
@@ -142,7 +144,10 @@ def test_the_probe_landing_fills_the_scopes():
 
 def test_errors_lead_with_the_human_consequence():
     assert "function humanErr(" in APP
-    assert "humanErr(" in APP.split("async function doProbe")[1].split("\nfunction ")[0]
+    probe = APP.split("async function doProbe")[1].split("\nfunction ")[0]
+    assert "showProbeFailure(e.message, e.detail, url)" in probe, \
+        "the structured verdict rides through from the probe"
+    assert "t(humanErr(msg, detail))" in APP, "the human line is built"
     eb = APP.split('} else if (j.status === "error" || j.status === "interrupted") {', 1)[1]
     eb = eb.split("} else if (j.filepath)")[0]
     assert "humanErr(" in eb, "a failed job row leads with machine text"

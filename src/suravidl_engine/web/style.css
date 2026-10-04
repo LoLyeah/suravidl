@@ -276,7 +276,10 @@ header {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--line-soft);
-  box-shadow: inset 0 1px 0 var(--glass-hi);
+  /* no top inset highlight on the bar (v0.44.0): against the native window
+     chrome this wet edge read as a 1px seam above the header (2026-10-04
+     desktop screenshot). The bar keeps its glass and hairline; the plates
+     keep their wet edge. */
   transition: box-shadow var(--t-base) ease;
 }
 body.scrolled header { box-shadow: 0 8px 26px rgba(0,0,0,.28); }

@@ -178,14 +178,14 @@ def test_app_js_builds_the_playlist_pick_list():
     # the range field remains the single thing handed to the engine
     assert "body.playlist_items = playlistFieldText()" in js
     # and the button says how many videos it would start
-    assert "Download ${count} picked" in js
+    assert 't("Download {count} picked", { count: count })' in js
     # v0.21.1 audit: "None" is a state of its own, because a blank field means
     # *everything* to the engine
     assert "PLAYLIST_NONE" in js and "pick items first" in js
     assert "pick at least one item first" in js
     # a typed range the list cannot represent survives, and junk is refused
     assert "representable" in js
-    assert 'btn.textContent = junk ? "fix the range"' in js
+    assert 'btn.textContent = junk ? t("fix the range")' in js
     assert 'btn.disabled = Boolean(junk || none)' in js
 
 
@@ -194,7 +194,7 @@ def test_app_js_marks_the_remembered_quality_without_applying_it():
     js = _app_js()
     assert "renderQualityRow(url, info.site_quality)" in js
     assert "function renderQualityRow(url, remembered)" in js
-    assert 'q.key === remembered' in js and "last ? q.label" in js
+    assert "remembered && q.key === remembered" in js and 'last ? t("{label} · last used", { label: q.label }) : q.label' in js
     # every chip ARMS a take now — the transport's START commits it (v0.37.0)
     # (the arm carries the button so a commit can disable it while it flies)
     assert "btn.onclick = () => armTake(q.fmt, q.label, btn)" in js
@@ -271,7 +271,7 @@ def test_app_js_only_closes_settings_when_it_is_open():
 
 def test_app_js_surfaces_a_failed_window_action_and_an_unreadable_size():
     js = _app_js()
-    assert 'toast("could not minimize: " + e.message, "bad")' in js
+    assert 'toast(t("could not minimize: {msg}", { msg: e.message }), "bad")' in js
     # the wipe confirm must not promise "0 files (0 B)" when the summary failed
     assert "size could not be read" in js
     assert 'catch(() => ({ files: 0, bytes: 0 }))' not in js

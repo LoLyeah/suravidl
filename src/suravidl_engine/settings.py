@@ -11,6 +11,7 @@ DEFAULTS = {
     "theme": "dark",       # light | dark | amoled
     "glass": "frosted",    # frosted | liquid
     "accent": "amber",     # amber | pine — the scheme (v0.38.3)
+    "language": "en",        # en | id — the UI dictionary (v0.44.0)
     "cookies_file": "",          # Netscape cookies.txt for age-gated videos
     "cookies_from_browser": "",  # e.g. chrome / firefox / edge
     "impersonate": "",           # off | chrome | firefox | safari | edge —
@@ -62,6 +63,7 @@ DEFAULTS = {
 THEMES = ("light", "dark", "amoled")
 GLASS_STYLES = ("frosted", "liquid")
 ACCENTS = ("amber", "pine")   # the scheme: signal amber, or the pine & cream voice
+LANGUAGES = ("en", "id")        # the UI dictionary: English, Bahasa Indonesia
 
 
 def int_in(value, name: str, lo: int, hi: int) -> int:
@@ -268,6 +270,11 @@ class Settings:
             value = str(value)
             if value not in ACCENTS:
                 raise ValueError(f"accent must be one of {ACCENTS}")
+            return value
+        if key == "language":
+            value = str(value)
+            if value not in LANGUAGES:
+                raise ValueError(f"language must be one of {LANGUAGES}")
             return value
         # -- tier-1 download options -----------------------------------------
         if key == "filename_template":
