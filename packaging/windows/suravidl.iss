@@ -66,4 +66,8 @@ Filename: "{app}\suravidl.exe"; Description: "Launch suravidl"; Flags: nowait po
 ; and is never touched, so it survives uninstall and reinstall.
 ; the user-profile root has no named Inno constant - only the env-var
 ; form expands here; an unknown constant aborts the compile, loudly
+; (and Inno has no {%NAME} default-value syntax to guard the edge with).
+; if %USERPROFILE% were somehow unset, {%USERPROFILE} expands empty and
+; this line names a path that does not exist - an uninstall-delete
+; against it is a no-op, so the edge is accepted (v0.43.3 audit note).
 Type: filesandordirs; Name: "{%USERPROFILE}\.cache\suravidl\updates"

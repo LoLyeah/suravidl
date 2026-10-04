@@ -218,6 +218,10 @@ class Settings:
         if key == "auto_resume":
             return bool(value)
         if key == "cookies_file":
+            # pointing at YOUR cookies file, anywhere, is the feature; the
+            # existence verdict is per-request and token-gated, so it tells
+            # a caller nothing about paths it did not already name
+            # (v0.43.3 audit note: kept — the token is already the wall)
             value = str(value or "").strip()
             if value:
                 p = Path(value).expanduser()

@@ -1,8 +1,9 @@
-# suravidl — threat model (cookies & stored data)
+# suravidl — threat model (cookies, stored data, network reach)
 
-Scope: what suravidl stores, where, and what an attacker would need to read
-it. Written for the Android app, which is the platform where "at rest"
-actually matters; the desktop/extension side is noted where it differs.
+Scope: what suravidl stores, where, what an attacker would need to read
+it, and which URLs the engine will and will not fetch. Written for the
+Android app, which is the platform where "at rest" actually matters; the
+desktop/extension side is noted where it differs.
 
 ## What is stored
 
@@ -61,6 +62,24 @@ the ciphertext is worthless elsewhere.
    (`migrateLegacy`) and the plaintext file deleted.
 5. The engine records only `<redacted>` in its database and API payloads, and
    scrubs pre-existing rows at startup (`VACUUM`).
+
+## Network reach (which URLs the engine will fetch)
+
+Link-local addresses (`169.254.0.0/16`, `fe80::/10`) and cloud-metadata
+hostnames (`metadata.google.internal` and friends) are refused **at every
+door** — classify, `/probe`, `/handoff`, and job creation — with the
+reason shown to the user (v0.43.2). A web page or extension that smuggles
+a URL into the pipeline cannot make the engine poke the machine's own
+network neighborhood, where cloud metadata services sit.
+
+The check is **literal-host only, on purpose** (v0.43.3): a name that
+*resolves* to a link-local address (DNS rebinding, `*.nip.io`-style) is
+not chased. Resolving before every fetch and pinning the address would
+break legitimate hostnames that move — CDNs, load balancers, and the
+user's own LAN NAS, which is a supported target — and the API is
+token-gated, so only the user's own tools can ask the engine to fetch
+anything at all. The line is drawn at the neighborhood, not at remote
+servers; remote URLs are the product.
 
 ## Reporting
 

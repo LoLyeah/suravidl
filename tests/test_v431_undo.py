@@ -196,16 +196,15 @@ def test_the_versions_line_shows_where_the_copy_comes_from():
         assert marker in APPJS
 
 
-def test_the_swarm_entry_retired_cleanly_with_the_thirteenth():
-    """The rolling card keeps ten entries — v0.43.2's entry pushed out
-    "The swarm" (0.40.8). Its feature lives on in the suite, its words
-    live in the release notes, and no half-entry may remain here."""
+def test_the_rolling_card_keeps_ten_and_the_retired_stay_retired():
+    """Ten entries max — v0.43.3's entry pushed out "The front door"
+    (0.40.9); earlier retirements stay retired. No half-entry may remain."""
     from suravidl_engine import whatsnew
 
     versions = [e["version"] for e in whatsnew.ENTRIES]
     titles = [e["title"] for e in whatsnew.ENTRIES]
     assert len(versions) == 10
-    assert versions[0] == "0.43.2"
-    assert "0.40.8" not in versions
-    assert "The swarm" not in titles
-    assert "0.40.7" not in versions    # the earlier retirement stays retired
+    assert versions[0] == "0.43.3"
+    assert "0.40.9" not in versions
+    assert "The front door" not in titles
+    assert "0.40.8" not in versions and "0.40.7" not in versions

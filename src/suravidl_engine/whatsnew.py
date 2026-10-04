@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.43.3",
+        "title": "The stitch",
+        "items": [
+            "The macOS self-update now stages its download in a fresh, private folder instead of a predictable name \u2014 a planted file can no longer stand where the update lands.",
+            "The threat model now states it plainly: link-local and cloud-metadata addresses are refused at every door, with DNS-level tricks the one named, deliberate exception.",
+        ],
+    },
+    {
         "version": "0.43.2",
         "title": "The rake",
         "items": [
@@ -90,14 +98,6 @@ ENTRIES = [
             "Two fresh-eyes audits went through the whole app; the sharpest fix: trashing the leftover card of a paused-and-resumed download no longer risks the finished file.",
             "Keyboard and touch on the deck: dialogs keep Tab inside and hand focus back, the main tabs answer to arrow keys, the day theme's focus ring is visible again, and small tap targets grew.",
             "The raw-arguments deny list learned the flags it was missing, and a bundled build now says where yt-dlp updates come from instead of failing quietly.",
-        ],
-    },
-    {
-        "version": "0.40.9",
-        "title": "The front door",
-        "items": [
-            "suravidl can put itself in your menu now: run the release binary once with --install-desktop and it appears like an installed app \u2014 Start Menu on Windows, applications menu on Linux.",
-            "No admin rights, nothing outside your own folders, and --uninstall-desktop takes it back out; installing never starts the engine or opens a window.",
         ],
     }
 ]

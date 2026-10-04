@@ -31,8 +31,11 @@ done
 sleep 1
 
 # 2) extract the new bundle beside the old one
-STAGE="$DIR/.suravidl-update.$$"
-mkdir -p "$STAGE" || exit 1
+#    mktemp, not a PID-named directory (v0.43.3 audit follow-up): a
+#    predictable name in the install directory is a symlink-planting
+#    target for a local program; mktemp creates it 0700 and will not
+#    reuse an existing path.
+STAGE="$(mktemp -d "$DIR/.suravidl-update.XXXXXX")" || { relaunch "$APP"; exit 1; }
 if ! ditto -x -k "$ZIP" "$STAGE"; then
   rm -rf "$STAGE"; relaunch "$APP"; exit 1
 fi
@@ -41,10 +44,16 @@ NEW="$STAGE/$BASE"
 if [ ! -d "$NEW" ]; then
   rm -rf "$STAGE"; relaunch "$APP"; exit 1
 fi
+# the zip was sha256-verified against the update manifest before this
+# script ran — its bytes are the release's bytes. The quarantine bit only
+# rides browser downloads, not the app's own fetches; the strip is belt
+# for odd carriers so a stray bit cannot prompt Gatekeeper on a bundle
+# the manifest already vouches for.
 xattr -dr com.apple.quarantine "$NEW" 2>/dev/null
 
 # 3) swap by rename; roll back on any failure
-OLD="$DIR/.suravidl-old.$$"
+OLD="$(mktemp -d "$DIR/.suravidl-old.XXXXXX")" || { rm -rf "$STAGE"; relaunch "$APP"; exit 1; }
+rm -rf "$OLD"   # the placeholder goes — the rename below needs the name free
 if ! mv "$APP" "$OLD"; then
   rm -rf "$STAGE"; relaunch "$APP"; exit 1
 fi

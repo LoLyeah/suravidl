@@ -411,6 +411,8 @@ class JobManager:
                 self._con.execute("VACUUM")
             if self.db_path != ":memory:":
                 # the WAL sidecars hold the same private rows as the db
+                # (v0.43.3 audit note: SQLite creates them with the db's
+                # own 0600, and the parent dir is 0700 — this loop is belt)
                 for suffix in ("-wal", "-shm"):
                     side = Path(self.db_path + suffix)
                     if side.exists():

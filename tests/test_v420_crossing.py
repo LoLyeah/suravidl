@@ -91,6 +91,16 @@ def test_the_script_is_valid_bash():
     assert r.returncode == 0, r.stderr
 
 
+def test_the_staging_names_are_mktemp_not_predictable():
+    """v0.43.3 (audit follow-up): a PID-named staging directory in the
+    install folder is a symlink-planting target for a local program —
+    mktemp creates a fresh 0700 path and never reuses an existing name."""
+    s = SWAP.read_text()
+    assert "mktemp -d" in s
+    assert ".suravidl-update.$$" not in s
+    assert ".suravidl-old.$$" not in s
+
+
 def test_the_app_bundle_ships_the_swap_script():
     spec = (ROOT / "suravidl.spec").read_text()
     assert "macos_swap.sh" in spec
