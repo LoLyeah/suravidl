@@ -456,10 +456,23 @@ def create_app(download_dir, auth_token: str | None = None,
 
         try:
             staged = ytdlp_update.pending_version(db_path)
+            source = ytdlp_update.active_source(db_path)
         except Exception:  # noqa: BLE001 - a hint must never 500 the tab
-            staged = None
+            staged = source = None
         return {"engine": __version__, "yt_dlp": yt_dlp.version.__version__,
-                "staged": staged}
+                "staged": staged, "source": source}
+
+    @app.post("/ytdlp/remove")
+    def ytdlp_remove(_mgr: JobManager = Depends(require_auth)):
+        """Delete the downloaded yt-dlp copy (v0.43.1). A staged copy is
+        canceled at once; an active one hands back to the bundle on the
+        next start. The was_active flag is read BEFORE the delete so the
+        UI can word the toast from what was actually running."""
+        from . import ytdlp_update
+
+        was_active = ytdlp_update.active_source(db_path) == "downloaded"
+        result = ytdlp_update.remove_shadow(db_path)
+        return {**result, "was_active": was_active}
 
     @app.post("/update")
     def update(_mgr: JobManager = Depends(require_auth)):

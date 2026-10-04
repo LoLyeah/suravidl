@@ -143,6 +143,9 @@ def _sweep_leftovers(base: Path) -> None:
     """Crashed stages and half-downloads never outlive a boot."""
     for p in base.glob("ytdlp.stage.*"):
         shutil.rmtree(p, ignore_errors=True)
+    # a swap that crashed between its renames leaves the previous copy
+    # renamed aside as ytdlp.old — it is garbage either way
+    shutil.rmtree(base / "ytdlp.old", ignore_errors=True)
     _unlink(base / "ytdlp.whl.part")
 
 
@@ -229,6 +232,42 @@ def activate_safe(db_path=None) -> str | None:
     except Exception as e:  # noqa: BLE001 - a boot must never fail here
         _dbg(f"activate raised: {e!r}")
         return None
+
+
+def active_source(db_path=None) -> str:
+    """Where the running yt_dlp comes from: downloaded, bundled, environment.
+
+    "downloaded" — the shadow is on sys.path, so imports resolved to it;
+    "bundled" — a packaged build with no shadow (its yt-dlp is inside);
+    "environment" — a pip/venv install (dev runs).
+    """
+    if str(_shadow_dir(db_path)) in sys.path:
+        return "downloaded"
+    return "bundled" if getattr(sys, "frozen", False) else "environment"
+
+
+def remove_shadow(db_path=None) -> dict:
+    """Delete the downloaded copy; the bundled one takes over.
+
+    A staged copy is canceled on the spot. An active one keeps serving
+    from memory until the next start — Python cannot hot-swap loaded
+    modules, the same reason updates apply on restart. Only the files
+    this feature created are touched; the bundle is never modified.
+    """
+    base = _app_data_dir(db_path)
+    shadow = _shadow_dir(db_path)
+    _sweep_leftovers(base)
+    if not shadow.exists():
+        return {"ok": True, "removed": False, "version": None}
+    ver = shadow_version(shadow)
+    shutil.rmtree(shadow, ignore_errors=True)
+    # drop any stale sys.path entry too — a path that points at nothing
+    # must not linger for whatever asks next
+    s = str(shadow)
+    while s in sys.path:
+        sys.path.remove(s)
+    gone = not shadow.exists()
+    return {"ok": gone, "removed": gone, "version": ver}
 
 
 def _fetch_json(url: str = PYPI_JSON) -> dict:

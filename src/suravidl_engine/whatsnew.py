@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.43.1",
+        "title": "The undo",
+        "items": [
+            "The downloaded yt-dlp can be removed again from its tab \u2014 a staged copy is canceled on the spot, and an active one hands back to the bundled copy from the next start.",
+            "The tab now says where the running copy comes from: (bundled) or (downloaded) \u2014 no guessing which one is in use.",
+        ],
+    },
+    {
         "version": "0.43.0",
         "title": "The refresh",
         "items": [
@@ -87,15 +95,7 @@ ENTRIES = [
         "items": [
             "Everything the project checks now runs on all the machine's cores at once \u2014 the same careful checks in a fraction of the time, so fixes and features reach you sooner.",
         ],
-    },
-    {
-        "version": "0.40.7",
-        "title": "The handful",
-        "items": [
-            "The extension popup's stream list is a checkbox list now \u2014 tick several finds and the quick door queues them all at best quality in one go.",
-            "Right-click any link, video, or page for \"Download with suravidl\" \u2014 straight to the app's quality picker, no trip through the toolbar.",
-        ],
-    },
+    }
 ]
 
 

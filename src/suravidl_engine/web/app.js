@@ -2272,6 +2272,20 @@ async function loadVersions() {
       st.textContent = v.staged
         ? `yt-dlp ${v.staged} is staged — restart to use it` : "";
     }
+    // where the running copy comes from (v0.43.1) — and the undo lives here
+    const src = $("ytdlpSrc");
+    if (src) src.textContent =
+      v.source === "downloaded" ? "(downloaded)"
+        : v.source === "bundled" ? "(bundled)" : "";
+    const row = $("ytdlpRemoveRow"), hint = $("ytdlpRemoveHint");
+    if (row) {
+      row.hidden = !(v.source === "downloaded" || v.staged);
+      if (hint) hint.textContent = v.staged
+        ? (v.source === "downloaded"
+          ? "a newer copy from PyPI is staged — removing deletes the downloaded copy and cancels the stage"
+          : "a copy from PyPI is staged — removing cancels it")
+        : "downloaded from PyPI — removing falls back to the bundled copy on the next start";
+    }
   } catch (_) { $("versions").textContent = ""; }
 }
 
@@ -2697,6 +2711,27 @@ function openExternal(url) {
   }
   window.open(url, "_blank", "noopener");
 }
+
+$("removeBtn").onclick = async () => {
+  const ok = await askConfirm(
+    "Remove the downloaded yt-dlp copy? suravidl goes back to the copy " +
+    "bundled with the app (from the next start).",
+    { okText: "Remove", danger: true });
+  if (!ok) return;
+  $("removeBtn").disabled = true;
+  try {
+    const r = await api("/ytdlp/remove", { method: "POST" });
+    loadVersions();
+    if (r.was_active)
+      toast("downloaded copy removed — bundled yt-dlp from the next start");
+    else if (r.removed) toast("staged copy removed");
+    else toast("nothing to remove");
+  } catch (e) {
+    toast("could not remove: " + e.message, "bad");
+  } finally {
+    $("removeBtn").disabled = false;
+  }
+};
 
 $("updateBtn").onclick = async () => {
   const ok = await askConfirm(
