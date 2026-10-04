@@ -64,4 +64,6 @@ Filename: "{app}\suravidl.exe"; Description: "Launch suravidl"; Flags: nowait po
 ; cleans a failed apply; on uninstall that subtree goes with the app.
 ; user data lives in %USERPROFILE%\.suravidl (jobs.db, settings, cookies)
 ; and is never touched, so it survives uninstall and reinstall.
-Type: filesandordirs; Name: "{userprofile}\.cache\suravidl\updates"
+; the user-profile root has no named Inno constant - only the env-var
+; form expands here; an unknown constant aborts the compile, loudly
+Type: filesandordirs; Name: "{%USERPROFILE}\.cache\suravidl\updates"

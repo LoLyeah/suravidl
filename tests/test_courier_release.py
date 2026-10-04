@@ -94,7 +94,10 @@ def test_windows_installer_script_is_per_user(tmp_path):
     # the staged-update cache lives under the engine's cache home
     # (%USERPROFILE%\.cache\suravidl\updates) — the uninstall removes
     # exactly that subtree, and never the data dir (v0.41.x audit, finding 4)
-    assert "{userprofile}\\.cache\\suravidl\\updates" in iss
+    assert "{%USERPROFILE}\\.cache\\suravidl\\updates" in iss
+    # ...via the env-var form only: Inno has no named user-profile
+    # constant, and a bare {userprofile} aborted ISCC at the v0.41.1 cut
+    assert '"{userprofile}\\.cache' not in iss
     assert "{localappdata}\\suravidl\\updates" not in iss
 
 

@@ -1,0 +1,6 @@
+Windows installer: {%USERPROFILE} is the Inno form
+
+ISCC rejected the uninstall rule at the v0.41.1 cut: there is no named
+{userprofile} constant, only the env-var expansion {%USERPROFILE}. The
+pin now asserts the env form and rejects the bare one, so the trap
+cannot come back quietly.
