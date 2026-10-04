@@ -188,9 +188,14 @@ def test_the_tour_is_escapable_and_traps_tab():
     assert '$("tourNext").focus({ preventScroll: true })' in APP
 
 
-def test_the_toast_lift_composes_with_the_safe_area():
-    assert "bottom: calc(24px + var(--toast-lift, 0px));" in CSS
-    assert ("env(safe-area-inset-bottom) + var(--toast-lift, 0px));" in CSS)
+def test_the_toast_lift_is_a_true_offset_not_an_additive_one():
+    """v0.43.4: the measured value IS the lane's bottom edge (8px above the
+    docked furniture) — it wins over the base via max(), it never sums with
+    it. The additive composition floated the lane a whole base too high."""
+    assert "bottom: max(24px, var(--toast-lift, 0px));" in CSS
+    assert ("bottom: max(calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)), "
+            "var(--toast-lift, 0px));" in CSS)
+    assert "+ var(--toast-lift" not in CSS
     fn = _fn("function syncToastLane", "\n}")
     assert 'host.style.setProperty("--toast-lift"' in fn
     assert 'host.style.removeProperty("--toast-lift")' in fn

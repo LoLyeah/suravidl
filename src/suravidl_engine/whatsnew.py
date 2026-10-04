@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.43.4",
+        "title": "The level",
+        "items": [
+            "Fixed: a toast clearing the settings Save strip floated a full row too high \u2014 over the Updates text you were reading. It now lands a breath above whatever is docked, exactly where it should.",
+        ],
+    },
+    {
         "version": "0.43.3",
         "title": "The stitch",
         "items": [
@@ -91,15 +98,6 @@ ENTRIES = [
             "The button row (ads \u00b7 site \u00b7 Scan \u00b7 Clear list \u00b7 Clear data) slides sideways when your screen is too narrow, so no control runs out of reach.",
         ],
     },
-    {
-        "version": "0.40.10",
-        "title": "The mend",
-        "items": [
-            "Two fresh-eyes audits went through the whole app; the sharpest fix: trashing the leftover card of a paused-and-resumed download no longer risks the finished file.",
-            "Keyboard and touch on the deck: dialogs keep Tab inside and hand focus back, the main tabs answer to arrow keys, the day theme's focus ring is visible again, and small tap targets grew.",
-            "The raw-arguments deny list learned the flags it was missing, and a bundled build now says where yt-dlp updates come from instead of failing quietly.",
-        ],
-    }
 ]
 
 

@@ -101,11 +101,13 @@ def test_toasts_sit_above_the_mobile_tab_bar():
     """#toasts sat 22px from the bottom, on top of the fixed tab bar: taps
     aimed at a tab hit the toast instead. The lane must carry the safe-area
     term — and since v0.38.2 it is adaptive: idle tabs dock at bar + 12px,
-    furniture tabs (transport, Save strip) at bar + 84px."""
+    furniture tabs (transport, Save strip) lifted clear of them — and
+    since v0.43.4 that measured offset wins outright (max, never a sum
+    with the base)."""
     assert "#toasts { left: 12px; right: 12px;" in CSS
     seg = CSS.split("#toasts { left: 12px; right: 12px;")[1].split("}")[0]
-    assert ("bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) "
-            "+ var(--toast-lift, 0px))" in seg)
+    assert ("bottom: max(calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)), "
+            "var(--toast-lift, 0px))" in seg)
     # the lift over docked furniture is measured (syncToastLane), not a
     # static per-tab rule (v0.38.2)
     assert 'body[data-tab="download"] #toasts' not in CSS

@@ -46,9 +46,9 @@ def test_the_toast_lane_measures_on_every_width():
     assert "899px" not in fn
     assert '".transport, #panel-settings .modal-foot"' in fn   # same furniture list
     assert "if (r.bottom < vh - 140) continue;" in fn            # docked-only
-    # the measured lift rides a CSS variable now, so the stylesheet can
-    # compose it over the safe-area inset (v0.41.x audit: the inline
-    # `bottom` used to clobber env(safe-area-inset-bottom) outright)
+    # the measured offset rides a CSS variable now; the stylesheet takes it
+    # as the lane's bottom edge when set — via max, so it wins over the base
+    # (v0.43.4: the old composition summed them and floated the lane high)
     assert 'host.style.removeProperty("--toast-lift")' in fn
     assert ('host.style.setProperty("--toast-lift", '
             'Math.round(vh - (top - 8)) + "px")') in fn
@@ -57,8 +57,8 @@ def test_the_toast_lane_measures_on_every_width():
 def test_the_lane_falls_back_to_the_corner_and_keeps_the_phone_rule():
     """Desktop fallback: the corner. Phones keep the tab-bar fallback. The
     old fixed lifts are gone for good."""
-    assert "bottom: calc(24px + var(--toast-lift, 0px));" in CSS
+    assert "bottom: max(24px, var(--toast-lift, 0px));" in CSS
     assert "bottom: 86px" not in CSS
     assert 'body[data-tab="settings"] #toasts' not in CSS
-    assert ("bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) "
-            "+ var(--toast-lift, 0px));" in CSS)
+    assert ("bottom: max(calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)), "
+            "var(--toast-lift, 0px));" in CSS)

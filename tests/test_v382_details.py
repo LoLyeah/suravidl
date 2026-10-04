@@ -30,10 +30,11 @@ def test_the_phone_toast_lane_measures_instead_of_guessing():
     Save strip docks with the settings scroll. A static per-tab rule is
     wrong both ways; the JS measures and only then lifts the lane."""
     # the fallback everywhere on a phone: just above the tab bar, safe-area
-    # kept free for the measured lift to compose over it (v0.41.x audit —
-    # the JS lift used to clobber the inset via an inline `bottom`)
-    assert ("bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) "
-            "+ var(--toast-lift, 0px));" in CSS)
+    # kept free; when furniture is docked the measured offset wins over it
+    # via max() — never a sum (v0.43.4: the sum floated the lane a base too
+    # high — mid-panel, over the Updates row it was reporting to)
+    assert ("bottom: max(calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)), "
+            "var(--toast-lift, 0px));" in CSS)
     # no static per-tab overrides remain in the mobile block
     seg = CSS.split("@media (max-width: 899px)")[-1]
     assert 'body[data-tab="download"] #toasts' not in seg

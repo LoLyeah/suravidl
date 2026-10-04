@@ -412,6 +412,9 @@ Show folder). The lane is measured, never tuned: at every width it lifts
 above what is actually docked at the bottom right now — the transport once it
 pins, the settings Save strip while it is up — and falls back to just above
 the tab bar on phones and the bottom corner on desktop.
+The measured offset
+IS the lane's bottom edge — it wins over the fallback, it never adds to it
+(v0.43.4).
 
 ### The Appearance swatches
 Three rows of tiles in Settings: theme (Light / Dark / AMOLED), glass finish

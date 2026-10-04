@@ -943,8 +943,12 @@ details.card { padding: 0 18px 6px; }
 /* ---------- toasts ---------- */
 #toasts {
   position: fixed; right: 16px; z-index: 60;
-  /* the measured lane lift (syncToastLane) rides on top of the base */
-  bottom: calc(24px + var(--toast-lift, 0px));
+  /* syncToastLane measures the lane's bottom edge outright — 8px above
+     whatever is really docked (the transport, the settings Save strip).
+     The measured offset wins over the base; summing the two floated the
+     toast a whole base too high (v0.43.4: mid-panel, over the Updates
+     row it was reporting to) */
+  bottom: max(24px, var(--toast-lift, 0px));
   display: flex; flex-direction: column; gap: 10px;
   width: min(430px, calc(100vw - 32px));
   pointer-events: none;
@@ -1275,7 +1279,7 @@ footer .linkbtn { color: var(--accent-ink); }
      (v0.38.2 report: a fixed 84px lane hovered "above something missing"
      on Queue — and the transport is sticky, so on Download it is only at
      the bottom when scrolled there). */
-  #toasts { left: 12px; right: 12px; width: auto; bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) + var(--toast-lift, 0px)); }
+  #toasts { left: 12px; right: 12px; width: auto; bottom: max(calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom)), var(--toast-lift, 0px)); }
   /* A probed list cannot fit a phone row: the four columns re-stack —
      quality + Take on the first line, the format beneath, the size last
      (2026-10-01 photo: Take buttons ran off the right edge). */
