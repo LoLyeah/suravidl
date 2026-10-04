@@ -54,6 +54,53 @@ function baseName(p) {
   return String(p ?? "").split(/[\\/]/).pop();
 }
 
+/* ---------- i18n: zero-build strings (v0.44.0) -----------------------------
+   No bundler, no build step — a plain dictionary and one t(), by house rule.
+   The English string IS the key: t("Open folder") looks itself up in the
+   chosen language and falls back to the key, so a missing dictionary or a
+   missing entry can only ever show English. {name} placeholders inside a
+   value are filled from t()'s second argument. The dictionaries carry the
+   same key set; `id` translates, `en` mirrors the keys. */
+/* i18n-dicts:start */
+const STRINGS = { en: {}, id: {} };
+/* i18n-dicts:end */
+let LANG = CFG.language === "id" ? "id" : "en";
+
+function t(s, vars) {
+  const dict = STRINGS[LANG] || null;
+  let out = (dict && dict[s] != null) ? dict[s] : s;
+  if (vars) {
+    for (const k in vars) out = out.split("{" + k + "}").join(String(vars[k]));
+  }
+  return out;
+}
+
+/** Everything static in the page: text (data-i18n), titles, aria-labels and
+ *  placeholders. One pass over what the markup declares, run at boot and on
+ *  every language switch. */
+function applyStaticI18n(root) {
+  const scope = root || document;
+  scope.querySelectorAll("[data-i18n]").forEach((n) => {
+    n.textContent = t(n.dataset.i18n);
+  });
+  scope.querySelectorAll("[data-i18n-title]").forEach((n) => {
+    n.title = t(n.dataset.i18nTitle);
+  });
+  scope.querySelectorAll("[data-i18n-aria]").forEach((n) => {
+    n.setAttribute("aria-label", t(n.dataset.i18nAria));
+  });
+  scope.querySelectorAll("[data-i18n-ph]").forEach((n) => {
+    n.placeholder = t(n.dataset.i18nPh);
+  });
+}
+
+/** The document-level facts a language switch moves: the lang attribute
+ *  (screen readers, hyphenation) and the window title. */
+function applyLanguageChrome() {
+  document.documentElement.lang = LANG;
+  document.title = t("suravidl");
+}
+
 const ACTIVE = new Set(["queued", "downloading", "merging"]);
 // v0.40.2 "the sieve": the queue's view filter. Filed and failed are exact
 // sets; ANY other state counts as active — a state the sieve has not met
@@ -112,15 +159,19 @@ function humanErr(s, detail) {
 
 /* ---------- the scope strip: instruments that read the source ---------- */
 /** data-state drives the lamps and the reading colours (style.css). */
+let SCOPE_LAST = null;   // the last call, replayable for a language switch
 function setScopes(state, read) {
   const strip = $("scopeStrip");
   if (!strip) return;
+  SCOPE_LAST = { state: state, read: read };
   strip.dataset.state = state;
   if (read) {
     if (read.src != null) $("scopeSrc").textContent = read.src;
     if (read.fmt != null) $("scopeFmt").textContent = read.fmt;
     if (read.size != null) $("scopeSize").textContent = read.size;
-    if (read.say != null) $("scopeSay").textContent = read.say;
+    // the say line is our own words (the rest is site data) — translated at
+    // the one place it is painted, so a stored call re-translates on replay
+    if (read.say != null) $("scopeSay").textContent = t(read.say);
   }
 }
 
@@ -144,6 +195,9 @@ let AUDIO_LANG = "";
 // v0.40.4 — the marks: the media element the player modal holds, if any
 let PLAY_NODE = null;
 let QUALITY_EST = {};   // v0.40.5: per-probe sizes, keyed by quality chip
+let LAST_PROBE = null;  // {url, info} — the on-deck readout, for relabelling
+let LAST_FAIL = null;   // {msg, detail} — the last probe failure, same reason
+let LAST_JOBS = [];     // the last queue snapshot (the bins rail replays it)
 
 function armTake(pick, label, btn) {
   if (!pick) return;
@@ -170,10 +224,13 @@ function renderTake() {
   if (!say || !lamp) return;
   const armed = TAKE.fmt || TAKE.preset;
   say.textContent = armed
-    ? (TAKE.preset ? "audio · " + TAKE.label : TAKE.label)
-    : "best available";
+    ? (TAKE.preset ? t("audio · {label}", { label: t(TAKE.label) })
+                   : t(TAKE.label))
+    : t("best available");
   say.classList.toggle("set", !!armed);
-  lamp.textContent = armed ? "START · " + (TAKE.label || "take") : "START · best";
+  lamp.textContent = armed
+    ? t("START · {label}", { label: t(TAKE.label || "take") })
+    : t("START · best");
   // the armed pick stays lit wherever it lives (chips, format rows, audio) —
   // and ONLY the armed one: a commit spends the take and every light goes out
   document.querySelectorAll("[data-pick]").forEach((b) => {
@@ -236,9 +293,9 @@ window.addEventListener("scroll", () => {
  *  The buttons stop the click from bubbling, so tapping one runs it and
  *  dismisses the toast, while a plain toast still dismisses on any tap. */
 function toast(msg, kind = "ok", opts) {
-  const t = el("div", "toast " + kind);
-  t.append(el("span", "dot"));
-  t.append(el("span", "tmsg", msg));
+  const box = el("div", "toast " + kind);
+  box.append(el("span", "dot"));
+  box.append(el("span", "tmsg", msg));
   const actions = opts && opts.actions;
   if (actions && actions.length) {
     const row = el("div", "toactions");
@@ -246,19 +303,19 @@ function toast(msg, kind = "ok", opts) {
       const b = el("button", "ghost-sm" + (a.prime ? " prime" : ""), a.label);
       b.onclick = (ev) => {
         ev.stopPropagation();
-        dismiss(t);
+        dismiss(box);
         try { if (a.onClick) a.onClick(); } catch (_) { /* a choice must not throw */ }
       };
       row.append(b);
     }
-    t.append(row);
+    box.append(row);
   } else {
-    t.onclick = () => dismiss(t);
+    box.onclick = () => dismiss(box);
   }
   syncToastLane();
-  $("toasts").append(t);
-  if (!(opts && opts.sticky)) setTimeout(() => dismiss(t), 4200);
-  return t;
+  $("toasts").append(box);
+  if (!(opts && opts.sticky)) setTimeout(() => dismiss(box), 4200);
+  return box;
 }
 /** The motion clock. Under prefers-reduced-motion the CSS snaps in 1ms, so
  *  a timer that exists only to cover a transition must not outlive it (the
@@ -420,28 +477,27 @@ function markSwatches(values) {
    or WebKit pausing transitions because the page reports itself hidden.
    Name whichever one is in force right here, where appearance is chosen,
    instead of leaving a still app unexplained. */
-function wireMotionNote() {
+function paintMotionNote() {
   const note = $("motionNote");
   if (!note) return;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const paint = () => {
-    if (reduce.matches) {
-      note.textContent = "Your system asks for reduced motion, and suravidl follows it — " +
-        "turn off \u201cReduce motion\u201d (macOS: System Settings \u2192 Accessibility \u2192 Motion) " +
-        "to see animations.";
-      note.hidden = false;
-    } else if (document.visibilityState === "hidden") {
-      note.textContent = "This window is reporting itself as not visible to the browser " +
-        "engine, which pauses animations — closing and reopening the app usually clears it.";
-      note.hidden = false;
-    } else {
-      note.hidden = true;
-    }
-  };
-  if (reduce.addEventListener) reduce.addEventListener("change", paint);
-  document.addEventListener("visibilitychange", paint);
-  paint();
+  if (reduce.matches) {
+    note.textContent = t("Your system asks for reduced motion, and suravidl follows it — turn off “Reduce motion” (macOS: System Settings → Accessibility → Motion) to see animations.");
+    note.hidden = false;
+  } else if (document.visibilityState === "hidden") {
+    note.textContent = t("This window is reporting itself as not visible to the browser engine, which pauses animations — closing and reopening the app usually clears it.");
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+  }
 }
+function wireMotionNote() {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  if (reduce.addEventListener) reduce.addEventListener("change", paintMotionNote);
+  document.addEventListener("visibilitychange", paintMotionNote);
+  paintMotionNote();
+}
+
 let CURRENT = { theme: CFG.theme || "dark", glass: CFG.glass || "frosted",
                 accent: CFG.accent || "amber" };
 let SETTINGS_SNAPSHOT = null;   // last /settings payload (used by the preset diff)
@@ -455,9 +511,78 @@ async function setAppearance(patch, label) {
     markSwatches(CURRENT);
     toast(label, "info");
   } catch (e) {
-    toast("could not apply: " + e.message, "bad");
+    toast(t("could not apply: {msg}", { msg: e.message }), "bad");
   }
 }
+
+/* ---------- language (v0.44.0) ----------
+   The switch rides the appearance controls: it saves through /settings (so
+   it persists exactly like theme/glass/accent), and it lands everywhere at
+   once — static text through applyStaticI18n, every dynamic surface by
+   re-reading its own state. */
+async function setLanguage(lang) {
+  try {
+    const s = await api("/settings", { method: "POST",
+                                       body: JSON.stringify({ language: lang }) });
+    LANG = s.language === "id" ? "id" : "en";
+    applyLanguageChrome();
+    relabelUI();
+    toast(t("Language: {name}",
+            { name: s.language === "id" ? "Indonesia" : "English" }), "info");
+  } catch (e) {
+    toast(t("could not apply: {msg}", { msg: e.message }), "bad");
+    const sel = $("setLang");
+    if (sel) sel.value = LANG;
+  }
+}
+
+/** Re-render every surface that carries state on screen. Zero-build i18n has
+ *  no reactive layer; this is the honest equivalent — each surface re-reads
+ *  its own state (stored at render time) and paints anew. */
+function relabelUI() {
+  applyStaticI18n();
+  applyLanguageChrome();
+  renderWhere(CFG.downloadDir);
+  renderTake();
+  renderBatchRow();
+  renderPlaylistState();
+  renderOvCount();
+  renderOvPresetInfo();
+  renderOvPresetActions();
+  renderOvPresets();
+  renderPresetList();
+  renderUpdateRow();
+  loadVersions();
+  if (OPTIONS) renderOptions($("optionsSearch").value);
+  if (LAST_PROBE) renderProbe(LAST_PROBE.url, LAST_PROBE.info);
+  else if (LAST_FAIL) showProbeFailure(LAST_FAIL.msg, LAST_FAIL.detail,
+                                       $("url").value.trim());
+  else if (SCOPE_LAST) setScopes(SCOPE_LAST.state, SCOPE_LAST.read);
+  renderBins(LAST_JOBS);
+  forceQueueRepaint();
+  const pd = $("probeDetails");
+  if (pd && !pd.classList.contains("hidden")) {
+    pd.textContent = $("probeMsg").classList.contains("hidden")
+      ? t("Show details") : t("Hide details");
+  }
+  if (refreshStorageInfo) refreshStorageInfo();
+  const fm = $("folderModal");
+  if (fm && !fm.classList.contains("hidden")) openFolderSheet();
+  if (TOUR_ON) tourShow();
+  const fb = $("faqList");
+  if (fb && fb.childElementCount) buildFaqList();
+  paintMotionNote();
+}
+
+/** A rebuilt row is a repainted row: stamping every live row stale makes the
+ *  next poll rebuild each one through jobRow() — the one place a row's text
+ *  is decided (v0.40.2's sig compare is the trigger, no new mechanism). */
+function forceQueueRepaint() {
+  document.querySelectorAll("#jobs .job").forEach((row) => { row.dataset.sig = ""; });
+  refreshJobs();
+}
+
+
 
 /* ---------- probe ---------- */
 let PROBE_SEQ = 0;
@@ -468,7 +593,7 @@ async function doProbe() {
   const seq = ++PROBE_SEQ;      // two probes in flight: the newest one wins
   // a previous failure's red clears before this probe starts speaking
   $("probeMsg").className = "msg muted";
-  $("probeMsg").textContent = "probing…";
+  $("probeMsg").textContent = t("probing…");
   $("probeMsg").classList.remove("hidden");
   $("probeSay").classList.add("hidden");
   $("probeSay").textContent = "";
@@ -485,36 +610,44 @@ async function doProbe() {
     $("browserOffer").classList.add("hidden");   // it probed fine: no browser needed
   } catch (e) {
     if (seq !== PROBE_SEQ) return;
-    // the engine explains a failure (it owns the "sign-in wall" judgement and
-    // says so in its own words) — the UI does not second-guess it
-    $("probeMsg").textContent = "probe failed: " + e.message;
-    // an error is tally rose and machine text is mono; this line was the
-    // one failure in the app that used to whisper in grey
-    $("probeMsg").className = "msg bad mono";
-    // the human line leads; the raw engine text sits behind "Show details"
-    // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
-    $("probeMsg").classList.add("hidden");
-    $("probeSay").textContent = humanErr(e.message, e.detail);
-    $("probeSay").className = "msg bad";
-    $("probeSay").classList.remove("hidden");
-    $("probeDetails").textContent = "Show details";
-    $("probeDetails").classList.remove("hidden");
-    setScopes("bad", { say: "no readout — see the message above" });
-    offerBrowser(e, url);
-    $("probeCard").classList.add("hidden");
-    // the onboarding line is for an EMPTY deck; reviving it under a failure
-    // made the page argue with itself (v0.40.10 audit)
-    $("dlEmpty").classList.add("hidden");
-    // chips from the *previous* probe still carry its URL: leaving them armed
-    // downloads a link the user has already replaced (v0.21.1 audit)
-    $("qualityRow").classList.add("hidden");
-    $("qualityBtns").replaceChildren();
-    $("playlistRow").classList.add("hidden");
-    PLAYLIST = null;
-    PLAYLIST_NONE = false;
+    showProbeFailure(e.message, e.detail, url);
   } finally {
     if (seq === PROBE_SEQ) $("probeBtn").classList.remove("busy");
   }
+}
+
+/** A failed probe, said the one way — extracted so a language switch can say
+ *  it again in the new language (raw text and human line both). */
+function showProbeFailure(msg, detail, url) {
+  LAST_FAIL = { msg: msg, detail: detail };
+  LAST_PROBE = null;
+  // the engine explains a failure (it owns the "sign-in wall" judgement and
+  // says so in its own words) — the UI does not second-guess it
+  $("probeMsg").textContent = t("probe failed: {msg}", { msg: msg });
+  // an error is tally rose and machine text is mono; this line was the
+  // one failure in the app that used to whisper in grey
+  $("probeMsg").className = "msg bad mono";
+  // the human line leads; the raw engine text sits behind "Show details"
+  // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
+  $("probeMsg").classList.add("hidden");
+  $("probeSay").textContent = t(humanErr(msg, detail));
+  $("probeSay").className = "msg bad";
+  $("probeSay").classList.remove("hidden");
+  $("probeDetails").textContent = t("Show details");
+  $("probeDetails").classList.remove("hidden");
+  setScopes("bad", { say: "no readout — see the message above" });
+  offerBrowser({ message: msg, detail: detail }, url);
+  $("probeCard").classList.add("hidden");
+  // the onboarding line is for an EMPTY deck; reviving it under a failure
+  // made the page argue with itself (v0.40.10 audit)
+  $("dlEmpty").classList.add("hidden");
+  // chips from the *previous* probe still carry its URL: leaving them armed
+  // downloads a link the user has already replaced (v0.21.1 audit)
+  $("qualityRow").classList.add("hidden");
+  $("qualityBtns").replaceChildren();
+  $("playlistRow").classList.add("hidden");
+  PLAYLIST = null;
+  PLAYLIST_NONE = false;
 }
 
 /* "No extractor for this page" is not a dead end on a host that has the in-app
@@ -562,8 +695,8 @@ const hasAudio = (f) => !!f.acodec && f.acodec !== "none";
 function fmtCodecs(f) {
   const parts = [f.ext];
   const v = codecName(f.vcodec), a = codecName(f.acodec);
-  if (v) parts.push("video " + v);
-  if (a) parts.push("audio " + a);
+  if (v) parts.push(t("video {codec}", { codec: v }));
+  if (a) parts.push(t("audio {codec}", { codec: a }));
   return parts.join(" · ");
 }
 
@@ -577,16 +710,16 @@ function fmtCodecs(f) {
  *  inexperienced user".) */
 function fmtKind(f, hasSeparateAudio) {
   const v = hasVideo(f), a = hasAudio(f);
-  if (v && a) return { label: "video + audio", cls: "k-both" };
+  if (v && a) return { label: t("video + audio"), cls: "k-both" };
   if (v) {
     if (!hasSeparateAudio) {
-      return { label: "video only — no sound available", cls: "k-video" };
+      return { label: t("video only — no sound available"), cls: "k-video" };
     }
     return { label: soundChoiceLabel(), cls: "k-video", sound: true };
   }
-  if (a) return { label: "audio only", cls: "k-audio" };
+  if (a) return { label: t("audio only"), cls: "k-audio" };
   // a plain file (direct link): the site told us nothing about its tracks
-  return { label: "single file", cls: "k-audio" };
+  return { label: t("single file"), cls: "k-audio" };
 }
 
 /** The two states of a video-only row's label, read live from the checkbox
@@ -596,7 +729,7 @@ function fmtKind(f, hasSeparateAudio) {
  *  only — no sound' if the checklist is checked"). */
 function soundChoiceLabel() {
   const off = $("noSound") && $("noSound").checked;
-  return off ? "video only — no sound" : "video only";
+  return off ? t("video only — no sound") : t("video only");
 }
 
 /** The "no sound" tick re-labels the rows it applies to, in place. Which
@@ -641,12 +774,12 @@ function renderAudioLangRow(info) {
   for (const val of ["", ...langs]) {
     const on = AUDIO_LANG === val;
     const btn = el("button", "btn sm" + (on ? " pick" : ""),
-                   val === "" ? "auto" : val);
+                   val === "" ? t("auto") : val);
     btn.type = "button";
     btn.setAttribute("aria-pressed", on ? "true" : "false");
     btn.title = val === ""
-      ? "the site's own choice of audio track"
-      : "pair takes with the " + val + " audio track";
+      ? t("the site's own choice of audio track")
+      : t("pair takes with the {lang} audio track", { lang: val });
     btn.onclick = () => {
       AUDIO_LANG = val;
       renderAudioLangRow(info);
@@ -678,10 +811,9 @@ function sizeCell(f) {
   if (b) {
     td.textContent = humanBytes(b);
   } else {
-    td.textContent = "unknown";
+    td.textContent = t("unknown");
     td.classList.add("muted");
-    const why = "the site does not advertise a size for this stream — " +
-                "the real size shows once the download starts";
+    const why = t("the site does not advertise a size for this stream — the real size shows once the download starts");
     td.title = why;                    // desktops hover
     td.onclick = () => toast(why);     // phones tap
   }
@@ -763,23 +895,25 @@ function renderSubsChips(info) {
     if (next.length && !$("ovSubs").value) $("ovSubs").value = "sidecar";
     if (typeof renderOvCount === "function") renderOvCount();
     sync();
-    toast(next.length ? `subtitles: ${next.join(", ")}`
-                       : "subtitles: none picked");
+    toast(next.length ? t("subtitles: {list}", { list: next.join(", ") })
+                       : t("subtitles: none picked"));
   };
 
   for (const lang of (SUBS_EXPANDED ? all : all.slice(0, CAP))) {
     const isAuto = !manual.includes(lang);
-    const chip = el("button", "chip", lang + (isAuto ? " (auto)" : ""));
+    const chip = el("button", "chip",
+                    isAuto ? t("{lang} (auto)", { lang: lang }) : lang);
     chip.type = "button";
     chip.dataset.lang = lang;
-    chip.title = "subtitles in " + lang + (isAuto ? " (auto-generated)" : "") +
-      " — click again to unpick";
+    chip.title = isAuto
+      ? t("subtitles in {lang} (auto-generated) — click again to unpick", { lang: lang })
+      : t("subtitles in {lang} — click again to unpick", { lang: lang });
     chip.onclick = () => toggle(lang);
     box.append(chip);
   }
   if (all.length > CAP) {
     const more = el("button", "chip more",
-      SUBS_EXPANDED ? "less" : `+${all.length - CAP} more`);
+      SUBS_EXPANDED ? t("less") : t("+{n} more", { n: all.length - CAP }));
     more.type = "button";
     more.onclick = () => { SUBS_EXPANDED = !SUBS_EXPANDED; renderSubsChips(info); };
     box.append(more);
@@ -802,7 +936,7 @@ function syncSubLangsWithProbe(info) {
   if (!gone.length) return;
   field.value = pickedSubs().filter((l) => available.includes(l)).join(", ");
   if (typeof renderOvCount === "function") renderOvCount();
-  toast(`subtitles: ${gone.join(", ")} — not on this video`);
+  toast(t("subtitles: {list} — not on this video", { list: gone.join(", ") }));
 }
 
 /** Chapters: one click fills the clip start (and end) so a long video can be
@@ -817,27 +951,31 @@ function renderChapterChips(info) {
     const start = clock(ch.start_time);
     const chip = el("button", "chip", ch.title || start);
     chip.type = "button";
-    chip.title = "clip " + start +
-      (ch.end_time != null ? " → " + clock(ch.end_time) : "");
+    chip.title = ch.end_time != null
+      ? t("clip {start} → {end}", { start: start, end: clock(ch.end_time) })
+      : t("clip {start}", { start: start });
     chip.onclick = () => {
       $("ovClipStart").value = start;
       $("ovClipEnd").value = ch.end_time != null ? clock(ch.end_time) : "";
       if (typeof renderOvCount === "function") renderOvCount();
-      toast(`clip: ${ch.title || start}`);
+      toast(t("clip: {name}", { name: ch.title || start }));
     };
     box.append(chip);
   }
 }
 
 function renderProbe(url, info) {
+  LAST_PROBE = { url: url, info: info };
+  LAST_FAIL = null;
   $("probeCard").classList.remove("hidden");
   $("dlEmpty").classList.add("hidden");
   $("probeTitle").textContent = info.title || url;
   // "0 min" is not a duration: round() alone said a 40-second clip was zero
   // minutes long (polish pass)
   const dur = info.duration
-    ? " · " + (info.duration < 60 ? "<1 min"
-                                  : Math.round(info.duration / 60) + " min") : "";
+    ? " · " + (info.duration < 60
+               ? t("<1 min")
+               : t("{n} min", { n: Math.round(info.duration / 60) })) : "";
   $("probeMeta").textContent = (info.extractor || "") + dur;
   // the probe lands on the scope strip — source, formats, largest (v0.37.0)
   $("probeCard").dataset.livery = liveryOf(info.extractor || "");
@@ -846,7 +984,8 @@ function renderProbe(url, info) {
     (f) => f.filesize || f.filesize_approx || 0));
   setScopes("live", {
     src: String(info.extractor || (info.playlist ? "playlist" : "direct")).slice(0, 22),
-    fmt: info.playlist ? ((info.count || 0) + " items") : String(scopeFmts.length),
+    fmt: info.playlist ? t("{n} items", { n: info.count || 0 })
+                       : String(scopeFmts.length),
     size: biggest ? humanBytes(biggest) : "—",
     say: "take ready — set the deck, press START",
   });
@@ -867,13 +1006,13 @@ function renderProbe(url, info) {
     $("qualityRow").classList.add("hidden");
     $("soundRow").classList.add("hidden");
     $("probeMeta").textContent =
-      (info.count ? info.count + " videos" : "playlist") +
+      (info.count ? t("{n} videos", { n: info.count }) : t("playlist")) +
       (info.extractor ? " · " + info.extractor : "");
     const entries = info.entries || [];
     PLAYLIST = { count: info.count || entries.length, shown: entries.length };
     PLAYLIST_NONE = false;
     setScopes("live", {
-      fmt: (info.count || entries.length) + " items",
+      fmt: t("{n} items", { n: info.count || entries.length }),
       say: "pick items on the deck, then START",
     });
     for (const [i, e] of entries.entries()) {
@@ -886,7 +1025,7 @@ function renderProbe(url, info) {
       const box = el("input", "plpick");
       box.type = "checkbox";
       box.dataset.index = String(n);
-      box.title = "include item " + n;
+      box.title = t("include item {n}", { n: n });
       box.onchange = () => syncPlaylistPicks();
       // the number half of the cell picks too: a phone should not have to
       // hit a 14px box (v0.40.10 audit)
@@ -899,7 +1038,8 @@ function renderProbe(url, info) {
       tr.append(
         pick,
         el("td", "fmt-c", e.title || e.url || "—"),
-        el("td", "fmt-s", e.duration ? Math.round(e.duration / 60) + " min" : "—"),
+        el("td", "fmt-s",
+           e.duration ? t("{n} min", { n: Math.round(e.duration / 60) }) : "—"),
       );
       tb.append(tr);
     }
@@ -907,8 +1047,8 @@ function renderProbe(url, info) {
       const tr = el("tr");
       tr.append(el("td", "", ""),
                 el("td", "muted",
-                   `… ${info.count - entries.length} more — tick the listed ` +
-                   "ones, or type a range like 501-600"),
+                   t("… {n} more — tick the listed ones, or type a range like 501-600",
+                     { n: info.count - entries.length })),
                 el("td"));
       tb.append(tr);
     }
@@ -946,7 +1086,7 @@ function renderProbe(url, info) {
     if (f.language) {
       // v0.40.1: with dubs listed separately, a row must say which one it is
       const langEl = el("div", "fmt-lang muted small", String(f.language));
-      langEl.title = "audio track language";
+      langEl.title = t("audio track language");
       cell.append(langEl);
     }
     tr.append(
@@ -955,7 +1095,7 @@ function renderProbe(url, info) {
       sizeCell(f),
     );
     const td = el("td");
-    const btn = el("button", "get", "Take");
+    const btn = el("button", "get", t("Take"));
     btn.dataset.pick = fmtSpec(f, separateAudio);
     // v0.40.1: read the dial when the Take is clicked, not when the table
     // was drawn — a pick frozen at render time ignores a later language
@@ -971,7 +1111,7 @@ function renderProbe(url, info) {
   $("soundRow").classList.toggle("hidden", !anyVideo);
   if (!fmts.length) {
     const tr = el("tr");
-    tr.append(el("td", "muted", "no formats found"));
+    tr.append(el("td", "muted", t("no formats found")));
     tb.append(tr);
   }
 }
@@ -996,20 +1136,21 @@ function renderQualityRow(url, remembered) {
     // a second START button).
     const last = remembered && q.key === remembered;
     const btn = el("button", "btn sm" + (last ? " pick" : ""),
-      last ? q.label + " · last used" : q.label);
+      last ? t("{label} · last used", { label: q.label }) : q.label);
     const est = QUALITY_EST[q.key];
     if (est) {
       // v0.40.5: what this pick will weigh — the site's own advertised
       // sizes, added the way the pick works (engine-side, per probe)
       const size = el("span", "qsize", " ~" + humanBytes(est));
-      size.title = "about " + humanBytes(est) +
-        " — the site's advertised sizes, added the way this pick works";
+      size.title = t("about {size} — the site's advertised sizes, added the way this pick works",
+                     { size: humanBytes(est) });
       btn.append(size);
     }
     btn.dataset.pick = q.fmt;
     btn.title = last
-      ? "your pick for this site last time — click to arm it as the take"
-      : "arm the take at best up to " + q.label + " (" + q.fmt + ")";
+      ? t("your pick for this site last time — click to arm it as the take")
+      : t("arm the take at best up to {label} ({fmt})",
+          { label: q.label, fmt: q.fmt });
     btn.onclick = () => armTake(q.fmt, q.label, btn);
     box.append(btn);
   }
@@ -1054,17 +1195,17 @@ function parseItemRange(text) {
   const out = new Set();
   if (!text) return null;
   for (const part of text.split(",")) {
-    const t = part.trim();
-    if (!t) continue;
-    const m = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    const s = part.trim();
+    if (!s) continue;
+    const m = s.match(/^(\d+)\s*-\s*(\d+)$/);
     if (m) {
       const a = Number(m[1]);
       const b = Number(m[2]);
       if (a < 1 || b < a || b - a > 5000) return null;
       for (let i = a; i <= b; i++) out.add(i);
-    } else if (/^\d+$/.test(t)) {
-      if (Number(t) < 1) return null;
-      out.add(Number(t));
+    } else if (/^\d+$/.test(s)) {
+      if (Number(s) < 1) return null;
+      out.add(Number(s));
     } else {
       return null;
     }
@@ -1104,15 +1245,19 @@ function renderPlaylistState() {
   const count = want ? want.size : 0;
   if (boxes.some((b) => b.checked)) PLAYLIST_NONE = false;
   if (label) {
-    label.textContent = junk ? "type a range like 1-5,8"
-      : none ? "none picked"
-      : text ? `${count} picked` + (count <= total ? ` of ${total}` : "")
-      : `all ${total}` + (shown < total ? ` · first ${shown} listed` : "");
+    label.textContent = junk ? t("type a range like 1-5,8")
+      : none ? t("none picked")
+      : text ? (count <= total
+                ? t("{count} picked of {total}", { count: count, total: total })
+                : t("{count} picked", { count: count }))
+      : (shown < total
+         ? t("all {total} · first {shown} listed", { total: total, shown: shown })
+         : t("all {total}", { total: total }));
   }
   btn.disabled = Boolean(junk || none);
-  btn.textContent = junk ? "fix the range"
-    : none ? "pick items first"
-    : text ? `Download ${count} picked` : "Download playlist";
+  btn.textContent = junk ? t("fix the range")
+    : none ? t("pick items first")
+    : text ? t("Download {count} picked", { count: count }) : t("Download playlist");
 }
 
 function syncPlaylistPicks(fromUser = true) {
@@ -1165,11 +1310,11 @@ function pickAll(checked) {
 
 async function startJob(url, fmt, preset, playlist, triggerBtn) {
   if (playlist && PLAYLIST_NONE && !playlistFieldText()) {
-    toast("pick at least one item first", "bad");
+    toast(t("pick at least one item first"), "bad");
     return false;
   }
   if (!url) {
-    toast("paste a video link first", "bad");
+    toast(t("paste a video link first"), "bad");
     return false;
   }
   // A start can take most of a second (SQLite lock, a busy worker), and a
@@ -1200,21 +1345,24 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     // report a bare "Added to downloads" either way (v0.35.0)
     const ovK = ov ? Object.keys(ov).length : 0;
     const note = (fmt && OV.preset)
-      ? ` — “${OV.name || OV.preset}” skipped: your format pick replaces it`
+      ? t(" — “{name}” skipped: your format pick replaces it",
+          { name: OV.name || OV.preset })
       : (OV.name && (body.preset === OV.preset || ovK)
-        ? ` — with preset “${OV.name}”`
-        : (ovK ? ` — with ${ovK} option${ovK === 1 ? "" : "s"} set below`
-          : (TAKE.label ? " — " + TAKE.label : "")));
+        ? t(" — with preset “{name}”", { name: OV.name })
+        : (ovK ? (ovK === 1 ? t(" — with 1 option set below")
+                            : t(" — with {n} options set below", { n: ovK }))
+          : (TAKE.label ? t(" — {label}", { label: t(TAKE.label) }) : "")));
     await api("/jobs", { method: "POST", body: JSON.stringify(body) });
     // the block says "this download only" — so it is spent on this download
     // (v0.21.1 audit: it used to stick to every job for the rest of the session)
     clearOv();
     PLAYLIST_NONE = false;
-    toast((playlist ? "Playlist added to downloads" : "Added to downloads") + note, "info");
+    toast((playlist ? t("Playlist added to downloads")
+                    : t("Added to downloads")) + note, "info");
     refreshJobs();
     return true;
   } catch (e) {
-    toast("could not start download: " + e.message, "bad");
+    toast(t("could not start download: {msg}", { msg: e.message }), "bad");
     return false;
   } finally {
     if (triggerBtn) {
@@ -1369,8 +1517,9 @@ function renderOvCount() {
     const what = entry
       ? "“" + entry.name + "”" + (entry.description ? " — " + entry.description : "")
       : OV.name ? "“" + OV.name + "”"
-        : k + " option" + (k === 1 ? "" : "s") + " set below";
-    txt.textContent = "next download: " + what;
+        : (k === 1 ? t("1 option set below")
+                   : t("{k} options set below", { k: k }));
+    txt.textContent = t("next download: {what}", { what: what });
     bar.classList.add("armed-open");
   }
   const chip = $("ovCount");
@@ -1382,18 +1531,18 @@ function renderOvCount() {
   }
   const parts = [];
   if (OV.preset) parts.push(OV.preset.replace(/^(audio|video)-/, ""));
-  if (patch) parts.push(Object.keys(patch).length + " option" +
-    (Object.keys(patch).length === 1 ? "" : "s"));
+  if (patch) parts.push(Object.keys(patch).length === 1
+    ? t("1 option") : t("{n} options", { n: Object.keys(patch).length }));
   chip.textContent = parts.join(" · ");
   // name them on hover/for screen readers: the chip says how many, but the
   // question people actually have is WHICH — a leftover clip or subtitle
   // filter from a preset used to be invisible until the download was wrong
   // (motion review)
   const keys = patch ? Object.keys(patch) : [];
-  chip.title = [OV.preset ? "preset " + OV.preset : "", ...keys]
+  chip.title = [OV.preset ? t("preset {name}", { name: OV.preset }) : "", ...keys]
     .filter(Boolean).join(", ");
   chip.setAttribute("aria-label", chip.title
-    ? "active for this download: " + chip.title : "");
+    ? t("active for this download: {keys}", { keys: chip.title }) : "");
   chip.classList.remove("hidden");
 }
 
@@ -1436,7 +1585,8 @@ function applyOvPreset() {
   renderOvPresetInfo();
   renderOvPresetActions();
   const n = Object.keys(readOv() || {}).length + (OV.preset ? 1 : 0);
-  toast(`preset “${name}” applied — ${n} option(s) for the next download`);
+  toast(t("preset “{name}” applied — {n} option(s) for the next download",
+           { name: name, n: n }));
 }
 
 /** What the applied preset carries, spelled out — the block shows a few of
@@ -1453,10 +1603,10 @@ function renderOvPresetInfo() {
   }
   const patch = entry.patch || {};
   const sets = Object.keys(patch).map((k) => k + "=" + patch[k]).join(" · ");
-  box.textContent = `preset “${entry.name}”`
-    + (entry.builtin ? " (built-in)" : "")
-    + (entry.description ? ` — ${entry.description}` : "")
-    + (sets ? ` · sets ${sets}` : "");
+  box.textContent = t("preset “{name}”", { name: entry.name })
+    + (entry.builtin ? " " + t("(built-in)") : "")
+    + (entry.description ? " — " + entry.description : "")
+    + (sets ? " · " + t("sets {sets}", { sets: sets }) : "");
   box.classList.remove("hidden");
 }
 
@@ -1467,8 +1617,8 @@ function renderOvPresetActions() {
   const entry = OV.name
     ? (PRESETS || []).find((p) => p.name === OV.name) : null;
   if (entry && !entry.builtin) {
-    upd.textContent = `Update “${entry.name}”`;
-    upd.title = "write the fields above into this preset";
+    upd.textContent = t("Update “{name}”", { name: entry.name });
+    upd.title = t("write the fields above into this preset");
     upd.classList.remove("hidden");
   } else {
     upd.classList.add("hidden");
@@ -1492,11 +1642,11 @@ async function savePanelPreset() {
   const name = $("ovSaveName").value.trim();
   const patch = presetFromPanel();
   if (!Object.keys(patch).length) {
-    showOvSaveMsg("set an option first — a preset needs at least one", "warn");
+    showOvSaveMsg(t("set an option first — a preset needs at least one"), "warn");
     return;
   }
   if (!name) {
-    showOvSaveMsg("give it a name first", "warn");
+    showOvSaveMsg(t("give it a name first"), "warn");
     return;
   }
   try {
@@ -1506,9 +1656,10 @@ async function savePanelPreset() {
     $("ovSaveName").value = "";
     OV.name = name;               // it is what the block now carries
     await loadPresets();          // dropdown (selects it), info line, Settings
-    toast(`saved “${name}” — ${Object.keys(patch).length} option(s)`);
+    toast(t("saved “{name}” — {n} option(s)",
+            { name: name, n: Object.keys(patch).length }));
   } catch (e) {
-    showOvSaveMsg("could not save: " + e.message, "bad");
+    showOvSaveMsg(t("could not save: {msg}", { msg: e.message }), "bad");
   }
 }
 
@@ -1518,16 +1669,17 @@ async function updatePanelPreset() {
   if (!entry || entry.builtin) return;
   const patch = presetFromPanel();
   if (!Object.keys(patch).length) {
-    toast("set an option first — a preset needs at least one", "bad");
+    toast(t("set an option first — a preset needs at least one"), "bad");
     return;
   }
   try {
     await api("/presets", { method: "POST",
                             body: JSON.stringify({ name: entry.name, patch }) });
     await loadPresets();
-    toast(`“${entry.name}” updated — ${Object.keys(patch).length} option(s)`);
+    toast(t("“{name}” updated — {n} option(s)",
+            { name: entry.name, n: Object.keys(patch).length }));
   } catch (e) {
-    toast("could not update: " + e.message, "bad");
+    toast(t("could not update: {msg}", { msg: e.message }), "bad");
   }
 }
 
@@ -1535,10 +1687,10 @@ function renderOvPresets() {
   const sel = $("ovPreset");
   const keep = sel.value;
   sel.innerHTML = "";
-  const blank = el("option", "", "— apply a preset —");
+  const blank = el("option", "", t("— apply a preset —"));
   blank.value = "";
   sel.append(blank);
-  const groups = [[true, "built-in"], [false, "saved"]];
+  const groups = [[true, t("built-in")], [false, t("saved")]];
   for (const [builtin, label] of groups) {
     const items = (PRESETS || []).filter((p) => !!p.builtin === builtin);
     if (!items.length) continue;
@@ -1560,7 +1712,7 @@ function renderOvPresets() {
 
 function initOverrides() {
   $("ovApply").onclick = applyOvPreset;
-  $("ovClear").onclick = () => { clearOv(); toast("cleared — using your settings"); };
+  $("ovClear").onclick = () => { clearOv(); toast(t("cleared — using your settings")); };
   // the preset row grows the two actions it used to lack (v0.34.0): save
   // the block as a preset, and write the fields back into the applied one
   $("ovSaveLink").onclick = () => {
@@ -1590,7 +1742,7 @@ function initOverrides() {
   // the block in — the card echoes the block, it does not duplicate it (v0.35.0)
   $("armedClear").onclick = () => {
     clearOv();
-    toast("cleared — using your settings");
+    toast(t("cleared — using your settings"));
   };
   $("armedText").tabIndex = 0;
   $("armedText").setAttribute("role", "button");
@@ -1614,8 +1766,8 @@ function initOverrides() {
 }
 
 function progressPct(j) {
-  const t = j.progress && j.progress.total_bytes;
-  return t ? Math.min(100, (j.progress.downloaded_bytes / t) * 100) : 0;
+  const total = j.progress && j.progress.total_bytes;
+  return total ? Math.min(100, (j.progress.downloaded_bytes / total) * 100) : 0;
 }
 
 function jobSig(j) {
@@ -1626,9 +1778,11 @@ function metaParts(j) {
   const downloading = j.status === "downloading";
   const pct = Math.round(progressPct(j));
   const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
-  const eta = j.progress && j.progress.eta != null ? "ETA " + j.progress.eta + "s" : "";
+  const eta = j.progress && j.progress.eta != null
+    ? t("ETA {n}s", { n: j.progress.eta }) : "";
   const pl = j.progress && j.progress.playlist_index && j.progress.playlist_count
-    ? "video " + j.progress.playlist_index + "/" + j.progress.playlist_count : "";
+    ? t("video {i}/{n}", { i: j.progress.playlist_index,
+                          n: j.progress.playlist_count }) : "";
   const size = `${humanBytes(j.progress && j.progress.downloaded_bytes)} / ${humanBytes(j.progress && j.progress.total_bytes)}`;
   // A queued or merging job has no percentage worth printing ("0%" beside a
   // moving bar reads as a stall) and nothing has been fetched yet, so its
@@ -1655,18 +1809,18 @@ async function settleThenDelete(job) {
 /** The trash button — one download gone, file and all, after a confirm. */
 function deleteButton(j) {
   const running = ACTIVE.has(j.status);
-  const b = el("button", "ghost-sm del", "Delete");
+  const b = el("button", "ghost-sm del", t("Delete"));
   b.prepend(ico("trash"));
-  b.title = "Delete this download — the file on disk goes with it";
+  b.title = t("Delete this download — the file on disk goes with it");
   b.onclick = async () => {
     const name = j.filepath ? baseName(j.filepath)
       : String(j.title || j.url).slice(0, 60);
-    const msg = (running ? `Stop “${name}” and delete the partial file?`
-      : j.filepath ? `Delete “${name}”?`
-        : `Remove “${name}” from the list?`)
-      + (j.filepath && GALLERY() ? " Its Gallery/Music copy goes too." : "")
-      + " This cannot be undone.";
-    if (!(await askConfirm(msg, { okText: running ? "Stop and delete" : "Delete" }))) {
+    const msg = (running ? t("Stop “{name}” and delete the partial file?", { name: name })
+      : j.filepath ? t("Delete “{name}”?", { name: name })
+        : t("Remove “{name}” from the list?", { name: name }))
+      + (j.filepath && GALLERY() ? " " + t("Its Gallery/Music copy goes too.") : "")
+      + " " + t("This cannot be undone.");
+    if (!(await askConfirm(msg, { okText: running ? t("Stop and delete") : t("Delete") }))) {
       return;
     }
     // The settle can take up to three seconds (cancel → the worker returns →
@@ -1677,7 +1831,7 @@ function deleteButton(j) {
     if (row) {
       row.classList.add("pending");
       const pill = row.querySelector(".pill");
-      if (pill) pill.textContent = running ? "stopping…" : "deleting…";
+      if (pill) pill.textContent = running ? t("stopping…") : t("deleting…");
     }
     try {
       const r = await settleThenDelete(j);
@@ -1693,15 +1847,17 @@ function deleteButton(j) {
         }
       }
       toast(r.deleted
-        ? `deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"} · ` +
-          `freed ${humanBytes(r.freed_bytes)}`
-        : "removed from the list");
+        ? (r.deleted === 1
+           ? t("deleted 1 file · freed {free}", { free: humanBytes(r.freed_bytes) })
+           : t("deleted {n} files · freed {free}",
+               { n: r.deleted, free: humanBytes(r.freed_bytes) }))
+        : t("removed from the list"));
       refreshJobs();
       // a delete empties part of the folder the Settings row reports on: keep
       // that row from reading stale (the "Delete 0 files (0 B)?" bug)
       if (refreshStorageInfo) refreshStorageInfo();
     } catch (e) {
-      toast("could not delete: " + e.message, "bad");
+      toast(t("could not delete: {msg}", { msg: e.message }), "bad");
       if (row) row.classList.remove("pending");   // the row is staying: undo it
     }
   };
@@ -1734,25 +1890,27 @@ function jobRow(j) {
     e.preventDefault();
     title.onclick();
   };
-  top.append(title, el("span", "pill " + j.status, j.status));
+  top.append(title, el("span", "pill " + j.status, t(j.status)));
   // a finished take gets the stamp (v0.37.0: completion used to be a pill
   // you never saw flip in a tab you were not on)
   if (j.status === "completed") {
-    const stamp = el("span", "stamp", "FILED");
-    stamp.title = "download finished — the file is in your downloads";
+    const stamp = el("span", "stamp", t("FILED"));
+    stamp.title = t("download finished — the file is in your downloads");
     top.append(stamp);
   }
   // what this job actually carries (preset / per-download overrides)
   const extra = j.overrides ? Object.keys(j.overrides).length : 0;
   if (j.preset) {
-    const chip = el("span", "chip tag", j.preset.replace("audio-", "") + " preset");
-    chip.title = "audio preset: " + j.preset;
+    const chip = el("span", "chip tag",
+      t("{name} preset", { name: j.preset.replace("audio-", "") }));
+    chip.title = t("audio preset: {name}", { name: j.preset });
     top.append(chip);
   }
   if (extra) {
     const chip = el("span", "chip tag",
-      extra + " option" + (extra === 1 ? "" : "s"));
-    chip.title = Object.keys(j.overrides).join(", ") + " — this download only";
+      extra === 1 ? t("1 option") : t("{n} options", { n: extra }));
+    chip.title = t("{keys} — this download only",
+                   { keys: Object.keys(j.overrides).join(", ") });
     top.append(chip);
   }
   row.append(top);
@@ -1770,12 +1928,12 @@ function jobRow(j) {
     bar.append(fill);
     row.append(bar);
     const meta = el("div", "jmeta");
-    meta.append(...metaParts(j).map((t) => el("span", "", t)));
+    meta.append(...metaParts(j).map((s) => el("span", "", s)));
     row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
     // the human consequence leads; the engine's own dialect goes below,
     // behind the toggle (v0.37.0 — it used to be the first thing you read)
-    row.append(el("div", "jerrsay", humanErr(j.error || "")));
+    row.append(el("div", "jerrsay", t(humanErr(j.error || ""))));
     // The whole message. A 160-char slice in a single ellipsised line cut
     // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
     // says what to do next was exactly the part that was hidden. Long text
@@ -1788,51 +1946,52 @@ function jobRow(j) {
     errEl.id = "jerr-" + j.id;   // the details toggle names its region
     if (errText.length > 90) {
       errEl.classList.add("clamp");
-      errEl.title = "tap to show the whole message";
+      errEl.title = t("tap to show the whole message");
       errEl.onclick = () => {
         const open = errEl.classList.toggle("open");
-        errEl.title = open ? "tap to collapse" : "tap to show the whole message";
+        errEl.title = open ? t("tap to collapse") : t("tap to show the whole message");
       };
     }
     row.append(errEl);
     const r = el("div", "jrow");
     if (errEl.classList.contains("clamp")) {
       // a visible affordance, not just a hidden cursor (v0.37.0)
-      const more = el("button", "linkbtn jrr-toggle", "Show details");
+      const more = el("button", "linkbtn jrr-toggle", t("Show details"));
       more.setAttribute("aria-expanded", "false");
       more.setAttribute("aria-controls", errEl.id || "");
       more.onclick = () => {
         const open = errEl.classList.toggle("open");
-        errEl.title = open ? "tap to collapse" : "tap to show the whole message";
-        more.textContent = open ? "Hide details" : "Show details";
+        errEl.title = open ? t("tap to collapse") : t("tap to show the whole message");
+        more.textContent = open ? t("Hide details") : t("Show details");
         more.setAttribute("aria-expanded", open ? "true" : "false");
       };
       r.append(more);
     }
-    const copy = el("button", "ghost-sm", "Copy");
-    copy.title = "copy the whole message";
+    const copy = el("button", "ghost-sm", t("Copy"));
+    copy.title = t("copy the whole message");
     copy.onclick = async () => {
       const ok = await copyText(errText);
-      toast(ok ? "error copied" : "copy failed", ok ? "ok" : "bad");
+      toast(ok ? t("error copied") : t("copy failed"), ok ? "ok" : "bad");
     };
-    const retry = el("button", "ghost-sm", "Retry");
+    const retry = el("button", "ghost-sm", t("Retry"));
     retry.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
-      .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
+      .then(refreshJobs)
+      .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad"));
     r.append(copy, retry);
     trashHost = r;
     row.append(r);
     if (j.error && /ffmpeg/i.test(j.error) &&
         /not found|not installed|No such file/i.test(j.error)) {
       row.append(el("div", "jobhint",
-        "This step needs ffmpeg. Use “keep original” for audio-only, or install ffmpeg."));
+        t("This step needs ffmpeg. Use “keep original” for audio-only, or install ffmpeg.")));
     }
   } else if (j.filepath) {
     const r = el("div", "jrow");
     r.append(el("span", "path", j.filepath));
     if (DESKTOP) {
-      const open = el("button", "ghost-sm", "Open folder");
+      const open = el("button", "ghost-sm", t("Open folder"));
       open.onclick = () => api(`/jobs/${j.id}/reveal`, { method: "POST" })
-        .catch((e) => toast("could not open: " + e.message, "bad"));
+        .catch((e) => toast(t("could not open: {msg}", { msg: e.message }), "bad"));
       r.append(open);
     }
     // A playlist row's filepath is the download folder, so the row-level
@@ -1849,14 +2008,14 @@ function jobRow(j) {
     && j.files[0] !== j.filepath && !j.files.includes(j.filepath));
     if (playlistRow) {
       const count = j.files.length;
-      const toggle = el("button", "ghost-sm", "Files (" + count + ")");
-      toggle.title = "show every file this playlist downloaded";
+      const toggle = el("button", "ghost-sm", t("Files ({n})", { n: count }));
+      toggle.title = t("show every file this playlist downloaded");
       const listHost = el("div", "jobfiles hidden");
       toggle.onclick = () => {
         const hidden = listHost.classList.toggle("hidden");
         toggle.textContent = hidden
-          ? "Files (" + count + ")"
-          : "Hide files (" + count + ")";
+          ? t("Files ({n})", { n: count })
+          : t("Hide files ({n})", { n: count });
       };
       for (const file of j.files) listHost.append(jobFileItem(j, file));
       r.append(toggle);
@@ -1865,22 +2024,22 @@ function jobRow(j) {
       // Hand off a *file*: Android/data is off-limits to file managers, so
       // hand the file itself to another app (a provider grant).
       if (ANDROID() && j.filepath) {
-        const open = el("button", "ghost-sm", "Open");
+        const open = el("button", "ghost-sm", t("Open"));
         open.onclick = () => {
           try { window.AndroidHost.openFile(j.filepath); }
-          catch (e) { toast("could not open: " + e.message, "bad"); }
+          catch (e) { toast(t("could not open: {msg}", { msg: e.message }), "bad"); }
         };
-        const share = el("button", "ghost-sm", "Share");
+        const share = el("button", "ghost-sm", t("Share"));
         share.onclick = () => {
           try { window.AndroidHost.shareFile(j.filepath); }
-          catch (e) { toast("could not share: " + e.message, "bad"); }
+          catch (e) { toast(t("could not share: {msg}", { msg: e.message }), "bad"); }
         };
         r.append(open, share);
       }
       // Play it right here (v0.22.0). Works on every platform: the engine
       // answers Range requests, so the player can seek.
       if (j.status === "completed" && j.filepath) {
-        const play = el("button", "ghost-sm", "Play");
+        const play = el("button", "ghost-sm", t("Play"));
         play.onclick = () => openPlayer(j);
         r.append(play);
       }
@@ -1893,9 +2052,9 @@ function jobRow(j) {
     const details = el("div", "jdetails");
     const grid = el("div", "jdgrid");   // the shrinkable row the fold animates
     grid.append(
-      el("span", "jdlbl", "size"),
+      el("span", "jdlbl", t("size")),
       el("span", "jdval", j.size_bytes != null ? humanBytes(j.size_bytes) : "—"),
-      el("span", "jdlbl", "saved"),
+      el("span", "jdlbl", t("saved")),
       el("span", "jdpath", j.filepath || "—"),
     );
     details.append(grid);
@@ -1904,37 +2063,42 @@ function jobRow(j) {
   }
 
   if (j.raw_args) {
-    row.append(el("div", "jobhint", "yt-dlp args: " + j.raw_args));
+    row.append(el("div", "jobhint",
+                  t("yt-dlp args: {args}", { args: j.raw_args })));
   }
 
   const actions = el("div", "jrow");
   if (ACTIVE.has(j.status)) {
     // pause keeps the bytes already fetched; cancel throws them away
     // (v0.22.0 review #6)
-    const pause = el("button", "ghost-sm", "Pause");
+    const pause = el("button", "ghost-sm", t("Pause"));
     pause.onclick = () => api(`/jobs/${j.id}/pause`, { method: "POST" })
-      .then(refreshJobs).catch((e) => toast("pause failed: " + e.message, "bad"));
-    const c = el("button", "ghost-sm", "Cancel");
+      .then(refreshJobs)
+      .catch((e) => toast(t("pause failed: {msg}", { msg: e.message }), "bad"));
+    const c = el("button", "ghost-sm", t("Cancel"));
     c.onclick = () => api(`/jobs/${j.id}/cancel`, { method: "POST" })
-      .then(refreshJobs).catch((e) => toast("cancel failed: " + e.message, "bad"));
+      .then(refreshJobs)
+      .catch((e) => toast(t("cancel failed: {msg}", { msg: e.message }), "bad"));
     actions.append(pause, c);
   } else if (j.status === "paused") {
-    const res = el("button", "ghost-sm", "Resume");
+    const res = el("button", "ghost-sm", t("Resume"));
     res.onclick = () => api(`/jobs/${j.id}/resume`, { method: "POST" })
-      .then(refreshJobs).catch((e) => toast("resume failed: " + e.message, "bad"));
+      .then(refreshJobs)
+      .catch((e) => toast(t("resume failed: {msg}", { msg: e.message }), "bad"));
     actions.append(res);
   } else if (j.status === "cancelled") {
     // a cancelled job shows no error line of its own, so its retry lives here
-    const r = el("button", "ghost-sm", "Retry");
+    const r = el("button", "ghost-sm", t("Retry"));
     r.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
-      .then(refreshJobs).catch((e) => toast("retry failed: " + e.message, "bad"));
+      .then(refreshJobs)
+      .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad"));
     actions.append(r);
   } else if (j.status === "error" || j.status === "interrupted") {
     // only "Edit & retry": the plain Retry already sits beside the error
     // message above, and two buttons doing one thing made failed rows look
     // broken (UI review)
-    const edit = el("button", "ghost-sm", "Edit & retry");
-    edit.title = "load this job's URL and options into the Download tab";
+    const edit = el("button", "ghost-sm", t("Edit & retry"));
+    edit.title = t("load this job's URL and options into the Download tab");
     edit.onclick = () => editAndRetry(j);
     actions.append(edit);
   }
@@ -1955,20 +2119,20 @@ function jobFileItem(j, file) {
   label.title = file;
   item.append(label);
   if (ANDROID() && window.AndroidHost) {
-    const open = el("button", "ghost-sm", "Open");
+    const open = el("button", "ghost-sm", t("Open"));
     open.onclick = () => {
       try { window.AndroidHost.openFile(file); }
-      catch (e) { toast("could not open: " + e.message, "bad"); }
+      catch (e) { toast(t("could not open: {msg}", { msg: e.message }), "bad"); }
     };
-    const share = el("button", "ghost-sm", "Share");
+    const share = el("button", "ghost-sm", t("Share"));
     share.onclick = () => {
       try { window.AndroidHost.shareFile(file); }
-      catch (e) { toast("could not share: " + e.message, "bad"); }
+      catch (e) { toast(t("could not share: {msg}", { msg: e.message }), "bad"); }
     };
     item.append(open, share);
   }
   if (j.status === "completed") {
-    const play = el("button", "ghost-sm", "Play");
+    const play = el("button", "ghost-sm", t("Play"));
     play.onclick = () => openPlayer(j, file);
     item.append(play);
   }
@@ -2003,7 +2167,7 @@ function updateJobRow(row, j) {
     fill.style.width = progressPct(j).toFixed(1) + "%";
   }
   const meta = row.querySelector(".jmeta");
-  if (meta) meta.replaceChildren(...metaParts(j).map((t) => el("span", "", t)));
+  if (meta) meta.replaceChildren(...metaParts(j).map((s) => el("span", "", s)));
   return row;
 }
 
@@ -2066,8 +2230,8 @@ function applyQueueFilter() {
     const say = empty.querySelector(".say");
     if (say) {
       say.textContent = hidden === 1
-        ? "1 job hidden by this filter"
-        : hidden + " jobs hidden by this filter";
+        ? t("1 job hidden by this filter")
+        : t("{n} jobs hidden by this filter", { n: hidden });
     }
   }
 }
@@ -2102,8 +2266,8 @@ function showQueueTrouble(e) {
   const box = $("jobs");
   if (!box || box.querySelector(".trouble")) return;
   box.prepend(el("div", "empty trouble",
-    "cannot reach the engine (" + ((e && e.message) || "no answer") +
-    ") — retrying every couple of seconds."));
+    t("cannot reach the engine ({why}) — retrying every couple of seconds.",
+      { why: (e && e.message) || t("no answer") })));
 }
 
 /** Take a queue row (or the empty-state box) off screen with an exit.
@@ -2142,13 +2306,14 @@ function onFiled(j) {
     : (j.title || j.url);
   const actions = [];
   if (j.filepath) {
-    actions.push({ label: "Play", prime: true, onClick: () => openPlayer(j) });
+    actions.push({ label: t("Play"), prime: true,
+                   onClick: () => openPlayer(j) });
   }
   actions.push({
-    label: "Show folder",
+    label: t("Show folder"),
     onClick: () => { const b = $("openDir"); if (b) b.click(); },
   });
-  toast("Filed — " + name, "ok", { actions: actions });
+  toast(t("Filed — {name}", { name: name }), "ok", { actions: actions });
 }
 
 /** The bins rail: the last few finished takes, newest first (v0.37.0). */
@@ -2161,7 +2326,7 @@ function renderBins(list) {
   box.replaceChildren();
   if (!filed.length) {
     box.append(el("div", "bins-empty muted small",
-      "Nothing filed yet — a finished download lands here."));
+      t("Nothing filed yet — a finished download lands here.")));
     return;
   }
   for (const j of filed.slice(0, 8)) {
@@ -2218,8 +2383,7 @@ async function refreshJobs() {
       box.querySelectorAll(".job").forEach(leaveRow);
       if (!box.querySelector(".empty")) {
         box.append(el("div", "empty",
-          "Nothing in the queue. Downloads you start land here — finished ones " +
-          "stay put so you can open, share or delete them."));
+          t("Nothing in the queue. Downloads you start land here — finished ones stay put so you can open, share or delete them.")));
       }
       const fe = $("filterEmpty");
       if (fe) fe.classList.add("hidden");
@@ -2261,7 +2425,8 @@ async function refreshJobs() {
 async function loadVersions() {
   try {
     const v = await api("/version");
-    $("versions").textContent = `engine ${v.engine} · yt-dlp ${v.yt_dlp}`;
+    $("versions").textContent =
+      t("engine {engine} · yt-dlp {dlp}", { engine: v.engine, dlp: v.yt_dlp });
     // the yt-dlp tab shows it beside its own update button
     const yv = $("ytdlpVer");
     if (yv) yv.textContent = v.yt_dlp;
@@ -2270,25 +2435,25 @@ async function loadVersions() {
     if (st) {
       st.hidden = !v.staged;
       st.textContent = v.staged
-        ? `yt-dlp ${v.staged} is staged — restart to use it` : "";
+        ? t("yt-dlp {v} is staged — restart to use it", { v: v.staged }) : "";
     }
     // where the running copy comes from (v0.43.1) — and the undo lives here
     const src = $("ytdlpSrc");
     if (src) src.textContent =
-      v.source === "downloaded" ? "(downloaded)"
-        : v.source === "bundled" ? "(bundled)" : "";
+      v.source === "downloaded" ? t("(downloaded)")
+        : v.source === "bundled" ? t("(bundled)") : "";
     const row = $("ytdlpRemoveRow"), hint = $("ytdlpRemoveHint");
     if (row) {
       row.hidden = !(v.source === "downloaded" || v.staged);
       const btn = $("removeBtn");
       if (btn) btn.hidden = !!v.remove_pending;   // nothing left to remove
       if (hint) hint.textContent = v.remove_pending
-        ? "removal is set — the bundled copy takes over on the next start"
+        ? t("removal is set — the bundled copy takes over on the next start")
         : v.staged
         ? (v.source === "downloaded"
-          ? "a newer copy from PyPI is staged — removing deletes the downloaded copy and cancels the stage"
-          : "a copy from PyPI is staged — removing cancels it")
-        : "downloaded from PyPI — removing falls back to the bundled copy on the next start";
+          ? t("a newer copy from PyPI is staged — removing deletes the downloaded copy and cancels the stage")
+          : t("a copy from PyPI is staged — removing cancels it"))
+        : t("downloaded from PyPI — removing falls back to the bundled copy on the next start");
     }
   } catch (_) { $("versions").textContent = ""; }
 }
@@ -2319,13 +2484,13 @@ let UPD_STATE = null;   // the last /update-check answer
 
 function humanSince(ts) {
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (s < 90) return "just now";
+  if (s < 90) return t("just now");
   const m = Math.round(s / 60);
-  if (m < 90) return `${m} minute${m === 1 ? "" : "s"} ago`;
+  if (m < 90) return m === 1 ? t("1 minute ago") : t("{m} minutes ago", { m: m });
   const h = Math.round(m / 60);
-  if (h < 36) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  if (h < 36) return h === 1 ? t("1 hour ago") : t("{h} hours ago", { h: h });
   const d = Math.round(h / 24);
-  return `${d} day${d === 1 ? "" : "s"} ago`;
+  return d === 1 ? t("1 day ago") : t("{d} days ago", { d: d });
 }
 
 /** Settings → General → Updates: state, the versions, and what to do. */
@@ -2337,7 +2502,8 @@ function renderUpdateRow() {
   const u = UPD_STATE;
   let last = null;
   try { last = JSON.parse(updStore.get(UPD.last, "") || "null"); } catch (_) { last = null; }
-  const when = last && last.at ? `checked ${humanSince(last.at)}` : "not checked yet";
+  const when = last && last.at
+    ? t("checked {when}", { when: humanSince(last.at) }) : t("not checked yet");
   const err = (u && u.error) || (last && last.error) || null;
   meta.classList.remove("bad");
   // an available update makes "Check now" redundant; the row is crowded
@@ -2349,12 +2515,12 @@ function renderUpdateRow() {
     // store). It gets plain words and the one door that fixes it; everything
     // else stays raw — it's information, not noise.
     const cert = /CERTIFICATE_VERIFY_FAILED|certificate verify failed/i.test(String(err));
-    state.textContent = "could not check for updates";
+    state.textContent = t("could not check for updates");
     meta.textContent = cert
-      ? `can't verify server certificates in this build — get the newest suravidl once and checks work from there · ${when}`
+      ? t("can't verify server certificates in this build — get the newest suravidl once and checks work from there · {when}", { when: when })
       : `${err} · ${when}`;
     if (cert) {
-      get.textContent = "Open the releases page";
+      get.textContent = t("Open the releases page");
       get.classList.remove("hidden");
       get.onclick = () => openExternal(RELEASES_LATEST);
     } else {
@@ -2365,7 +2531,7 @@ function renderUpdateRow() {
     return;
   }
   if (!u) {                       // no answer yet: say so, offer the button
-    state.textContent = "not checked yet";
+    state.textContent = t("not checked yet");
     meta.textContent = when;
     get.classList.add("hidden");
     skip.classList.add("hidden");
@@ -2381,21 +2547,22 @@ function renderUpdateRow() {
     return;
   }
   if (u.update_available && u.url) {
-    state.textContent = `suravidl ${u.latest} is available`;
-    meta.textContent = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
+    state.textContent = t("suravidl {v} is available", { v: u.latest });
+    meta.textContent = t("you have {v} · {when}", { v: u.current, when: when })
+      + (skipped ? " · " + t("skipped") : "");
     man.classList.add("hidden");
-    get.textContent = `Get ${u.latest}`;
+    get.textContent = t("Get {v}", { v: u.latest });
     get.classList.remove("hidden");
     get.onclick = () => openExternal(u.url);
-    skip.textContent = skipped ? "Stop skipping" : "Skip this version";
+    skip.textContent = skipped ? t("Stop skipping") : t("Skip this version");
     skip.classList.remove("hidden");
     skip.onclick = () => {
       updStore.set(UPD.skipped, skipped ? "" : u.latest);
       renderUpdateRow();
     };
   } else {
-    state.textContent = "up to date";
-    meta.textContent = `you have ${u.current} · ${when}`;
+    state.textContent = t("up to date");
+    meta.textContent = t("you have {v} · {when}", { v: u.current, when: when });
     get.classList.add("hidden");
     skip.classList.add("hidden");
     man.classList.add("hidden");
@@ -2408,19 +2575,21 @@ function showUpdateBanner(u) {
   // The courier (v0.41.0): a build that can install its own update gets the
   // one-tap door; every other build keeps the release page.
   const prime = u.can_apply
-    ? { label: "Update now", prime: true, onClick: () => startUpdateDownload() }
-    : { label: `Get ${u.latest}`, prime: true, onClick: () => openExternal(u.url) };
-  toast(`suravidl ${u.latest} is available — you have ${u.current}`, "info update", {
+    ? { label: t("Update now"), prime: true, onClick: () => startUpdateDownload() }
+    : { label: t("Get {v}", { v: u.latest }), prime: true,
+        onClick: () => openExternal(u.url) };
+  toast(t("suravidl {v} is available — you have {cur}",
+          { v: u.latest, cur: u.current }), "info update", {
     sticky: true,
     actions: [
       prime,
-      { label: "Later", onClick: () => {
+      { label: t("Later"), onClick: () => {
         updStore.set(UPD.snooze, String(Date.now() + UPD.SNOOZE_MS));
-        toast("I'll remind you tomorrow");
+        toast(t("I'll remind you tomorrow"));
       } },
-      { label: "Skip this version", onClick: () => {
+      { label: t("Skip this version"), onClick: () => {
         updStore.set(UPD.skipped, u.latest);
-        toast(`won't ask about ${u.latest} again`);
+        toast(t("won't ask about {v} again", { v: u.latest }));
         renderUpdateRow();
       } },
     ],
@@ -2447,10 +2616,10 @@ async function startUpdateDownload() {
   try {
     UPD_DL = await api("/update/download", { method: "POST" });
   } catch (e) {
-    toast("could not start the update: " + e.message, "bad");
+    toast(t("could not start the update: {msg}", { msg: e.message }), "bad");
     return;
   }
-  toast("downloading the update in the background — watch Settings → Updates");
+  toast(t("downloading the update in the background — watch Settings → Updates"));
   renderUpdateRow();
   pollUpdateStatus();
 }
@@ -2467,8 +2636,8 @@ function pollUpdateStatus() {
     } else if (UPD_DL && UPD_DL.status === "failed") {
       // a failure buried in a hidden Settings tab reads as "nothing
       // happened" (v0.41.x audit) — it gets a voice wherever the user is
-      toast("the update download failed: " +
-            (humanErr(UPD_DL.error || "") || UPD_DL.error || "unknown reason"),
+      toast(t("the update download failed: {why}",
+              { why: humanErr(UPD_DL.error || "") || UPD_DL.error || t("unknown reason") }),
             "bad");
     }
   }, 900);
@@ -2478,9 +2647,9 @@ function pollUpdateStatus() {
  *  action per shell — restarting the app alone installs nothing. */
 function announceUpdateReady() {
   if (document.querySelector(".toast.update-ready")) return;
-  toast("the update is downloaded and verified", "info update-ready", {
+  toast(t("the update is downloaded and verified"), "info update-ready", {
     sticky: true,
-    actions: [{ label: ANDROID() ? "Install now" : "Restart & Install",
+    actions: [{ label: ANDROID() ? t("Install now") : t("Restart & Install"),
                 prime: true, onClick: installStagedUpdate }],
   });
 }
@@ -2516,7 +2685,7 @@ async function installStagedUpdate() {
         // the OS settings detour used to end in a dead-end: remember that
         // we sent the user away, and greet them on the way back (audit)
         UPD_PERM_WAIT = true;
-        toast("let suravidl install updates, then tap Install again");
+        toast(t("let suravidl install updates, then tap Install again"));
         if (window.AndroidHost.openInstallPermissionSettings)
           window.AndroidHost.openInstallPermissionSettings();
         return;
@@ -2525,8 +2694,8 @@ async function installStagedUpdate() {
       return;
     } catch (e) {
       // never silently eject to a browser: say what failed first (audit)
-      toast("could not launch the installer: " +
-            ((e && e.message) || "unknown reason"), "bad");
+      toast(t("could not launch the installer: {msg}",
+              { msg: (e && e.message) || t("unknown reason") }), "bad");
       return;
     }
   }
@@ -2538,10 +2707,10 @@ async function installStagedUpdate() {
       DESKTOP_APPLY_KINDS.indexOf(UPD_STATE.apply_kind) !== -1) {
     try {
       const r = await api("/update/apply", { method: "POST" });
-      if (r.ok) { toast("restarting to install…"); return; }
-      toast(r.reason || "could not start the installer", "bad");
+      if (r.ok) { toast(t("restarting to install…")); return; }
+      toast(r.reason || t("could not start the installer"), "bad");
     } catch (e) {
-      toast("could not start the installer: " + e.message, "bad");
+      toast(t("could not start the installer: {msg}", { msg: e.message }), "bad");
     }
     return;
   }
@@ -2569,14 +2738,15 @@ function renderCourierRow(u, els, when, skipped) {
     _restartSwap(meta);
   }
   UPD_LAST_BUCKET = st.status;
-  state.textContent = `suravidl ${u.latest} is available`;
-  const base = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
+  state.textContent = t("suravidl {v} is available", { v: u.latest });
+  const base = t("you have {v} · {when}", { v: u.current, when: when })
+    + (skipped ? " · " + t("skipped") : "");
   // the skip toggle stays reachable in every resting state; the manual
   // release-page door is a button of its own now — it used to squat on
   // skip, so "Skip this version" (and its undo) became unreachable in
   // Settings (v0.41.x audit)
   const skipToggle = () => {
-    skip.textContent = skipped ? "Stop skipping" : "Skip this version";
+    skip.textContent = skipped ? t("Stop skipping") : t("Skip this version");
     skip.classList.remove("hidden");
     skip.onclick = () => {
       updStore.set(UPD.skipped, skipped ? "" : u.latest);
@@ -2586,26 +2756,27 @@ function renderCourierRow(u, els, when, skipped) {
   if (st.status === "downloading" || st.status === "verifying") {
     if (st.status === "downloading") {
       const pct = updPct(st);
-      meta.textContent = "downloading… " + (pct == null
-        ? humanBytes(st.bytes || 0)
-        : pct + "% of " + humanBytes(st.total));
-      get.textContent = "Downloading…";
+      meta.textContent = t("downloading… {detail}", {
+        detail: pct == null ? humanBytes(st.bytes || 0)
+          : t("{pct}% of {size}", { pct: pct, size: humanBytes(st.total) }),
+      });
+      get.textContent = t("Downloading…");
     } else {
-      meta.textContent = "verifying the download…";
-      get.textContent = "Verifying…";
+      meta.textContent = t("verifying the download…");
+      get.textContent = t("Verifying…");
     }
     get.disabled = true;
     get.classList.remove("hidden");
     get.onclick = null;
     // the one way out of a download the user regrets: the engine aborts
     // between chunks and leaves nothing behind (v0.41.x audit)
-    skip.textContent = "Cancel download";
+    skip.textContent = t("Cancel download");
     skip.classList.remove("hidden");
     skip.onclick = cancelUpdateDownload;
     man.classList.add("hidden");
   } else if (st.status === "ready") {
-    meta.textContent = `${base} · downloaded and verified`;
-    get.textContent = ANDROID() ? "Install update" : "Restart & Install";
+    meta.textContent = t("{base} · downloaded and verified", { base: base });
+    get.textContent = ANDROID() ? t("Install update") : t("Restart & Install");
     get.disabled = false;
     get.classList.remove("hidden");
     get.onclick = installStagedUpdate;
@@ -2614,10 +2785,10 @@ function renderCourierRow(u, els, when, skipped) {
   } else if (st.status === "failed") {
     // same words as every other refusal, same rose (v0.41.x audit)
     meta.classList.add("bad");
-    meta.textContent = "the download failed: "
-      + (humanErr(st.error || "") || st.error || "unknown reason")
+    meta.textContent = t("the download failed: {why}",
+        { why: humanErr(st.error || "") || st.error || t("unknown reason") })
       + " · " + base;
-    get.textContent = "Try again";
+    get.textContent = t("Try again");
     get.disabled = false;
     get.classList.remove("hidden");
     get.onclick = startUpdateDownload;
@@ -2626,7 +2797,7 @@ function renderCourierRow(u, els, when, skipped) {
     man.onclick = () => openExternal(u.url);
   } else {
     meta.textContent = base;
-    get.textContent = `Update to ${u.latest}`;
+    get.textContent = t("Update to {v}", { v: u.latest });
     get.disabled = false;
     get.classList.remove("hidden");
     get.onclick = startUpdateDownload;
@@ -2662,9 +2833,8 @@ async function checkAppUpdate(force) {
       // v0.43.0: packaged builds fetch the newest release from PyPI
       // (sha256-verified) and it applies from the next start — nothing
       // to disable any more, the tooltip just says where it comes from
-      $("updateBtn").title =
-        "packaged build: fetches the newest yt-dlp from PyPI, verified — " +
-        "applies on next start";
+      $("updateBtn").title = t(
+        "packaged build: fetches the newest yt-dlp from PyPI, verified — applies on next start");
     }
     updStore.set(UPD.last, JSON.stringify({
       at: Date.now(), latest: u.latest || null,
@@ -2678,7 +2848,7 @@ async function checkAppUpdate(force) {
   } catch (e) {
     updStore.set(UPD.last, JSON.stringify({
       at: Date.now(), latest: null, available: false,
-      error: "the engine did not answer",
+      error: t("the engine did not answer"),
     }));
     renderUpdateRow();
   }
@@ -2690,13 +2860,14 @@ function wireUpdateRow() {
   b.onclick = async () => {
     const old = b.textContent;
     b.disabled = true;
-    b.textContent = "checking…";
+    b.textContent = t("checking…");
     await checkAppUpdate(true);
     b.disabled = false;
     b.textContent = old;
-    if (UPD_STATE && UPD_STATE.error) toast("update check failed: " + UPD_STATE.error, "bad");
+    if (UPD_STATE && UPD_STATE.error)
+      toast(t("update check failed: {msg}", { msg: UPD_STATE.error }), "bad");
     else if (UPD_STATE && !UPD_STATE.update_available)
-      toast(`you're on the latest version (${UPD_STATE.current})`);
+      toast(t("you're on the latest version ({v})", { v: UPD_STATE.current }));
   };
   renderUpdateRow();
   syncStagedUpdate();   // a staged download survives a page reload
@@ -2710,7 +2881,7 @@ function openExternal(url) {
   }
   if (APP_INFO && APP_INFO.can_open_url) {
     api("/app/open-url", { method: "POST", body: JSON.stringify({ url }) })
-      .catch((e) => toast("could not open browser: " + e.message, "bad"));
+      .catch((e) => toast(t("could not open browser: {msg}", { msg: e.message }), "bad"));
     return;
   }
   window.open(url, "_blank", "noopener");
@@ -2718,22 +2889,21 @@ function openExternal(url) {
 
 $("removeBtn").onclick = async () => {
   const ok = await askConfirm(
-    "Remove the downloaded yt-dlp copy? suravidl goes back to the copy " +
-    "bundled with the app (from the next start).",
-    { okText: "Remove", danger: true });
+    t("Remove the downloaded yt-dlp copy? suravidl goes back to the copy bundled with the app (from the next start)."),
+    { okText: t("Remove"), danger: true });
   if (!ok) return;
   $("removeBtn").disabled = true;
   try {
     const r = await api("/ytdlp/remove", { method: "POST" });
     loadVersions();
     if (r.pending)
-      toast("removal is set — the downloaded copy goes at the next start");
+      toast(t("removal is set — the downloaded copy goes at the next start"));
     else if (r.was_active)
-      toast("downloaded copy removed — bundled yt-dlp from the next start");
-    else if (r.removed) toast("staged copy removed");
-    else toast("nothing to remove");
+      toast(t("downloaded copy removed — bundled yt-dlp from the next start"));
+    else if (r.removed) toast(t("staged copy removed"));
+    else toast(t("nothing to remove"));
   } catch (e) {
-    toast("could not remove: " + e.message, "bad");
+    toast(t("could not remove: {msg}", { msg: e.message }), "bad");
   } finally {
     $("removeBtn").disabled = false;
   }
@@ -2741,24 +2911,23 @@ $("removeBtn").onclick = async () => {
 
 $("updateBtn").onclick = async () => {
   const ok = await askConfirm(
-    "Update yt-dlp? The newest release is fetched and verified — " +
-    "packaged builds apply it on the next start.",
-    { okText: "Update", danger: false });
+    t("Update yt-dlp? The newest release is fetched and verified — packaged builds apply it on the next start."),
+    { okText: t("Update"), danger: false });
   if (!ok) return;
   $("updateBtn").disabled = true;
   const old = $("updateBtn").textContent;
-  $("updateBtn").textContent = "updating…";
+  $("updateBtn").textContent = t("updating…");
   try {
     const r = await api("/update", { method: "POST" });
     loadVersions();          // the tab shows the version next to this button
     if (r.updated && r.restart)
-      toast(`yt-dlp ${r.after} is staged — restart to use it`);
-    else if (r.updated) toast(`yt-dlp updated → ${r.after}`);
+      toast(t("yt-dlp {v} is staged — restart to use it", { v: r.after }));
+    else if (r.updated) toast(t("yt-dlp updated → {v}", { v: r.after }));
     else if (r.ok === false)
-      toast("update failed: " + (r.detail || "unknown"), "bad");
-    else toast(`yt-dlp already latest (${r.after})`);
+      toast(t("update failed: {msg}", { msg: r.detail || t("unknown") }), "bad");
+    else toast(t("yt-dlp already latest ({v})", { v: r.after }));
   } catch (e) {
-    toast("update failed: " + e.message, "bad");
+    toast(t("update failed: {msg}", { msg: e.message }), "bad");
   }
   $("updateBtn").textContent = old;
   $("updateBtn").disabled = false;
@@ -2861,9 +3030,9 @@ async function maybeShowWhatsNew() {
 async function openWhatsNew() {
   let data;
   try { data = await api("/whats-new"); }
-  catch (_) { toast("could not fetch what's new", "bad"); return; }
+  catch (_) { toast(t("could not fetch what's new"), "bad"); return; }
   const pick = (data.entries || []).filter((e) => e && e.version === data.version);
-  if (!pick.length) { toast("nothing new to show"); return; }
+  if (!pick.length) { toast(t("nothing new to show")); return; }
   showWhatsNew(pick, data.version);
 }
 
@@ -2878,7 +3047,8 @@ function wireQuitButton() {
   quit.classList.remove("hidden");
   quit.onclick = async () => {
     const ok = await askConfirm(
-      "Quit suravidl? Active downloads will be interrupted.", { okText: "Quit" });
+      t("Quit suravidl? Active downloads will be interrupted."),
+      { okText: t("Quit") });
     if (!ok) return;
     if (window.AndroidHost) {
       window.AndroidHost.quit();          // stops the service + kills the process
@@ -2932,23 +3102,30 @@ const FAQ = [
    "Settings → Tools checks for a new release and installs it. The browser extension updates itself through Mozilla once the new version clears review."],
 ];
 
+function buildFaqList() {
+  const box = $("faqList");
+  if (!box) return;
+  // one painter for the list: boot builds it lazily, a language switch asks
+  // it to repaint (relabelUI), so the two can never drift
+  box.replaceChildren();
+  for (const [q, a] of FAQ) {
+    const it = document.createElement("details");
+    it.className = "faq-item";
+    const s = document.createElement("summary");
+    s.textContent = t(q);
+    const wrap = document.createElement("div");
+    wrap.className = "faq-body";   // the FAQ folds like the deck's bay door
+    wrap.append(el("p", "muted", t(a)));
+    it.append(s, wrap);
+    box.append(it);
+  }
+  box.querySelectorAll(".faq-item").forEach((it) =>
+    wireBayDoor(it, it.querySelector(".faq-body")));
+}
+
 function openFaq() {
   const box = $("faqList");
-  if (box && !box.childElementCount) {
-    for (const [q, a] of FAQ) {
-      const it = document.createElement("details");
-      it.className = "faq-item";
-      const s = document.createElement("summary");
-      s.textContent = q;
-      const wrap = document.createElement("div");
-      wrap.className = "faq-body";   // the FAQ folds like the deck's bay door
-      wrap.append(el("p", "muted", a));
-      it.append(s, wrap);
-      box.append(it);
-    }
-    box.querySelectorAll(".faq-item").forEach((it) =>
-      wireBayDoor(it, it.querySelector(".faq-body")));
-  }
+  if (box && !box.childElementCount) buildFaqList();
   openModal($("faqModal"));
 }
 
@@ -3005,10 +3182,10 @@ function tourShow() {
   const step = TOUR[TOUR_STEP];
   if (!step || !TOUR_ON) return;
   if (step.tab) showTab(step.tab);
-  $("tourTitle").textContent = step.title;
-  $("tourBody").textContent = step.body;
-  $("tourCount").textContent = (TOUR_STEP + 1) + " of " + TOUR.length;
-  $("tourNext").textContent = TOUR_STEP === TOUR.length - 1 ? "Done" : "Next";
+  $("tourTitle").textContent = t(step.title);
+  $("tourBody").textContent = t(step.body);
+  $("tourCount").textContent = t("{i} of {n}", { i: TOUR_STEP + 1, n: TOUR.length });
+  $("tourNext").textContent = TOUR_STEP === TOUR.length - 1 ? t("Done") : t("Next");
   // every step lands with the primary button focused: the walk is
   // keyboard-complete, not just keyboard-startable (v0.41.x audit)
   try { $("tourNext").focus({ preventScroll: true }); } catch (_) {}
@@ -3079,13 +3256,13 @@ function renderWhere(dir) {
   if (ANDROID()) {
     const gallery = GALLERY();
     $("dlWhere").textContent = gallery
-      ? "saved where you can open it — Gallery → suravidl (audio: Music → suravidl)"
-      : "saved in the app's folder — use Open or Share on a finished download";
+      ? t("saved where you can open it — Gallery → suravidl (audio: Music → suravidl)")
+      : t("saved in the app's folder — use Open or Share on a finished download");
     $("dlDir").title = gallery
-      ? "the app's own folder (not browsable): " + d
-      : "the app's folder (reachable by file managers on this Android): " + d;
+      ? t("the app's own folder (not browsable): {path}", { path: d })
+      : t("the app's folder (reachable by file managers on this Android): {path}", { path: d });
   } else {
-    $("dlWhere").textContent = "downloads";
+    $("dlWhere").textContent = t("downloads");
   }
 }
 
@@ -3094,7 +3271,7 @@ function wireCopyPath() {
   if (!b) return;
   b.onclick = async () => {
     const ok = await copyText($("dlDir").textContent || "");
-    toast(ok ? "path copied" : "copy failed", ok ? "ok" : "bad");
+    toast(ok ? t("path copied") : t("copy failed"), ok ? "ok" : "bad");
   };
 }
 
@@ -3115,10 +3292,7 @@ async function initAppControls() {
     // or a cookies.txt exported from a desktop browser (the encrypted import)
     const authHintEl = $("authHint");
     if (authHintEl) {
-      authHintEl.textContent = "Two routes: sign in to the site in \u201cFind a video on a page\u201d — " +
-        "that session goes with the download — or import a " +
-        "cookies.txt exported from a desktop browser (encrypted on this device). " +
-        "Instagram sessions expire in hours — re-import when a download asks for a sign-in.";
+      authHintEl.textContent = t("Two routes: sign in to the site in “Find a video on a page” — that session goes with the download — or import a cookies.txt exported from a desktop browser (encrypted on this device). Instagram sessions expire in hours — re-import when a download asks for a sign-in.");
     }
     const imp = $("importCookies");
     imp.classList.remove("hidden");
@@ -3145,7 +3319,7 @@ async function initAppControls() {
       const min = $("minBtn");
       min.classList.remove("hidden");
       min.onclick = () => api("/app/minimize", { method: "POST" })
-        .catch((e) => toast("could not minimize: " + e.message, "bad"));
+        .catch((e) => toast(t("could not minimize: {msg}", { msg: e.message }), "bad"));
     }
     if (info.can_pick_file) {
       const browse = $("browseCookies");
@@ -3155,10 +3329,10 @@ async function initAppControls() {
           const { path } = await api("/app/pick-file", { method: "POST" });
           if (path) {
             $("setCookies").value = path;
-            toast("selected — press Save");
+            toast(t("selected — press Save"));
           }
         } catch (e) {
-          toast("file picker unavailable: " + e.message, "bad");
+          toast(t("file picker unavailable: {msg}", { msg: e.message }), "bad");
         }
       };
     }
@@ -3173,7 +3347,7 @@ function initVaultSection() {
   sec.classList.remove("hidden");
   const show = () => {
     try { $("vaultStatus").textContent = window.AndroidHost.cookiesStatus(); }
-    catch (_) { $("vaultStatus").textContent = "status unavailable"; }
+    catch (_) { $("vaultStatus").textContent = t("status unavailable"); }
   };
   show();
   $("deleteCookiesBtn").onclick = () => {
@@ -3181,7 +3355,7 @@ function initVaultSection() {
     $("setCookies").value = "";
     api("/settings", { method: "POST", body: JSON.stringify({ cookies_file: "" }) })
       .catch(() => { });
-    toast("stored cookies deleted");
+    toast(t("stored cookies deleted"));
     show();
   };
 }
@@ -3198,16 +3372,17 @@ async function initStorageSection() {
     try {
       const s = await api("/files/summary");
       $("storageInfo").textContent = s.files
-        ? `${s.files} file${s.files === 1 ? "" : "s"} · ${humanBytes(s.bytes)}`
-        : "no downloaded files";
+        ? (s.files === 1 ? t("1 file") : t("{n} files", { n: s.files }))
+          + " · " + humanBytes(s.bytes)
+        : t("no downloaded files");
       // the app cache (yt-dlp's player/signature data): counted apart from
       // the downloads, with its own button since v0.29.0
       const cache = typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
       $("storageCache").textContent = cache
-        ? `app cache · ${humanBytes(cache)}`
-        : "app cache · empty";
+        ? t("app cache · {size}", { size: humanBytes(cache) })
+        : t("app cache · empty");
     } catch (_) {
-      $("storageInfo").textContent = "size unavailable";
+      $("storageInfo").textContent = t("size unavailable");
       $("storageCache").textContent = "";
     }
   };
@@ -3226,25 +3401,28 @@ async function initStorageSection() {
     // while a delete elsewhere emptied the folder — and "Delete 0 files
     // (0 B)?" against a row that says 2 is the consistency bug this fixes.
     if (known && s.files === 0) {
-      toast("nothing to delete");
+      toast(t("nothing to delete"));
       show();
       return;
     }
     const one = known && s.files === 1;
     const counted = known
-      ? `Delete ${s.files} file${one ? "" : "s"} (${humanBytes(s.bytes)})`
-      : "Delete every downloaded file";
+      ? (one ? t("Delete 1 file ({size})", { size: humanBytes(s.bytes) })
+             : t("Delete {n} files ({size})",
+                 { n: s.files, size: humanBytes(s.bytes) }))
+      : t("Delete every downloaded file");
     let msg;
     if (keepGallery) {
-      msg = counted + " from the app's folder? The Gallery/Music copies stay.";
+      msg = counted + " " + t("from the app's folder? The Gallery/Music copies stay.");
     } else if (known) {
       msg = counted +
-        (GALLERY() ? ` and ${one ? "its" : "their"} Gallery/Music cop${one ? "y" : "ies"}` : "") +
-        "? This cannot be undone.";
+        (GALLERY() ? " " + (one ? t("and its Gallery/Music copy")
+                                : t("and their Gallery/Music copies")) : "") +
+        t("? This cannot be undone.");
     } else {
-      msg = counted + "? (its size could not be read) This cannot be undone.";
+      msg = counted + t("? (its size could not be read) This cannot be undone.");
     }
-    const ok = await askConfirm(msg, { okText: "Delete" });
+    const ok = await askConfirm(msg, { okText: t("Delete") });
     if (!ok) return;
     try {
       const r = await api("/files/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
@@ -3253,15 +3431,16 @@ async function initStorageSection() {
       }
       const parts = [];
       if (r.deleted > 0) {
-        parts.push(`deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"}`,
-                   `freed ${humanBytes(r.freed_bytes)}`);
+        parts.push(r.deleted === 1 ? t("deleted 1 file")
+                                   : t("deleted {n} files", { n: r.deleted }),
+                   t("freed {size}", { size: humanBytes(r.freed_bytes) }));
       }
-      if (keepGallery && GALLERY()) parts.push("Gallery/Music copies kept");
-      toast(parts.length ? parts.join(" · ") : "nothing freed");
+      if (keepGallery && GALLERY()) parts.push(t("Gallery/Music copies kept"));
+      toast(parts.length ? parts.join(" · ") : t("nothing freed"));
       refreshJobs();
       show();
     } catch (e) {
-      toast("could not delete: " + e.message, "bad");
+      toast(t("could not delete: {msg}", { msg: e.message }), "bad");
     }
   };
   $("clearDownloadsBtn").onclick = () => clearFiles(false);
@@ -3275,22 +3454,23 @@ async function initStorageSection() {
     const s = await api("/files/summary").catch(() => null);
     const cacheBytes = s && typeof s.cache_bytes === "number" ? s.cache_bytes : 0;
     if (s && cacheBytes === 0) {
-      toast("the app cache is already empty");
+      toast(t("the app cache is already empty"));
       show();
       return;
     }
-    const what = s && cacheBytes ? ` (${humanBytes(cacheBytes)})` : "";
+    const what = s && cacheBytes ? " (" + humanBytes(cacheBytes) + ")" : "";
     const ok = await askConfirm(
-      `Clear the app cache${what}? Player data yt-dlp simply fetches again — ` +
-      "nothing downloaded is touched.", { okText: "Clear" });
+      t("Clear the app cache{what}? Player data yt-dlp simply fetches again — nothing downloaded is touched.",
+        { what: what }), { okText: t("Clear") });
     if (!ok) return;
     try {
       const r = await api("/cache/clear", { method: "POST", body: JSON.stringify({ confirm: "delete" }) });
-      toast(r.freed_bytes > 0 ? `cache cleared (${humanBytes(r.freed_bytes)})`
-                              : "cache was already empty");
+      toast(r.freed_bytes > 0
+        ? t("cache cleared ({size})", { size: humanBytes(r.freed_bytes) })
+        : t("cache was already empty"));
       show();
     } catch (e) {
-      toast("could not clear the cache: " + e.message, "bad");
+      toast(t("could not clear the cache: {msg}", { msg: e.message }), "bad");
     }
   };
 }
@@ -3298,12 +3478,12 @@ async function initStorageSection() {
 /* called back by the Android host after the cookies file is imported */
 window.onCookiesPicked = (path) => {
   if (!path) {
-    toast("cookies import failed", "bad");
+    toast(t("cookies import failed"), "bad");
     return;
   }
   $("setCookies").value = path;
-  saveSettings().then(() => toast("cookies imported")).catch((e) =>
-    toast("could not save: " + e.message, "bad"));
+  saveSettings().then(() => toast(t("cookies imported"))).catch((e) =>
+    toast(t("could not save: {msg}", { msg: e.message }), "bad"));
 };
 
 /* ---------- settings ---------- */
@@ -3362,12 +3542,13 @@ async function loadSettings() {
     $("setGeoBypass").checked = !!s.geo_bypass;
     $("setGeoCountry").value = s.geo_bypass_country || "";
     $("setExtractorArgs").value = s.extractor_args || "";
+    $("setLang").value = s.language === "id" ? "id" : "en";
     renderWhere(s.download_dir);
     renderDefaultPreset();
     markSwatches(CURRENT);
     markSettingsDirty(false);   // the form now mirrors the server
   } catch (e) {
-    toast("could not load settings: " + e.message, "bad");
+    toast(t("could not load settings: {msg}", { msg: e.message }), "bad");
   }
 }
 
@@ -3409,7 +3590,7 @@ function showTab(name, opts) {
   // the active tab on the body, so CSS can react to it (the mobile toast lane
   // needs to clear the Settings tab's pinned Save bar — theme review)
   document.body.dataset.tab = target;
-  const panels = TABS.map((t) => $("panel-" + t)).filter(Boolean);
+  const panels = TABS.map((tab) => $("panel-" + tab)).filter(Boolean);
   const incoming = $("panel-" + target);
   // v0.37.1: the swap is immediate. It used to wait out the old screen's exit
   // fade and then wash the new one in over .4s — on a phone the next tab only
@@ -3426,10 +3607,10 @@ function showTab(name, opts) {
     void incoming.offsetWidth;   // restart the fade on a rapid re-switch
     incoming.classList.add("tab-in");
   }
-  TABS.forEach((t) => {
-    document.querySelectorAll(`#tabs .tab[data-tab="${t}"]`).forEach((b) => {
-      b.classList.toggle("active", t === target);
-      b.setAttribute("aria-selected", t === target ? "true" : "false");
+  TABS.forEach((tab) => {
+    document.querySelectorAll(`#tabs .tab[data-tab="${tab}"]`).forEach((b) => {
+      b.classList.toggle("active", tab === target);
+      b.setAttribute("aria-selected", tab === target ? "true" : "false");
     });
   });
   if (location.hash.slice(1) !== target) {
@@ -3490,13 +3671,13 @@ let OPTIONS = null;
 
 async function loadOptions(force) {
   if (OPTIONS && !force) { renderOptions($("optionsSearch").value); return; }
-  $("optionsList").textContent = "loading…";
+  $("optionsList").textContent = t("loading…");
   try {
     const r = await api("/options");
     OPTIONS = r.options || [];
-    $("optionsCount").textContent = `${r.count} options`;
+    $("optionsCount").textContent = t("{n} options", { n: r.count });
   } catch (e) {
-    $("optionsList").textContent = "could not load options: " + e.message;
+    $("optionsList").textContent = t("could not load options: {msg}", { msg: e.message });
     return;
   }
   renderOptions($("optionsSearch").value);
@@ -3527,16 +3708,16 @@ function renderOptions(query) {
         (o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name)).trim();
       $("setRawEnabled").checked = true;
       renderRawAccess(true);
-      toast(`added ${o.name} — save to keep it`);
+      toast(t("added {name} — save to keep it", { name: o.name }));
     };
     row.onclick = add;
     makeOptionRowReachable(row, add);
     box.append(row);
   }
-  if (!list.length) box.append(el("div", "muted small", "nothing matches that search"));
+  if (!list.length) box.append(el("div", "muted small", t("nothing matches that search")));
   $("optionsCount").textContent = q
-    ? `${list.length} match${list.length === 1 ? "" : "es"}`
-    : `${(OPTIONS || []).length} options`;
+    ? (list.length === 1 ? t("1 match") : t("{n} matches", { n: list.length }))
+    : t("{n} options", { n: (OPTIONS || []).length });
 }
 
 /** Raw arguments only matter once enabled in Settings → Advanced. */
@@ -3580,10 +3761,10 @@ function renderDefaultPreset() {
   const stored = (SETTINGS_SNAPSHOT && SETTINGS_SNAPSHOT.default_preset) || "";
   const keep = sel.value || stored;
   sel.innerHTML = "";
-  const none = el("option", "", "none — use my settings");
+  const none = el("option", "", t("none — use my settings"));
   none.value = "";
   sel.append(none);
-  const groups = [[true, "built-in"], [false, "saved"]];
+  const groups = [[true, t("built-in")], [false, t("saved")]];
   for (const [builtin, label] of groups) {
     const items = (PRESETS || []).filter((p) => !!p.builtin === builtin);
     if (!items.length) continue;
@@ -3600,7 +3781,7 @@ function renderDefaultPreset() {
   if (keep && !Array.from(sel.options).some((o) => o.value === keep)) {
     // the setting outlived its preset (deleted later) — say so instead of
     // silently falling back to none
-    const gone = el("option", "", "“" + keep + "” (no longer exists)");
+    const gone = el("option", "", t("“{name}” (no longer exists)", { name: keep }));
     gone.value = keep;
     sel.append(gone);
   }
@@ -3612,10 +3793,10 @@ function renderDefaultPreset() {
         method: "POST", body: JSON.stringify({ default_preset: name }) });
       if (SETTINGS_SNAPSHOT) SETTINGS_SNAPSHOT.default_preset = s.default_preset;
       toast(name
-        ? `default preset: “${name}” rides every new download`
-        : "default preset cleared — downloads use just your settings");
+        ? t("default preset: “{name}” rides every new download", { name: name })
+        : t("default preset cleared — downloads use just your settings"));
     } catch (e) {
-      toast("could not save: " + e.message, "bad");
+      toast(t("could not save: {msg}", { msg: e.message }), "bad");
       sel.value = stored;       // the control goes back to what is stored
     }
   };
@@ -3630,37 +3811,39 @@ function renderPresetList() {
   if (!PRESETS.length) {
     if (PRESETS_ERROR) {
       box.append(el("div", "empty",
-        "could not load presets (" + PRESETS_ERROR + ") — "));
-      const again = el("button", "btn sm ghost-sm", "retry");
+        t("could not load presets ({err}) —", { err: PRESETS_ERROR })));
+      const again = el("button", "btn sm ghost-sm", t("retry"));
       again.onclick = () => loadPresets();
       box.append(again);
       box.append(el("div", "muted",
-        "your saved presets are not gone, they just could not be read"));
+        t("your saved presets are not gone, they just could not be read")));
     } else {
-      box.append(el("div", "empty", "No presets yet — save one from your settings above, or from the download panel."));
+      box.append(el("div", "empty", t("No presets yet — save one from your settings above, or from the download panel.")));
     }
     return;
   }
   for (const p of PRESETS) {
     const row = el("div", "optrow");
     const left = el("div", "col");
-    left.append(el("span", "optname", p.name + (p.builtin ? " (built-in)" : "")));
+    left.append(el("span", "optname",
+                   p.name + (p.builtin ? " " + t("(built-in)") : "")));
     const keys = Object.keys(p.patch || {});
     left.append(el("span", "optsum small muted",
       (p.description || keys.map((k) => `${k}=${p.patch[k]}`).join(" · ")).slice(0, 140)));
     row.append(left);
     if (!p.builtin) {
-      const del = el("button", "ghost-sm del", "Delete");
+      const del = el("button", "ghost-sm del", t("Delete"));
       del.prepend(ico("trash"));
       del.onclick = async () => {
-        if (!(await askConfirm(`Delete the preset “${p.name}”? Downloads already
-started keep their options.`, { okText: "Delete" }))) return;
+        if (!(await askConfirm(
+          t("Delete the preset “{name}”? Downloads already started keep their options.",
+            { name: p.name }), { okText: t("Delete") }))) return;
         try {
           await api(`/presets/${encodeURIComponent(p.name)}`, { method: "DELETE" });
-          toast("preset deleted");
+          toast(t("preset deleted"));
           loadPresets();
         } catch (e) {
-          toast("could not delete: " + e.message, "bad");
+          toast(t("could not delete: {msg}", { msg: e.message }), "bad");
         }
       };
       row.append(del);
@@ -3692,22 +3875,22 @@ async function saveCurrentAsPreset() {
   const msg = $("presetMsg");
   const patch = presetPatchFromSettings();
   if (!Object.keys(patch).length) {
-    msg.textContent = OV.perJobKeys ? ("Nothing to save yet — change a download option first " +
-      "(Settings → Media / Network).")
-      : "presets could not be loaded, so there is nothing to diff against — " +
-        "retry from Settings → Presets.";
+    msg.textContent = OV.perJobKeys
+      ? t("Nothing to save yet — change a download option first (Settings → Media / Network).")
+      : t("presets could not be loaded, so there is nothing to diff against — retry from Settings → Presets.");
     msg.className = OV.perJobKeys ? "msg warn" : "msg bad";
     return;
   }
   try {
     await api("/presets", { method: "POST", body: JSON.stringify({ name, patch }) });
-    msg.textContent = `saved “${name}” with ${Object.keys(patch).length} option(s): ` +
-      Object.keys(patch).join(", ");
+    msg.textContent = t("saved “{name}” with {n} option(s): {keys}",
+      { name: name, n: Object.keys(patch).length,
+        keys: Object.keys(patch).join(", ") });
     msg.className = "msg ok";
     $("presetName").value = "";
     loadPresets();
   } catch (e) {
-    msg.textContent = "could not save: " + e.message;
+    msg.textContent = t("could not save: {msg}", { msg: e.message });
     msg.className = "msg bad";
   }
 }
@@ -3751,16 +3934,18 @@ window.addEventListener("hashchange", () => {
 
 document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
   b.onclick = () => setAppearance({ theme: b.dataset.theme },
-    "Theme: " + b.querySelector(".sw-label").textContent);
+    t("Theme: {name}", { name: b.querySelector(".sw-label").textContent }));
 });
 document.querySelectorAll("#glassSwatches .swatch").forEach((b) => {
   b.onclick = () => setAppearance({ glass: b.dataset.glass },
-    "Glass: " + b.querySelector(".sw-label").textContent);
+    t("Glass: {name}", { name: b.querySelector(".sw-label").textContent }));
 });
 document.querySelectorAll("#schemeSwatches .swatch").forEach((b) => {
   b.onclick = () => setAppearance({ accent: b.dataset.accent },
-    "Scheme: " + b.querySelector(".sw-label").textContent);
+    t("Scheme: {name}", { name: b.querySelector(".sw-label").textContent }));
 });
+const langSel = $("setLang");
+if (langSel) langSel.onchange = () => setLanguage(langSel.value);
 wireMotionNote();
 
 function saveSettings() {
@@ -3814,15 +3999,15 @@ function saveSettings() {
 }
 
 async function saveAndToast(msgEl) {
-  msgEl.textContent = "saving…";
+  msgEl.textContent = t("saving…");
   try {
     await saveSettings();
     msgEl.textContent = "";
     $("setMsg").textContent = "";
     $("ytdlpMsg").textContent = "";
-    toast("Settings saved");
+    toast(t("Settings saved"));
   } catch (e) {
-    msgEl.textContent = "save failed: " + e.message;
+    msgEl.textContent = t("save failed: {msg}", { msg: e.message });
   }
 }
 
@@ -3846,7 +4031,7 @@ async function testCookies() {
   const msg = $("cookiesMsg");
   const btn = $("testCookies");
   btn.disabled = true;
-  msg.textContent = "testing…";
+  msg.textContent = t("testing…");
   msg.classList.remove("good", "bad");
   try {
     // save first: the test must check what is on screen, not what was saved
@@ -3862,10 +4047,11 @@ async function testCookies() {
     msg.classList.toggle("bad", !r.ok);
     if (r.detail) msg.title = r.detail;
     if (r.cookies) {
-      msg.textContent += ` (${r.cookies.domains.join(", ") || "no domains"})`;
+      msg.textContent += " " + t("({domains})",
+        { domains: r.cookies.domains.join(", ") || t("no domains") });
     }
   } catch (e) {
-    msg.textContent = "test failed: " + e.message;
+    msg.textContent = t("test failed: {msg}", { msg: e.message });
     msg.classList.add("bad");
   } finally {
     btn.disabled = false;
@@ -3881,7 +4067,7 @@ window.suravidlShared = (url) => {
   showTab("download");
   $("url").value = url.trim();
   doProbe();
-  toast("shared link ready — pick a format");
+  toast(t("shared link ready — pick a format"));
 };
 
 /* the bay's door: summary clicks are intercepted (preventDefault) so
@@ -3961,7 +4147,7 @@ $("probeDetails").setAttribute("aria-expanded", "false");
 $("probeDetails").setAttribute("aria-controls", "probeMsg");
 $("probeDetails").onclick = () => {
   const hidden = $("probeMsg").classList.toggle("hidden");
-  $("probeDetails").textContent = hidden ? "Show details" : "Hide details";
+  $("probeDetails").textContent = hidden ? t("Show details") : t("Hide details");
   $("probeDetails").setAttribute("aria-expanded", hidden ? "false" : "true");
 };
 $("audioNativeBtn").dataset.pick = "audio-native";
@@ -3990,13 +4176,13 @@ $("playlistItems").addEventListener("change", checkboxFromRange);
  *  looking at it (motion review). Only scrolls when the field is actually
  *  obscured, so desktop focus never moves the page. */
 document.addEventListener("focusin", (e) => {
-  const t = e.target;
-  if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || "")) return;
-  const r = t.getBoundingClientRect();
+  const field = e.target;
+  if (!field || !/^(INPUT|SELECT|TEXTAREA)$/.test(field.tagName || "")) return;
+  const r = field.getBoundingClientRect();
   const pad = 90;   // the sticky header and footer own this much of each edge
   if (r.top >= pad && r.bottom <= window.innerHeight - pad) return;   // visible
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  t.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  field.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
 });
 
 initOptionListKeyboard();
@@ -4016,23 +4202,23 @@ $("presetSave").onclick = saveCurrentAsPreset;
 function wireToken() {
   const el = $("apiToken");
   if (!el) return;
-  const t = (CFG && CFG.token) || "";
-  el.textContent = t ? t.slice(0, 6) + "…" + t.slice(-4) : "not set";
+  const tok = (CFG && CFG.token) || "";
+  el.textContent = tok ? tok.slice(0, 6) + "…" + tok.slice(-4) : t("not set");
   const btn = $("copyToken");
   if (btn) {
     btn.onclick = () => {
       const done = (ok) => {
-        btn.textContent = ok ? "Copied" : "Select it above";
-        setTimeout(() => (btn.textContent = "Copy"), 1800);
+        btn.textContent = ok ? t("Copied") : t("Select it above");
+        setTimeout(() => (btn.textContent = t("Copy")), 1800);
       };
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(t).then(() => done(true), () => done(false));
+        navigator.clipboard.writeText(tok).then(() => done(true), () => done(false));
       } else {
         done(false);
       }
     };
   }
-  el.title = "send it as: Authorization: Bearer <token>";
+  el.title = t("send it as: Authorization: Bearer <token>");
 }
 
 wireToken();
@@ -4105,7 +4291,7 @@ async function checkHandoff() {
       showTab("download");
       $("url").value = h.url;
       $("probeMsg").className = "msg muted";
-      $("probeMsg").textContent = "preparing the video your browser sent…";
+      $("probeMsg").textContent = t("preparing the video your browser sent…");
       $("probeMsg").classList.remove("hidden");
       $("probeSay").classList.add("hidden");
       $("probeDetails").classList.add("hidden");
@@ -4123,23 +4309,13 @@ async function checkHandoff() {
     renderProbe($("url").value, h.probe);
     setScopes("live", { say: "sent from your browser — pick a take" });
     HANDOFF = { id: h.id, url: $("url").value };
-    toast("Sent from your browser — pick the quality, then take it", "info");
+    toast(t("Sent from your browser — pick the quality, then take it"), "info");
     focusWindow();
   } else {
-    // the engine probed it and it failed; say so the way any failed probe is said
-    const raw = h.error || "probe failed";
-    $("probeMsg").textContent = raw;
-    $("probeMsg").className = "msg bad mono";
-    $("probeMsg").classList.add("hidden");
-    $("probeSay").textContent = humanErr(raw);
-    $("probeSay").className = "msg bad";
-    $("probeSay").classList.remove("hidden");
-    $("probeDetails").textContent = "Show details";
-    $("probeDetails").classList.remove("hidden");
-    setScopes("bad", { say: "no readout — see the message above" });
-    $("probeCard").classList.add("hidden");
-    $("dlEmpty").classList.add("hidden");
-    toast("the browser sent a video, but reading it failed", "bad");
+    // the engine probed it and it failed; said the one way every failed probe
+    // is said — and stored, so a language switch can say it again
+    showProbeFailure(h.error || t("probe failed"), null, $("url").value.trim());
+    toast(t("the browser sent a video, but reading it failed"), "bad");
   }
 }
 
@@ -4163,12 +4339,12 @@ function openPlayer(job, file) {
   const stream = `/jobs/${encodeURIComponent(job.id)}/stream?`;
   if (file) {
     const name = baseName(file);
-    openPlayerSrc(job.title || "download",
+    openPlayerSrc(job.title || t("download"),
       stream + "name=" + encodeURIComponent(name) +
       "&token=" + encodeURIComponent(CFG.token), extOf(name));
     return;
   }
-  openPlayerSrc(job.title || "download",
+  openPlayerSrc(job.title || t("download"),
     stream + "token=" + encodeURIComponent(CFG.token), extOf(job.filepath));
 }
 
@@ -4181,7 +4357,7 @@ function extOf(p) {
 function openPlayerSrc(title, src, ext) {
   const isVideo = ["mp4", "m4v", "webm", "mkv", "mov"].includes(ext);
   const isText = ["srt", "vtt"].includes(ext);
-  $("playTitle").textContent = title || "download";
+  $("playTitle").textContent = title || t("download");
   const body = $("playBody");
   body.replaceChildren();
   let node;
@@ -4195,8 +4371,8 @@ function openPlayerSrc(title, src, ext) {
   } else if (isText) {
     node = document.createElement("pre");
     node.className = "player-text";
-    fetch(src).then((r) => r.text()).then((t) => { node.textContent = t; })
-      .catch(() => { node.textContent = "could not load the subtitles"; });
+    fetch(src).then((r) => r.text()).then((txt) => { node.textContent = txt; })
+      .catch(() => { node.textContent = t("could not load the subtitles"); });
   } else {
     node = document.createElement("audio");
     node.controls = true;
@@ -4232,7 +4408,8 @@ function markClip(which) {
   const v = clock(t);
   if (which === "in") $("ovClipStart").value = v;
   else $("ovClipEnd").value = v;
-  toast(which === "in" ? "clip starts at " + v : "clip ends at " + v);
+  toast(which === "in" ? t("clip starts at {v}", { v: v })
+                       : t("clip ends at {v}", { v: v }));
 }
 
 function initPlayer() {
@@ -4257,21 +4434,22 @@ function initPlayer() {
  *  below copy path"). */
 async function openFolderSheet() {
   const list = $("folderList");
-  list.replaceChildren(el("div", "muted", "loading…"));
+  list.replaceChildren(el("div", "muted", t("loading…")));
   openModal($("folderModal"));
   try {
     const r = await api("/files/list");
-    $("folderTitle").textContent = "downloads · " + r.files.length +
-      (r.files.length === 1 ? " file" : " files");
+    $("folderTitle").textContent = r.files.length === 1
+      ? t("downloads · 1 file")
+      : t("downloads · {n} files", { n: r.files.length });
     list.replaceChildren();
     if (!r.files.length) {
-      list.append(el("div", "muted", "the folder is empty"));
+      list.append(el("div", "muted", t("the folder is empty")));
       return;
     }
     for (const f of r.files) list.append(folderItem(f));
   } catch (e) {
     list.replaceChildren(
-      el("div", "muted", "could not read the folder: " + e.message));
+      el("div", "muted", t("could not read the folder: {msg}", { msg: e.message })));
   }
 }
 
@@ -4282,22 +4460,22 @@ function folderItem(f) {
   name.title = f.path;
   item.append(name, el("span", "fsize", humanBytes(f.bytes)));
   if (f.kind === "video" || f.kind === "audio") {
-    const play = el("button", "ghost-sm", "Play");
+    const play = el("button", "ghost-sm", t("Play"));
     play.onclick = () => openPlayerSrc(f.name,
       "/files/stream?path=" + encodeURIComponent(f.name) +
       "&token=" + encodeURIComponent(CFG.token), extOf(f.name));
     item.append(play);
   }
   if (ANDROID() && window.AndroidHost) {
-    const open = el("button", "ghost-sm", "Open");
+    const open = el("button", "ghost-sm", t("Open"));
     open.onclick = () => {
       try { window.AndroidHost.openFile(f.path); }
-      catch (e) { toast("could not open: " + e.message, "bad"); }
+      catch (e) { toast(t("could not open: {msg}", { msg: e.message }), "bad"); }
     };
-    const share = el("button", "ghost-sm", "Share");
+    const share = el("button", "ghost-sm", t("Share"));
     share.onclick = () => {
       try { window.AndroidHost.shareFile(f.path); }
-      catch (e) { toast("could not share: " + e.message, "bad"); }
+      catch (e) { toast(t("could not share: {msg}", { msg: e.message }), "bad"); }
     };
     item.append(open, share);
   }
@@ -4353,14 +4531,17 @@ function renderBatchRow() {
   const show = tokens.length > 1 || urls.length > 1;
   const over = urls.length > 20;          // the engine's own batch ceiling
   $("batchRow").classList.toggle("hidden", !show);
-  const links = `${urls.length} ${urls.length === 1 ? "link" : "links"}`;
+  const links = urls.length === 1
+    ? t("1 link") : t("{n} links", { n: urls.length });
   // v0.40.5: a line the paste cannot use is named, not silently uncounted
   const skipped = junk
-    ? `${junk} skipped — not ${junk === 1 ? "a link" : "links"}` : "";
+    ? (junk === 1 ? t("1 skipped — not a link")
+                  : t("{n} skipped — not links", { n: junk })) : "";
   const say = urls.length ? [links, skipped].filter(Boolean).join(" · ") : skipped;
   $("batchCount").textContent = !show ? ""
-    : over ? `${links} pasted${skipped ? " · " + skipped : ""} — only 20 fit in one batch`
-    : urls.length > 1 ? say + " — queue them all?"
+    : over ? t("{links} pasted{skipped} — only 20 fit in one batch",
+               { links: links, skipped: skipped ? " · " + skipped : "" })
+    : urls.length > 1 ? say + t(" — queue them all?")
     : say;
   $("batchBtn").disabled = over || urls.length < 2;
 }
@@ -4385,14 +4566,14 @@ function initBatch() {
       const n = (r.jobs || []).length;
       const skipped = r.skipped || [];
       if (skipped.length) {
-        toast(`${n} queued · ${skipped.length} skipped: ` + skipped[0].error,
-          "bad");
+        toast(t("{n} queued · {k} skipped: {err}",
+                { n: n, k: skipped.length, err: skipped[0].error }), "bad");
       } else {
-        toast(`${n} links queued`, "info");
+        toast(t("{n} links queued", { n: n }), "info");
       }
       refreshJobs();
     } catch (e) {
-      toast("could not queue those links: " + e.message, "bad");
+      toast(t("could not queue those links: {msg}", { msg: e.message }), "bad");
     } finally {
       $("batchBtn").classList.remove("busy");
     }
@@ -4406,38 +4587,38 @@ async function loadArchive() {
     const a = await api("/archive");
     const n = a.count || 0;
     $("archiveCount").textContent = n
-      ? `· ${n} entr${n === 1 ? "y" : "ies"}` : "· empty";
+      ? (n === 1 ? t("· 1 entry") : t("· {n} entries", { n: n })) : t("· empty");
     const list = $("archiveList");
     list.replaceChildren();
     list.classList.remove("hidden");
     if (!n) {
-      list.append(el("div", "muted small", "nothing archived yet"));
+      list.append(el("div", "muted small", t("nothing archived yet")));
       return;
     }
     const entries = (a.entries || []).slice(-50).reverse();
     if (a.entries && entries.length < n) {
       list.append(el("div", "muted small",
-        `showing the last ${entries.length} of ${n}`));
+        t("showing the last {shown} of {n}", { shown: entries.length, n: n })));
     }
     for (const line of entries) {
       const row = el("div", "jrow");
       row.append(el("span", "small mono", line));
-      const forget = el("button", "ghost-sm", "forget");
+      const forget = el("button", "ghost-sm", t("forget"));
       forget.onclick = async () => {
         try {
           await api("/archive/forget",
             { method: "POST", body: JSON.stringify({ entry: line }) });
-          toast("forgotten — that video can be downloaded again", "info");
+          toast(t("forgotten — that video can be downloaded again"), "info");
           loadArchive();
         } catch (e) {
-          toast("could not forget: " + e.message, "bad");
+          toast(t("could not forget: {msg}", { msg: e.message }), "bad");
         }
       };
       row.append(forget);
       list.append(row);
     }
   } catch (e) {
-    toast("could not read the archive: " + e.message, "bad");
+    toast(t("could not read the archive: {msg}", { msg: e.message }), "bad");
   }
 }
 
@@ -4452,16 +4633,17 @@ function initArchive() {
   };
   $("archiveForget").onclick = async () => {
     const entry = $("archiveEntry").value.trim();
-    if (!entry) { toast("paste an archive entry first", "bad"); return; }
+    if (!entry) { toast(t("paste an archive entry first"), "bad"); return; }
     try {
       const r = await api("/archive/forget",
         { method: "POST", body: JSON.stringify({ entry }) });
-      toast(`forgotten ${r.removed} entr${r.removed === 1 ? "y" : "ies"}`,
+      toast(r.removed === 1 ? t("forgotten 1 entry")
+                            : t("forgotten {n} entries", { n: r.removed }),
         "info");
       $("archiveEntry").value = "";
       loadArchive();
     } catch (e) {
-      toast("could not forget: " + e.message, "bad");
+      toast(t("could not forget: {msg}", { msg: e.message }), "bad");
     }
   };
 }
@@ -4492,7 +4674,7 @@ function editAndRetry(j) {
   }
   renderOvCount();
   showTab("download");
-  toast("loaded the failed settings — change what you like, then start it", "info");
+  toast(t("loaded the failed settings — change what you like, then start it"), "info");
 }
 
 addEventListener("scroll", () => {
