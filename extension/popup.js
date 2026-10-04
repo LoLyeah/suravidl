@@ -17,6 +17,11 @@
 const api = globalThis.browser || chrome;
 const $ = (id) => document.getElementById(id);
 
+// the version chip reads the manifest — a bump can never leave it stale
+const MANIFEST = (api.runtime && api.runtime.getManifest)
+  ? api.runtime.getManifest() : null;
+if (MANIFEST && $("ver")) $("ver").textContent = "v" + MANIFEST.version;
+
 let TAB = null;
 let ITEMS = [];      // every find on the tab
 let RANK = null;     // the engine's shape for them (hides fragments)
