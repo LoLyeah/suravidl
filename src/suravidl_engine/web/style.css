@@ -212,6 +212,12 @@ html[data-host="android"] body::before {
 }
 .hidden { display: none !important; }
 .mono { font-family: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* one string for screen readers only — the visible design is untouched */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .small { font-size: 12.5px; }
 .muted { color: var(--muted); }
 .spacer { flex: 1; }
@@ -285,7 +291,7 @@ header {
 body.scrolled header { box-shadow: 0 8px 26px rgba(0,0,0,.28); }
 html[data-theme="light"] body.scrolled header { box-shadow: 0 8px 22px rgba(40,34,24,.14); }
 .mark {
-  width: 30px; height: 30px; border-radius: 8px;
+  width: 30px; height: 30px; border-radius: 9px;
   display: block; flex: none;
   box-shadow: 0 6px 16px -6px var(--mark-deep);
 }
@@ -384,6 +390,10 @@ main { display: block; padding: 18px 20px 110px; }
 }
 .bin-empty, .bins-empty { padding: 10px 4px; }
 
+@media (min-width: 900px) {
+  /* tablet / split-screen widths: the deck keeps its measure (v0.44.x audit) */
+  main { max-width: 1240px; margin: 0 auto; }
+}
 @media (min-width: 1080px) {
   main {
     display: grid;
@@ -393,7 +403,7 @@ main { display: block; padding: 18px 20px 110px; }
     margin: 0 auto;
     padding: 20px 24px 130px;
   }
-  .bins { grid-column: 1; grid-row: 1; }
+  .bins { grid-column: 1; grid-row: 1; position: sticky; top: 74px; align-self: start; }
   body[data-tab="download"] .bins, body[data-tab="queue"] .bins { display: block; }
   .panel:not(.hidden) { grid-column: 1 / -1; }
   body[data-tab="download"] .panel:not(.hidden),
@@ -417,7 +427,8 @@ main { display: block; padding: 18px 20px 110px; }
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .card, header, .tabs, .modal, .btn, .transport, .toast {
+  .card, header, .tabs, .modal, .btn, .transport, .toast,
+  .scope, .get, #ovBlock, .job, .bin, .optrow, .swatch, .tour-card {
     background: var(--panel-solid) !important;
     background-image: none !important;
   }
@@ -508,6 +519,7 @@ select {
 input:focus, select:focus, textarea:focus { border-color: var(--accent-line); }
 select:focus-visible { border-color: var(--accent-line); }
 input::placeholder, textarea::placeholder { color: var(--ph); }
+input.mono { font-family: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace; }
 /* iOS WebKit zooms the viewport when a focused field is under 16px. Gate
    it to iOS-in-a-narrow-viewport so Android's WebView and desktop keep
    the denser instrument sizes (v0.41.x audit). */
@@ -1076,6 +1088,8 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
    corners (it used to be an opaque slab that squared them off) */
+/* the Device tab is action-only — nothing there rides the Save form (audit) */
+#panel-settings[data-stab="device"] .modal-foot { display: none; }
 #panel-settings .modal-foot {
   position: sticky; z-index: 3; bottom: 12px;
   margin: 14px -18px -18px; padding: 12px 18px;
@@ -1096,6 +1110,14 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 }
 @media (hover: hover) { .swatch:hover { border-color: var(--accent-line); } }
 .swatch.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* selected outlines must clear 3:1 on the day ground too — #c07a16 reads
+   2.74:1 there, so the light theme leans on the darker voice (v0.44.x audit;
+   pine's own accent is dark enough by itself but shares the rule) */
+html[data-theme="light"] .swatch.on { border-color: var(--accent2); }
+html[data-theme="light"] .get.picked { border-color: var(--accent2); }
+@media (min-width: 900px) {
+  html[data-theme="light"] .tab.active { border-bottom-color: var(--accent2); }
+}
 .sw-preview {
   width: 74px; height: 44px; border-radius: 8px;
   border: 1px solid rgba(127,127,127,.25);

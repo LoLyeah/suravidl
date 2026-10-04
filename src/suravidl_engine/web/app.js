@@ -351,7 +351,7 @@ const STRINGS = { en: {}, id: {
   "The deck fills up here": "Isinya muncul di sini",
   "The extension finds nothing, or says the app isn't running.": "Ekstensi tidak menemukan apa pun, atau bilang aplikasinya tidak berjalan.",
   "The folder shown at the bottom of the screen — press Open folder next to it. On a phone, finished downloads get Open and Share buttons instead; files land in Gallery (video) or Music (audio) under suravidl.": "Folder yang terlihat di bagian bawah layar — tekan Buka folder di sebelahnya. Di ponsel, unduhan yang selesai punya tombol Buka dan Bagikan; berkasnya masuk ke Gallery (video) atau Music (audio) di dalam suravidl.",
-  "The literal “every feature” switch. Once it is on, the arguments field in the ": "Sakelar “semua fitur” yang sesungguhnya. Setelah menyala, kolom argumen di tab ",
+  "The literal “every feature” switch. Once it is on, the arguments field in the ": "Sakelar “semua fitur” yang sesungguhnya. Setelah menyala, kolom argumen di ",
   "The phone app's browser serves a few known ad networks empty, and some pages notice. In its second row there is an 'ads blocked / ads allowed' switch — flip it and reload. The off-site jump and pop-up guard keeps working either way.": "Browser aplikasi ponsel mengosongkan beberapa jaringan iklan yang dikenal, dan sebagian halaman menyadarinya. Di baris keduanya ada sakelar 'ads blocked / ads allowed' — ubah dan muat ulang. Penjaga lompatan situs dan pop-up tetap bekerja.",
   "The phone app's built-in browser refuses off-site jumps and pop-ups while you hunt for a stream — the page, and the find list, stay put. If a refused hop was one you meant, tap the note on screen to follow it anyway.": "Browser bawaan aplikasi ponsel menolak lompatan ke situs lain dan pop-up saat kamu mencari stream — halamannya, dan daftar temuannya, tetap di tempat. Kalau lompatan yang ditolak itu memang kamu maksud, ketuk catatan di layar untuk tetap mengikutinya.",
   "The queue": "Antrean",
@@ -724,7 +724,17 @@ const STRINGS = { en: {}, id: {
   "“{name}” (no longer exists)": "“{name}” (sudah tidak ada)",
   "“{name}” updated — {n} option(s)": "“{name}” diperbarui — {n} opsi",
   "… {n} more — tick the listed ones, or type a range like 501-600": "… {n} lagi — centang yang terdaftar, atau ketik rentang seperti 501-600",
-  "…). Click an option below to add it.": "…). Klik opsi di bawah untuk menambahkannya."
+  "…). Click an option below to add it.": "…). Klik opsi di bawah untuk menambahkannya.",
+  "Concurrent downloads: {n}": "Unduhan bersamaan: {n}",
+  "a preset needs a name": "preset perlu nama",
+  "Delete the stored cookies from this device?": "Hapus cookie tersimpan dari perangkat ini?",
+  "Forget archive entry {entry}": "Lupakan entri arsip {entry}",
+  "Delete preset “{name}”": "Hapus preset “{name}”",
+  "socks5://127.0.0.1:1080 (blank = direct)": "socks5://127.0.0.1:1080 (kosong = langsung)",
+  "probe ready — the formats are below": "cek selesai — formatnya di bawah",
+  "Clip start time": "Waktu mulai klip",
+  "start 1:30": "mulai 1:30",
+  "end 2:45": "akhir 2:45"
 } };
 /* i18n-dicts:end */
 let LANG = CFG.language === "id" ? "id" : "en";
@@ -1126,12 +1136,23 @@ function applyTheme(theme, glass, accent) {
   }
 }
 function markSwatches(values) {
-  document.querySelectorAll("#themeSwatches .swatch").forEach((b) =>
-    b.classList.toggle("on", b.dataset.theme === values.theme));
-  document.querySelectorAll("#glassSwatches .swatch").forEach((b) =>
-    b.classList.toggle("on", b.dataset.glass === values.glass));
-  document.querySelectorAll("#schemeSwatches .swatch").forEach((b) =>
-    b.classList.toggle("on", b.dataset.accent === values.accent));
+  // the visual .on and the announced pressed state move together (v0.44.x
+  // audit: screen readers heard three identical buttons, no selection)
+  document.querySelectorAll("#themeSwatches .swatch").forEach((b) => {
+    const on = b.dataset.theme === values.theme;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  document.querySelectorAll("#glassSwatches .swatch").forEach((b) => {
+    const on = b.dataset.glass === values.glass;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  document.querySelectorAll("#schemeSwatches .swatch").forEach((b) => {
+    const on = b.dataset.accent === values.accent;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
 }
 
 /* ---------- the motion note (v0.38.7) ----------
@@ -1235,6 +1256,8 @@ function relabelUI() {
   const fb = $("faqList");
   if (fb && fb.childElementCount) buildFaqList();
   paintMotionNote();
+  wireToken();   // the token chip and its title ride the language too (audit)
+  if ($("archiveCount") && $("archiveCount").textContent.trim()) loadArchive();
 }
 
 /** A rebuilt row is a repainted row: stamping every live row stale makes the
@@ -1260,6 +1283,7 @@ async function doProbe() {
   $("probeMsg").classList.remove("hidden");
   $("probeSay").classList.add("hidden");
   $("probeSay").textContent = "";
+  if ($("probeLive")) $("probeLive").textContent = "";
   $("probeDetails").classList.add("hidden");
   setScopes("scan", { say: "reading the source…" });
   $("probeBtn").classList.add("busy");
@@ -1270,6 +1294,10 @@ async function doProbe() {
     if (seq !== PROBE_SEQ) return;
     renderProbe(url, info);
     $("probeMsg").textContent = "";
+    if ($("probeLive")) {
+      // sighted users see the table; this is the audible half (v0.44.x audit)
+      $("probeLive").textContent = t("probe ready — the formats are below");
+    }
     $("browserOffer").classList.add("hidden");   // it probed fine: no browser needed
   } catch (e) {
     if (seq !== PROBE_SEQ) return;
@@ -1682,7 +1710,7 @@ function renderProbe(url, info) {
       const tr = el("tr", "enter");
       // capped lower than a full stagger: a table that takes a quarter second
       // to finish arriving reads as slow
-      tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
+      if (motionMs(150) > 0) tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
       const n = e.index || i + 1;
       const pick = el("td", "fmt-q");
       const box = el("input", "plpick");
@@ -1737,7 +1765,7 @@ function renderProbe(url, info) {
     const tr = el("tr", "enter");
     // capped lower than a full stagger: a table that takes a quarter second
     // to finish arriving reads as slow
-    tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
+    if (motionMs(150) > 0) tr.style.animationDelay = Math.min(i * 30, 150) + "ms";
     const kind = fmtKind(f, separateAudio);
     const cell = el("td", "fmt-c");
     cell.append(el("div", "", fmtCodecs(f) || "—"));
@@ -2529,6 +2557,7 @@ function deleteButton(j) {
 
 function jobRow(j) {
   const row = el("div", "job");
+  row.setAttribute("role", "listitem");
   row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   const top = el("div", "jobtop");
   const title = el("span", "jobtitle", j.title || j.url);
@@ -2586,6 +2615,10 @@ function jobRow(j) {
     // motion anywhere reads as a hung engine (motion review).
     const downloading = j.status === "downloading";
     const bar = el("div", "bar");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    if (downloading) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
     const fill = el("div", "fill active" + (downloading ? "" : " indet"));
     fill.style.width = downloading ? progressPct(j).toFixed(1) + "%" : "100%";
     bar.append(fill);
@@ -2713,6 +2746,7 @@ function jobRow(j) {
     // us the file size and the location too — it's expanding for a reason").
     // Collapsed rows keep the compact strip; the title tap unfolds both.
     const details = el("div", "jdetails");
+    details.id = "jd-" + j.id;   // the title button names what it controls
     const grid = el("div", "jdgrid");   // the shrinkable row the fold animates
     grid.append(
       el("span", "jdlbl", t("size")),
@@ -2721,6 +2755,7 @@ function jobRow(j) {
       el("span", "jdpath", j.filepath || "—"),
     );
     details.append(grid);
+    title.setAttribute("aria-controls", details.id);
     row.append(details);
     if (j.note) row.append(el("div", "jobhint", j.note));
   }
@@ -2828,6 +2863,8 @@ function updateJobRow(row, j) {
   const fill = row.querySelector(".fill");
   if (fill && !fill.classList.contains("indet")) {
     fill.style.width = progressPct(j).toFixed(1) + "%";
+    const bar = row.querySelector(".bar");
+    if (bar) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
   }
   const meta = row.querySelector(".jmeta");
   if (meta) meta.replaceChildren(...metaParts(j).map((s) => el("span", "", s)));
@@ -3978,6 +4015,8 @@ async function initAppControls() {
     APP_INFO = info;
     if (!info.desktop) return;
     DESKTOP = true;
+    const revealField = $("revealField");
+    if (revealField) revealField.classList.remove("hidden");   // desktop-only row
     if (info.can_minimize) {
       const min = $("minBtn");
       min.classList.remove("hidden");
@@ -4013,7 +4052,10 @@ function initVaultSection() {
     catch (_) { $("vaultStatus").textContent = t("status unavailable"); }
   };
   show();
-  $("deleteCookiesBtn").onclick = () => {
+  $("deleteCookiesBtn").onclick = async () => {
+    // the wipe is irreversible — same ask as every other delete (v0.44.x audit)
+    if (!(await askConfirm(t("Delete the stored cookies from this device?"),
+                           { okText: t("Delete") }))) return;
     try { window.AndroidHost.deleteCookies(); } catch (_) { }
     $("setCookies").value = "";
     api("/settings", { method: "POST", body: JSON.stringify({ cookies_file: "" }) })
@@ -4168,7 +4210,7 @@ async function loadSettings() {
   try {
     const s = await api("/settings");
     SETTINGS_SNAPSHOT = s;
-    CURRENT = { theme: s.theme, glass: s.glass };
+    CURRENT = { theme: s.theme, glass: s.glass, accent: s.accent };
     $("setDir").value = s.download_dir || "";
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
@@ -4224,14 +4266,22 @@ function showSettingsTab(name) {
     const on = b.dataset.stab === name;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", on ? "true" : "false");
-    // the row scrolls on phones: keep the active sub-tab in view
+    b.tabIndex = on ? 0 : -1;   // one tab stop; arrows move (v0.44.x audit)
+    // only a row that actually scrolls is worth centering — on a wrapped
+    // phone row the old call nudged the page for nothing (v0.44.x audit)
     if (on && b.scrollIntoView) {
-      try { b.scrollIntoView({ inline: "center", block: "nearest" }); }
-      catch (_) { /* older WebView */ }
+      const row = b.parentElement;
+      try {
+        if (row && row.scrollWidth > row.clientWidth + 4) {
+          b.scrollIntoView({ inline: "center", block: "nearest" });
+        }
+      } catch (_) { /* older WebView */ }
     }
   });
   document.querySelectorAll(".spanel").forEach((p) =>
     p.classList.toggle("hidden", p.id !== "spanel-" + name));
+  const ps = $("panel-settings");
+  if (ps) ps.dataset.stab = name;   // the Save strip retires on the Device tab
   // v0.37.1: the swap dresses itself — the sub-tabs were the only navigation
   // in the app with no transition at all (2026-09-30); a re-tap doesn't re-run
   if (incoming && !wasOn) {
@@ -4240,9 +4290,36 @@ function showSettingsTab(name) {
     incoming.classList.add("spanel-in");
   }
 }
+/* The sub-tabs follow the same APG pattern as the main deck (v0.44.x audit:
+   they carried aria-selected only — one tab stop and arrow moves were
+   missing, while the main tabs' comment claimed they already had them). */
+function syncStabTabs() {
+  const cur = document.querySelector("#settingsTabs .stab.active");
+  const name = cur ? cur.dataset.stab : "general";
+  document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
+    b.tabIndex = b.dataset.stab === name ? 0 : -1;
+  });
+  const ps = $("panel-settings");
+  if (ps) ps.dataset.stab = name;
+}
 document.querySelectorAll("#settingsTabs .stab").forEach((b) => {
   b.onclick = () => showSettingsTab(b.dataset.stab);
+  b.addEventListener("keydown", (e) => {
+    const tabs = [...document.querySelectorAll("#settingsTabs .stab")]
+      .filter((t) => !t.classList.contains("hidden"));
+    const i = tabs.indexOf(b);
+    let t = null;
+    if (e.key === "ArrowRight") t = tabs[(i + 1) % tabs.length];
+    if (e.key === "ArrowLeft") t = tabs[(i - 1 + tabs.length) % tabs.length];
+    if (e.key === "Home") t = tabs[0];
+    if (e.key === "End") t = tabs[tabs.length - 1];
+    if (!t) return;
+    e.preventDefault();
+    showSettingsTab(t.dataset.stab);
+    t.focus();
+  });
 });
+syncStabTabs();
 
 /* ---------- the shell: four tabs, hash-routed ---------- */
 const TABS = ("download queue settings ytdlp").split(" ");
@@ -4328,6 +4405,9 @@ function syncStartState() {
 }
 $("url").addEventListener("input", syncStartState);
 syncStartState();
+// moved off initFolderSheet (v0.44.x audit): a download-deck control must not
+// ride an Android folder-sheet initializer
+$("noSound").addEventListener("change", refreshSoundLabels);
 
 /* ---------- yt-dlp tab: curated groups + option browser ---------- */
 let OPTIONS = null;
@@ -4496,6 +4576,8 @@ function renderPresetList() {
     row.append(left);
     if (!p.builtin) {
       const del = el("button", "ghost-sm del", t("Delete"));
+      del.setAttribute("aria-label",
+        t("Delete preset “{name}”", { name: p.name }));
       del.prepend(ico("trash"));
       del.onclick = async () => {
         if (!(await askConfirm(
@@ -4516,13 +4598,15 @@ function renderPresetList() {
 }
 
 /** The patch "save my current settings" should store: what differs from the
- *  defaults, limited to the keys a single download may override. */
+ *  defaults, limited to the keys a single download may override. It reads
+ *  the live form, not the disk (v0.44.x audit: fresh edits were missed). */
 function presetPatchFromSettings() {
   const patch = {};
   const keys = OV.perJobKeys || [];
   const defaults = OV.defaults || {};
+  const form = settingsFormPayload();
   for (const k of keys) {
-    const v = SETTINGS_SNAPSHOT ? SETTINGS_SNAPSHOT[k] : undefined;
+    const v = form[k];
     if (v === undefined || v === null) continue;
     const d = defaults[k];
     const isDefault = Array.isArray(v) || typeof v === "object"
@@ -4542,6 +4626,12 @@ async function saveCurrentAsPreset() {
       ? t("Nothing to save yet — change a download option first (Settings → Media / Network).")
       : t("presets could not be loaded, so there is nothing to diff against — retry from Settings → Presets.");
     msg.className = OV.perJobKeys ? "msg warn" : "msg bad";
+    return;
+  }
+  if (!name) {
+    // the server refuses this too — say it here, without the round trip
+    msg.textContent = t("a preset needs a name");
+    msg.className = "msg warn";
     return;
   }
   try {
@@ -4611,10 +4701,12 @@ const langSel = $("setLang");
 if (langSel) langSel.onchange = () => setLanguage(langSel.value);
 wireMotionNote();
 
-function saveSettings() {
-  return api("/settings", {
-    method: "POST",
-    body: JSON.stringify({
+/** The settings form as an API payload — ONE builder, two readers: Save
+ *  posts it, and the preset diff reads it, so "the current settings" means
+ *  the form in front of the user, not the last disk write (v0.44.x audit:
+ *  a preset saved after fresh edits recorded the stale snapshot). */
+function settingsFormPayload() {
+  return {
       download_dir: $("setDir").value.trim(),
       max_concurrent: Number($("setConc").value),
       open_dir_on_complete: $("setReveal").checked,
@@ -4650,12 +4742,22 @@ function saveSettings() {
       geo_bypass: $("setGeoBypass").checked,
       geo_bypass_country: $("setGeoCountry").value.trim().toUpperCase(),
       extractor_args: $("setExtractorArgs").value.trim(),
-    }),
+  };
+}
+
+function saveSettings() {
+  return api("/settings", {
+    method: "POST",
+    body: JSON.stringify(settingsFormPayload()),
   }).then((s) => {
     SETTINGS_SNAPSHOT = s;   // the preset diff reads this
     markSettingsDirty(false);  // the form was accepted as-is
     renderWhere(s.download_dir);
+    // the engine clamps (0 -> 1, junk refused): show what it actually stored
     $("setConc").value = s.max_concurrent;
+    $("setFragments").value = s.fragments;
+    $("setRetries").value = s.retries;
+    $("setMaxDownloads").value = s.max_downloads;
     renderRawAccess(!!s.raw_args_enabled);
     return s;
   });
@@ -4679,15 +4781,40 @@ $("ytdlpSave").onclick = () => saveAndToast($("ytdlpMsg"));
 $("setRawEnabled").onchange = (e) => renderRawAccess(e.target.checked);
 
 // anything the user edits in Settings marks the form dirty, so a tab switch
-// does not silently reload it from the server (v0.21.1 audit)
+// does not silently reload it from the server (v0.21.1 audit). Controls that
+// persist themselves — or scratch boxes that were never settings — must not
+// light the dot (v0.44.x audit: it stayed lit after a language or default-
+// preset change, and typing in the preset-name box claimed unsaved work)
 {
   const panel = $("panel-settings");
   if (panel) {
+    const DIRTY_IGNORE = new Set(["setLang", "defaultPreset", "setConc",
+                                  "presetName", "archiveEntry"]);
     for (const ev of ["input", "change"]) {
-      panel.addEventListener(ev, () => { markSettingsDirty(true); });
+      panel.addEventListener(ev, (e) => {
+        const id = e.target && e.target.id;
+        if (id && DIRTY_IGNORE.has(id)) return;
+        markSettingsDirty(true);
+      });
     }
   }
 }
+
+/* "applied live" is a promise the field now keeps (v0.44.x audit): a change
+   posts just this key, so the queue's capacity moves without a Save — the
+   rest of the form keeps its unsaved edits untouched */
+$("setConc").onchange = async () => {
+  const n = Math.min(4, Math.max(1, Math.round(Number($("setConc").value) || 1)));
+  $("setConc").value = n;
+  try {
+    const s = await api("/settings", { method: "POST",
+                                       body: JSON.stringify({ max_concurrent: n }) });
+    if (SETTINGS_SNAPSHOT) SETTINGS_SNAPSHOT.max_concurrent = s.max_concurrent;
+    toast(t("Concurrent downloads: {n}", { n: s.max_concurrent }));
+  } catch (e) {
+    toast(t("could not apply: {msg}", { msg: e.message }), "bad");
+  }
+};
 
 /* ---------- test cookies: the button that answers "did it work?" ---------- */
 async function testCookies() {
@@ -4697,13 +4824,18 @@ async function testCookies() {
   msg.textContent = t("testing…");
   msg.classList.remove("good", "bad");
   try {
-    // save first: the test must check what is on screen, not what was saved
-    await saveSettings();
-    // the URL box is the natural subject when the user just pasted something
+    // the test must check what is on screen — the cookie fields ride as
+    // transient overrides, so testing never commits the form (v0.44.x audit:
+    // it used to silently save every dirty panel). The URL box stays the
+    // subject when the user just pasted something.
     const url = ($("url").value || "").trim();
     const r = await api("/auth/check", {
       method: "POST",
-      body: JSON.stringify({ url: url || null }),
+      body: JSON.stringify({
+        url: url || null,
+        cookies_file: $("setCookies").value.trim(),
+        cookies_from_browser: $("setCookiesBrowser").value,
+      }),
     });
     msg.textContent = r.message;
     msg.classList.toggle("good", !!r.ok);
@@ -4769,6 +4901,13 @@ function wireBayDoor(d, bodyEl) {
     body._doorEnd = h;
     body.addEventListener("transitionend", h);
   };
+  d.addEventListener("toggle", () => {
+    // the Studio button sits outside the fold — its state follows the door
+    if (d.id === "ovBlock") {
+      const b = $("studioBtn");
+      if (b) b.setAttribute("aria-expanded", d.open ? "true" : "false");
+    }
+  });
   d.querySelector("summary").addEventListener("click", (e) => {
     e.preventDefault();                            // <details> must not snap
     const wantsOpen = !d.open || closing;          // a mid-close click reverses
@@ -4871,16 +5010,42 @@ function wireToken() {
   el.textContent = tok ? tok.slice(0, 6) + "…" + tok.slice(-4) : t("not set");
   const btn = $("copyToken");
   if (btn) {
-    btn.onclick = () => {
-      const done = (ok) => {
-        btn.textContent = ok ? t("Copied") : t("Select it above");
-        setTimeout(() => (btn.textContent = t("Copy")), 1800);
+    btn.onclick = async () => {
+      const legacy = (tok) => {          // most engines still allow this path
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = tok;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.append(ta);
+          ta.select();
+          const ok = document.execCommand("copy");
+          ta.remove();
+          return ok;
+        } catch (_) { return false; }
       };
+      let ok = false;
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(tok).then(() => done(true), () => done(false));
+        try { await navigator.clipboard.writeText(tok); ok = true; }
+        catch (_) { ok = legacy(tok); }
       } else {
-        done(false);
+        ok = legacy(tok);
       }
+      if (!ok) {
+        // "select it above" only works if the FULL token is up there — the
+        // masked string copied an unusable half-token (v0.44.x audit)
+        el.textContent = tok;
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const sel = getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } catch (_) { /* selection is best-effort */ }
+      }
+      btn.textContent = ok ? t("Copied") : t("Select it above");
+      setTimeout(() => (btn.textContent = t("Copy")), 1800);
     };
   }
   el.title = t("send it as: Authorization: Bearer <token>");
@@ -5166,7 +5331,6 @@ function initFolderSheet() {
     }
     openFolderSheet();
   };
-  $("noSound").addEventListener("change", refreshSoundLabels);
 }
 
 /** Several links in the box at once: offer to queue them all (review #5).
@@ -5269,6 +5433,8 @@ async function loadArchive() {
       const row = el("div", "jrow");
       row.append(el("span", "small mono", line));
       const forget = el("button", "ghost-sm", t("forget"));
+      forget.setAttribute("aria-label",
+        t("Forget archive entry {entry}", { entry: line }));
       forget.onclick = async () => {
         try {
           await api("/archive/forget",

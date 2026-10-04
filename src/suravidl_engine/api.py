@@ -76,6 +76,10 @@ class HandoffAckRequest(BaseModel):
 
 class AuthCheckRequest(BaseModel):
     url: str | None = None
+    # transient cookie fields: the test checks the form on screen without
+    # committing it (v0.44.x audit — it used to save every dirty panel first)
+    cookies_file: str | None = None
+    cookies_from_browser: str | None = None
 
 
 class FilesClearRequest(BaseModel):
@@ -851,8 +855,15 @@ def create_app(download_dir, auth_token: str | None = None,
 
         With a URL the answer is proven by a real extraction; without one only
         the cookies file itself can be read (values never leave the engine).
+        The cookie fields ride as transient overrides — the test must check
+        the form on screen without committing it (v0.44.x audit).
         """
-        return check_auth(settings.get(), (body.url or "").strip() or None)
+        s = settings.get()          # already a copy — safe to overlay
+        if body.cookies_file is not None:
+            s["cookies_file"] = body.cookies_file.strip()
+        if body.cookies_from_browser is not None:
+            s["cookies_from_browser"] = body.cookies_from_browser.strip()
+        return check_auth(s, (body.url or "").strip() or None)
 
     def _queue_one(body: JobRequest, mgr: JobManager) -> dict:
         """Validate and queue one job — the shared heart of /jobs and /jobs/batch.
