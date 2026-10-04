@@ -10,6 +10,7 @@ extension, desktop app, Android app. It downloads anything yt-dlp understands
 [![release](https://img.shields.io/github/v/release/LoLyeah/suravidl?style=for-the-badge&label=release&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases/latest)
 [![build](https://img.shields.io/github/actions/workflow/status/LoLyeah/suravidl/ci.yml?style=for-the-badge&label=build&logo=githubactions&logoColor=white)](https://github.com/LoLyeah/suravidl/actions/workflows/ci.yml)
 [![downloads](https://img.shields.io/github/downloads/LoLyeah/suravidl/total?style=for-the-badge&label=downloads&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases)
+[<img src="docs/img/obtainium-badge.png" height="48" alt="Get it on Obtainium">](https://github.com/ImranR98/Obtainium/releases/latest)
 
 [![mozilla add-on](https://img.shields.io/amo/v/suravidl.svg)](https://addons.mozilla.org/en-US/firefox/addon/suravidl/)
 [![chrome / edge](https://img.shields.io/badge/chrome%20%2F%20edge-zip-blue.svg)](https://github.com/LoLyeah/suravidl/releases/latest/download/suravidl-extension-chrome.zip)
@@ -59,7 +60,7 @@ From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
 - `suravidl-macos-arm64.dmg` — drag to Applications. Unsigned, so the first
   launch needs right-click → Open; after that it updates itself in place, like
   Windows.
-- `app-release.apk` — Android (see below).
+- `app-release.apk` — Android (see below). [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest) can also watch these releases and install the updates for you.
 - Extension: Firefox — [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/);
   Chrome/Edge/Brave — `suravidl-extension-chrome.zip` (load unpacked), both below.
 
@@ -185,6 +186,12 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
   downloads the right asset, verifies its SHA-256, and installs it in place — one
   tap on Windows and macOS, one system confirmation on Android; every other
   platform keeps the download link. Details: [docs/UPDATES.md](docs/UPDATES.md).
+- **Obtainium (Android)**: [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest) watches this
+  repo's releases and offers every new `app-release.apk` — install it, tap *Add app*, paste
+  `https://github.com/LoLyeah/suravidl`. It installs the same signed APKs as the in-app updater,
+  so the two never conflict. One-tap link once Obtainium is on the phone (send it over and
+  open it):
+  `obtainium://app/%7B%22id%22%3A%22com.suravidl.app%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FLoLyeah%2Fsuravidl%22%2C%22author%22%3A%22LoLyeah%22%2C%22name%22%3A%22suravidl%22%7D`
 
 ## Privacy and security
 
