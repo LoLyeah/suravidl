@@ -5,6 +5,7 @@ headless server, or a Linux frozen build without GTK bindings).
 Runnable as `python -m suravidl_engine` or as a PyInstaller-frozen binary.
 """
 import argparse
+import base64
 import os
 import secrets
 import socket
@@ -123,8 +124,12 @@ def load_or_create_token() -> str:
             _harden(p, 0o600)
             return t
     t = secrets.token_hex(16)
-    p.write_text(t, encoding="utf-8")
-    _harden(p, 0o600)
+    # born 0600 (v0.43.2 audit): a write-then-chmod pair leaves a window in
+    # which a watcher on the same machine can read the token
+    fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(t)
+    _harden(p, 0o600)   # belt: an exotic umask or filesystem may need it
     return t
 
 
@@ -1196,25 +1201,45 @@ def _try_tray(url: str, open_downloads: Path):
 
 
 def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
-    """The silent-upgrade invocation the courier rides (v0.41.0).
+    """The silent-upgrade invocation the courier rides (v0.41.0; v0.43.2).
 
-    Detached cmd chain: a short wait lets THIS process die and hand back its
-    file locks, the installer runs silent (no wizard, no restart prompt, it
-    closes stragglers through the Restart Manager), and the freshly installed
-    app comes back up. Pure function — the tests pin the exact flags.
+    A detached PowerShell script, base64-encoded (`-EncodedCommand`). The
+    v0.41 chain handed cmd.exe a multi-command string, and subprocess on
+    Windows re-quotes such strings for CreateProcess — the embedded quotes
+    come out `\\"`, which cmd does not parse as quoting, so every path
+    boundary was a parsing edge: a `&` in %LOCALAPPDATA% broke the chain,
+    and a hostile asset NAME could have ridden the gaps (audit). As one
+    opaque ASCII argument there is nothing left to re-quote — UTF-16LE
+    base64 survives any username, path metacharacter or locale.
+
+    The script preserves the chain's promises: a short wait lets THIS
+    process die and hand back its file locks; the installer runs silent
+    (no wizard, no restart prompt, it closes stragglers through the
+    Restart Manager); the spent setup is deleted the moment the installer
+    exits; and even a failed install brings the app back up (statements
+    run in order regardless of any one step's outcome).
     """
-    inner = (f'ping -n 3 127.0.0.1 >nul & '
-             f'"{installer}" /SILENT /SP- /NORESTART /CLOSEAPPLICATIONS '
-             # the staged setup is spent the moment it exits (v0.42.1):
-             # no 36 MB installer lingers in the cache after the update
-             f'& del /f /q "{installer}"')
+
+    def q(s: str) -> str:
+        # PowerShell single-quoted literal: '' is the only escape it has
+        return "'" + s.replace("'", "''") + "'"
+
+    lines = [
+        "$ErrorActionPreference = 'SilentlyContinue'",
+        # the wait is Start-Sleep, not ping/timeout: a detached process has
+        # no console, and timeout.exe exits instantly without one (v0.41.x
+        # audit, finding 10)
+        "Start-Sleep -Seconds 2   # let the app exit and drop its file locks",
+        f"Start-Process -FilePath {q(installer)} "
+        "-ArgumentList '/SILENT','/SP-','/NORESTART','/CLOSEAPPLICATIONS' -Wait",
+        f"Remove-Item -LiteralPath {q(installer)} -Force",
+    ]
     if relaunch:
-        # single & on purpose: even a failed install brings the app back
-        # rather than stranding the user; the wait is ping, not timeout,
-        # because a detached process has no console and timeout.exe exits
-        # instantly without one (audit finding 10)
-        inner += f' & start "" "{relaunch}"'
-    return ["cmd.exe", "/c", inner]
+        lines.append(f"Start-Process -FilePath {q(relaunch)}")
+    script = "\r\n".join(lines)
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return ["powershell.exe", "-NoProfile", "-NonInteractive",
+            "-EncodedCommand", encoded]
 
 
 def _installed_exe() -> str | None:

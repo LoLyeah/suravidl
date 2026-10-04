@@ -15,6 +15,7 @@ from pathlib import Path
 import yt_dlp
 
 from .auth import explain_download_error
+from .classify import blocked_reason
 from .extract import extract_info
 
 # How many worker threads serve the queue. It equals the settings ceiling for
@@ -22,6 +23,11 @@ from .extract import extract_info
 # worker to use; waiting jobs sit in a deque, not on a thread each (v0.40.0:
 # a 20-link batch used to park 20 sleeping threads).
 POOL_SIZE = 4
+
+# A ceiling on waiting jobs (v0.43.2 audit): a caller could append to the
+# queue forever — the pool stays saturated, the deque (and every job's row)
+# does not. Past this, create() refuses and the caller backs off.
+MAX_QUEUE = 500
 
 # Bumped when the migration block in `_init_db` changes shape.
 SCHEMA_VERSION = 1
@@ -228,9 +234,15 @@ def ffmpeg_opts() -> dict:
     return {"ffmpeg_location": loc} if loc else {}
 
 
-# a language tag like `.en` or `.en-US`, nothing looser: `Name.2.vtt` is a
-# different video's sidecar, not a subtitle of `Name`
-_LANG_TAG_RE = re.compile(r"\.[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,})*")
+# A language tag, BCP-47-shaped: `.en`, `.en-US`, `.zh-Hans`, `.es-419`,
+# and yt-dlp's own `.en-orig`. The old `[A-Za-z0-9]{2,}` subtag accepted
+# `movie.hd-trailer.srt` as a subtitle of movie.mp4, and the trash button
+# deleted a file the job never wrote (v0.43.2 audit). A tag outside this
+# shape loses nothing: the sidecar simply stays put.
+_LANG_TAG_RE = re.compile(
+    r"\.[A-Za-z]{2,3}"
+    r"(?:-(?:[A-Za-z]{2}|[0-9]{3}|orig|Hans|Hant|Latn|Cyrl|Arab|Deva|Hebr"
+    r"|Jpan|Kore|Thai))*")
 
 
 def _subtitle_files(info) -> list[str]:
@@ -525,6 +537,15 @@ class JobManager:
             raise ValueError("a job needs a URL")
         if len(url) > URL_MAX:
             raise ValueError(f"that URL is too long (max {URL_MAX} characters)")
+        # one judgement, every door (v0.43.2): classify rendered it, but a
+        # job could still be created straight for a link-local address
+        why = blocked_reason(url)
+        if why:
+            raise ValueError(why)
+        if len(self._pending) >= MAX_QUEUE:
+            raise ValueError(
+                f"the queue is full ({MAX_QUEUE} waiting) — let some "
+                "downloads finish first")
 
         if overrides:
             # validated here, before a row exists: a bad patch never queues

@@ -158,16 +158,21 @@ def test_the_faq_rides_the_bay_door():
 # ---------- housekeeping: spent update files are deleted ----------
 
 def test_the_windows_chain_deletes_the_spent_setup():
+    import base64
+
     from suravidl_engine.__main__ import _windows_apply_command
 
-    joined = " ".join(_windows_apply_command(
-        r"C:\Temp\suravidl-setup.exe", r"C:\App\suravidl.exe"))
-    assert '& del /f /q "C:\\Temp\\suravidl-setup.exe"' in joined
+    argv = _windows_apply_command(r"C:\Temp\suravidl-setup.exe",
+                                  r"C:\App\suravidl.exe")
+    script = base64.b64decode(argv[-1]).decode("utf-16-le")
+    assert "Remove-Item -LiteralPath 'C:\\Temp\\suravidl-setup.exe'" in script
     # it runs AFTER the installer exits, BEFORE the relaunch
-    assert joined.index("del /f /q") > joined.index("/CLOSEAPPLICATIONS")
-    assert joined.index("del /f /q") < joined.index("& start")
-    lone = " ".join(_windows_apply_command(r"C:\Temp\setup.exe", None))
-    assert "del /f /q" in lone, "no relaunch still cleans up"
+    assert script.index("Remove-Item") > script.index("/CLOSEAPPLICATIONS")
+    assert script.index("Remove-Item") < script.index(
+        "Start-Process -FilePath 'C:\\App\\suravidl.exe'")
+    lone = base64.b64decode(
+        _windows_apply_command(r"C:\Temp\setup.exe", None)[-1]).decode("utf-16-le")
+    assert "Remove-Item" in lone, "no relaunch still cleans up"
 
 
 def test_the_mac_swap_consumes_the_zip():

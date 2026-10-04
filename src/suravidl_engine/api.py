@@ -10,7 +10,8 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import (HTMLResponse, JSONResponse, Response,
+                               StreamingResponse)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ from pydantic import BaseModel
 from . import __version__
 from .auth import (check_auth, cookie_session, explain_download_error,
                    unsupported_error)
-from .classify import classify, patterns, rank
+from .classify import blocked_reason, classify, patterns, rank
 from .download_opts import probe_extra_opts
 from .handoff import HandoffStore
 from .jobs import ACTIVE_STATUSES, JobManager, redact_job
@@ -87,6 +88,9 @@ class BatchJobRequest(BaseModel):
     urls: list[str]
     fmt: str | None = None
     headers: dict | None = None
+    # per-link captured headers (the extension's quick door, v0.43.2);
+    # `headers` stays as the flat fallback for links with no entry here
+    headers_by_url: dict | None = None
     preset: str | None = None
     playlist_items: str | None = None
     raw_args: str | None = None
@@ -107,6 +111,62 @@ class RetryRequest(BaseModel):
 
 # one batch is a click, not a crawl: a bigger paste belongs in several goes
 BATCH_MAX = 20
+
+# Nothing here accepts an upload: every request body is a small JSON
+# document (the largest is a 20-URL batch). A ceiling turns "how big can a
+# request get" from "as big as the machine's memory" into a number
+# (v0.43.2 audit).
+MAX_BODY_BYTES = 16 * 1024 * 1024
+
+
+class PayloadTooLarge(Exception):
+    """Raised mid-stream when a body crosses MAX_BODY_BYTES."""
+
+
+class BodyLimitMiddleware:
+    """Pure-ASGI body ceiling (v0.43.2 audit).
+
+    A Content-Length over the cap is refused before a byte is read; a body
+    that crosses the cap mid-stream (chunked, or a header that lied) trips
+    `PayloadTooLarge`, which the app answers as 413.
+    """
+
+    def __init__(self, app, max_bytes: int = MAX_BODY_BYTES):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        for key, value in scope.get("headers") or []:
+            if key == b"content-length":
+                try:
+                    too_big = int(value) > self.max_bytes
+                except ValueError:
+                    too_big = False
+                if too_big:
+                    return await _send_413(send)
+                break
+        seen = 0
+
+        async def guarded_receive():
+            nonlocal seen
+            message = await receive()
+            if message["type"] == "http.request":
+                seen += len(message.get("body") or b"")
+                if seen > self.max_bytes:
+                    raise PayloadTooLarge()
+            return message
+
+        return await self.app(scope, guarded_receive, send)
+
+
+async def _send_413(send) -> None:
+    body = b'{"detail": "request body too large"}'
+    await send({"type": "http.response.start", "status": 413,
+                "headers": [(b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode())]})
+    await send({"type": "http.response.body", "body": body})
 
 _MEDIA_TYPES = {
     ".mp4": "video/mp4", ".m4v": "video/x-m4v", ".webm": "video/webm",
@@ -333,6 +393,13 @@ def create_app(download_dir, auth_token: str | None = None,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    # outermost on purpose (added last): refuse an oversized body before it
+    # is buffered anywhere at all
+    app.add_middleware(BodyLimitMiddleware)
+    app.add_exception_handler(
+        PayloadTooLarge,
+        lambda request, exc: JSONResponse(
+            {"detail": "request body too large"}, status_code=413))
     if settings_path is None and db_path:
         settings_path = Path(db_path).parent / "settings.json"
     settings = Settings(path=settings_path, default_download_dir=download_dir,
@@ -457,10 +524,13 @@ def create_app(download_dir, auth_token: str | None = None,
         try:
             staged = ytdlp_update.pending_version(db_path)
             source = ytdlp_update.active_source(db_path)
+            remove_pending = ytdlp_update.removal_pending(db_path)
         except Exception:  # noqa: BLE001 - a hint must never 500 the tab
             staged = source = None
+            remove_pending = False
         return {"engine": __version__, "yt_dlp": yt_dlp.version.__version__,
-                "staged": staged, "source": source}
+                "staged": staged, "source": source,
+                "remove_pending": remove_pending}
 
     @app.post("/ytdlp/remove")
     def ytdlp_remove(_mgr: JobManager = Depends(require_auth)):
@@ -685,7 +755,14 @@ def create_app(download_dir, auth_token: str | None = None,
         Same option builder either way; the site's remembered quality rides
         along as an offer (M20): the caller marks that chip, the user still
         decides.
+
+        The link-local gate rides here too (v0.43.2): classify judged the
+        URL, but /probe and the handoff probe went straight to yt-dlp —
+        this is the one seam both of them share.
         """
+        why = blocked_reason(url)
+        if why:
+            raise ValueError(why)
         with cookie_session(settings.get()) as cookie_opts:
             info = probe(url, extra_headers=headers,
                          cookie_opts=cookie_opts,
@@ -715,7 +792,8 @@ def create_app(download_dir, auth_token: str | None = None,
             # like a sign-in wall" judgement, the UI does not guess
             raise HTTPException(status_code=400,
                                 detail=(unsupported_error(str(e))
-                                        or explain_download_error(str(e)))) from e
+                                        or explain_download_error(str(e))
+                                        or str(e))) from e
 
     @app.post("/classify")
     def classify_endpoint(body: ClassifyRequest,
@@ -749,6 +827,9 @@ def create_app(download_dir, auth_token: str | None = None,
         if not url.startswith(("http://", "https://")):
             raise HTTPException(status_code=400,
                                 detail="only http(s) links can be handed over")
+        why = blocked_reason(url)
+        if why:
+            raise HTTPException(status_code=400, detail=why)
         item = handoffs.add(url, urls=body.urls,
                             headers=body.headers, tab_url=body.tab_url)
         return {"ok": True, "id": item["id"], "status": item["status"]}
@@ -881,8 +962,9 @@ def create_app(download_dir, auth_token: str | None = None,
                                          "like https://…"})
                 continue
             try:
+                hdrs = (body.headers_by_url or {}).get(url) or body.headers
                 created.append(_queue_one(
-                    JobRequest(url=url, fmt=body.fmt, headers=body.headers,
+                    JobRequest(url=url, fmt=body.fmt, headers=hdrs,
                                preset=body.preset,
                                playlist_items=body.playlist_items,
                                raw_args=body.raw_args, overrides=body.overrides),

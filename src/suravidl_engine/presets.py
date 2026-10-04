@@ -130,7 +130,10 @@ class PresetStore:
         if not self.path:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+        # born 0600 (v0.43.2 audit), same reason as settings.py
+        fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(self._data, indent=2))
         try:
             os.chmod(self.path, 0o600)
         except OSError:

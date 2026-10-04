@@ -15,6 +15,17 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.43.2",
+        "title": "The rake",
+        "items": [
+            "Hardening pass: link-local and cloud-metadata addresses are refused everywhere \u2014 pasted, handed over from the browser, or queued as a download \u2014 with a plain reason.",
+            "The download queue has a ceiling now, and oversized requests bounce before they are read: a runaway script cannot grow either without bound.",
+            "Multi-select downloads from the browser extension carry each file's captured headers now, like the single download always did.",
+            "Remove downloaded copy, while that copy is the one running, is applied on the next start \u2014 the tab says so instead of the files vanishing mid-session.",
+            "Windows self-updates run through one opaque command: special characters in usernames or folders can no longer break the installer chain. Settings and token files are born owner-only.",
+        ],
+    },
+    {
         "version": "0.43.1",
         "title": "The undo",
         "items": [
@@ -87,13 +98,6 @@ ENTRIES = [
         "items": [
             "suravidl can put itself in your menu now: run the release binary once with --install-desktop and it appears like an installed app \u2014 Start Menu on Windows, applications menu on Linux.",
             "No admin rights, nothing outside your own folders, and --uninstall-desktop takes it back out; installing never starts the engine or opens a window.",
-        ],
-    },
-    {
-        "version": "0.40.8",
-        "title": "The swarm",
-        "items": [
-            "Everything the project checks now runs on all the machine's cores at once \u2014 the same careful checks in a fraction of the time, so fixes and features reach you sooner.",
         ],
     }
 ]

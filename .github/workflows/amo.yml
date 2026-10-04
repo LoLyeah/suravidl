@@ -74,6 +74,24 @@ jobs:
           # "Waiting for validation…" appears in both outcomes.
           bash .github/scripts/amo_verdict.sh /tmp/amo-sign.log "$status"
 
+      - name: Scrub the submission log
+        # the artifact is public; GitHub masks secrets in log DISPLAY, not
+        # in uploaded file contents — replace the JWT wherever it appears
+        # (v0.43.2 audit)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          p = pathlib.Path("/tmp/amo-sign.log")
+          if p.exists():
+              t = p.read_text(errors="replace")
+              for var in ("AMO_JWT_SECRET", "AMO_JWT_ISSUER"):
+                  v = os.environ.get(var, "")
+                  if v:
+                      t = t.replace(v, "[redacted]")
+              p.write_text(t)
+          PY
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

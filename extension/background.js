@@ -324,7 +324,15 @@ async function sendToEngine(url) {
 async function sendBatchToEngine(urls) {
   const list = (urls || []).filter(Boolean).slice(0, 20);
   if (!list.length) return { ok: false, error: "nothing to send" };
-  const stored = await api.storage.local.get({ engineToken: "" });
+  const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
+  // v0.43.2: the single quick door rides the captured request headers (an
+  // auth-walled stream refuses without them) — the batch door must too.
+  // One map keyed by URL; links with nothing captured fall back engine-side.
+  const headersByUrl = {};
+  for (const u of list) {
+    const h = stored.reqHeaders[u] && stored.reqHeaders[u].headers;
+    if (h && Object.keys(h).length) headersByUrl[u] = h;
+  }
   const eng = await resolveEngine();
   if (!eng.ok) {
     return { ok: false, error: "cannot reach the engine at " + eng.base +
@@ -338,7 +346,9 @@ async function sendBatchToEngine(urls) {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + stored.engineToken,
       },
-      body: JSON.stringify({ urls: list }),
+      body: JSON.stringify(Object.keys(headersByUrl).length
+        ? { urls: list, headers_by_url: headersByUrl }
+        : { urls: list }),
     });
   } catch (e) {
     RESOLVED = "";   // it moved: look again next time

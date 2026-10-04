@@ -27,12 +27,24 @@ import os
 import re
 import shutil
 import sys
+import threading
 import urllib.request
 import zipfile
 from pathlib import Path
 
 from . import __version__
 from .net import ssl_context
+
+# One staging run per process (v0.43.2 audit): POST /update is synchronous,
+# and two worker threads share os.getpid() — the same part file, the same
+# stage directory, interleaved writes. The second caller gets an honest
+# busy answer instead.
+_STAGE_LOCK = threading.Lock()
+
+# A scheduled removal (v0.43.2): an ACTIVE copy cannot be unlinked while the
+# process runs (yt-dlp imports extractors from it lazily), so the request
+# lands as a marker file and activate() honours it at the next start.
+_REMOVE_MARKER = "remove-pending"
 
 PYPI_JSON = "https://pypi.org/pypi/yt-dlp/json"
 ALLOWED_HOST = "files.pythonhosted.org"
@@ -188,6 +200,13 @@ def activate(db_path=None) -> str | None:
             return shadow_version(shadow)
         if not shadow.is_dir():
             return None
+        if (shadow / _REMOVE_MARKER).exists():
+            # the user asked for this while the copy was live last session
+            # (v0.43.2): this is the first start where nothing has imported
+            # from it, so deleting it now cannot break anything
+            _dbg("activate: pending removal - dropping the downloaded copy")
+            shutil.rmtree(shadow, ignore_errors=True)
+            return None
         sv = shadow_version(shadow)
         _dbg(f"activate: shadow_version={sv!r}")
         if sv is None:
@@ -247,19 +266,33 @@ def active_source(db_path=None) -> str:
 
 
 def remove_shadow(db_path=None) -> dict:
-    """Delete the downloaded copy; the bundled one takes over.
+    """Remove the downloaded copy; the bundled one takes over.
 
-    A staged copy is canceled on the spot. An active one keeps serving
-    from memory until the next start — Python cannot hot-swap loaded
-    modules, the same reason updates apply on restart. Only the files
-    this feature created are touched; the bundle is never modified.
+    A staged copy is canceled on the spot — nothing has imported from it.
+    An ACTIVE copy is different: its modules are loaded, and yt-dlp pulls
+    extractor submodules from that directory lazily for as long as the
+    process lives, so deleting it mid-run turns the next unseen site into
+    a ModuleNotFoundError (v0.43.2 audit). The removal is scheduled
+    instead: a marker file lands inside the copy, `activate()` drops it
+    at the next start — before anything has imported from it — and the
+    bundle serves from then on. Only the files this feature created are
+    ever touched; the bundle is never modified.
     """
     base = _app_data_dir(db_path)
     shadow = _shadow_dir(db_path)
     _sweep_leftovers(base)
-    if not shadow.exists():
-        return {"ok": True, "removed": False, "version": None}
+    if not shadow.is_dir():
+        return {"ok": True, "removed": False, "pending": False,
+                "version": None}
     ver = shadow_version(shadow)
+    if str(shadow) in sys.path:
+        try:
+            (shadow / _REMOVE_MARKER).write_text("1", encoding="utf-8")
+        except OSError as e:
+            return {"ok": False, "removed": False, "pending": False,
+                    "version": ver,
+                    "detail": f"couldn't schedule the removal: {e}"}
+        return {"ok": True, "removed": False, "pending": True, "version": ver}
     shutil.rmtree(shadow, ignore_errors=True)
     # drop any stale sys.path entry too — a path that points at nothing
     # must not linger for whatever asks next
@@ -267,7 +300,15 @@ def remove_shadow(db_path=None) -> dict:
     while s in sys.path:
         sys.path.remove(s)
     gone = not shadow.exists()
-    return {"ok": gone, "removed": gone, "version": ver}
+    return {"ok": gone, "removed": gone, "pending": False, "version": ver}
+
+
+def removal_pending(db_path=None) -> bool:
+    """True when a removal is scheduled for the next start (v0.43.2)."""
+    try:
+        return (_shadow_dir(db_path) / _REMOVE_MARKER).exists()
+    except Exception:  # noqa: BLE001 - a hint must never fail
+        return False
 
 
 def _fetch_json(url: str = PYPI_JSON) -> dict:
@@ -388,45 +429,50 @@ def stage_update(db_path=None, *, fetch_json=None, download=None,
         return {"ok": False, "updated": False, "bundled": True,
                 "before": before, "after": before, "detail": detail}
 
+    if not _STAGE_LOCK.acquire(blocking=False):
+        return fail("another yt-dlp update is already running")
     try:
-        payload = fetch_json()
-    except Exception as e:  # noqa: BLE001 - surfaced to the client
-        return fail(f"couldn't reach PyPI: {e}")
-    latest = pick_stable(payload)
-    if latest is None:
-        return fail("no suitable yt-dlp release found on PyPI")
-    if not is_newer(latest["version"], before):
-        return {"ok": True, "updated": False, "bundled": True,
-                "before": before, "after": before,
-                "detail": f"already on the latest release ({before})"}
-    if latest["size"] and latest["size"] > MAX_WHEEL:
-        return fail(f"refusing a {latest['size']}-byte wheel")
-    base.mkdir(parents=True, exist_ok=True)
-    part = base / "ytdlp.whl.part"
-    stage = base / f"ytdlp.stage.{os.getpid()}"
-    shadow = _shadow_dir(db_path)
-    try:
-        _sweep_leftovers(base)
-        download(latest["url"], part)
-        got = _file_sha256(part)
-        if got != latest["sha256"]:
-            raise ValueError(
-                f"sha256 mismatch (wanted {latest['sha256'][:12]}…, got {got[:12]}…)")
-        _extract_wheel(part, stage, expect_version=latest["version"])
-        (stage / "staged.json").write_text(json.dumps({
-            "version": latest["version"], "baseline": before,
-            "app": __version__}))
-        _swap_in(stage, shadow)
-    except Exception as e:  # noqa: BLE001 - surfaced to the client
-        shutil.rmtree(stage, ignore_errors=True)
-        _unlink(part)
-        return fail(str(e))
+        try:
+            payload = fetch_json()
+        except Exception as e:  # noqa: BLE001 - surfaced to the client
+            return fail(f"couldn't reach PyPI: {e}")
+        latest = pick_stable(payload)
+        if latest is None:
+            return fail("no suitable yt-dlp release found on PyPI")
+        if not is_newer(latest["version"], before):
+            return {"ok": True, "updated": False, "bundled": True,
+                    "before": before, "after": before,
+                    "detail": f"already on the latest release ({before})"}
+        if latest["size"] and latest["size"] > MAX_WHEEL:
+            return fail(f"refusing a {latest['size']}-byte wheel")
+        base.mkdir(parents=True, exist_ok=True)
+        part = base / "ytdlp.whl.part"
+        stage = base / f"ytdlp.stage.{os.getpid()}"
+        shadow = _shadow_dir(db_path)
+        try:
+            _sweep_leftovers(base)
+            download(latest["url"], part)
+            got = _file_sha256(part)
+            if got != latest["sha256"]:
+                raise ValueError(
+                    f"sha256 mismatch (wanted {latest['sha256'][:12]}…, got {got[:12]}…)")
+            _extract_wheel(part, stage, expect_version=latest["version"])
+            (stage / "staged.json").write_text(json.dumps({
+                "version": latest["version"], "baseline": before,
+                "app": __version__}))
+            _swap_in(stage, shadow)
+        except Exception as e:  # noqa: BLE001 - surfaced to the client
+            shutil.rmtree(stage, ignore_errors=True)
+            _unlink(part)
+            return fail(str(e))
+        finally:
+            _unlink(part)
+        return {"ok": True, "updated": True, "bundled": True,
+                "before": before, "after": latest["version"],
+                "restart": True,
+                "detail": f"staged {latest['version']} — applies on next start"}
     finally:
-        _unlink(part)
-    return {"ok": True, "updated": True, "bundled": True,
-            "before": before, "after": latest["version"],
-            "restart": True,
-            "detail": f"staged {latest['version']} — applies on next start"}
+        _STAGE_LOCK.release()
 
 
 def pending_version(db_path=None) -> str | None:

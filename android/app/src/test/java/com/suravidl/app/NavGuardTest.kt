@@ -70,4 +70,35 @@ class NavGuardTest {
         assertFalse(AdHosts.blocked("https://video.example.com/stream.mp4"))
         assertFalse(AdHosts.blocked("not a url"))
     }
+
+    @Test
+    fun hostResolvesBackslashesTheWayBrowsersDo() {
+        // every browser reads `\` as `/` when resolving a URL: the scan used
+        // to treat it as an ordinary character, name the wrong host, and let
+        // the hop through (v0.43.2 audit)
+        assertEquals(
+            "attacker.com",
+            NavGuard.host("https://attacker.com\\sub.trusted-site.com/video")
+        )
+        assertNotNull(
+            NavGuard.blockReason(
+                "https://sub.trusted-site.com/watch",
+                "https://attacker.com\\sub.trusted-site.com/video"
+            )
+        )
+    }
+
+    @Test
+    fun hostStripsWhitespaceTheWayBrowsersDo() {
+        // tab/CR/LF vanish before parsing: `trusted.com\t@evil.com` resolves
+        // to evil.com (userinfo), and the guard must agree
+        assertEquals(
+            "evil.com",
+            NavGuard.host("https://trusted.com\t@evil.com/")
+        )
+        assertNotNull(
+            NavGuard.blockReason(
+                "https://trusted.com/watch", "https://trusted.com\t@evil.com/")
+        )
+    }
 }

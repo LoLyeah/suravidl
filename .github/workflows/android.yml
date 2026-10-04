@@ -56,10 +56,13 @@ jobs:
           gradle-version: '8.7'
       - name: Restore signing keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > /tmp/suravidl-release.keystore
-          echo "ANDROID_KEYSTORE_FILE=/tmp/suravidl-release.keystore" >> "$GITHUB_ENV"
-          echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/suravidl-release.keystore"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/suravidl-release.keystore" >> "$GITHUB_ENV"
       - name: Build signed release APK
+        # the password is step-scoped on purpose (v0.43.2 audit): exporting
+        # it job-wide would hand it to every later step's environment
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: gradle -p android assembleRelease --no-daemon
       - name: Verify signature
         run: $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs android/app/build/outputs/apk/release/app-release.apk
@@ -102,9 +105,10 @@ jobs:
       - name: Attach the APK and fold it into the update manifest
         env:
           GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          TAG="${{ github.ref_name }}"
+          TAG="$REF_NAME"
           REPO="${{ github.repository }}"
           # wait (bounded, ~20 min) for the release AND its manifest: the
           # release-published event can start us while the release job is

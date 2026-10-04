@@ -88,4 +88,35 @@ class CookieVaultTest {
         assertTrue(session!!.readText().contains(marker))
         CookieVault.delete(ctx)
     }
+
+    @Test(timeout = 60_000)
+    fun a_disk_failure_keeps_the_vault_and_says_so() {
+        // v0.43.2 audit: a write failure for the session file used to run
+        // the same catch as an unreadable blob — the encrypted vault was
+        // deleted and the message blamed the key. Disk trouble is not the
+        // key's fault, and the vault must survive it.
+        CookieVault.delete(ctx)
+        CookieVault.save(ctx, sample.toByteArray())
+        // the portable stand-in for "the disk refuses": a directory cannot
+        // be opened as a file, which is exactly the failure shape
+        val session = File(ctx.filesDir, "cookies.session.txt")
+        session.delete()
+        assertTrue(session.mkdirs())
+        try {
+            val failure = try {
+                CookieVault.unlockForSession(ctx)
+                null
+            } catch (t: IllegalStateException) {
+                t
+            }
+            assertNotNull("a write failure must surface", failure)
+            assertTrue("the message must not blame the key",
+                       failure!!.message!!.contains("intact"))
+            assertTrue("the encrypted vault must survive", CookieVault.has(ctx))
+            assertTrue(File(ctx.filesDir, "cookies.enc").exists())
+        } finally {
+            session.delete()
+            CookieVault.delete(ctx)
+        }
+    }
 }

@@ -2280,7 +2280,11 @@ async function loadVersions() {
     const row = $("ytdlpRemoveRow"), hint = $("ytdlpRemoveHint");
     if (row) {
       row.hidden = !(v.source === "downloaded" || v.staged);
-      if (hint) hint.textContent = v.staged
+      const btn = $("removeBtn");
+      if (btn) btn.hidden = !!v.remove_pending;   // nothing left to remove
+      if (hint) hint.textContent = v.remove_pending
+        ? "removal is set — the bundled copy takes over on the next start"
+        : v.staged
         ? (v.source === "downloaded"
           ? "a newer copy from PyPI is staged — removing deletes the downloaded copy and cancels the stage"
           : "a copy from PyPI is staged — removing cancels it")
@@ -2722,7 +2726,9 @@ $("removeBtn").onclick = async () => {
   try {
     const r = await api("/ytdlp/remove", { method: "POST" });
     loadVersions();
-    if (r.was_active)
+    if (r.pending)
+      toast("removal is set — the downloaded copy goes at the next start");
+    else if (r.was_active)
       toast("downloaded copy removed — bundled yt-dlp from the next start");
     else if (r.removed) toast("staged copy removed");
     else toast("nothing to remove");

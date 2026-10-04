@@ -29,7 +29,16 @@ object NavGuard {
         val scheme = url.substring(0, schemeAt).lowercase()
         if (scheme != "http" && scheme != "https") return null
         var rest = url.substring(schemeAt + 3)
-        val cut = rest.indexOfFirst { it == '/' || it == '?' || it == '#' }
+        // Browsers strip tab/CR/LF anywhere and read `\` as `/` before they
+        // resolve a URL: `https://evil.com\sub.trusted.com/x` navigates to
+        // evil.com. The v0.39.7 scan treated the backslash as an ordinary
+        // character and named `sub.trusted.com` — so the hop passed the
+        // off-site check and the page was replaced anyway (v0.43.2 audit).
+        // Resolve those characters the way the browser will, then scan.
+        rest = rest.replace("\t", "").replace("\r", "").replace("\n", "")
+        val cut = rest.indexOfFirst {
+            it == '/' || it == '?' || it == '#' || it == '\\' || it == ' '
+        }
         if (cut >= 0) rest = rest.substring(0, cut)
         val at = rest.lastIndexOf('@')            // userinfo is not the host
         if (at >= 0) rest = rest.substring(at + 1)

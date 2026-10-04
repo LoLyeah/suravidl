@@ -331,20 +331,27 @@ def test_apply_is_honest_without_an_applier(tmp_path):
 # --- the desktop applier (pins; the real spawn is Windows-only) -------------
 
 def test_the_silent_upgrade_command_keeps_its_flags():
+    import base64
+
     from suravidl_engine.__main__ import _windows_apply_command
 
-    joined = " ".join(_windows_apply_command(
-        "C:\\Temp\\suravidl-setup.exe", "C:\\App\\suravidl.exe"))
-    assert "/SILENT" in joined and "/SP-" in joined
-    assert "/NORESTART" in joined          # we own the relaunch
-    assert "/CLOSEAPPLICATIONS" in joined  # stragglers let go via RM
-    assert '"C:\\Temp\\suravidl-setup.exe"' in joined
-    assert '"C:\\App\\suravidl.exe"' in joined
+    argv = _windows_apply_command("C:\\Temp\\suravidl-setup.exe",
+                                  "C:\\App\\suravidl.exe")
+    # one opaque argument (v0.43.2): nothing for CreateProcess re-quoting
+    # to mangle — decode and read the script it will run
+    assert argv[0] == "powershell.exe" and "-EncodedCommand" in argv
+    script = base64.b64decode(argv[-1]).decode("utf-16-le")
+    assert "/SILENT" in script and "/SP-" in script
+    assert "/NORESTART" in script          # we own the relaunch
+    assert "/CLOSEAPPLICATIONS" in script  # stragglers let go via RM
+    assert "'C:\\Temp\\suravidl-setup.exe'" in script
+    assert "'C:\\App\\suravidl.exe'" in script
     # the wait must survive a DETACHED process (no console): timeout.exe
-    # dies instantly with no stdin, ping does not (v0.41.x audit, finding 10)
-    assert "ping -n 3 127.0.0.1" in joined
-    # single & on purpose: the app comes back even if the installer failed
-    assert "& start" in joined
+    # dies instantly with no stdin — Start-Sleep is the console-free wait
+    assert "Start-Sleep" in script
+    # statements run in order regardless of any one step's outcome: the
+    # app comes back even if the installer failed
+    assert script.index("Start-Process") < script.index("Remove-Item")
 
 
 def test_the_applier_honestly_refuses_outside_windows(tmp_path):

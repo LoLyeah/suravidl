@@ -113,9 +113,13 @@ jobs:
       - name: Build Windows installer
         if: matrix.os == 'windows-2022'
         shell: pwsh
+        env:
+          # ref names can come from a branch or dispatch; they reach the
+          # shell via the environment, never by interpolation (v0.43.2)
+          REF_NAME: ${{ github.ref_name }}
         run: |
           # pwsh keeps /D flags unmangled (msys would rewrite them)
-          $version = '${{ github.ref_name }}' -replace '^v', ''
+          $version = $env:REF_NAME -replace '^v', ''
           if (-not $version) { $version = '0.0.0' }
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
           if (-not (Test-Path $iscc)) {
@@ -177,9 +181,11 @@ jobs:
           merge-multiple: true
           path: dist
       - name: Write the update manifest (version.json + SHA256SUMS)
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
           python3 scripts/generate_release_manifest.py dist \
-              --tag "${{ github.ref_name }}" --repo "${{ github.repository }}"
+              --tag "$REF_NAME" --repo "${{ github.repository }}"
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
@@ -191,4 +197,5 @@ jobs:
       - name: Dispatch the Android attach on the tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run android.yml --ref "${{ github.ref_name }}"
+          REF_NAME: ${{ github.ref_name }}
+        run: gh workflow run android.yml --ref "$REF_NAME"

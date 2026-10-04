@@ -301,6 +301,9 @@ ok(mCall && JSON.parse(mCall.opts.body).url === "https://site/watch",
 
 // 6. the popup's quick door for several finds (v0.40.7): one batch call to
 // the engine's own batch endpoint — /jobs/batch, never N single jobs
+// v0.43.2: the batch rides each find's captured headers like the single
+// quick door does — seed one and watch it come through keyed by URL
+store.reqHeaders = { "https://cdn/a.mp4": { headers: { Referer: "https://site/" } } };
 const batched = await new Promise((resolve) => {
   const keep = onMessage({ type: "sendBatch",
                            urls: ["https://cdn/a.mp4", "https://cdn/b.mp4"] }, {}, resolve);
@@ -312,6 +315,12 @@ ok(batchCall && JSON.parse(batchCall.opts.body).urls.length === 2,
    "carrying every ticked find");
 ok(batchCall && String(batchCall.opts.headers.Authorization).startsWith("Bearer"),
    "…with the engine token");
+const batchBody = batchCall && JSON.parse(batchCall.opts.body);
+ok(batchBody && batchBody.headers_by_url &&
+   batchBody.headers_by_url["https://cdn/a.mp4"].Referer === "https://site/",
+   "the captured headers ride the batch, keyed by URL");
+ok(batchBody && !batchBody.headers_by_url["https://cdn/b.mp4"],
+   "links with nothing captured stay out of the map");
 ok(batched && batched.ok && batched.queued === 2,
    "the engine's own count comes back to the popup");
 

@@ -82,17 +82,12 @@ object CookieVault {
         if (!source.exists()) return null
         val blob = source.readBytes()
         val out = File(context.filesDir, SESSION)
-        try {
+        val plain = try {
             require(blob.size > IV_LEN) { "cookie blob is truncated" }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key(),
                         GCMParameterSpec(128, blob.copyOfRange(0, IV_LEN)))
-            val plain = cipher.doFinal(blob.copyOfRange(IV_LEN, blob.size))
-            out.outputStream().use { it.write(plain) }
-            ownerOnly(out)
-            plain.fill(0)
-            File(context.filesDir, LEGACY).delete()
-            return out
+            cipher.doFinal(blob.copyOfRange(IV_LEN, blob.size))
         } catch (t: Throwable) {
             // A blob this device's key cannot open is unreadable forever: that
             // key never leaves the Keystore and does not survive a reinstall or
@@ -104,6 +99,25 @@ object CookieVault {
                 "the saved cookies cannot be read on this device (the key does " +
                 "not survive a reinstall or a restore) — import cookies.txt again",
                 t)
+        }
+        try {
+            out.outputStream().use { it.write(plain) }
+            ownerOnly(out)
+            File(context.filesDir, LEGACY).delete()
+            return out
+        } catch (t: Throwable) {
+            // A disk that refuses the session file is NOT a bad key (v0.43.2
+            // audit: this path used to delete the encrypted vault too, on
+            // anything from a full disk to a transient I/O error, and blame
+            // the key while doing it). Drop the partial write, keep the
+            // vault, say what actually happened.
+            out.delete()
+            throw IllegalStateException(
+                "the saved cookies are intact, but the session file could " +
+                "not be written — check the device's storage and try again",
+                t)
+        } finally {
+            plain.fill(0)
         }
     }
 

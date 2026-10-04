@@ -61,7 +61,8 @@ def test_remove_shadow_with_nothing_downloaded_is_a_quiet_noop(tmp_path):
     from suravidl_engine import ytdlp_update as yu
 
     r = yu.remove_shadow(db_path=tmp_path / "jobs.db")
-    assert r == {"ok": True, "removed": False, "version": None}
+    assert r == {"ok": True, "removed": False, "pending": False,
+                 "version": None}
 
 
 def test_remove_shadow_also_cleans_stage_scratch(tmp_path):
@@ -76,27 +77,33 @@ def test_remove_shadow_also_cleans_stage_scratch(tmp_path):
         assert not (tmp_path / leftover).exists(), leftover
 
 
-def test_removal_also_drops_the_stale_import_path_entry(tmp_path, monkeypatch):
-    # a deleted directory left on sys.path would keep shadowing nothing —
-    # it must not linger for whatever asks next (v0.43.0 regression terms)
+def test_removing_an_active_copy_schedules_and_keeps_the_path_entry(tmp_path, monkeypatch):
+    # an ACTIVE copy cannot be unlinked mid-run (v0.43.2): yt-dlp imports
+    # extractors from its directory lazily, so the removal is scheduled —
+    # a marker drops it at the next start instead
+    from suravidl_engine import ytdlp_update as yu
+
+    sh = _plant_shadow(tmp_path, "2026.9.9")
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
+    body = yu.remove_shadow(db_path=tmp_path / "jobs.db")
+    assert body["pending"] is True and body["removed"] is False
+    assert (sh / "remove-pending").exists()
+    assert str(sh) in sys.path        # loaded modules still need it
+
+
+def test_after_removal_the_bundle_takes_over(tmp_path, monkeypatch):
     from suravidl_engine import ytdlp_update as yu
 
     sh = _plant_shadow(tmp_path, "2026.9.9")
     monkeypatch.setattr(sys, "path", list(sys.path))
     assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
     yu.remove_shadow(db_path=tmp_path / "jobs.db")
-    assert str(sh) not in sys.path
-
-
-def test_after_removal_the_bundle_takes_over(tmp_path, monkeypatch):
-    from suravidl_engine import ytdlp_update as yu
-
-    _plant_shadow(tmp_path, "2026.9.9")
-    monkeypatch.setattr(sys, "path", list(sys.path))
-    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
-    yu.remove_shadow(db_path=tmp_path / "jobs.db")
-    # what the next start sees: nothing staged, nothing on the path
+    assert sh.is_dir()                # still serving THIS session
+    # what the next start sees: the marker honored, nothing on the path
+    monkeypatch.setattr(sys, "path", [p for p in sys.path if p != str(sh)])
     assert yu.activate(db_path=tmp_path / "jobs.db") is None
+    assert not sh.exists()
 
 
 def test_active_source_names_the_running_copy(tmp_path, monkeypatch):
@@ -117,6 +124,7 @@ def test_version_reports_the_source_and_the_stage(tmp_path):
         v = c.get("/version", headers=AUTH).json()
         assert v["source"] in ("environment", "bundled")
         assert v["staged"] is None
+        assert v["remove_pending"] is False
         _plant_shadow(tmp_path, "2026.9.9")
         v2 = c.get("/version", headers=AUTH).json()
         # on disk but not yet active: staged, and the source is unchanged
@@ -153,8 +161,15 @@ def test_remove_endpoint_takes_over_from_an_active_copy(tmp_path, monkeypatch):
         v = c.get("/version", headers=AUTH).json()
         assert v["source"] == "downloaded"
         body = c.post("/ytdlp/remove", headers=AUTH).json()
-        assert body["was_active"] is True and body["removed"] is True
-        assert not (tmp_path / "ytdlp").exists()
+        # active copy: scheduled, not unlinked (v0.43.2) — the next start
+        # drops it before anything can import from it
+        assert body["was_active"] is True
+        assert body["pending"] is True and body["removed"] is False
+        assert c.get("/version", headers=AUTH).json()["remove_pending"] is True
+    sh = tmp_path / "ytdlp"
+    monkeypatch.setattr(sys, "path", [p for p in sys.path if p != str(sh)])
+    assert yu.activate(db_path=tmp_path / "jobs.db") is None
+    assert not sh.exists()
 
 
 # -- web: the tab carries the undo --------------------------------------------
@@ -181,13 +196,16 @@ def test_the_versions_line_shows_where_the_copy_comes_from():
         assert marker in APPJS
 
 
-def test_the_handful_entry_retired_cleanly_with_the_twelfth():
-    """The rolling card keeps ten entries — v0.43.1's entry pushed out
-    "The handful" (0.40.7). Its feature lives on in test_v407_handful.py,
-    its words live in the release notes, and no half-entry may remain here."""
+def test_the_swarm_entry_retired_cleanly_with_the_thirteenth():
+    """The rolling card keeps ten entries — v0.43.2's entry pushed out
+    "The swarm" (0.40.8). Its feature lives on in the suite, its words
+    live in the release notes, and no half-entry may remain here."""
     from suravidl_engine import whatsnew
 
     versions = [e["version"] for e in whatsnew.ENTRIES]
+    titles = [e["title"] for e in whatsnew.ENTRIES]
     assert len(versions) == 10
-    assert "0.40.7" not in versions
-    assert all(e["title"] != "The handful" for e in whatsnew.ENTRIES)
+    assert versions[0] == "0.43.2"
+    assert "0.40.8" not in versions
+    assert "The swarm" not in titles
+    assert "0.40.7" not in versions    # the earlier retirement stays retired

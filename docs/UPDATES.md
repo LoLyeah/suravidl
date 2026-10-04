@@ -76,9 +76,12 @@ the **Update yt-dlp** button on those builds fetches the official wheel
 from PyPI, verifies its sha256 against PyPI's own metadata, and unpacks it
 next to `jobs.db` (in a `ytdlp/` folder). From the next start the newer
 copy shadows the bundled one, and the tab shows "staged — restart to use
-it" until it is live. **Remove downloaded copy** deletes it again: a
-staged copy is canceled at once, an active one hands back to the bundled
-yt-dlp on the next start. The bundle itself is never touched.
+it" until it is live. **Remove downloaded copy** ends it again: a staged
+copy is canceled at once; an active one is scheduled — the running
+process keeps serving from it (yt-dlp reads parts of that copy lazily,
+so pulling it out mid-run would break the next download), and the bundled
+one takes over on the next start, which the tab says. The bundle itself
+is never touched.
 
 The newer copy wins **by version**, always: if an app update ever ships
 something newer than the staged copy, the stage is removed on the next
