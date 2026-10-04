@@ -10,7 +10,6 @@ extension, desktop app, Android app. It downloads anything yt-dlp understands
 [![release](https://img.shields.io/github/v/release/LoLyeah/suravidl?style=for-the-badge&label=release&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases/latest)
 [![build](https://img.shields.io/github/actions/workflow/status/LoLyeah/suravidl/ci.yml?style=for-the-badge&label=build&logo=githubactions&logoColor=white)](https://github.com/LoLyeah/suravidl/actions/workflows/ci.yml)
 [![downloads](https://img.shields.io/github/downloads/LoLyeah/suravidl/total?style=for-the-badge&label=downloads&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases)
-[<img src="docs/img/obtainium-badge.png" height="48" alt="Get it on Obtainium">](https://github.com/ImranR98/Obtainium/releases/latest)
 
 [![mozilla add-on](https://img.shields.io/amo/v/suravidl.svg)](https://addons.mozilla.org/en-US/firefox/addon/suravidl/)
 [![chrome / edge](https://img.shields.io/badge/chrome%20%2F%20edge-zip-blue.svg)](https://github.com/LoLyeah/suravidl/releases/latest/download/suravidl-extension-chrome.zip)
