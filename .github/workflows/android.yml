@@ -4,9 +4,11 @@ on:
   push:
     branches: [main]
     paths: ["android/**", "src/**", ".github/workflows/android.yml"]
-  # the release workflow creates the release: that event starts this run,
-  # so the APK rides a tag without a manual dispatch. Dispatch stays as the
-  # fallback; both paths wait for the release's manifest before attaching.
+  # release: published fires only for releases published by a PERSON (UI or
+  # a PAT) -- a release created with GITHUB_TOKEN emits no events that start
+  # workflows. The automated cut arrives via release.yml's workflow_dispatch
+  # call instead (the documented exception). Every path waits for the
+  # release's version.json before attaching, so an early start is safe.
   release:
     types: [published]
   workflow_dispatch:

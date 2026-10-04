@@ -112,6 +112,11 @@ def test_the_release_workflow_builds_and_attaches_the_installer():
     # would hold the feed back by design — the courier went stable with
     # v0.41.1, so re-adding "prerelease" here is a deliberate, reviewable act
     assert "prerelease" not in yml
+    # the automated cut dispatches the android attach itself: a release
+    # created with GITHUB_TOKEN emits no events, and workflow_dispatch is
+    # the exception that makes this call start a run
+    assert "gh workflow run android.yml --ref" in yml
+    assert "actions: write" in yml
 
 
 def _gen_no_apk(tmp_path: Path) -> Path:

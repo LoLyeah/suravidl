@@ -1,0 +1,10 @@
+release: the publish dispatches the android attach itself
+
+A release created with GITHUB_TOKEN produces no events that start other
+workflows (GitHub's anti-recursion rule), so android.yml's
+release:published trigger only fires for a release a PERSON publishes.
+workflow_dispatch is the documented exception to that rule, so the
+publish job now dispatches android.yml on the tag itself; it gains
+actions: write for it. The trigger comment on android.yml records why
+both doors exist, and every path still waits for version.json before
+attaching.

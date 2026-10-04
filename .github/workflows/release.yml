@@ -137,6 +137,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write        # the android dispatch below needs it
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -151,3 +152,11 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+      # The release was created with GITHUB_TOKEN: events it produces do not
+      # start other workflows (GitHub's anti-recursion rule) -- except
+      # workflow_dispatch, which is exactly this call. The android run then
+      # puts the APK on the tag and folds it into version.json.
+      - name: Dispatch the Android attach on the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run android.yml --ref "${{ github.ref_name }}"
