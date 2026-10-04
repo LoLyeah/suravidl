@@ -16,8 +16,8 @@ AppName=suravidl
 AppVersion={#AppVersion}
 ; per-user installation into user profile without requiring administrator elevation
 PrivilegesRequired=lowest
-; suppress install-mode dialog so users are never prompted for admin credentials
-PrivilegesRequiredOverridesAllowed=none
+; no PrivilegesRequiredOverridesAllowed directive on purpose: absent, it means no
+; override at all, so users are never offered a mode that asks for admin rights
 DefaultDirName={localappdata}\Programs\suravidl
 ; disable start menu group page because modern windows apps use a direct shortcut
 DisableProgramGroupPage=yes
