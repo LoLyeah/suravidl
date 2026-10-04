@@ -87,13 +87,30 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: suravidl-release-apk
           path: apk
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: apk/app-release.apk
+      - name: Attach the APK and fold it into the update manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          # the release must exist (the release workflow creates it first);
+          # fail loudly instead of letting an uploader create a stray release
+          gh release view "$TAG" --repo "$REPO" > /dev/null
+          gh release upload "$TAG" apk/app-release.apk --clobber --repo "$REPO"
+          # the APK lands after version.json was written - fold it in so the
+          # manifest on the release always describes the complete release
+          gh release download "$TAG" --repo "$REPO" \
+              --pattern version.json --pattern SHA256SUMS.txt --dir meta
+          python3 scripts/refresh_update_manifest.py meta apk/app-release.apk \
+              --tag "$TAG" --repo "$REPO"
+          gh release upload "$TAG" meta/version.json meta/SHA256SUMS.txt \
+              --clobber --repo "$REPO"
 
   instrumentation:
     runs-on: ubuntu-latest

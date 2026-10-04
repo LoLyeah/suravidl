@@ -14,6 +14,10 @@ Each release carries a small `version.json` (plus `SHA256SUMS.txt`), written by
   manifest.
 - Download URLs inside the manifest are pinned to their own tag, so the sha256
   it carries always describes the bytes that URL serves.
+- The APK is built by the android workflow and attached after the release is
+  created; the attach step folds it into `version.json` and `SHA256SUMS.txt`
+  (re-uploaded with `--clobber`), so the manifest on a release always
+  describes the complete release.
 - Privacy: one plain HTTPS GET. No query parameters, no cookies, no
   identifiers, no telemetry. A failed check is reported once, never retried in
   a loop.

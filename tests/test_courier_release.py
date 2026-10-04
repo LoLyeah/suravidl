@@ -103,3 +103,60 @@ def test_the_release_workflow_builds_and_attaches_the_installer():
     # pre-release until the courier feature is verified — flipping this line
     # back is a deliberate, reviewable act
     assert "prerelease" in yml
+
+
+def _gen_no_apk(tmp_path: Path) -> Path:
+    dist = _make_dist(tmp_path)
+    (dist / "app-release.apk").unlink()      # the apk is attached later
+    assert _gen(dist).returncode == 0
+    return dist
+
+
+def _refresh(meta: Path, apk: Path):
+    return subprocess.run(
+        [sys.executable, str(ROOT / "scripts/refresh_update_manifest.py"),
+         str(meta), str(apk), "--tag", "v0.41.0", "--repo", "LoLyeah/suravidl"],
+        capture_output=True, text=True)
+
+
+def test_the_apk_folds_into_the_manifest(tmp_path):
+    dist = _gen_no_apk(tmp_path)
+    apk = tmp_path / "app-release.apk"
+    apk.write_bytes(b"APK!")
+    r = _refresh(dist, apk)
+    assert r.returncode == 0, r.stderr
+    m = json.loads((dist / "version.json").read_text())
+    # the APK joins the assets with the same pinned-URL + hash discipline ...
+    entry = m["assets"]["app-release.apk"]
+    assert entry["sha256"] == hashlib.sha256(b"APK!").hexdigest()
+    assert entry["size"] == 4
+    assert entry["url"].endswith("/download/v0.41.0/app-release.apk")
+    # ... and the updater's role lookup now finds it
+    assert m["roles"]["android_apk"] == "app-release.apk"
+    assert f"{entry['sha256']}  app-release.apk" in (dist / "SHA256SUMS.txt").read_text()
+    # idempotent: the same inputs rewrite the same bytes
+    before = (dist / "version.json").read_bytes()
+    assert _refresh(dist, apk).returncode == 0
+    assert (dist / "version.json").read_bytes() == before
+
+
+def test_the_merge_refuses_a_manifestless_release(tmp_path):
+    meta = tmp_path / "meta"
+    meta.mkdir()
+    apk = tmp_path / "app-release.apk"
+    apk.write_bytes(b"APK!")
+    r = _refresh(meta, apk)
+    assert r.returncode != 0
+    assert "version.json" in (r.stderr + r.stdout)
+
+
+def test_the_attach_job_folds_the_apk_into_the_manifest():
+    yml = (ROOT / ".github/workflows/android.yml").read_text()
+    attach = yml.split("attach-apk:", 1)[1].split("\n  instrumentation:")[0]
+    # uploads through gh, guarded: a missing release fails loudly instead of
+    # letting the uploader create a stray release (v0.41.0 footgun)
+    assert "gh release view" in attach
+    assert "gh release upload" in attach
+    # and folds the APK into the manifest right after uploading it
+    assert "refresh_update_manifest" in attach
+    assert "softprops" not in attach
