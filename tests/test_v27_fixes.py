@@ -176,7 +176,9 @@ def test_the_settings_screen_offers_impersonation():
     assert 'id="impersonateRow"' in HTML
     # loaded, saved, and hidden on the phone (no curl_cffi there)
     assert 's.impersonate' in _seg(APP, "async function loadSettings()")
-    assert 'impersonate: $("setImpersonate").value' in _seg(APP, "function saveSettings()")
+    # v0.44.x: the payload lives in one builder both Save and the preset diff read
+    assert 'impersonate: $("setImpersonate").value' in _seg(APP, "function settingsFormPayload()")
+    assert "body: JSON.stringify(settingsFormPayload())" in APP
     assert '"impersonateRow"' in APP and 'classList.add("hidden")' in APP
 
 

@@ -282,5 +282,9 @@ def test_app_js_keeps_unsaved_settings_through_a_tab_switch():
     assert 'if (target === "settings" && !SETTINGS_DIRTY) loadSettings();' in js
     # the flag is set through the helper now, which also dots the tab
     assert "function markSettingsDirty(on)" in js
-    assert "panel.addEventListener(ev, () => { markSettingsDirty(true); });" in js
+    # v0.44.x audit: self-persisting controls are exempt from the listener,
+    # everything else still rides the same helper
+    assert "DIRTY_IGNORE" in js
+    assert "panel.addEventListener(ev, (e) => {" in js
+    assert "markSettingsDirty(true);" in js
     assert 'tab.classList.toggle("has-dirty", on)' in js
