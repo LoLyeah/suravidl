@@ -21,7 +21,7 @@ from .auth import (check_auth, cookie_session, explain_download_error,
 from .classify import classify, patterns, rank
 from .download_opts import probe_extra_opts
 from .handoff import HandoffStore
-from .jobs import JobManager, redact_job
+from .jobs import ACTIVE_STATUSES, JobManager, redact_job
 from .probe import probe, scrub_secrets
 from . import site_memory
 
@@ -303,10 +303,9 @@ def default_cache_dir() -> Path:
     return base / "suravidl"
 
 
-# the archive rewrite (read → filter → replace) is a read-modify-write on one
-# file: one writer at a time, or a concurrent forget loses entries (the
-# archive appender is yt-dlp itself, so this locks OUR side of the pen) —
-# v0.40.10 audit
+# one writer at a time on the archive rewrite (read, filter, replace): the
+# archive appender is yt-dlp itself, so this locks OUR side of the pen; an
+# unlocked concurrent forget would lose entries.
 _ARCHIVE_LOCK = threading.Lock()
 
 
@@ -489,8 +488,15 @@ def create_app(download_dir, auth_token: str | None = None,
 
         return updater.update_status()
 
+    @app.post("/update/cancel")
+    def update_cancel(_mgr: JobManager = Depends(require_auth)):
+        """Abort a staged download in flight (the row's Cancel button)."""
+        from . import updater
+
+        return updater.cancel_update_download()
+
     @app.post("/update/apply")
-    def update_apply(_mgr: JobManager = Depends(require_auth)):
+    def update_apply(mgr: JobManager = Depends(require_auth)):
         """Hand the staged file to the desktop shell's applier — the shell
         spawns the installer and shuts the app down. Android has no applier
         here: its UI drives the system installer through the Kotlin bridge."""
@@ -503,6 +509,14 @@ def create_app(download_dir, auth_token: str | None = None,
         st = updater.update_status()
         if st.get("status") != "ready" or not st.get("path"):
             return {"ok": False, "reason": "nothing staged yet"}
+        # the installer restarts the app, killing in-flight transfers: a
+        # live download deserves a clear refusal, not a truncated file
+        # (audit finding 8)
+        active = [j for j in mgr.list() if j.get("status") in ACTIVE_STATUSES]
+        if active:
+            return {"ok": False,
+                    "reason": f"{len(active)} download(s) still running; "
+                              "finish or cancel them before the app restarts"}
         if act(st["path"]) is False:
             return {"ok": False, "reason": "the applier refused to run"}
         return {"ok": True, "mode": "desktop"}

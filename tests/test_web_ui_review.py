@@ -104,7 +104,8 @@ def test_toasts_sit_above_the_mobile_tab_bar():
     furniture tabs (transport, Save strip) at bar + 84px."""
     assert "#toasts { left: 12px; right: 12px;" in CSS
     seg = CSS.split("#toasts { left: 12px; right: 12px;")[1].split("}")[0]
-    assert "bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom))" in seg
+    assert ("bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) "
+            "+ var(--toast-lift, 0px))" in seg)
     # the lift over docked furniture is measured (syncToastLane), not a
     # static per-tab rule (v0.38.2)
     assert 'body[data-tab="download"] #toasts' not in CSS

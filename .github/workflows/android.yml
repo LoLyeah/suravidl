@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     paths: ["android/**", "src/**", ".github/workflows/android.yml"]
+  # the release workflow creates the release: that event starts this run,
+  # so the APK rides a tag without a manual dispatch. Dispatch stays as the
+  # fallback; both paths wait for the release's manifest before attaching.
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -99,12 +104,27 @@ jobs:
           set -euo pipefail
           TAG="${{ github.ref_name }}"
           REPO="${{ github.repository }}"
-          # the release must exist (the release workflow creates it first);
-          # fail loudly instead of letting an uploader create a stray release
-          gh release view "$TAG" --repo "$REPO" > /dev/null
+          # wait (bounded, ~20 min) for the release AND its manifest: the
+          # release-published event can start us while the release job is
+          # still uploading, and a manual dispatch can arrive even earlier.
+          # Never create anything here; upload into what the release made.
+          ready=""
+          for i in $(seq 1 60); do
+            if gh release view "$TAG" --repo "$REPO" --json assets \
+                 --jq '.assets[].name' 2>/dev/null | grep -qx version.json; then
+              ready=1
+              break
+            fi
+            sleep 20
+          done
+          if [ -z "$ready" ]; then
+            echo "release/version.json for $TAG never appeared" >&2
+            exit 1
+          fi
           gh release upload "$TAG" apk/app-release.apk --clobber --repo "$REPO"
-          # the APK lands after version.json was written - fold it in so the
+          # the APK lands after version.json was written; fold it in so the
           # manifest on the release always describes the complete release
+          rm -rf meta
           gh release download "$TAG" --repo "$REPO" \
               --pattern version.json --pattern SHA256SUMS.txt --dir meta
           python3 scripts/refresh_update_manifest.py meta apk/app-release.apk \

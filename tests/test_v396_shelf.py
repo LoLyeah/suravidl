@@ -26,9 +26,13 @@ MASTER = (ROOT / "assets" / "brand" / "arrow-cream.svg").read_text()
 
 
 def test_the_bar_stands_in_flow_at_the_documents_end():
-    """Source order: it is the last thing (after main); the wide screen
-    re-orders it back under the header, the phone pins it at the thumb."""
-    assert HTML.index("</main>") < HTML.index('id="tabs"') < HTML.index("<footer")
+    """Source order mirrors reading order (header, nav, main, footer): the
+    keyboard walks the tab bar before the panels. The wide screen re-orders
+    it back under the header, the phone pins it at the thumb — both via
+    flex `order`, which never touches the DOM (v0.41.x audit: the old
+    after-main DOM gave keyboard users a tab stop order that matched the
+    paint, not the reading)."""
+    assert HTML.index("</header>") < HTML.index('id="tabs"') < HTML.index('id="panels"')
     assert "display: flex; flex-direction: column; min-height: 100vh;" in CSS
     assert ".tabs { order: 2; }" in CSS
     assert "position: sticky; bottom: 0; z-index: 40;" in CSS

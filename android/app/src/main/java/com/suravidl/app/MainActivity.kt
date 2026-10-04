@@ -450,13 +450,17 @@ class MainActivity : AppCompatActivity() {
          * was a system-wide setting), so installs can always be dispatched.
          */
         @JavascriptInterface
-        fun canInstallPackages(): Boolean =
-            if (Build.VERSION.SDK_INT < 26) true
-            else try {
+        fun canInstallPackages(): Boolean {
+            if (Build.VERSION.SDK_INT < 26) return true
+            val canRequest = try {
                 packageManager.canRequestPackageInstalls()
             } catch (_: Throwable) {
                 false
             }
+            // the decision itself lives in the pure, JVM-tested policy
+            return !UpdateInstallPolicy.needsUnknownSourcesPrompt(
+                Build.VERSION.SDK_INT, canRequest)
+        }
 
         /**
          * Direct the user to the "Install unknown apps" settings screen for

@@ -214,7 +214,8 @@ function syncToastLane() {
     if (r.bottom < vh - 140) continue;                          // in the flow, not docked
     top = Math.min(top, r.top);
   }
-  host.style.bottom = top === Infinity ? "" : Math.round(vh - (top - 8)) + "px";
+  if (top === Infinity) host.style.removeProperty("--toast-lift");
+  else host.style.setProperty("--toast-lift", Math.round(vh - (top - 8)) + "px");
 }
 window.addEventListener("resize", syncToastLane, { passive: true });
 // capture: the phone panels can be their own scroll containers
@@ -487,8 +488,8 @@ async function doProbe() {
     // the engine explains a failure (it owns the "sign-in wall" judgement and
     // says so in its own words) — the UI does not second-guess it
     $("probeMsg").textContent = "probe failed: " + e.message;
-    // an error is Nova Rose and machine text is mono; this line was the one
-    // failure in the app that whispered in grey (polish pass)
+    // an error is tally rose and machine text is mono; this line was the
+    // one failure in the app that used to whisper in grey
     $("probeMsg").className = "msg bad mono";
     // the human line leads; the raw engine text sits behind "Show details"
     // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
@@ -2135,6 +2136,8 @@ function renderBins(list) {
 }
 
 async function refreshJobs() {
+  if (document.hidden) return;   // a hidden page keeps its last snapshot;
+  // the visibilitychange below re-syncs the moment it is looked at again
   if (JOBS_BUSY) return;      // one poll at a time: a slow, older snapshot
   JOBS_BUSY = true;           // must never repaint newer state
   const seq = ++JOBS_SEQ;
@@ -2263,12 +2266,17 @@ function humanSince(ts) {
 function renderUpdateRow() {
   const state = $("updState"), meta = $("updMeta");
   if (!state) return;
-  const get = $("updGet"), skip = $("updSkip");
+  const get = $("updGet"), skip = $("updSkip"), man = $("updManual");
+  const chk = $("updCheck");
   const u = UPD_STATE;
   let last = null;
   try { last = JSON.parse(updStore.get(UPD.last, "") || "null"); } catch (_) { last = null; }
   const when = last && last.at ? `checked ${humanSince(last.at)}` : "not checked yet";
   const err = (u && u.error) || (last && last.error) || null;
+  meta.classList.remove("bad");
+  // an available update makes "Check now" redundant; the row is crowded
+  // enough at 360px without it (v0.41.x audit)
+  if (chk) chk.classList.toggle("hidden", !!(u && u.update_available));
   if (err) {
     // One error class the user can act on: a build that can't verify the
     // server's certificate (packaged Mac apps before v0.38.8 carried no CA
@@ -2287,6 +2295,7 @@ function renderUpdateRow() {
       get.classList.add("hidden");
     }
     skip.classList.add("hidden");
+    man.classList.add("hidden");
     return;
   }
   if (!u) {                       // no answer yet: say so, offer the button
@@ -2294,6 +2303,7 @@ function renderUpdateRow() {
     meta.textContent = when;
     get.classList.add("hidden");
     skip.classList.add("hidden");
+    man.classList.add("hidden");
     return;
   }
   const skipped = !!u.latest && updStore.get(UPD.skipped, "") === u.latest;
@@ -2301,12 +2311,13 @@ function renderUpdateRow() {
   // update, the row becomes the whole flow — stage it, watch it, restart
   // into it. Builds that cannot keep the plain release-page door below.
   if (u.update_available && u.can_apply) {
-    renderCourierRow(u, { state, meta, get, skip }, when, skipped);
+    renderCourierRow(u, { state, meta, get, skip, man }, when, skipped);
     return;
   }
   if (u.update_available && u.url) {
     state.textContent = `suravidl ${u.latest} is available`;
     meta.textContent = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
+    man.classList.add("hidden");
     get.textContent = `Get ${u.latest}`;
     get.classList.remove("hidden");
     get.onclick = () => openExternal(u.url);
@@ -2321,6 +2332,7 @@ function renderUpdateRow() {
     meta.textContent = `you have ${u.current} · ${when}`;
     get.classList.add("hidden");
     skip.classList.add("hidden");
+    man.classList.add("hidden");
   }
 }
 
@@ -2358,6 +2370,7 @@ function showUpdateBanner(u) {
  * refusal falls back to the release page. */
 let UPD_DL = null;     // the last /update/status answer
 let UPD_POLL = 0;      // one poller at a time
+let UPD_PERM_WAIT = false;   // sent to Android's settings; greet on return
 
 function updPct(st) {
   if (!st || !st.total) return null;
@@ -2371,6 +2384,7 @@ async function startUpdateDownload() {
     toast("could not start the update: " + e.message, "bad");
     return;
   }
+  toast("downloading the update in the background — watch Settings → Updates");
   renderUpdateRow();
   pollUpdateStatus();
 }
@@ -2383,9 +2397,46 @@ function pollUpdateStatus() {
     if (UPD_DL && (UPD_DL.status === "downloading" || UPD_DL.status === "verifying")) {
       pollUpdateStatus();
     } else if (UPD_DL && UPD_DL.status === "ready") {
-      toast("the update is downloaded and verified — restart when you're ready");
+      announceUpdateReady();
+    } else if (UPD_DL && UPD_DL.status === "failed") {
+      // a failure buried in a hidden Settings tab reads as "nothing
+      // happened" (v0.41.x audit) — it gets a voice wherever the user is
+      toast("the update download failed: " +
+            (humanErr(UPD_DL.error || "") || UPD_DL.error || "unknown reason"),
+            "bad");
     }
   }, 900);
+}
+
+/** The ready door as a notice: sticky, one tap, and it names the real
+ *  action per shell — restarting the app alone installs nothing. */
+function announceUpdateReady() {
+  if (document.querySelector(".toast.update-ready")) return;
+  toast("the update is downloaded and verified", "info update-ready", {
+    sticky: true,
+    actions: [{ label: ANDROID() ? "Install now" : "Restart & Install",
+                prime: true, onClick: installStagedUpdate }],
+  });
+}
+
+/** Abort a staged download the user no longer wants: the worker stops
+ *  between chunks, leaves nothing behind, and the row resets to idle. */
+async function cancelUpdateDownload() {
+  try { UPD_DL = await api("/update/cancel", { method: "POST" }); } catch (_) {}
+  renderUpdateRow();
+  pollUpdateStatus();     // settles in idle on its own and stops
+}
+
+/** Back from Android's settings detour: if the permission is granted
+ *  now, put the door back in front of the user (v0.41.x audit). */
+function checkUpdatePermResume() {
+  if (!UPD_PERM_WAIT || !ANDROID()) return;
+  if (!UPD_DL || UPD_DL.status !== "ready") { UPD_PERM_WAIT = false; return; }
+  if (window.AndroidHost && window.AndroidHost.canInstallPackages &&
+      window.AndroidHost.canInstallPackages()) {
+    UPD_PERM_WAIT = false;
+    announceUpdateReady();
+  }
 }
 
 /** The ready-state door: installer here, system installer on Android,
@@ -2396,6 +2447,9 @@ async function installStagedUpdate() {
     try {
       if (window.AndroidHost.canInstallPackages &&
           !window.AndroidHost.canInstallPackages()) {
+        // the OS settings detour used to end in a dead-end: remember that
+        // we sent the user away, and greet them on the way back (audit)
+        UPD_PERM_WAIT = true;
         toast("let suravidl install updates, then tap Install again");
         if (window.AndroidHost.openInstallPermissionSettings)
           window.AndroidHost.openInstallPermissionSettings();
@@ -2403,7 +2457,12 @@ async function installStagedUpdate() {
       }
       window.AndroidHost.installApk(st.name);
       return;
-    } catch (_) { /* fall through to the manual door */ }
+    } catch (e) {
+      // never silently eject to a browser: say what failed first (audit)
+      toast("could not launch the installer: " +
+            ((e && e.message) || "unknown reason"), "bad");
+      return;
+    }
   }
   if (!ANDROID() && UPD_STATE && UPD_STATE.apply_kind === "windows_installer") {
     try {
@@ -2420,32 +2479,42 @@ async function installStagedUpdate() {
 
 /** Settings → Updates, courier edition: one row walks the whole flow. */
 function renderCourierRow(u, els, when, skipped) {
-  const { state, meta, get, skip } = els;
+  const { state, meta, get, skip, man } = els;
   const st = UPD_DL || { status: "idle" };
   state.textContent = `suravidl ${u.latest} is available`;
   const base = `you have ${u.current} · ${when}` + (skipped ? " · skipped" : "");
-  // the manual release page stays one tap away in the states that need it
-  const manual = () => {
-    skip.textContent = "Download manually";
+  // the skip toggle stays reachable in every resting state; the manual
+  // release-page door is a button of its own now — it used to squat on
+  // skip, so "Skip this version" (and its undo) became unreachable in
+  // Settings (v0.41.x audit)
+  const skipToggle = () => {
+    skip.textContent = skipped ? "Stop skipping" : "Skip this version";
     skip.classList.remove("hidden");
-    skip.onclick = () => openExternal(u.url);
+    skip.onclick = () => {
+      updStore.set(UPD.skipped, skipped ? "" : u.latest);
+      renderUpdateRow();
+    };
   };
-  if (st.status === "downloading") {
-    const pct = updPct(st);
-    meta.textContent = "downloading… " + (pct == null
-      ? humanBytes(st.bytes || 0)
-      : pct + "% of " + humanBytes(st.total));
-    get.textContent = "Downloading…";
+  if (st.status === "downloading" || st.status === "verifying") {
+    if (st.status === "downloading") {
+      const pct = updPct(st);
+      meta.textContent = "downloading… " + (pct == null
+        ? humanBytes(st.bytes || 0)
+        : pct + "% of " + humanBytes(st.total));
+      get.textContent = "Downloading…";
+    } else {
+      meta.textContent = "verifying the download…";
+      get.textContent = "Verifying…";
+    }
     get.disabled = true;
     get.classList.remove("hidden");
     get.onclick = null;
-    skip.classList.add("hidden");
-  } else if (st.status === "verifying") {
-    meta.textContent = "verifying the download…";
-    get.textContent = "Verifying…";
-    get.disabled = true;
-    get.classList.remove("hidden");
-    skip.classList.add("hidden");
+    // the one way out of a download the user regrets: the engine aborts
+    // between chunks and leaves nothing behind (v0.41.x audit)
+    skip.textContent = "Cancel download";
+    skip.classList.remove("hidden");
+    skip.onclick = cancelUpdateDownload;
+    man.classList.add("hidden");
   } else if (st.status === "ready") {
     meta.textContent = `${base} · downloaded and verified`;
     get.textContent = ANDROID() ? "Install update" : "Restart & Install";
@@ -2453,20 +2522,29 @@ function renderCourierRow(u, els, when, skipped) {
     get.classList.remove("hidden");
     get.onclick = installStagedUpdate;
     skip.classList.add("hidden");
+    man.classList.add("hidden");
   } else if (st.status === "failed") {
-    meta.textContent = `the download failed: ${st.error || "unknown reason"} · ${base}`;
+    // same words as every other refusal, same rose (v0.41.x audit)
+    meta.classList.add("bad");
+    meta.textContent = "the download failed: "
+      + (humanErr(st.error || "") || st.error || "unknown reason")
+      + " · " + base;
     get.textContent = "Try again";
     get.disabled = false;
     get.classList.remove("hidden");
     get.onclick = startUpdateDownload;
-    manual();
+    skipToggle();
+    man.classList.remove("hidden");
+    man.onclick = () => openExternal(u.url);
   } else {
     meta.textContent = base;
     get.textContent = `Update to ${u.latest}`;
     get.disabled = false;
     get.classList.remove("hidden");
     get.onclick = startUpdateDownload;
-    manual();
+    skipToggle();
+    man.classList.remove("hidden");
+    man.onclick = () => openExternal(u.url);
   }
 }
 
@@ -2477,7 +2555,10 @@ async function syncStagedUpdate() {
     if (st && st.status !== "idle") {
       UPD_DL = st;
       renderUpdateRow();
-      if (st.status === "downloading") pollUpdateStatus();
+      if (st.status === "downloading" || st.status === "verifying") pollUpdateStatus();
+      // a reload while the update is ready keeps the door in front of the
+      // user instead of hiding it in a Settings row (v0.41.x audit)
+      else if (st.status === "ready") announceUpdateReady();
     }
   } catch (_) { /* the row keeps its last truth */ }
 }
@@ -2804,6 +2885,9 @@ function tourShow() {
   $("tourBody").textContent = step.body;
   $("tourCount").textContent = (TOUR_STEP + 1) + " of " + TOUR.length;
   $("tourNext").textContent = TOUR_STEP === TOUR.length - 1 ? "Done" : "Next";
+  // every step lands with the primary button focused: the walk is
+  // keyboard-complete, not just keyboard-startable (v0.41.x audit)
+  try { $("tourNext").focus({ preventScroll: true }); } catch (_) {}
   const target = document.querySelector(step.sel);
   if (target && target.scrollIntoView) target.scrollIntoView({ block: "center" });
   requestAnimationFrame(tourPlace);
@@ -2847,6 +2931,23 @@ function wireWelcome() {
   on("tourBack", tourBack);
   on("tourNext", tourNext);
 }
+
+// the tour declares itself a modal dialog, so it must behave like one:
+// Escape closes it and Tab cycles inside the card (v0.41.x audit — focus
+// used to wander into the page behind the shade)
+document.addEventListener("keydown", (e) => {
+  if (!TOUR_ON) return;
+  if (e.key === "Escape") { e.preventDefault(); tourEnd(); return; }
+  if (e.key !== "Tab") return;
+  const f = $("tourCard") ? $("tourCard").querySelectorAll("button") : [];
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault(); first.focus();
+  }
+}, true);
 
 function renderWhere(dir) {
   const d = dir || "";
@@ -3918,7 +4019,11 @@ async function checkHandoff() {
 
 setInterval(checkHandoff, 2600);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) checkHandoff();
+  if (!document.hidden) {
+    checkHandoff();
+    refreshJobs();      // the queue is current the moment it is visible
+    checkUpdatePermResume();
+  }
 });
 checkHandoff();
 

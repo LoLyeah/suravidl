@@ -91,6 +91,11 @@ def test_windows_installer_script_is_per_user(tmp_path):
     assert "AppId" in iss
     # an interactive install may offer to launch; silent upgrades must not
     assert "skipifsilent" in iss
+    # the staged-update cache lives under the engine's cache home
+    # (%USERPROFILE%\.cache\suravidl\updates) — the uninstall removes
+    # exactly that subtree, and never the data dir (v0.41.x audit, finding 4)
+    assert "{userprofile}\\.cache\\suravidl\\updates" in iss
+    assert "{localappdata}\\suravidl\\updates" not in iss
 
 
 def test_the_release_workflow_builds_and_attaches_the_installer():
@@ -141,6 +146,24 @@ def test_the_apk_folds_into_the_manifest(tmp_path):
     assert (dist / "version.json").read_bytes() == before
 
 
+def test_the_refresh_refuses_a_bad_or_mismatched_tag(tmp_path):
+    dist = _gen_no_apk(tmp_path)
+    apk = tmp_path / "app-release.apk"
+    apk.write_bytes(b"APK!")
+    bad = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/refresh_update_manifest.py"),
+         str(dist), str(apk), "--tag", "0.41.0", "--repo", "o/n"],
+        capture_output=True, text=True)
+    assert bad.returncode != 0
+    assert "v" in (bad.stderr + bad.stdout).lower()
+    mismatch = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/refresh_update_manifest.py"),
+         str(dist), str(apk), "--tag", "v9.9.9", "--repo", "o/n"],
+        capture_output=True, text=True)
+    assert mismatch.returncode != 0
+    assert "match" in (mismatch.stderr + mismatch.stdout).lower()
+
+
 def test_the_merge_refuses_a_manifestless_release(tmp_path):
     meta = tmp_path / "meta"
     meta.mkdir()
@@ -161,3 +184,8 @@ def test_the_attach_job_folds_the_apk_into_the_manifest():
     # and folds the APK into the manifest right after uploading it
     assert "refresh_update_manifest" in attach
     assert "softprops" not in attach
+    # the release-published event runs this workflow by itself — no manual
+    # dispatch needed — and the attach WAITS (bounded) for the release's
+    # version.json instead of racing the release job (v0.41.x audit, 3+5)
+    assert "types: [published]" in yml
+    assert "seq 1 60" in attach and "sleep 20" in attach

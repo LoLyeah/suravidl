@@ -46,14 +46,19 @@ def test_the_toast_lane_measures_on_every_width():
     assert "899px" not in fn
     assert '".transport, #panel-settings .modal-foot"' in fn   # same furniture list
     assert "if (r.bottom < vh - 140) continue;" in fn            # docked-only
-    assert ('host.style.bottom = top === Infinity ? "" : '
-            'Math.round(vh - (top - 8)) + "px";') in fn
+    # the measured lift rides a CSS variable now, so the stylesheet can
+    # compose it over the safe-area inset (v0.41.x audit: the inline
+    # `bottom` used to clobber env(safe-area-inset-bottom) outright)
+    assert 'host.style.removeProperty("--toast-lift")' in fn
+    assert ('host.style.setProperty("--toast-lift", '
+            'Math.round(vh - (top - 8)) + "px")') in fn
 
 
 def test_the_lane_falls_back_to_the_corner_and_keeps_the_phone_rule():
     """Desktop fallback: the corner. Phones keep the tab-bar fallback. The
     old fixed lifts are gone for good."""
-    assert "#toasts {\n  position: fixed; right: 16px; bottom: 24px; z-index: 60;" in CSS
+    assert "bottom: calc(24px + var(--toast-lift, 0px));" in CSS
     assert "bottom: 86px" not in CSS
     assert 'body[data-tab="settings"] #toasts' not in CSS
-    assert "bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom));" in CSS
+    assert ("bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom) "
+            "+ var(--toast-lift, 0px));" in CSS)

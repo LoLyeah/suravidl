@@ -88,6 +88,14 @@ def test_the_old_contract_gains_the_new_keys():
     assert r["asset"] is None
 
 
+def test_parse_orders_prereleases_below_the_release():
+    """0.41.0-rc1 < 0.41.0 so rc installs get offered the final build
+    (v0.41.x audit, finding 7)."""
+    assert updater._parse("0.41.0-rc1") < updater._parse("0.41.0")
+    assert updater._parse("v0.41.0-rc1") < updater._parse("v0.41.0")
+    assert updater._parse("0.41.0") < updater._parse("0.41.1")
+
+
 # --- the staged download ----------------------------------------------------
 
 class _BlobHandler(BaseHTTPRequestHandler):
@@ -133,6 +141,17 @@ def test_download_refuses_a_traversal_name(tmp_path, blob_url):
         updater.download_asset(blob_url, None, "../evil.apk", tmp_path)
 
 
+def test_download_refuses_a_missing_checksum(tmp_path, blob_url):
+    """A manifest that carries no sha256 must not fail open: no checksum,
+    no staging (v0.41.x audit, finding 1)."""
+    for missing in (None, "", "   "):
+        st = updater.download_asset(blob_url, missing, "app-release.apk", tmp_path)
+        assert st["status"] == "failed", missing
+        assert "checksum" in st["error"].lower()
+        assert not (tmp_path / "app-release.apk").exists()
+        assert not list(tmp_path.glob("*.part"))
+
+
 def test_start_walks_the_flow_offline(tmp_path):
     seen = {}
 
@@ -156,6 +175,24 @@ def test_start_walks_the_flow_offline(tmp_path):
     assert st["name"] == seen["name"]
 
 
+def test_start_refuses_a_foreign_repo_url(tmp_path):
+    """Any github repo is still the wrong repo: the prefix pins to this
+    project's release path (v0.41.x audit, finding 6)."""
+    updater.reset_update_state()
+    updater.start_update_download(
+        "0.41.0",
+        manifest_fn=lambda repo: _manifest(url_host="https://github.com/attacker/mirror"),
+        download_fn=lambda *a, **k: pytest.fail("must not download"),
+        dest_dir=tmp_path)
+    for _ in range(100):
+        if updater.update_status()["status"] != "downloading":
+            break
+        threading.Event().wait(0.05)
+    st = updater.update_status()
+    assert st["status"] == "failed"
+    assert "untrusted" in st["error"].lower()
+
+
 def test_start_refuses_an_untrusted_url(tmp_path):
     updater.reset_update_state()
     updater.start_update_download(
@@ -170,6 +207,52 @@ def test_start_refuses_an_untrusted_url(tmp_path):
     st = updater.update_status()
     assert st["status"] == "failed"
     assert "untrusted" in st["error"].lower()
+
+
+def test_start_is_claimed_once(tmp_path):
+    """Two quick taps: the claim is visible under the lock BEFORE the
+    blocking feed check, so only one check runs (v0.41.x audit, finding 2)."""
+    updater.reset_update_state()
+    calls = []
+    gate = threading.Event()
+
+    def slow_manifest(repo):
+        calls.append(1)
+        gate.set()
+        threading.Event().wait(0.7)
+        return _manifest()
+
+    def fake_download(url, sha256, name, dest_dir):
+        return {"status": "ready", "path": str(tmp_path / name),
+                "sha256_ok": True, "bytes": 1, "total": 1, "name": name,
+                "error": None}
+
+    t = threading.Thread(target=lambda: updater.start_update_download(
+        "0.41.0", manifest_fn=slow_manifest, download_fn=fake_download,
+        dest_dir=tmp_path))
+    t.start()
+    assert gate.wait(2)
+    second = updater.start_update_download(
+        "0.41.0", manifest_fn=slow_manifest, download_fn=fake_download,
+        dest_dir=tmp_path)
+    assert second["status"] == "downloading"   # the claim is visible
+    assert len(calls) == 1                     # and only one check ran
+    t.join()
+
+
+def test_a_locked_destination_still_fails_clean(tmp_path, blob_url, monkeypatch):
+    """If the move into place fails (AV lock, handle), the .part must not
+    survive (v0.41.x audit, finding 11)."""
+    from pathlib import Path as _P
+
+    def boom(self, target):
+        raise PermissionError("locked by another process")
+
+    monkeypatch.setattr(_P, "replace", boom)
+    st = updater.download_asset(blob_url, PAYLOAD_SHA, "app-release.apk", tmp_path)
+    assert st["status"] == "failed"
+    assert "move" in st["error"].lower()
+    assert not list(tmp_path.glob("*.part"))
 
 
 # --- the endpoints ----------------------------------------------------------
@@ -214,6 +297,27 @@ def test_apply_hands_the_staged_file_to_the_desktop_shell(tmp_path):
     assert seen["path"] == str(tmp_path / "setup.exe")
 
 
+def test_apply_refuses_while_downloads_run(tmp_path, monkeypatch):
+    """The installer restarts the app; live downloads would die mid-stream.
+    The guard consults the manager's listing (a restart marks stale rows
+    interrupted, so a db seed cannot stay 'active') — pin one active job
+    there and expect the refusal (v0.41.x audit, finding 8)."""
+    from suravidl_engine import jobs as jobs_mod
+
+    updater.reset_update_state(status="ready", path=str(tmp_path / "setup.exe"),
+                               name="suravidl-windows-x64-setup.exe")
+    monkeypatch.setattr(
+        jobs_mod.JobManager, "list",
+        lambda self: [{"id": "j1", "status": "downloading"}])
+    c, h = _client(tmp_path,
+                   desktop_actions={"apply_update": lambda path=None: True})
+    r = c.post("/update/apply", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert "download" in body["reason"].lower()
+
+
 def test_apply_is_honest_without_an_applier(tmp_path):
     updater.reset_update_state(status="ready", path=str(tmp_path / "x"))
     c, h = _client(tmp_path)
@@ -236,6 +340,11 @@ def test_the_silent_upgrade_command_keeps_its_flags():
     assert "/CLOSEAPPLICATIONS" in joined  # stragglers let go via RM
     assert '"C:\\Temp\\suravidl-setup.exe"' in joined
     assert '"C:\\App\\suravidl.exe"' in joined
+    # the wait must survive a DETACHED process (no console): timeout.exe
+    # dies instantly with no stdin, ping does not (v0.41.x audit, finding 10)
+    assert "ping -n 3 127.0.0.1" in joined
+    # single & on purpose: the app comes back even if the installer failed
+    assert "& start" in joined
 
 
 def test_the_applier_honestly_refuses_outside_windows(tmp_path):

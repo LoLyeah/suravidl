@@ -50,6 +50,9 @@ def test_a_staged_download_resumes_after_a_reload():
     wire = _fn("function wireUpdateRow", "function openExternal")
     assert "syncStagedUpdate()" in wire, "the row must re-read a staged download"
     sync = _fn("async function syncStagedUpdate", "/** force")
+    # a reload mid-verify must keep polling, not freeze the row
+    # (v0.41.x audit, finding 9)
+    assert '"verifying"' in sync
     assert 'api("/update/status")' in sync
     assert "pollUpdateStatus();" in sync
 
@@ -65,6 +68,14 @@ def test_the_js_and_the_kotlin_agree_on_bridge_names():
                  "installApk"):
         assert name in APP, f"JS lost {name}"
         assert name in KOT, f"Kotlin lost {name}"
+    # the unknown-sources decision lives in the pure, JVM-tested policy —
+    # the bridge delegates to it instead of re-implementing it
+    # (v0.41.x audit, finding 12)
+    assert "needsUnknownSourcesPrompt" in KOT, "the bridge stopped delegating"
+    policy = (ROOT /
+              "android/app/src/main/java/com/suravidl/app/UpdateInstallPolicy.kt"
+              ).read_text()
+    assert "needsUnknownSourcesPrompt" in policy
 
 
 def test_the_apk_lands_where_the_fileprovider_serves_it():

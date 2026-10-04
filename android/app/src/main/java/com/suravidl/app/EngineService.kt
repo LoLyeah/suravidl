@@ -38,11 +38,10 @@ class EngineService : Service() {
 
     /** The notification's big tile: OUR pine mark, rasterized from this
      *  build's own resources, never the phone's possibly-stale copy of the
-     *  app icon (v0.39.6). Rasterized through the Drawable API on purpose
-     *  (v0.39.7): on modern Android the launcher icon is an adaptive-icon
-     *  XML, which BitmapFactory cannot decode — decodeResource returns null
-     *  for it, silently. The draw is guarded too: a notification with no
-     *  big tile is fine, a dead engine is not. */
+     *  app icon. Drawable API on purpose: on modern Android the launcher
+     *  icon is an adaptive-icon XML that BitmapFactory cannot decode (a
+     *  silent null). Guarded too: a notification with no big tile is fine,
+     *  a dead engine is not. */
     private val notifLogo: android.graphics.Bitmap? by lazy {
         try {
             val d = androidx.core.content.ContextCompat.getDrawable(this, R.mipmap.ic_launcher)

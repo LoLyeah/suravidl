@@ -31,6 +31,9 @@ def merge(meta_dir: Path, asset: Path, tag: str, repo: str) -> dict:
         raise FileNotFoundError(
             f"no version.json in {meta_dir} — this release predates the manifest")
     vj = json.loads(vj_path.read_text())
+    if vj.get("tag") and vj["tag"] != tag:
+        raise ValueError(f"the tag {tag!r} does not match the manifest's "
+                         f"{vj['tag']!r}")
     vj.setdefault("assets", {})[asset.name] = {
         "url": f"https://github.com/{repo}/releases/download/{tag}/{asset.name}",
         "size": asset.stat().st_size,
@@ -55,6 +58,10 @@ def main() -> int:
     ap.add_argument("--tag", required=True, help="the git tag, e.g. v0.41.0")
     ap.add_argument("--repo", required=True, help="owner/name on GitHub")
     args = ap.parse_args()
+    if not args.tag.startswith("v") or len(args.tag) < 3:
+        print(f"the tag must look like vX.Y.Z — got {args.tag!r} "
+              f"(releases tag with a leading v)", file=sys.stderr)
+        return 2
     try:
         vj = merge(args.meta, args.asset, args.tag, args.repo)
     except (FileNotFoundError, ValueError) as e:

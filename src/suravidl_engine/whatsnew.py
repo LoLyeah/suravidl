@@ -20,6 +20,7 @@ ENTRIES = [
         "items": [
             "Releases are full releases again \u2014 the update feed is live: suravidl fetches the next version itself, verifies it, and installs it in place with one tap. No more release-page trips.",
             "First stable release of the self-updating line: install the Windows setup or the Android APK once, and every version after this arrives in-app.",
+            "Polish pass: an update download can be cancelled mid-flight, a failed update says so wherever you are, and the ready notice carries the install button.",
         ],
     },
     {

@@ -1,0 +1,52 @@
+v0.41.1 "the delivery" — the audit pass: every confirmed finding fixed
+
+agy's two audit reports (code: 15 findings, UI: 20) ran against 4b4e965.
+Each finding was checked against the real tree first; what confirmed got
+fixed, what did not got evidence instead.
+
+Engine (updater.py, api.py):
+- stage nothing without a checksum: a manifest that omits sha256 is
+  refused, not failed open
+- the download claim lands before the blocking feed check, so a second
+  tap cannot race a duplicate staging thread
+- an update download can be cancelled: POST /update/cancel arms a flag
+  the worker observes between chunks — it ends idle, nothing left behind
+- the asset URL must live under this repo's release path, not any
+  github.com URL
+- prerelease versions sort below their release
+- /update/apply refuses while downloads are running — the installer
+  restarts the app and would truncate them
+- a locked destination fails clean: no .part left behind
+
+Windows shell (__main__.py, suravidl.iss):
+- the silent-upgrade waits with ping, not timeout: a detached process
+  has no console and timeout.exe exits instantly without one
+- the uninstaller cleans the real cache home
+  (%USERPROFILE%\.cache\suravidl\updates) and never touches user data
+
+Android (MainActivity.kt, android.yml):
+- canInstallPackages delegates to the JVM-tested install policy
+- the APK attaches on release:publish with a bounded wait for
+  version.json, so the manual dispatch is only a fallback now
+
+Web UI (app.js, index.html, style.css):
+- cancel button during download/verify; failures toast wherever you are
+- the ready notice carries the install door (restarting alone installs
+  nothing) and survives a reload
+- Skip this version stays reachable; the manual door is its own button
+- Android: install failures say what happened instead of a silent
+  browser ejection; the permission detour greets on return
+- Check now hides while an update is offered; failed rows wear tally rose
+- hidden pages stop polling the queue and re-sync on return
+- the tab bar precedes the panels in the DOM (keyboard order == reading)
+- the tour is escapable and holds Tab; each step lands focused
+- iOS <16px input zoom gated to iOS; linkbtn is inline-flex so the
+  44px touch rule bites; toast lane composes its lift over the safe area
+- Get it and Download playlist step off prime (one lamp per region)
+
+Rejected with evidence: the bay-door "snap" (wireBayDoor animates a
+pixel max-height; the static 0-to-none pair is only the fallback),
+gradient fill and instrument radii (reviewed against DESIGN.md intent),
+and the telecine voice + em-dash copy (reported, not rewritten).
+
+955 tests.

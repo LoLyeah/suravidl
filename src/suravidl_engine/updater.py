@@ -47,7 +47,10 @@ def _parse(v: str):
         parts.append(int(digits) if digits else 0)
     while len(parts) < 3:
         parts.append(0)
-    return tuple(parts[:3])
+    # a "-suffix" marks a prerelease: same numbers, sorted BELOW the
+    # release it leads to, so an rc install gets offered the final build
+    prerelease = 0 if "-" in (v or "") else 1
+    return tuple(parts[:3]) + (prerelease,)
 
 
 def check_update(current: str, repo: str = DEFAULT_REPO, fetch_fn=None,
@@ -178,7 +181,7 @@ def _fetch_manifest(repo: str) -> dict:
 
 
 _DL_INIT = {"status": "idle", "name": None, "path": None, "bytes": 0,
-            "total": 0, "sha256_ok": None, "error": None}
+            "total": 0, "sha256_ok": None, "error": None, "cancel": False}
 _DL = dict(_DL_INIT)
 _DL_LOCK = threading.Lock()
 
@@ -208,15 +211,23 @@ def _updates_dir() -> Path:
 
 
 def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
-    """Stream one asset into dest_dir/name, verifying sha256 when given.
+    """Stream one asset into dest_dir/name, verifying sha256 (required).
 
     Synchronous and stateful (progress lands in update_status() while it
-    runs); the caller owns threading. A mismatch or a network death leaves
-    nothing behind — no final file, no .part.
+    runs); the caller owns threading. A missing checksum is refused, and a
+    mismatch or a network death leaves nothing behind: no final file, no
+    .part.
     """
     name = str(name or "")
     if not name or "/" in name or "\\" in name or ".." in name:
         raise ValueError(f"bad asset name: {name!r}")
+    if not (sha256 and str(sha256).strip()):
+        # no checksum, no staging: a manifest that omits the hash must not
+        # fail open (audit finding 1)
+        return _set_state(
+            status="failed", sha256_ok=None,
+            error="the release manifest carries no checksum for this "
+                  "file, refusing to stage it")
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / name
@@ -224,6 +235,15 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
     req = Request(url, headers={"User-Agent": "suravidl-update-download"})
     h = hashlib.sha256()
     got = 0
+
+    def cancelled() -> bool:
+        """The user asked to stop: clean up and end idle, voluntarily."""
+        if not _DL.get("cancel"):
+            return False
+        part.unlink(missing_ok=True)
+        _set_state(status="idle", name=None, path=None, bytes=0, total=0,
+                   sha256_ok=None, error=None, cancel=False)
+        return True
     try:
         with urlopen(req, timeout=30, context=ssl_context()) as r:
             total = int(r.headers.get("Content-Length") or 0)
@@ -231,6 +251,8 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
                        total=total, sha256_ok=None, error=None)
             with open(part, "wb") as f:
                 while True:
+                    if cancelled():
+                        return update_status()
                     chunk = r.read(65536)
                     if not chunk:
                         break
@@ -241,16 +263,39 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
     except Exception as e:  # noqa: BLE001 - reported through the state
         part.unlink(missing_ok=True)
         return _set_state(status="failed", error=str(e))
+    if cancelled():
+        return update_status()
     _set_state(status="verifying")
-    if sha256 and h.hexdigest().lower() != str(sha256).lower():
+    if h.hexdigest().lower() != str(sha256).strip().lower():
         part.unlink(missing_ok=True)
         return _set_state(
             status="failed", sha256_ok=False,
             error="sha256 mismatch — the download does not match the "
                   "release manifest")
-    part.replace(dest)
+    if cancelled():
+        return update_status()
+    try:
+        part.replace(dest)
+    except OSError as e:
+        # a locked destination (AV scanner, open handle) must not leave
+        # the .part behind (audit finding 11)
+        part.unlink(missing_ok=True)
+        return _set_state(status="failed", sha256_ok=True,
+                          error=f"could not move the verified download "
+                                f"into place: {e}")
     return _set_state(status="ready", path=str(dest), sha256_ok=True,
                       bytes=got, total=total or got)
+
+
+def cancel_update_download() -> dict:
+    """Abort a staged download in flight.
+
+    The worker observes the flag between chunks and ends in idle, leaving
+    nothing behind; with nothing running this is a no-op."""
+    with _DL_LOCK:
+        if _DL["status"] in ("downloading", "verifying"):
+            _DL["cancel"] = True
+        return dict(_DL)
 
 
 def start_update_download(current: str, repo: str = DEFAULT_REPO,
@@ -262,9 +307,13 @@ def start_update_download(current: str, repo: str = DEFAULT_REPO,
     `download_fn` and `manifest_fn` exist for tests — production uses the
     real ones.
     """
-    state = update_status()
-    if state["status"] == "downloading":
-        return state
+    with _DL_LOCK:
+        if _DL["status"] in ("downloading", "verifying"):
+            return dict(_DL)
+        # claim BEFORE the blocking feed check: a second tap must see the
+        # claim, not race past it into a duplicate download (finding 2)
+        _DL.update(status="downloading", name=None, path=None, bytes=0,
+                   total=0, sha256_ok=None, error=None, cancel=False)
     fetch = download_fn or download_asset
     dest = Path(dest_dir) if dest_dir else _updates_dir()
     info = check_update(current, repo, manifest_fn=manifest_fn)
@@ -273,9 +322,16 @@ def start_update_download(current: str, repo: str = DEFAULT_REPO,
                           total=0, sha256_ok=None, error=None)
     asset = info["asset"]
     url = str(asset.get("url") or "")
-    if not url.startswith("https://github.com/"):
+    # the asset must come from THIS project's release path, not any repo
+    # an attacker could register (finding 6)
+    if not url.startswith(f"https://github.com/{repo}/releases/download/"):
         return _set_state(status="failed",
                           error=f"untrusted asset url: {url!r}")
+    if not str(asset.get("sha256") or "").strip():
+        return _set_state(
+            status="failed",
+            error="the release manifest carries no checksum for this "
+                  "asset, refusing to stage it")
     _set_state(status="downloading", name=asset.get("name"), path=None,
                bytes=0, total=int(asset.get("size") or 0), sha256_ok=None,
                error=None)

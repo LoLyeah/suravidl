@@ -70,7 +70,8 @@ def test_a_skipped_or_snoozed_version_does_not_pop_up_by_itself():
 
 def test_the_settings_row_always_answers_the_button():
     """Settings → General → Updates: state, versions, and the way to ask again."""
-    for el_id in ("updState", "updMeta", "updGet", "updSkip", "updCheck"):
+    for el_id in ("updState", "updMeta", "updGet", "updSkip", "updCheck",
+                  "updManual"):
         assert f'id="{el_id}"' in HTML, f"{el_id} is missing from Settings"
     wire = _fn("function wireUpdateRow", "\n/** Open a link outside")
     assert "checkAppUpdate(true)" in wire, "Check now must force past skip/snooze"

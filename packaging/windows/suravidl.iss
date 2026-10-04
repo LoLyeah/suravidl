@@ -59,6 +59,9 @@ Name: "{userdesktop}\suravidl"; Filename: "{app}\suravidl.exe"; Tasks: desktopic
 Filename: "{app}\suravidl.exe"; Description: "Launch suravidl"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; remove cached update installers downloaded by the in-app updater
-; never touch user data in {localappdata}\suravidl (jobs.db, settings, cookies) so data survives uninstall
-Type: filesandordirs; Name: "{localappdata}\suravidl\updates"
+; the engine stages update downloads under its cache home
+; (%USERPROFILE%\.cache\suravidl\updates on Windows) and nothing else
+; cleans a failed apply; on uninstall that subtree goes with the app.
+; user data lives in %USERPROFILE%\.suravidl (jobs.db, settings, cookies)
+; and is never touched, so it survives uninstall and reinstall.
+Type: filesandordirs; Name: "{userprofile}\.cache\suravidl\updates"

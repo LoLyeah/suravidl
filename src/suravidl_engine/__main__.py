@@ -107,11 +107,9 @@ def token_path() -> Path:
 def load_or_create_token() -> str:
     """The engine's token: `SURAVIDL_TOKEN` when set, else the token file.
 
-    The env var came first here for a reason (v0.21.1 audit): the README tells
-    people to run the engine with `SURAVIDL_TOKEN=x …`, but only the `.api`
-    entry honoured it — `python -m suravid_engine` silently used the file
-    instead, so a documented way of pinning a token did nothing. An env var
-    that is set is a decision: it wins, and it is not written to disk.
+    An env var that is set is a decision: it wins, and it is never written
+    to disk. Both entry points honour it — the README documents pinning a
+    token this way.
     """
     env = os.environ.get("SURAVIDL_TOKEN", "").strip()
     if env:
@@ -1187,9 +1185,13 @@ def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
     closes stragglers through the Restart Manager), and the freshly installed
     app comes back up. Pure function — the tests pin the exact flags.
     """
-    inner = (f'timeout /t 2 /nobreak >nul & '
+    inner = (f'ping -n 3 127.0.0.1 >nul & '
              f'"{installer}" /SILENT /SP- /NORESTART /CLOSEAPPLICATIONS')
     if relaunch:
+        # single & on purpose: even a failed install brings the app back
+        # rather than stranding the user; the wait is ping, not timeout,
+        # because a detached process has no console and timeout.exe exits
+        # instantly without one (audit finding 10)
         inner += f' & start "" "{relaunch}"'
     return ["cmd.exe", "/c", inner]
 
