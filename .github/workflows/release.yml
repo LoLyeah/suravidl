@@ -151,6 +151,3 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
-          # PRE-RELEASE until the courier feature (installer + in-app updates)
-          # is verified on real machines — flip it back with this one line
-          prerelease: true

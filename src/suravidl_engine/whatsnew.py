@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.41.1",
+        "title": "The delivery",
+        "items": [
+            "Releases are full releases again \u2014 the update feed is live: suravidl fetches the next version itself, verifies it, and installs it in place with one tap. No more release-page trips.",
+            "First stable release of the self-updating line: install the Windows setup or the Android APK once, and every version after this arrives in-app.",
+        ],
+    },
+    {
         "version": "0.41.0",
         "title": "The courier",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "The player can set your clip now: Mark in and Mark out write the player's own clock into the clip fields \u2014 cut a section from what you are watching, not from a time typed by memory.",
             "The marks appear for video players only; an audio file has no picture to cut from.",
-        ],
-    },
-    {
-        "version": "0.40.3",
-        "title": "The wide view",
-        "items": [
-            "The phone's browser can ask for the desktop page now: a mobile site / desktop site switch sits beside the ads one \u2014 flip it, reload, and the site serves its full-width layout. Same session, same finds.",
-            "The switch remembers itself, so the next visit opens wide on its own.",
         ],
     },
 ]

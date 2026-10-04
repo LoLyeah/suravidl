@@ -100,9 +100,10 @@ def test_the_release_workflow_builds_and_attaches_the_installer():
     assert "suravidl-windows-x64.exe" in yml
     # the manifest rides along in dist/ (the publish job uploads dist/*)
     assert "generate_release_manifest" in yml
-    # pre-release until the courier feature is verified — flipping this line
-    # back is a deliberate, reviewable act
-    assert "prerelease" in yml
+    # full releases: the update feed reads releases/latest, and a prerelease
+    # would hold the feed back by design — the courier went stable with
+    # v0.41.1, so re-adding "prerelease" here is a deliberate, reviewable act
+    assert "prerelease" not in yml
 
 
 def _gen_no_apk(tmp_path: Path) -> Path:
