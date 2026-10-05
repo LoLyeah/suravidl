@@ -1,9 +1,12 @@
 """v0.37.4 — the backdrop pass: one definition of the dialog overlay's frost.
 
 The popup report ("What's new pop up doesn't have blur") took v0.37.3's fix
-to the phone; the desktop veil stayed a flat dim. The frost now lives on the
+to the phone; the desktop veil stayed a flat dim. The frost moved to the
 base .overlay rule — every host — and DESIGN.md carries the full material
 spec so the next glass dispute has one authoritative sheet to point at.
+
+Superseded by v0.45.3: the veil mattes to the tour ring's dim — no frost of
+its own; the popup card is the room's only frost (the Popup Standard).
 """
 from pathlib import Path
 
@@ -27,11 +30,12 @@ def _block(marker, text=CSS):
     raise AssertionError("unbalanced braces after " + marker)
 
 
-def test_the_overlay_frosts_on_every_host():
-    """One definition, not a host override: the veil frosts everywhere."""
+def test_the_veil_dims_without_frosting():
+    """v0.45.3: the veil dims like the tour ring and carries no frost;
+    the card is the only frost in the room."""
     blk = _block(".overlay {")
-    assert "backdrop-filter: blur(10px) saturate(120%)" in blk
-    assert "-webkit-backdrop-filter: blur(10px) saturate(120%)" in blk
+    assert "background: rgba(5,7,10,.55);" in blk
+    assert "backdrop-filter" not in blk
 
 
 def test_design_md_carries_the_material_spec():
@@ -40,5 +44,5 @@ def test_design_md_carries_the_material_spec():
     assert "blur(26px) saturate(165%) brightness(1.04)" in MD
     assert "blur(19px) saturate(165%)" in MD
     assert "blur(11px) saturate(120%)" in MD
-    assert "blur(10px)" in MD and "saturate(120%)" in MD
+    assert "rgba(5,7,10,.55)" in MD
     assert "The Measured-Blur Rule." in MD

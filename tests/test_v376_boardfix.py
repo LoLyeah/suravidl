@@ -89,9 +89,9 @@ def test_the_phone_transport_pours_dense():
 
 
 def test_the_android_overlay_keeps_the_proven_veil():
-    """This device never frosted the full-page veil either — the dense
-    v0.36 veil returns; the frost stays declared on the base rule."""
+    """This device keeps its dense v0.36 veil; since v0.45.3 base veils
+    carry no frost at all, so there is nothing to unset here."""
     veil = _block('html[data-host="android"] .overlay {')
     assert "rgba(3, 5, 12, .72)" in veil
     base = _block(".overlay {")
-    assert "backdrop-filter: blur(10px) saturate(120%)" in base
+    assert "backdrop-filter" not in base

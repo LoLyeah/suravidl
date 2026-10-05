@@ -6,8 +6,9 @@
    to the panel and hung over the content (reproduced live: content-relative
    y 405 that moved with scroll, vs 699 pinned to the viewport).
 2. "What's new pop up doesn't have blur" — the full-screen overlay was a
-   flat veil; the popup's backdrop frosts now (v0.37.4 moved it to the
-   base rule, every host).
+   flat veil; v0.37.4–v0.45.2 frosted the veil itself. v0.45.3 supersedes:
+   the veil dims only (the tour ring's look); the popup card is the room's
+   only frost.
 3. "the chosen Bottom bar tab needs a squircle outline instead of just one
    line" — the 2px top hairline became a rounded outline.
 """
@@ -43,14 +44,13 @@ def test_the_tab_arrival_never_transforms_the_panel():
     assert "translateY" not in into
 
 
-def test_the_overlay_frosts_the_backdrop():
-    """The popup report ("doesn't have blur") ends here: the veil carries a
-    real backdrop pass on the base rule. The android host re-values the
-    veil's COLOR only (the dense v0.36 veil) — it must never touch the
-    frost itself."""
+def test_the_veil_dims_and_leaves_the_frost_to_the_card():
+    """v0.45.3 (the Popup Standard): the veil dims like the tour ring, no
+    frost — the popup card is the room's only frost. The android host
+    re-values the veil's COLOR only (its dense veil), nothing else."""
     blk = _block(".overlay {")
-    assert "backdrop-filter: blur(" in blk
-    assert "-webkit-backdrop-filter: blur(" in blk
+    assert "background: rgba(5,7,10,.55);" in blk
+    assert "backdrop-filter" not in blk
     veil = _block('html[data-host="android"] .overlay {')
     assert "rgba(3, 5, 12, .72)" in veil
     assert "backdrop-filter" not in veil
