@@ -8,11 +8,18 @@ name: amo
 #
 # Runs on every v* tag (an update of a listed add-on is submitted for review
 # the same way the first version is) and on demand from the Actions tab.
+# A tag whose extension version is unchanged since the previous release is
+# skipped — AMO does not accept a version it already has (pending or live).
+# workflow_dispatch takes `force: true` to submit anyway.
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Submit even when the extension version is unchanged since the last release tag"
+        default: "false"
 
 permissions:
   contents: read
@@ -28,6 +35,24 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+
+      - name: Did the extension change since the last release?
+        id: changed
+        run: |
+          git fetch --tags --force -q
+          prev=$(git tag --sort=v:refname | grep -B1 -x "$GITHUB_REF_NAME" | head -1)
+          here=$(python3 -c "import json;print(json.load(open('extension/firefox/manifest.json'))['version'])")
+          there=""
+          if [ -n "$prev" ]; then
+            there=$(git show "$prev:extension/firefox/manifest.json" 2>/dev/null \
+              | python3 -c "import json,sys;print(json.load(sys.stdin)['version'])" 2>/dev/null || true)
+          fi
+          if [ -n "$there" ] && [ "$here" = "$there" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=amo::extension $here is unchanged since $prev — nothing to submit"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Do we have AMO credentials?
         run: |
@@ -56,7 +81,7 @@ jobs:
         run: npx --yes web-ext@latest lint --source-dir /tmp/ffext --warnings-as-errors=false
 
       - name: Submit to AMO
-        if: env.AMO_JWT_ISSUER != ''
+        if: env.AMO_JWT_ISSUER != '' && (steps.changed.outputs.changed == 'true' || github.event.inputs.force == 'true')
         run: |
           set +e
           npx --yes web-ext@latest sign \
