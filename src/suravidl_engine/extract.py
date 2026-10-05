@@ -6,7 +6,10 @@ TikTok's web front refuses a fraction of fetches from any given network
 arrives); yt-dlp's own tracker treats it as intermittent: "roughly a third
 of requests fail ... the same videos download fine individually, and that's
 what the repeated passes are for" (yt-dlp/yt-dlp#17604). Two more attempts
-turn that refusal into a non-event.
+turn that refusal into a non-event — and they step aside from the exact
+request that was refused: a refusal is per-fingerprint, so three identical
+requests earn three identical answers. Each retry wears a different user
+agent (the served-when-different workaround the tracker documents).
 
 The second: signed CDN links rotate mid-transfer. A download that dies on an
 HTTP 403/410 *after bytes had arrived* was not refused — its link expired
@@ -46,6 +49,24 @@ REFRESH_PHRASES = (
 ATTEMPTS = 3
 BACKOFF = (0.8, 2.0)
 REFRESH_PAUSE = 0.5
+
+# The faces the TikTok retries wear. Attempt one is exactly what the caller
+# asked for; a refusal is per-fingerprint (the same request earns the same
+# answer), so the retries step aside from it the way the community does —
+# a user agent that does not match the impersonated browser is served where
+# the newest Chrome profile is turned away (yt-dlp/yt-dlp#17604).
+RETRY_USER_AGENTS = (
+    None,   # attempt 1: the caller's own options, untouched
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 OPR/118.0.0.0",
+)
+
+
+def _with_user_agent(opts: dict, ua: str) -> dict:
+    """A copy of opts whose request wears the given User-Agent."""
+    headers = dict(opts.get("http_headers") or {})
+    headers["User-Agent"] = ua
+    return {**opts, "http_headers": headers}
 
 
 def is_tiktok_flake(error: object) -> bool:
@@ -90,10 +111,12 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
     tests never actually wait.
     """
     seen = {"bytes": False}
-    run_opts = _watching_progress(opts, seen) if download else opts
     refresh_left = 1 if (download and retry_refresh) else 0
     tiktok_left = ATTEMPTS - 1
     while True:
+        face = RETRY_USER_AGENTS[ATTEMPTS - 1 - tiktok_left]
+        base = _with_user_agent(opts, face) if face else opts
+        run_opts = _watching_progress(base, seen) if download else base
         seen["bytes"] = False
         try:
             with yt_dlp.YoutubeDL(run_opts) as ydl:
