@@ -1212,11 +1212,22 @@ footer .linkbtn { color: var(--accent-ink); }
 
 /* ---------- the welcome mat: FAQ + tour (v0.39.4) ---------- */
 .faqlist {
-  display: grid; gap: 0; align-content: start;
+  display: grid; gap: 8px; align-content: start;
   max-height: 56vh; overflow-y: auto; padding-right: 4px;
 }
-.faq-item { border-top: 1px solid var(--line-soft); }
-.faq-item:first-child { border-top: 0; }
+/* v0.45.4: every entry is a glass card — the popup-standard material at
+   plate size ("do it with the FAQ cards too", 2026-10-05) */
+.faq-item {
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  background-image: var(--glass-gloss);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 8px 22px rgba(0,0,0,.16), inset 0 1px 0 var(--glass-hi);
+  padding: 1px 14px 0;
+}
+@media (hover: hover) { .faq-item:hover { border-color: var(--accent-line); } }
 .faq-item summary {
   cursor: pointer; padding: 10px 2px; font-weight: 600; font-size: 13.5px;
   list-style: none; display: flex; align-items: center; gap: 10px;
