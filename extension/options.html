@@ -7,12 +7,13 @@
   </head>
   <body>
     <h3>suravidl engine</h3>
-    <label for="engineUrl">Engine URL</label>
+    <label for="engineUrl" data-i18n="Engine URL">Engine URL</label>
     <input id="engineUrl" placeholder="http://127.0.0.1:8787" />
-    <label for="engineToken">API token</label>
-    <input id="engineToken" type="password" placeholder="from suravidl → Settings → Network" />
-    <button id="save">Save</button>
+    <label for="engineToken" data-i18n="API token">API token</label>
+    <input id="engineToken" type="password" placeholder="from suravidl → Settings → Authentication" data-i18n-ph="from suravidl → Settings → Authentication" />
+    <button id="save" data-i18n="Save">Save</button>
     <div id="msg"></div>
+    <script src="i18n.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

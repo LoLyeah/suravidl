@@ -21,6 +21,7 @@ const $ = (id) => document.getElementById(id);
 const MANIFEST = (api.runtime && api.runtime.getManifest)
   ? api.runtime.getManifest() : null;
 if (MANIFEST && $("ver")) $("ver").textContent = "v" + MANIFEST.version;
+applyI18n();   // the static strings; dynamic ones go through t() at paint
 
 let TAB = null;
 let ITEMS = [];      // every find on the tab
@@ -45,10 +46,10 @@ function kindWord(m) {
   const shape = {};
   for (const it of (RANK && RANK.items) || []) shape[it.url] = it;
   const kind = (shape[m.url] && shape[m.url].kind) || "";
-  if (kind === "manifest") return "Playlist";
-  if (kind === "media") return "Video";
-  if (kind === "segment") return "Fragment";
-  return "Stream";
+  if (kind === "manifest") return t("Playlist");
+  if (kind === "media") return t("Video");
+  if (kind === "segment") return t("Fragment");
+  return t("Stream");
 }
 
 // A row should say what it IS, not just count. When the URL carries a
@@ -111,13 +112,13 @@ function refreshDoors() {
   const quick = $("quick");
   if (quick) {
     quick.textContent = n > 1
-      ? "Queue all " + n + " at best quality"
-      : "Quick download — best quality";
+      ? t("Queue all {n} at best quality", { n: n })
+      : t("Quick download — best quality");
   }
   const all = $("allbtn");
   if (all) {
     const every = INPUTS.length > 0 && INPUTS.every((i) => i.checked);
-    all.textContent = every ? "Select none" : "Select all";
+    all.textContent = every ? t("Select none") : t("Select all");
     all.setAttribute("aria-pressed", String(every));
   }
 }
@@ -133,7 +134,7 @@ async function send(url, mode) {
   btn.classList.add("busy");
   $("send").disabled = true;
   $("quick").disabled = true;
-  status("Sending to suravidl…", "");
+  status(t("Sending to suravidl…"), "");
   let res = null;
   try {
     res = await api.runtime.sendMessage(quick
@@ -152,14 +153,15 @@ async function send(url, mode) {
   if (res && res.ok) {
     SENT = true;
     btn.classList.remove("busy");
-    status(quick
+    const sentLine = quick
       ? (single
-          ? "✓ Sent — suravidl is downloading it in best quality."
-          : "✓ Sent — " + res.queued + " downloading at best quality."
-            + (res.skipped ? " " + res.skipped + " skipped." : ""))
+          ? t("✓ Sent — suravidl is downloading it in best quality.")
+          : t("✓ Sent — {n} downloading at best quality.", { n: res.queued })
+            + (res.skipped ? " " + t("{n} skipped.", { n: res.skipped }) : ""))
       : res.mode === "job"
-        ? "✓ Sent — this suravidl build downloads it straight away."
-        : "✓ Sent — choose the quality in suravidl.", "ok");
+        ? t("✓ Sent — this suravidl build downloads it straight away.")
+        : t("✓ Sent — choose the quality in suravidl.");
+    status(sentLine, "ok");
     // long enough for the line to be read (and announced), then get out of the way
     setTimeout(() => { try { window.close(); } catch (_) { /* not a popup */ } }, 2400);
   } else {
@@ -176,11 +178,11 @@ async function send(url, mode) {
 
 // One plain sentence per failure kind — no addresses, no status codes.
 function plainSendError(why) {
-  if (/cannot reach/i.test(why)) return "Couldn't reach suravidl — open the app, then try again.";
+  if (/cannot reach/i.test(why)) return t("Couldn't reach suravidl — open the app, then try again.");
   if (/refused the token/i.test(why))
-    return "suravidl didn't accept the saved token — open Engine settings and paste the current one.";
-  if (/^engine \d/i.test(why)) return "suravidl couldn't read this one — the app knows why.";
-  return "something went wrong sending it — try again.";
+    return t("suravidl didn't accept the saved token — open Engine settings and paste the current one.");
+  if (/^engine \d/i.test(why)) return t("suravidl couldn't read this one — the app knows why.");
+  return t("something went wrong sending it — try again.");
 }
 
 function status(text, kind) {
@@ -215,11 +217,11 @@ function render() {
 
   const many = vis.length > 1;
   $("headline").textContent = many
-    ? vis.length + " streams found on this page"
-    : "Video found on this page";
+    ? t("{n} streams found on this page", { n: vis.length })
+    : t("Video found on this page");
   $("subline").textContent = many
-    ? "Tick the ones you want — queue them all at best, or choose quality for the first in the app."
-    : "The quality picker is in the app — suravidl opens ready to choose.";
+    ? t("Tick the ones you want — queue them all at best, or choose quality for the first in the app.")
+    : t("The quality picker is in the app — suravidl opens ready to choose.");
 
   const group = $("pickgroup");
   group.hidden = !many;
@@ -261,7 +263,8 @@ function render() {
       more.className = "more";
       more.textContent = "URL";
       more.setAttribute("aria-expanded", "false");
-      more.setAttribute("aria-label", "Show the raw link — " + say.textContent);
+      more.setAttribute("aria-label",
+        t("Show the raw link — {name}", { name: say.textContent }));
       more.onclick = () => {
         const opening = raw.hidden;
         raw.hidden = !opening;
@@ -293,10 +296,10 @@ function setEngine(state) {
   const chip = $("engine");
   if (state && state.ok) {
     chip.className = "engine ok";
-    $("engineText").textContent = "engine ready";
+    $("engineText").textContent = t("engine ready");
   } else {
     chip.className = "engine down";
-    $("engineText").textContent = "not running";
+    $("engineText").textContent = t("not running");
   }
 }
 

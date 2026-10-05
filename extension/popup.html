@@ -12,7 +12,7 @@
           <path d="M 90 48 H 166 A 12 12 0 0 1 178 60 V 160 H 216 L 128 224 L 40 160 H 78 V 60 A 12 12 0 0 1 90 48 Z M 104 71 L 104 137 Q 104 148 113 141.6 L 157 110.4 Q 166 104 157 97.6 L 113 66.4 Q 104 60 104 71 Z" fill="var(--mark-arrow)" fill-rule="evenodd"/>
         </svg>
         <span class="word">suravidl</span>
-        <span class="engine" id="engine"><span class="led"></span><span id="engineText">checking…</span></span>
+        <span class="engine" id="engine"><span class="led"></span><span id="engineText" data-i18n="checking…">checking…</span></span>
       </header>
 
       <section class="plate" id="found" hidden>
@@ -23,33 +23,34 @@
         <h1 id="headline"></h1>
         <p class="sub" id="subline"></p>
         <div class="pickgroup" id="pickgroup" hidden>
-          <div class="lbl" id="pickLabel">which ones</div>
+          <div class="lbl" id="pickLabel" data-i18n="which ones">which ones</div>
           <div class="streams" id="streams" role="group" aria-labelledby="pickLabel"></div>
-          <button class="more" id="allbtn" type="button" aria-pressed="false">Select all</button>
+          <button class="more" id="allbtn" type="button" aria-pressed="false" data-i18n="Select all">Select all</button>
         </div>
-        <button class="send" id="send">Choose quality in suravidl</button>
-        <button class="ghost wide" id="quick">Quick download — best quality</button>
+        <button class="send" id="send" data-i18n="Choose quality in suravidl">Choose quality in suravidl</button>
+        <button class="ghost wide" id="quick" data-i18n="Quick download — best quality">Quick download — best quality</button>
       </section>
 
       <section class="plate quiet" id="empty" hidden>
-        <h1>Nothing playing yet</h1>
-        <p class="sub">If this page has a video, play it for a moment, then press Check again.</p>
-        <button class="ghost" id="rescan">Check again</button>
+        <h1 data-i18n="Nothing playing yet">Nothing playing yet</h1>
+        <p class="sub" data-i18n="If this page has a video, play it for a moment, then press Check again.">If this page has a video, play it for a moment, then press Check again.</p>
+        <button class="ghost" id="rescan" data-i18n="Check again">Check again</button>
       </section>
 
       <section class="plate quiet" id="down" hidden>
-        <h1>suravidl isn’t running</h1>
-        <p class="sub">Open the suravidl app, then try again.</p>
-        <button class="ghost" id="retry">Try again</button>
+        <h1 data-i18n="suravidl isn’t running">suravidl isn’t running</h1>
+        <p class="sub" data-i18n="Open the suravidl app, then try again.">Open the suravidl app, then try again.</p>
+        <button class="ghost" id="retry" data-i18n="Try again">Try again</button>
       </section>
 
       <div class="status" id="status" role="status" aria-live="polite"></div>
     </div>
 
     <footer>
-      <a href="#" id="optsLink">Engine settings…</a>
+      <a href="#" id="optsLink" data-i18n="Engine settings…">Engine settings…</a>
       <span class="ver" id="ver">v0.5.10</span>
     </footer>
+    <script src="i18n.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

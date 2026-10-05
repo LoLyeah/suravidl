@@ -11,7 +11,9 @@ import { dirname, join } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, "background.js"), "utf8");
+const i18nSrc = readFileSync(join(here, "i18n.js"), "utf8");
 const popupSrc = readFileSync(join(here, "popup.js"), "utf8");
+const popupFull = i18nSrc + "\n" + popupSrc;   // the extension's own t() rides along
 
 const failures = [];
 const ok = (cond, what) => {
@@ -653,7 +655,7 @@ ok(batched && batched.ok && batched.queued === 2,
 
     // — one find: the plain flow —
     let nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup script must load without throwing (" + e + ")");
     }
@@ -677,7 +679,7 @@ ok(batched && batched.ok && batched.queued === 2,
 
     // — the other door: quick download takes the best quality right away —
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
@@ -706,7 +708,7 @@ ok(batched && batched.ok && batched.queued === 2,
       url: "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4" });
     await settle();
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
@@ -746,7 +748,7 @@ ok(batched && batched.ok && batched.queued === 2,
     // — v0.40.7: tick several, and the quick door takes them all in one
     //   call — the quality door keeps its single first-ticked pick —
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
@@ -773,7 +775,7 @@ ok(batched && batched.ok && batched.queued === 2,
 
     // — select all: one press ticks every row, the door flips its label —
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
@@ -799,7 +801,7 @@ ok(batched && batched.ok && batched.queued === 2,
     // — engine down: one thing to fix, not a list you cannot send —
     ff.healthOk = false;
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }
@@ -812,7 +814,7 @@ ok(batched && batched.ok && batched.queued === 2,
     // — nothing playing: the plate offers its own way out —
     ff.store.tabMedia = {};
     nodes = installDom(mkNodes());
-    try { new Function(popupSrc)(); }
+    try { new Function(popupFull)(); }
     catch (e) {
       failures.push("firefox: the popup reload must load without throwing (" + e + ")");
     }

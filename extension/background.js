@@ -310,7 +310,7 @@ async function sendToEngine(url) {
   }
   if (res.status === 401 || res.status === 403) {
     return { ok: false, error: "the engine refused the token (" + res.status +
-             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             ") — copy it in suravidl → Settings → Authentication → API token, paste it " +
              "into the extension's Options (the link below)" };
   }
   if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
@@ -357,7 +357,7 @@ async function sendBatchToEngine(urls) {
   }
   if (res.status === 401 || res.status === 403) {
     return { ok: false, error: "the engine refused the token (" + res.status +
-             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             ") — copy it in suravidl → Settings → Authentication → API token, paste it " +
              "into the extension's Options (the link below)" };
   }
   if (res.status === 404 || res.status === 405) {
@@ -482,7 +482,7 @@ async function sendHandoff(url, urls, tabUrl) {
   }
   if (res.status === 401 || res.status === 403) {
     return { ok: false, error: "the engine refused the token (" + res.status +
-             ") — copy it in suravidl → Settings → Network → API token, paste it " +
+             ") — copy it in suravidl → Settings → Authentication → API token, paste it " +
              "into the extension's Options (the link below)" };
   }
   if (!res.ok) return { ok: false, error: "engine " + res.status + ": " + (await res.text()) };
