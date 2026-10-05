@@ -1,5 +1,6 @@
 package com.suravidl.app
 
+import android.os.Environment
 import android.system.Os
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -146,6 +147,64 @@ class FfmpegBinaryTest {
             out.write("data".toByteArray()); out.write(le32(data))
             out.write(ByteArray(data))
         }
+    }
+
+    /**
+     * The exact postprocess the phone died on (v0.45.6 report): yt-dlp
+     * merges a TikTok pick — h265 mp4 video + a 44.1 kHz mp3 audio track —
+     * into one mp4 with the faststart second pass. Every other ffmpeg path
+     * is already proven here; this one was not. It runs in two folders: the
+     * cache, and the real download folder under the byte-exact name that
+     * failed on the device.
+     */
+    @Test(timeout = 180_000)
+    fun bundledFfmpegMergesH265Mp3() {
+        val ffmpeg = SuravidlApp.ffmpegBinary(ctx)
+        assertTrue("libffmpeg.so missing", ffmpeg != null)
+        val probe = SuravidlApp.ffprobeBinary(ctx)
+        assertTrue("libffprobe.so missing", probe != null)
+
+        val base = "French Song Recommendations\uD83C\uDDEB\uD83C\uDDF7 " +
+            "Judul Lagu & Nama Penyanyi \u2193\u2193\u2193 1.Est-ce..."
+        val dirs = mutableListOf(ctx.cacheDir)
+        ctx.getExternalFilesDir(Environment.DIRECTORY_MOVIES)?.let {
+            val d = File(it, "suravidl")
+            d.mkdirs()
+            dirs += d
+        }
+
+        for (dir in dirs) {
+            val vid = File(dir, "$base.fvid.mp4")
+            val aud = File(dir, "$base.faud.mp3")
+            copyAsset("merge/vid.mp4", vid)
+            copyAsset("merge/aud.mp3", aud)
+            assertTrue("fixtures missing in $dir", vid.length() > 1000 && aud.length() > 1000)
+
+            val out = File(dir, "$base.temp.mp4")
+            out.delete()
+            val log = run(listOf(ffmpeg!!.absolutePath, "-y",
+                "-loglevel", "repeat+info",
+                "-i", vid.absolutePath, "-i", aud.absolutePath,
+                "-c", "copy", "-map", "0:v:0", "-map", "1:a:0",
+                "-movflags", "+faststart", out.absolutePath))
+            assertTrue("merge failed in $dir — ffmpeg said:\n$log",
+                out.exists() && out.length() > 1000)
+
+            val streams = run(listOf(probe!!.absolutePath, "-v", "error",
+                "-show_entries", "stream=codec_type", "-of", "csv=p=0",
+                out.absolutePath))
+            assertTrue("merged file lost a stream:\n$streams",
+                streams.contains("video") && streams.contains("audio"))
+
+            vid.delete(); aud.delete(); out.delete()
+        }
+    }
+
+    private fun copyAsset(path: String, dest: File) {
+        InstrumentationRegistry.getInstrumentation().context.assets
+            .open(path).use { input ->
+                dest.outputStream().buffered().use { input.copyTo(it) }
+            }
     }
 
     private fun run(argv: List<String>): String {
