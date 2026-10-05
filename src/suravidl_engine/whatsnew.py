@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.7",
+        "title": "The sound",
+        "items": [
+            "TikTok picks could end with the sound dying at 1:00 — the site serves the video’s music as its own file, often a 60-second preview, and it was being used as the soundtrack. Picks now take the video’s own complete audio.",
+            "For those videos that means the single complete copy with its real soundtrack; nothing else about the presets changes.",
+        ],
+    },
+    {
         "version": "0.45.6",
         "title": "The cover",
         "items": [
@@ -85,14 +93,6 @@ ENTRIES = [
         "title": "The level",
         "items": [
             "Fixed: a toast clearing the settings Save strip floated a full row too high \u2014 over the Updates text you were reading. It now lands a breath above whatever is docked, exactly where it should.",
-        ],
-    },
-    {
-        "version": "0.43.3",
-        "title": "The stitch",
-        "items": [
-            "The macOS self-update now stages its download in a fresh, private folder instead of a predictable name \u2014 a planted file can no longer stand where the update lands.",
-            "The threat model now states it plainly: link-local and cloud-metadata addresses are refused at every door, with DNS-level tricks the one named, deliberate exception.",
         ],
     },
 ]
