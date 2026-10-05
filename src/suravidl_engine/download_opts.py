@@ -142,6 +142,32 @@ def strip_audio_pairing(fmt: str) -> str:
         return heads[0]
     return "/".join(h for h in heads if h)
 
+def tiktok_safe_format(fmt) -> str:
+    """The same pick, with TikTok's music file excluded from the audio side.
+
+    yt-dlp's TikTok `audio` format is the video's SOUND — `music.playUrl` —
+    not the file's own soundtrack, and for licensed songs it is a ~60 s
+    preview with no duration attached (report 2026-10-05: "the audio cut
+    after a minute": one minute of song under a ten-minute video). The
+    video's complete soundtrack lives inside the muxed formats, so
+    excluding the music track makes the pick fall back to those whenever
+    no real audio-only stream exists — TikTok offers no other one today,
+    so nothing better is ever skipped. No `format` means the yt-dlp
+    default (`bestvideo*+bestaudio/best`, a video intent): it becomes the
+    safe best. Audio-only expressions pair no `+ba` and pass untouched.
+
+    Pure: whatever string arrives, a valid one goes back.
+    """
+    if not fmt:
+        return "bv*+ba[format_id!=audio]/b"
+    f = str(fmt)
+    if "+ba[" in f:
+        f = f.replace("+ba[", "+ba[format_id!=audio][")
+    if "+ba/" in f:
+        f = f.replace("+ba/", "+ba[format_id!=audio]/")
+    return f
+
+
 # The curated groups the yt-dlp tab exposes as named controls (as opposed to
 # raw arguments). Kept here so the UI, the engine and the tests share one list.
 CURATED_KEYS = (

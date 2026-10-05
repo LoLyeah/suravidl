@@ -36,8 +36,11 @@ from __future__ import annotations
 
 import os
 import time
+from urllib.parse import urlparse
 
 import yt_dlp
+
+from .download_opts import tiktok_safe_format
 
 TIKTOK_FLAKE_PHRASES = (
     # the webpage came back with neither challenge nor hydration data
@@ -203,6 +206,16 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
     yt-dlp's own `continuedl` resumes the `.part`. `sleep` is injectable so
     tests never actually wait.
     """
+    # TikTok's "audio" is the video's music file, not its soundtrack — for
+    # licensed songs a 60 s preview (v0.45.7: "the audio cut after a
+    # minute"). Every pick gets its audio side made safe before it runs.
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except ValueError:
+        host = ""
+    if host == "tiktok.com" or host.endswith(".tiktok.com"):
+        opts = {**opts, "format": tiktok_safe_format(opts.get("format"))}
+
     seen = {"bytes": False}
     refresh_left = 1 if (download and retry_refresh) else 0
     tiktok_left = ATTEMPTS - 1
