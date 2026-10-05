@@ -28,11 +28,11 @@ API = (SRC / "api.py").read_text(encoding="utf-8")
 AUTH = {"Authorization": "Bearer t"}
 
 
-def _app(tmp_path):
+def _app(tmp_path, **kw):
     import suravidl_engine.api as api
 
     return api.create_app(download_dir=tmp_path / "dl", auth_token="t",
-                          db_path=tmp_path / "jobs.db")
+                          db_path=tmp_path / "jobs.db", **kw)
 
 
 # -- settings: the sub-tabs keep the APG promise -----------------------------
@@ -274,8 +274,7 @@ def test_reduced_motion_keeps_the_documented_kill():
 
 def test_the_options_page_labels_point_at_their_inputs():
     ext = (ROOT / "extension" / "options.html").read_text(encoding="utf-8")
-    assert '<label for="engineUrl">' in ext
-    assert '<label for="engineToken">' in ext
+    assert 'for="engineUrl"' in ext and 'for="engineToken"' in ext
 
 
 def test_the_popup_version_reads_the_manifest():
@@ -293,3 +292,86 @@ def test_the_ytdlp_tab_usher_line_reads_once():
     frag = d["The literal “every feature” switch. Once it is on, the arguments field in the "]
     assert frag.endswith("di ")
     assert "tab tab" not in frag + d["yt-dlp tab →"]
+
+
+# -- the flagged list, finished: queue bulk, the log card, the folder picker,
+
+def test_the_queue_grew_bulk_actions():
+    assert 'id="queueRetryFailed"' in HTML and 'id="queueClearFiled"' in HTML
+    assert "function renderQueueActions(" in APP
+    assert "renderQueueActions(jobs);" in APP          # painted with every poll
+    assert "function retryFailedJobs(" in APP and "function clearFiledJobs(" in APP
+    # one confirm for the whole clear; the engine-side deletes are reused
+    seg = APP[APP.index("async function clearFiledJobs()"):][:1600]
+    assert "askConfirm(" in seg and "settleThenDelete(j)" in seg
+    assert "QUEUE_BUCKETS.error.includes" in APP
+
+
+def test_the_log_card_reads_the_capture():
+    worker = (SRC / "logcap.py").read_text(encoding="utf-8")
+    assert "deque(maxlen=" in worker
+    assert "logcap" in (SRC / "download_opts.py").read_text(encoding="utf-8")
+    assert 'id="logModal"' in HTML and 'id="logOpen"' in HTML and 'id="logView"' in HTML
+    assert "async function loadLog(" in APP
+    assert 'openModal($("logModal"))' in APP
+
+
+def test_logs_endpoint_serves_the_capture(tmp_path):
+    from suravidl_engine import logcap
+
+    logcap.clear()
+    lg = logcap.logger()
+    lg.debug("hello from the test")
+    lg.warning("careful now")
+    c = TestClient(_app(tmp_path))
+    body = c.get("/logs", headers=AUTH).json()
+    assert body["verbose"] is False
+    lines = body["lines"]
+    assert any("hello from the test" in line for line in lines)
+    assert any(line == "WARNING: careful now" for line in lines)
+    assert c.get("/logs").status_code == 401
+    logcap.clear()
+
+
+def test_the_desktop_folder_picker_exists_end_to_end():
+    assert "can_pick_folder" in API
+    assert 'id="browseDir"' in HTML
+    assert "/app/pick-folder" in APP
+    assert "_pick_folder" in (SRC / "__main__.py").read_text(encoding="utf-8")
+
+
+def test_pick_folder_endpoint(tmp_path):
+    c = TestClient(_app(tmp_path))
+    assert c.post("/app/pick-folder", headers=AUTH).status_code == 501
+    c2 = TestClient(_app(tmp_path,
+                         desktop_actions={"pick_folder": lambda: str(tmp_path)}))
+    r = c2.post("/app/pick-folder", headers=AUTH)
+    assert r.status_code == 200 and r.json()["path"] == str(tmp_path)
+    info = c2.get("/app/info", headers=AUTH).json()
+    assert info["can_pick_folder"] is True
+
+
+def test_the_token_moved_under_authentication():
+    auth = HTML.split('id="spanel-auth"')[1].split("<!-- /spanel-auth -->")[0]
+    media = HTML.split('id="spanel-media"')[1].split("<!-- /spanel-media -->")[0]
+    net = HTML.split('id="spanel-network"')[1].split("<!-- /spanel-network -->")[0]
+    assert 'id="apiToken"' in auth and 'id="apiToken"' not in net
+    assert 'id="setMaxDownloads"' in media and 'id="setMaxDownloads"' not in net
+    # every path reference follows the move
+    ext = (ROOT / "extension" / "background.js").read_text(encoding="utf-8")
+    assert "Settings → Network → API token" not in ext
+    assert "Settings → Authentication → API token" in ext
+    assert "Settings → Authentication" in (ROOT / "README.md").read_text(encoding="utf-8")
+
+
+def test_the_extension_speaks_indonesian():
+    i18n = (ROOT / "extension" / "i18n.js").read_text(encoding="utf-8")
+    assert '"Quick download — best quality": "Unduh cepat — kualitas terbaik"' in i18n
+    assert "navigator.language" in i18n
+    popup = (ROOT / "extension" / "popup.js").read_text(encoding="utf-8")
+    assert 't("Quick download — best quality")' in popup
+    ph = (ROOT / "extension" / "popup.html").read_text(encoding="utf-8")
+    assert "i18n.js" in ph and ph.index("i18n.js") < ph.index("popup.js")
+    assert 'data-i18n="Quick download — best quality"' in ph
+    op = (ROOT / "extension" / "options.html").read_text(encoding="utf-8")
+    assert 'data-i18n="Engine URL"' in op and "i18n.js" in op

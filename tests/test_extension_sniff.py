@@ -42,8 +42,8 @@ def test_the_popup_hides_fragments_only_on_the_engines_word():
     # "hidden — part of the playlist above" debug note is gone with the wall
     # of URLs it annotated
     assert "hidden — part of the playlist above" not in POPUP
-    assert 'if (kind === "manifest") return "Playlist";' in POPUP
-    assert 'if (kind === "media") return "Video";' in POPUP
+    assert 'if (kind === "manifest") return t("Playlist");' in POPUP
+    assert 'if (kind === "media") return t("Video");' in POPUP
 
 
 def test_the_handoff_still_carries_the_captured_headers():

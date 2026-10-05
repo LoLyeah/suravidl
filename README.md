@@ -101,7 +101,7 @@ tab badge shows how many videos were detected.
   `extension/manifest.json` with `extension/firefox/manifest.json` first
   (that swap is exactly what the Mozilla Add-ons build does).
 - Paste the engine token once in the extension's options page — the engine's
-  **Settings → Network** shows it (masked, with a Copy button) if you don't want
+  **Settings → Authentication** shows it (masked, with a Copy button) if you don't want
   to open `~/.suravidl/token`. The popup's footer links straight to it.
 - The media list it watches for comes from the engine (`GET /sniff/patterns`),
   so a new format is an engine update, not an extension update; a response that
@@ -240,7 +240,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 1105 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 1112 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

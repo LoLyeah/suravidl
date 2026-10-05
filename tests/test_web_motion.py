@@ -151,7 +151,7 @@ def test_deleting_says_deleting():
     """The settle loop runs up to ~3s after the confirm dialog has gone; the row
     looked untouched the whole time."""
     assert '.job.pending {' in CSS
-    seg = APP.split("await settleThenDelete(j)")[0][-900:]
+    seg = APP.split("function deleteButton(j)")[1].split("await settleThenDelete(j)")[0]
     assert 'classList.add("pending")' in seg
     assert '"deleting…"' in seg and '"stopping…"' in seg
     # and a failed delete must not leave the row stuck in that state

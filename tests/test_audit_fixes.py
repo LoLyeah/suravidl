@@ -99,7 +99,8 @@ def test_a_headless_engine_does_not_advertise_a_window(tmp_path):
     with TestClient(_app(tmp_path)) as c:
         info = c.get("/app/info", headers=AUTH).json()
         assert info == {"desktop": False, "can_minimize": False,
-                        "can_pick_file": False, "can_open_url": False}
+                        "can_pick_file": False, "can_pick_folder": False,
+                        "can_open_url": False}
         for ep in ("/app/minimize", "/app/quit"):
             r = c.post(ep, headers=AUTH)
             assert r.status_code == 501, f"{ep} -> {r.status_code}: {r.text}"
