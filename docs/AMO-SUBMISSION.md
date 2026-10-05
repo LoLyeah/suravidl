@@ -1,11 +1,12 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.10` rides this release (the multi-select quick
-door now carries each find's captured headers, like the single door
-always did). The release pipeline submits it; `0.5.8` stays the live
-public version until a reviewer approves an update — `0.5.9` and `0.5.10`
-are both in the queue, each submission superseding the pending one.
-Earlier versions — `0.5.9` (multi-select in the popup, right-click
+**Status:** `suravidl 0.5.11` rides this release (the extension speaks
+Bahasa Indonesia, and its token hints follow Settings → Authentication).
+The release pipeline submits it; `0.5.8` stays the live public version
+until a reviewer approves an update — `0.5.9`, `0.5.10` and `0.5.11`
+sit in the queue, each submission superseding the pending one.
+Earlier versions — `0.5.10` (multi-select across all of a tab’s
+finds), `0.5.9` (multi-select in the popup, right-click
 "Download with suravidl"), `0.5.8` (the tab-reset fix), `0.5.7` (readable
 stream rows with a per-row raw-link door), `0.5.6` (the port-ladder fix),
 `0.5.5` (quick download) and `0.5.4` (the doorman itself) — are

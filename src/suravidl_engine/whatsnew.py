@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.0",
+        "title": "The ledger",
+        "items": [
+            "The queue grew bulk actions: clear everything finished, or retry everything failed, in one move \u2014 the counts sit right above the list, and clearing asks once.",
+            "The verbose switch has a reader now: a Log card in the yt-dlp tab shows the last lines yt-dlp said, ready to copy. Turn Verbose log on for the deep one.",
+            "Settings keeps its promises: the sub-tabs take arrow keys, the appearance swatches say what is selected, and Test cookies checks what you typed without quietly saving the rest of the form.",
+            "The browser extension speaks Bahasa Indonesia too, following your browser\u2019s language \u2014 and the API token moved to Settings \u2192 Authentication, where its Copy button now lives.",
+        ],
+    },
+    {
         "version": "0.44.0",
         "title": "The phrasebook",
         "items": [
@@ -88,14 +98,6 @@ ENTRIES = [
             "Releases are full releases again \u2014 the update feed is live: suravidl fetches the next version itself, verifies it, and installs it in place with one tap. No more release-page trips.",
             "First stable release of the self-updating line: install the Windows setup or the Android APK once, and every version after this arrives in-app.",
             "Polish pass: an update download can be cancelled mid-flight, a failed update says so wherever you are, and the ready notice carries the install button.",
-        ],
-    },
-    {
-        "version": "0.41.0",
-        "title": "The courier",
-        "items": [
-            "Windows gets a real installer: per-user, no admin prompts, a Start Menu entry and a proper uninstall in Windows Settings \u2014 the portable exe stays for anyone who prefers it.",
-            "The app updates itself now: check, download, verify by checksum \u2014 then one tap to install (Windows restarts into it; Android shows its own single confirmation). No more release-page trips.",
         ],
     },
 ]
