@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.5",
+        "title": "The disguise",
+        "items": [
+            "TikTok\u2019s \u201cunexpected response\u201d refusal is retried with a different browser identity each attempt \u2014 a refused fetch no longer repeats itself into the same wall.",
+            "The first attempt stays exactly what you configured; only the retries step aside \u2014 and only for TikTok\u2019s challenge, never for a real error.",
+        ],
+    },
+    {
         "version": "0.45.4",
         "title": "The answers",
         "items": [
@@ -88,14 +96,6 @@ ENTRIES = [
             "Multi-select downloads from the browser extension carry each file's captured headers now, like the single download always did.",
             "Remove downloaded copy, while that copy is the one running, is applied on the next start \u2014 the tab says so instead of the files vanishing mid-session.",
             "Windows self-updates run through one opaque command: special characters in usernames or folders can no longer break the installer chain. Settings and token files are born owner-only.",
-        ],
-    },
-    {
-        "version": "0.43.1",
-        "title": "The undo",
-        "items": [
-            "The downloaded yt-dlp can be removed again from its tab \u2014 a staged copy is canceled on the spot, and an active one hands back to the bundled copy from the next start.",
-            "The tab now says where the running copy comes from: (bundled) or (downloaded) \u2014 no guessing which one is in use.",
         ],
     },
 ]
