@@ -391,14 +391,18 @@ main { display: block; padding: 18px 20px 110px; }
 .bin-empty, .bins-empty { padding: 10px 4px; }
 
 @media (min-width: 900px) {
-  /* tablet / split-screen widths: the deck keeps its measure (v0.44.x audit) */
-  main { max-width: 1240px; margin: 0 auto; }
+  /* tablet / split-screen widths: the deck keeps its measure (v0.44.x audit).
+     width: 100% (v0.45.2): the body is a flex column, and auto margins alone
+     made the deck fit-content — it resized to whatever panel was visible
+     (the settings deck's width jumped per sub-tab). */
+  main { width: 100%; max-width: 1240px; margin: 0 auto; }
 }
 @media (min-width: 1080px) {
   main {
     display: grid;
     grid-template-columns: 236px minmax(0, 1fr);
     gap: 20px;
+    width: 100%;
     max-width: 1240px;
     margin: 0 auto;
     padding: 20px 24px 130px;
@@ -1114,6 +1118,10 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
   border-top: 1px solid var(--line);
   background: var(--glass-bg-strong);
   border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
+  /* v0.45.2: rows scroll beneath this strip — frost them. The phone block
+     and the Android host below switch the blur back off. */
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
 .updrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .updmeta { margin-top: 6px; }
@@ -1349,6 +1357,7 @@ footer .linkbtn { color: var(--accent-ink); }
     margin: 14px -14px -14px; padding: 12px 14px;
     border-top: 1px solid var(--line);
     background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: none; backdrop-filter: none;  /* phones keep the flat strip (v0.45.2) */
   }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
   .swatches { gap: 8px; }

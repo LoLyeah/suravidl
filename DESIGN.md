@@ -127,7 +127,10 @@ before they are written in stack traces, and a finished download says so.
 - Two voices, both shipped with the app: Archivo for prose, Martian Mono for
   every machine readout.
 - Machine-instrument shapes: 8–14px controls, 20px floating plates; pills for
-  state. Nothing sharper than 8px, nothing rounder than a pill.
+  state. Nothing sharper than 8px, nothing rounder than a pill. The deck keeps
+  its measure: a centered deck must carry an explicit `width: 100%` beside its
+  `margin: 0 auto` — the shell is a flex column, and auto margins alone
+  silently shrink the deck to the visible panel's content (v0.45.2).
 - Controls wear the app's skin, never the OS's: selects reset the native
   appearance and draw their caret in the theme's ink (v0.45.1 — macOS
   WKWebView kept a bezel and double-chevron on them; the menu controls were
@@ -322,7 +325,10 @@ changing tokens, never surface by surface.
 - **Flattened on purpose:** toasts (Panel Solid — reading beats atmosphere)
   and the phone's Settings Save strip (rows scroll beneath it). Both keep
   hairlines and radii so they still read as plates; solid is a legibility
-  choice, never a fallback for ability.
+  choice, never a fallback for ability. The desktop Save strip is glass, not
+  flat (v0.45.2): rows scroll beneath it, so it frosts them with the material
+  blur — phones and Android keep the flat strip (their backdrops don't
+  composite it).
 
 ### Named Rules
 **The Real Glass Rule.** Every blurred surface ships `-webkit-backdrop-filter`
