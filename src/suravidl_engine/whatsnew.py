@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.3",
+        "title": "The summons",
+        "items": [
+            "The tour card\u2019s blur and transparency is the standard for every popup: the room behind a dialog dims but stays sharp, and the popup is the room\u2019s only frosted glass \u2014 nothing behind it smears flat anymore.",
+            "It\u2019s lighter on the machine too \u2014 one less full-screen blur pass rides every dialog.",
+        ],
+    },
+    {
         "version": "0.45.2",
         "title": "The measure",
         "items": [
@@ -88,15 +96,6 @@ ENTRIES = [
         "items": [
             "The yt-dlp button works on every build now: packaged installs (Windows, macOS, Linux, Android) fetch the newest release straight from PyPI, verify it, and apply it on the next start \u2014 no app update needed.",
             "The newer copy is the one that runs \u2014 and if an app update ever ships something even newer, that wins instead. A staged update says \"restart to use it\" until it is live.",
-        ],
-    },
-    {
-        "version": "0.42.1",
-        "title": "The glide",
-        "items": [
-            "Motion polish all through the app: the armed strip folds instead of pushing the formats table down, subtitle picks and tab dots glide in, and the queue's filter eases rows out instead of jumping them.",
-            "The FAQ folds like the download card; modal exits are quick where they lingered; and timer fallbacks now respect your system's reduced-motion setting everywhere.",
-            "Housekeeping: a downloaded update file is deleted the moment it is spent \u2014 right after a self-update on Windows and macOS, and on the next launch on Android.",
         ],
     },
 ]
