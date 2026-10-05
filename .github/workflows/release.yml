@@ -26,8 +26,8 @@ jobs:
               suravidl-macos-arm64.zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install deps
@@ -133,7 +133,7 @@ jobs:
           & $iscc "/DAppVersion=$version" packaging/windows/suravidl.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Move-Item -Force packaging/windows/Output/suravidl-setup.exe suravidl-windows-x64-setup.exe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.os }}
           path: ${{ matrix.files }}
@@ -142,7 +142,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build Firefox .xpi + load-unpacked zips
         run: |
           set -e
@@ -159,7 +159,7 @@ jobs:
           (cd extension && zip -qr "$OLDPWD/suravidl-extension-chrome.zip" . \
               -x "firefox/*" -x "test_harness.mjs")
           (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox-src.zip" .)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: extension
           path: |
@@ -175,8 +175,8 @@ jobs:
       contents: write
       actions: write        # the android dispatch below needs it
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
         with:
           merge-multiple: true
           path: dist
@@ -186,7 +186,7 @@ jobs:
         run: |
           python3 scripts/generate_release_manifest.py dist \
               --tag "$REF_NAME" --repo "${{ github.repository }}"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           generate_release_notes: true

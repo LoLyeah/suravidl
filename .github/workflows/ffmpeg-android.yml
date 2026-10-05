@@ -30,7 +30,7 @@ jobs:
           - { abi: arm64-v8a, target: aarch64-linux-android }
           - { abi: x86_64,    target: x86_64-linux-android }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install nasm (needed for x86_64 asm)
         run: sudo apt-get update -qq && sudo apt-get install -y -qq nasm
@@ -47,7 +47,7 @@ jobs:
           scripts/build_ffmpeg_android.sh "${{ matrix.abi }}" "${{ matrix.target }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ffmpeg-${{ matrix.abi }}
           path: |
@@ -60,7 +60,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: dl
 
