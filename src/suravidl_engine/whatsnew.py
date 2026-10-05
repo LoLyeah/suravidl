@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.6",
+        "title": "The cover",
+        "items": [
+            "Covers that arrive without a usable file extension \u2014 TikTok\u2019s end in \u201c.image\u201d \u2014 no longer break a download with thumbnails turned on: the file\u2019s own bytes decide its name, so it converts and embeds cleanly.",
+            "That was the \u201cError opening output files: Invalid argument\u201d wall those downloads ended on; the fix rides the desktop and the phone alike.",
+        ],
+    },
+    {
         "version": "0.45.5",
         "title": "The disguise",
         "items": [
@@ -85,17 +93,6 @@ ENTRIES = [
         "items": [
             "The macOS self-update now stages its download in a fresh, private folder instead of a predictable name \u2014 a planted file can no longer stand where the update lands.",
             "The threat model now states it plainly: link-local and cloud-metadata addresses are refused at every door, with DNS-level tricks the one named, deliberate exception.",
-        ],
-    },
-    {
-        "version": "0.43.2",
-        "title": "The rake",
-        "items": [
-            "Hardening pass: link-local and cloud-metadata addresses are refused everywhere \u2014 pasted, handed over from the browser, or queued as a download \u2014 with a plain reason.",
-            "The download queue has a ceiling now, and oversized requests bounce before they are read: a runaway script cannot grow either without bound.",
-            "Multi-select downloads from the browser extension carry each file's captured headers now, like the single download always did.",
-            "Remove downloaded copy, while that copy is the one running, is applied on the next start \u2014 the tab says so instead of the files vanishing mid-session.",
-            "Windows self-updates run through one opaque command: special characters in usernames or folders can no longer break the installer chain. Settings and token files are born owner-only.",
         ],
     },
 ]
