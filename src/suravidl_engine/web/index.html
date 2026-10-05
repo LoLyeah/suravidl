@@ -353,6 +353,10 @@
         <button class="btn sm" data-qfilter="filed" aria-pressed="false" data-i18n="Filed">Filed</button>
         <button class="btn sm" data-qfilter="error" aria-pressed="false" data-i18n="Errors">Errors</button>
       </div>
+      <div id="queueActions" class="hidden">
+        <button id="queueRetryFailed" class="btn sm hidden" type="button" data-i18n="Retry failed">Retry failed</button>
+        <button id="queueClearFiled" class="btn sm hidden" type="button" data-i18n="Clear filed">Clear filed</button>
+      </div>
       <div id="jobs" role="list"><div class="empty muted" id="jobsInitial" data-i18n="Checking the queue…">Checking the queue…</div></div>
       <div id="filterEmpty" class="hidden" role="status"><span class="muted small say"></span>
         <button class="linkbtn" id="filterAll" type="button" data-i18n="Show all">Show all</button></div>
@@ -433,7 +437,10 @@
 
       <div class="field">
         <label class="lbl" for="setDir" data-i18n="Download folder">Download folder</label>
-        <input id="setDir" class="mono" type="text" spellcheck="false"/>
+        <div class="jrow">
+          <input id="setDir" class="mono" type="text" spellcheck="false"/>
+          <button id="browseDir" class="btn sm hidden" type="button" data-i18n="Browse…">Browse…</button>
+        </div>
       </div>
 
       <div class="field row">
@@ -497,6 +504,12 @@
             <option value="site" data-i18n="One per site">One per site</option>
           </select>
           <span class="muted small" data-i18n="for playlists, courses and channels">for playlists, courses and channels</span>
+        </div>
+
+        <div class="field row">
+          <label class="lbl" for="setMaxDownloads" data-i18n="Playlist limit">Playlist limit</label>
+          <input id="setMaxDownloads" type="number" min="0" max="1000" aria-describedby="setMaxDownloadsHint"/>
+          <span class="muted small" id="setMaxDownloadsHint" data-i18n="stop after N downloads · 0 = the whole list">stop after N downloads · 0 = the whole list</span>
         </div>
 
         <div class="field">
@@ -628,11 +641,6 @@
           <span class="muted small" id="setRetriesHint" data-i18n="0–30 · per download, on a flaky connection">0–30 · per download, on a flaky connection</span>
         </div>
         <div class="field row">
-          <label class="lbl" for="setMaxDownloads" data-i18n="Playlist limit">Playlist limit</label>
-          <input id="setMaxDownloads" type="number" min="0" max="1000" aria-describedby="setMaxDownloadsHint"/>
-          <span class="muted small" id="setMaxDownloadsHint" data-i18n="stop after N downloads · 0 = the whole list">stop after N downloads · 0 = the whole list</span>
-        </div>
-        <div class="field row">
           <label class="lbl" for="setRateLimit" data-i18n="Speed limit">Speed limit</label>
           <input id="setRateLimit" class="mono" type="text" spellcheck="false" placeholder="e.g. 2M (blank = unlimited)" data-i18n-ph="e.g. 2M (blank = unlimited)"/>
         </div>
@@ -640,12 +648,6 @@
           <label class="lbl" for="setProxy" data-i18n="Proxy">Proxy</label>
           <input id="setProxy" class="mono" type="text" spellcheck="false"
                  placeholder="socks5://127.0.0.1:1080 (blank = direct)" data-i18n-ph="socks5://127.0.0.1:1080 (blank = direct)"/>
-        </div>
-        <div class="field row">
-          <label class="lbl" data-i18n="API token">API token</label>
-          <span id="apiToken" class="muted small mono">…</span>
-          <button id="copyToken" class="btn sm" type="button" data-i18n="Copy">Copy</button>
-          <span class="muted small" data-i18n="what the browser extension sends">what the browser extension sends</span>
         </div>
       </div><!-- /spanel-network -->
 
@@ -691,6 +693,13 @@
           </div>
         </div>
       </div>
+
+        <div class="field row">
+          <label class="lbl" data-i18n="API token">API token</label>
+          <span id="apiToken" class="muted small mono">…</span>
+          <button id="copyToken" class="btn sm" type="button" data-i18n="Copy">Copy</button>
+          <span class="muted small" data-i18n="what the browser extension sends">what the browser extension sends</span>
+        </div>
 
       </div><!-- /spanel-auth -->
 
@@ -786,6 +795,7 @@
             <input id="setVerbose" type="checkbox"/><span data-i18n=" Verbose log ">
             Verbose log </span><span class="muted" data-i18n="(yt-dlp&#x27;s full log — debugging)">(yt-dlp's full log — debugging)</span>
           </label>
+          <div class="jrow"><button id="logOpen" class="btn sm" type="button" data-i18n="View log">View log</button></div>
         </div>
 
         <div class="field">
@@ -934,6 +944,23 @@
     <div id="whatsNewList" class="wnlist"></div>
     <div class="modal-foot right">
       <button id="whatsNewDone" class="btn prime" data-i18n="Got it">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div id="logModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="logTitle">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="logTitle" class="title" data-i18n="yt-dlp log">yt-dlp log</span>
+      <span class="spacer"></span>
+      <button id="logClose" class="btn ghost-sm" data-i18n="Close">Close</button>
+    </div>
+    <pre id="logView" class="logs mono"></pre>
+    <div class="modal-foot">
+      <button id="logRefresh" class="btn sm" type="button" data-i18n="Refresh">Refresh</button>
+      <span class="spacer"></span>
+      <button id="logCopy" class="btn sm" type="button" data-i18n="Copy">Copy</button>
     </div>
   </div>
 </div>

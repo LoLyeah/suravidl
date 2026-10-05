@@ -656,6 +656,7 @@ def create_app(download_dir, auth_token: str | None = None,
         return {"desktop": bool(acts.get("quit") or acts.get("minimize")),
                 "can_minimize": bool(acts.get("minimize")),
                 "can_pick_file": bool(acts.get("pick_file")),
+                "can_pick_folder": bool(acts.get("pick_folder")),
                 "can_open_url": bool(acts.get("open_url"))}
 
     def _window_action(name: str):
@@ -702,6 +703,18 @@ def create_app(download_dir, auth_token: str | None = None,
         if not fn:
             raise HTTPException(status_code=501,
                                 detail="file picking is only available in the desktop app")
+        try:
+            return {"path": fn()}
+        except Exception:  # noqa: BLE001 - a cancelled/broken dialog is not an error
+            return {"path": None}
+
+    @app.post("/app/pick-folder")
+    def app_pick_folder(_mgr: JobManager = Depends(require_auth)):
+        """Native folder picker (desktop app only) — the Download folder row."""
+        fn = acts.get("pick_folder")
+        if not fn:
+            raise HTTPException(status_code=501,
+                                detail="folder picking is only available in the desktop app")
         try:
             return {"path": fn()}
         except Exception:  # noqa: BLE001 - a cancelled/broken dialog is not an error
@@ -1103,6 +1116,17 @@ def create_app(download_dir, auth_token: str | None = None,
         lines = _archive_lines()
         return {"path": str(archive_path) if archive_path else None,
                 "count": len(lines), "entries": lines[-200:]}
+
+    @app.get("/logs")
+    def get_logs(_mgr: JobManager = Depends(require_auth)):
+        """The last lines yt-dlp said — the detail behind the verbose switch.
+
+        Bounded and in-memory (see logcap): it dies with the process, and the
+        engine's own token is the wall, like every other endpoint.
+        """
+        from . import logcap
+
+        return {"lines": logcap.lines(), "verbose": bool(settings.get()["verbose"])}
 
     @app.post("/archive/forget")
     def forget_archive(body: ArchiveForgetRequest,

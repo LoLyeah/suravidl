@@ -734,7 +734,17 @@ const STRINGS = { en: {}, id: {
   "probe ready — the formats are below": "cek selesai — formatnya di bawah",
   "Clip start time": "Waktu mulai klip",
   "start 1:30": "mulai 1:30",
-  "end 2:45": "akhir 2:45"
+  "end 2:45": "akhir 2:45",
+  "Retry failed ({n})": "Coba ulang yang gagal ({n})",
+  "Clear filed ({n})": "Bersihkan yang selesai ({n})",
+  "Delete the {n} filed downloads?": "Hapus {n} unduhan yang selesai?",
+  "Their Gallery/Music copies go too.": "Salinan Gallery/Music-nya ikut terhapus.",
+  "retrying {n}": "mencoba ulang {n}",
+  "View log": "Lihat log",
+  "yt-dlp log": "log yt-dlp",
+  "Refresh": "Muat ulang",
+  "nothing logged yet — turn on Verbose log for the deep one": "belum ada catatan — nyalakan Verbose log untuk versi detailnya",
+  "could not read the log: {msg}": "tidak bisa membaca log: {msg}"
 } };
 /* i18n-dicts:end */
 let LANG = CFG.language === "id" ? "id" : "en";
@@ -1258,6 +1268,7 @@ function relabelUI() {
   paintMotionNote();
   wireToken();   // the token chip and its title ride the language too (audit)
   if ($("archiveCount") && $("archiveCount").textContent.trim()) loadArchive();
+  if ($("logModal") && !$("logModal").classList.contains("hidden")) loadLog();
 }
 
 /** A rebuilt row is a repainted row: stamping every live row stale makes the
@@ -2497,6 +2508,108 @@ async function settleThenDelete(job) {
   return api(`/jobs/${job.id}/delete`, { method: "POST" });
 }
 
+/* ---------- queue bulk actions (v0.44.x audit) ----------
+   The sieve made big queues readable; acting on them still meant one modal
+   per row. Two counters do the bulk work — retry everything failed, clear
+   everything filed — each behind its own single confirm. */
+function renderQueueActions(jobs) {
+  const box = $("queueActions");
+  if (!box) return;
+  const failed = (jobs || []).filter((j) => QUEUE_BUCKETS.error.includes(j.status)).length;
+  const filed = (jobs || []).filter((j) => QUEUE_BUCKETS.filed.includes(j.status)).length;
+  const rb = $("queueRetryFailed"), cb = $("queueClearFiled");
+  rb.textContent = t("Retry failed ({n})", { n: failed });
+  cb.textContent = t("Clear filed ({n})", { n: filed });
+  rb.classList.toggle("hidden", !failed);
+  cb.classList.toggle("hidden", !filed);
+  box.classList.toggle("hidden", !failed && !filed);
+}
+
+async function retryFailedJobs() {
+  const { jobs } = await api("/jobs").catch(() => ({ jobs: [] }));
+  const failed = (jobs || []).filter((j) => QUEUE_BUCKETS.error.includes(j.status));
+  if (!failed.length) return;
+  let n = 0;
+  for (const j of failed) {
+    try { await api(`/jobs/${j.id}/retry`, { method: "POST" }); n += 1; }
+    catch (_) { /* one refusal must not stop the rest */ }
+  }
+  toast(t("retrying {n}", { n }));
+  refreshJobs();
+}
+
+async function clearFiledJobs() {
+  const { jobs } = await api("/jobs").catch(() => ({ jobs: [] }));
+  const filed = (jobs || []).filter((j) => QUEUE_BUCKETS.filed.includes(j.status));
+  if (!filed.length) return;
+  const msg = t("Delete the {n} filed downloads?", { n: filed.length })
+    + (GALLERY() ? " " + t("Their Gallery/Music copies go too.") : "")
+    + " " + t("This cannot be undone.");
+  if (!(await askConfirm(msg, { okText: t("Delete") }))) return;
+  let deleted = 0, freed = 0;
+  for (const j of filed) {
+    try {
+      const r = await settleThenDelete(j);
+      deleted += r.deleted || 0;
+      freed += r.freed_bytes || 0;
+      if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
+        const names = (j.files && j.files.length ? j.files : [j.filepath || ""])
+          .map((p) => baseName(p)).filter(Boolean);
+        for (const name of names) {
+          try { window.AndroidHost.deleteMediaNamed(name); } catch (_) { }
+        }
+      }
+    } catch (_) { /* report below; keep clearing the rest */ }
+  }
+  toast(deleted
+    ? (deleted === 1
+       ? t("deleted 1 file · freed {free}", { free: humanBytes(freed) })
+       : t("deleted {n} files · freed {free}", { n: deleted, free: humanBytes(freed) }))
+    : t("removed from the list"));
+  refreshJobs();
+  if (refreshStorageInfo) refreshStorageInfo();
+}
+$("queueRetryFailed").onclick = retryFailedJobs;
+$("queueClearFiled").onclick = clearFiledJobs;
+
+/* ---------- the yt-dlp log card (v0.44.x audit) ----------
+   The verbose switch asked people to turn on a log they could never read.
+   The engine keeps the last lines in memory (logcap); this card shows them. */
+async function loadLog() {
+  const box = $("logView");
+  if (!box) return;
+  try {
+    const r = await api("/logs");
+    const lines = r.lines || [];
+    box.textContent = lines.length
+      ? lines.join("\n")
+      : t("nothing logged yet — turn on Verbose log for the deep one");
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    box.textContent = t("could not read the log: {msg}", { msg: e.message });
+  }
+}
+$("logOpen").onclick = async () => {
+  $("logView").textContent = t("loading…");
+  openModal($("logModal"));
+  await loadLog();
+};
+$("logRefresh").onclick = loadLog;
+$("logClose").onclick = () => closeModal($("logModal"));
+$("logCopy").onclick = async () => {
+  const ok = await copyText($("logView").textContent || "");
+  toast(ok ? t("Copied") : t("copy failed"), ok ? "ok" : "bad");
+};
+{
+  const modal = $("logModal");
+  if (modal) {
+    modal.onclick = (e) => { if (e.target === modal) closeModal(modal); };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal(modal);
+    });
+  }
+}
+
 /** The trash button — one download gone, file and all, after a confirm. */
 function deleteButton(j) {
   const running = ACTIVE.has(j.status);
@@ -3052,6 +3165,7 @@ async function refreshJobs() {
     if (seq !== JOBS_SEQ) return;
     JOBS_FAILS = 0;
     renderQueueBadge(jobs);
+    renderQueueActions(jobs);
     const box = $("jobs");
     // a banner raised by an outage has to die with the outage: it was only
     // ever removed on the non-empty path, so it stayed on screen forever over
@@ -4031,6 +4145,21 @@ async function initAppControls() {
           const { path } = await api("/app/pick-file", { method: "POST" });
           if (path) {
             $("setCookies").value = path;
+            toast(t("selected — press Save"));
+          }
+        } catch (e) {
+          toast(t("file picker unavailable: {msg}", { msg: e.message }), "bad");
+        }
+      };
+    }
+    if (info.can_pick_folder) {
+      const browse = $("browseDir");
+      browse.classList.remove("hidden");
+      browse.onclick = async () => {
+        try {
+          const { path } = await api("/app/pick-folder", { method: "POST" });
+          if (path) {
+            $("setDir").value = path;
             toast(t("selected — press Save"));
           }
         } catch (e) {

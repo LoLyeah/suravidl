@@ -1362,6 +1362,16 @@ def main() -> None:
                 return None
             return picked[0] if picked else None
 
+        def _pick_folder():
+            mode = getattr(webview, "FOLDER_DIALOG", None)
+            if mode is None:                 # an old pywebview: no folder mode
+                return None
+            try:
+                picked = window.create_file_dialog(mode)
+            except Exception:  # noqa: BLE001 - dialog cancelled or unsupported
+                return None
+            return picked[0] if picked else None
+
         def _open_url(url):
             """Open a link in the user's REAL browser: the embedded window
             cannot honour target=_blank, so release pages must go outside."""
@@ -1408,6 +1418,7 @@ def main() -> None:
                    "quit": window.destroy,
                    "focus": _focus_window,
                    "reveal": _open_folder, "pick_file": _pick_file,
+                   "pick_folder": _pick_folder,
                    "open_url": _open_url,
                    "apply_update": _make_apply_update_action(window)}
 

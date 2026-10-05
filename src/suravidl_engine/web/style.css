@@ -828,6 +828,7 @@ details.card { padding: 0 18px 6px; }
 #jobs { display: flex; flex-direction: column; gap: 12px; }
 /* v0.40.2 "the sieve": the queue's view filter */
 #queueFilters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+#queueActions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 #filterEmpty { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
 .job {
   position: relative;
@@ -1090,6 +1091,13 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
    corners (it used to be an opaque slab that squared them off) */
 /* the Device tab is action-only — nothing there rides the Save form (audit) */
 #panel-settings[data-stab="device"] .modal-foot { display: none; }
+
+.logs {
+  max-height: 52vh; overflow: auto; margin: 10px 0 0;
+  padding: 12px 14px; font-size: 12px; line-height: 1.5;
+  background: var(--input-bg); border: 1px solid var(--line); border-radius: 10px;
+  white-space: pre-wrap; word-break: break-word;
+}
 #panel-settings .modal-foot {
   position: sticky; z-index: 3; bottom: 12px;
   margin: 14px -18px -18px; padding: 12px 18px;

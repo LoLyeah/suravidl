@@ -193,6 +193,11 @@ def curated_settings_opts(settings: dict) -> dict:
         opts["verbose"] = True
         opts["quiet"] = False
         opts["no_warnings"] = False
+        # the switch must have somewhere to read (v0.44.x audit): the Log
+        # card in the app reads this bounded in-memory capture
+        from . import logcap
+
+        opts["logger"] = logcap.logger()
     ip_version = settings.get("ip_version", "auto")
     if ip_version in _SOURCE_ADDRESS:
         opts["source_address"] = _SOURCE_ADDRESS[ip_version]
