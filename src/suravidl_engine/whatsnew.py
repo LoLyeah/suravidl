@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.2",
+        "title": "The measure",
+        "items": [
+            "The settings deck stopped changing size: its width followed whichever panel was open \u2014 every tab now keeps the deck\u2019s full measure.",
+            "The Save strip frosts what scrolls beneath it \u2014 rows passing under the bar read as a smudge now, not a list.",
+        ],
+    },
+    {
         "version": "0.45.1",
         "title": "The pane",
         "items": [
@@ -89,14 +97,6 @@ ENTRIES = [
             "Motion polish all through the app: the armed strip folds instead of pushing the formats table down, subtitle picks and tab dots glide in, and the queue's filter eases rows out instead of jumping them.",
             "The FAQ folds like the download card; modal exits are quick where they lingered; and timer fallbacks now respect your system's reduced-motion setting everywhere.",
             "Housekeeping: a downloaded update file is deleted the moment it is spent \u2014 right after a self-update on Windows and macOS, and on the next launch on Android.",
-        ],
-    },
-    {
-        "version": "0.42.0",
-        "title": "The crossing",
-        "items": [
-            "macOS joins the self-updating line: suravidl checks, downloads and verifies the new version \u2014 then one tap swaps the app in place and reopens it. No more dmg trips.",
-            "The swap is guarded: a copy running from the download image or a folder it cannot write says so in words, and a failed swap rolls back to the version you have.",
         ],
     },
 ]
