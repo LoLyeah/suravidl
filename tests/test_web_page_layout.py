@@ -60,5 +60,7 @@ def test_the_sticky_save_bar_keeps_the_cards_shape():
     assert "var(--panel-solid)" not in foot, "no opaque slab over the glass"
     assert "border-bottom-left-radius: 20px" in foot
     assert "border-bottom-right-radius: 20px" in foot
-    # a sticky element that blurs smears its backdrop in Android's WebView
-    assert "backdrop-filter" not in foot
+    # v0.45.2: the desktop strip frosts what scrolls beneath it (the Mac
+    # report); phones and Android keep the flat strip — see test_v452_measure
+    assert "backdrop-filter: var(--glass-blur);" in foot
+    assert "-webkit-backdrop-filter: var(--glass-blur);" in foot
