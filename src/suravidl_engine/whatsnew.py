@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.4",
+        "title": "The answers",
+        "items": [
+            "Every FAQ entry sits on its own glass card now \u2014 the same material as every popup \u2014 and the answers learned the current app: where updates live, how to pair the extension, and where the log hides when a download fails.",
+            "Where things live, corrected: the updater is at Settings \u2192 General, and the cookies and the pairing token at Settings \u2192 Authentication.",
+        ],
+    },
+    {
         "version": "0.45.3",
         "title": "The summons",
         "items": [
@@ -88,14 +96,6 @@ ENTRIES = [
         "items": [
             "The downloaded yt-dlp can be removed again from its tab \u2014 a staged copy is canceled on the spot, and an active one hands back to the bundled copy from the next start.",
             "The tab now says where the running copy comes from: (bundled) or (downloaded) \u2014 no guessing which one is in use.",
-        ],
-    },
-    {
-        "version": "0.43.0",
-        "title": "The refresh",
-        "items": [
-            "The yt-dlp button works on every build now: packaged installs (Windows, macOS, Linux, Android) fetch the newest release straight from PyPI, verify it, and apply it on the next start \u2014 no app update needed.",
-            "The newer copy is the one that runs \u2014 and if an app update ever ships something even newer, that wins instead. A staged update says \"restart to use it\" until it is live.",
         ],
     },
 ]
