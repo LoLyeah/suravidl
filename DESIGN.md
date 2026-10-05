@@ -318,10 +318,10 @@ changing tokens, never surface by surface.
   on it.
 - **Where it lands:** header, tab bar, cards, glass buttons, the scope
   strip, the patch bay, job rows, the transport, dialogs. A dialog's
-  full-screen overlay frosts behind it too (`blur(10px) saturate(120%)`
-  under the veil `rgba(4,6,9,.55)`) — the popup crisp, the room behind it
-  at a smudge. (2026-10-01: the veil used to be a flat dim; the popup read
-  as blur-less until it frosted.)
+  full-screen veil dims like the tour ring (`rgba(5,7,10,.55)`) and carries
+  NO frost of its own — the popup card is the room's only frost (v0.45.3,
+  the Popup Standard below; v0.37.4–v0.45.2 veils frosted too, and the
+  double-stack smeared the room flat behind every dialog).
 - **Flattened on purpose:** toasts (Panel Solid — reading beats atmosphere)
   and the phone's Settings Save strip (rows scroll beneath it). Both keep
   hairlines and radii so they still read as plates; solid is a legibility
@@ -349,6 +349,12 @@ glass.
 
 **The AMOLED Hairline Rule.** Where there is no shadow (AMOLED), borders carry
 all separation; never re-introduce grey shadows there.
+
+**The Popup Standard.** Every popup card carries the tour card's recipe —
+`--glass-bg-strong` fill, the material blur (`--glass-blur`), the gloss, the
+hairline and the shadow — over a dim-only veil (`rgba(5,7,10,.55)`, no frost
+on the veil). Blessed on the Mac, 2026-10-05: "this is the perfect blur and
+transparency ratio — make it the standard for pop up." 
 
 ## Shapes
 

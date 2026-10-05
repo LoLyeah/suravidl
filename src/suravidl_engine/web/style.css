@@ -1010,11 +1010,11 @@ details.card { padding: 0 18px 6px; }
 /* ---------- overlays & modals ---------- */
 .overlay {
   position: fixed; inset: 0; z-index: 70;
-  background: rgba(4,6,9,.55);
-  /* the veil frosts, not just dims — the popup is crisp, the room behind
-     it isn't ("What's new pop up doesn't have blur", 2026-10-01) */
-  backdrop-filter: blur(10px) saturate(120%);
-  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  background: rgba(5,7,10,.55);
+  /* the veil dims like the tour ring — it does NOT frost. The popup card is
+     the only frost in the room (v0.45.3: the tour card became the popup
+     standard — "the perfect blur and transparency ratio", 2026-10-05; the
+     v0.37.4 veil frost reads as a flat smear behind every dialog). */
   display: grid; place-items: center;
   padding: 18px;
   animation: fade var(--t-base) var(--e-out) both;
@@ -1445,8 +1445,8 @@ html[data-host="android"] .transport {
 html[data-host="android"] .overlay {
   background: rgba(3, 5, 12, .72);
 }
-/* the overlay's frost lives on the base .overlay rule as of v0.37.4 —
-   one definition, every host (the android-era override is gone) */
+/* the veil has no frost to place since v0.45.3 — the popup card is the
+   only frost; hosts keep their own dim density (see android above) */
 /* 2026-09-30, corrected: v0.37.1 briefly made the floating surfaces
    (dialogs, the transport, toasts) near-opaque here on the premise that
    this WebView composites rgba and skips backdrop-filter. The premise was
