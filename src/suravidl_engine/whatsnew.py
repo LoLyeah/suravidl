@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.1",
+        "title": "The pane",
+        "items": [
+            "The menus wear the app\u2019s skin now: dropdowns drew the operating system\u2019s own chrome on macOS \u2014 bezel and double-chevron \u2014 and now draw their own edge and caret like every other control.",
+            "The macOS room lets a little more of the desktop through: the page\u2019s wash eased a step on all three themes, still holding the text-contrast floor.",
+        ],
+    },
+    {
         "version": "0.45.0",
         "title": "The ledger",
         "items": [
@@ -89,15 +97,6 @@ ENTRIES = [
         "items": [
             "macOS joins the self-updating line: suravidl checks, downloads and verifies the new version \u2014 then one tap swaps the app in place and reopens it. No more dmg trips.",
             "The swap is guarded: a copy running from the download image or a folder it cannot write says so in words, and a failed swap rolls back to the version you have.",
-        ],
-    },
-    {
-        "version": "0.41.1",
-        "title": "The delivery",
-        "items": [
-            "Releases are full releases again \u2014 the update feed is live: suravidl fetches the next version itself, verifies it, and installs it in place with one tap. No more release-page trips.",
-            "First stable release of the self-updating line: install the Windows setup or the Android APK once, and every version after this arrives in-app.",
-            "Polish pass: an update download can be cancelled mid-flight, a failed update says so wherever you are, and the ready notice carries the install button.",
         ],
     },
 ]

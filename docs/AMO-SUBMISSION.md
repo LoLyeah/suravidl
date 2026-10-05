@@ -1,10 +1,12 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.11` rides this release (the extension speaks
-Bahasa Indonesia, and its token hints follow Settings → Authentication).
-The release pipeline submits it; `0.5.8` stays the live public version
-until a reviewer approves an update — `0.5.9`, `0.5.10` and `0.5.11`
-sit in the queue, each submission superseding the pending one.
+**Status:** `suravidl 0.5.11` went up with v0.45.0 (the extension speaks
+Bahasa Indonesia, and its token hints follow Settings → Authentication),
+superseding `0.5.9` and `0.5.10` in the review queue. v0.45.1 ships no
+extension change — the pipeline's new guard skips the AMO step when a
+tag's extension version is unchanged since the last release (force it from
+the Actions tab when you mean it). `0.5.8` stays the live public version
+until a reviewer approves an update.
 Earlier versions — `0.5.10` (multi-select across all of a tab’s
 finds), `0.5.9` (multi-select in the popup, right-click
 "Download with suravidl"), `0.5.8` (the tab-reset fix), `0.5.7` (readable
