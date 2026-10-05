@@ -20,7 +20,7 @@ colors:
   ink-well: "rgba(4, 6, 8, 0.45)"
   panel-solid: "#14181d"
   lamp-glow: "rgba(232, 163, 62, 0.10)"
-  darwin-wash: "rgba(15, 18, 22, 0.88)"
+  darwin-wash: "rgba(15, 18, 22, 0.86)"
 typography:
   title:
     fontFamily: "Archivo, system-ui, -apple-system, sans-serif"
@@ -128,10 +128,15 @@ before they are written in stack traces, and a finished download says so.
   every machine readout.
 - Machine-instrument shapes: 8–14px controls, 20px floating plates; pills for
   state. Nothing sharper than 8px, nothing rounder than a pill.
+- Controls wear the app's skin, never the OS's: selects reset the native
+  appearance and draw their caret in the theme's ink (v0.45.1 — macOS
+  WKWebView kept a bezel and double-chevron on them; the menu controls were
+  the last borrowed chrome).
 - Motion stays under half a second; reduced-motion stops it — never shortens it.
 - On macOS the room itself is Apple's real glass: the page sits on Liquid
   Glass / vibrancy through a transparent window, behind a near-opaque wash
   of the theme's tone — the desktop reads as a hint, never as the background.
+  (v0.45.1: the wash eased a step toward the material on all three themes.)
 
 ## Colors
 
@@ -175,8 +180,9 @@ brand, and never follow it.
   fields read as recessed.
 - **Panel Solid** (#14181d): the one honest slab — toasts and flattened
   surfaces where reading beats atmosphere.
-- **Darwin Wash** (rgba(15,18,22,.88) at night): the page's own wash on the
-  native macOS shell — the desktop shows through as a hint, never as ground.
+- **Darwin Wash** (rgba(15,18,22,.86) at night; day .88, AMOLED .86 — eased
+  toward the material in v0.45.1): the page's own wash on the native macOS
+  shell — the desktop shows through as a hint, never as ground.
 
 ### Named Rules
 **The One Lamp Rule.** Each plate has at most ONE filled amber control; every
@@ -300,8 +306,9 @@ changing tokens, never surface by surface.
   rides Apple's real material — Liquid Glass (`NSGlassEffectView`) on
   macOS 26+, vibrancy (`NSVisualEffectView`) on older releases. The page
   carries a near-opaque wash of the theme's tone (`--darwin-wash`: graphite
-  `rgba(15,18,22,.88)`, day-room `rgba(231,228,222,.90)`, AMOLED
-  `rgba(0,0,0,.88)`). Alpha ≥ .86 is the contrast floor — even a white
+  `rgba(15,18,22,.86)`, day-room `rgba(231,228,222,.88)`, AMOLED
+  `rgba(0,0,0,.86)` — eased a step toward the material in v0.45.1, down to
+  the floor at night, one step short of it at day). Alpha ≥ .86 is the contrast floor — even a white
   wallpaper spot keeps body text at 4.5:1 — and the desktop stays a blur
   you can feel more than see. Plates keep their tints, blur and hairlines
   on top of the wash; the material reads through, the page never sits bare

@@ -25,7 +25,7 @@
 /* ---------- theme tokens ---------- */
 :root, html[data-theme="dark"] {
   --bg: #0f1216;                /* the room at night: cool graphite */
-  --darwin-wash: rgba(15,18,22,.88);   /* the native shell's page wash — v0.39.13 */
+  --darwin-wash: rgba(15,18,22,.86);   /* the native shell's page wash — v0.39.13; eased v0.45.1 */
   --text: #e8eaed;
   --muted: #a8b1bd;
   --dim: #7f8a97;
@@ -59,7 +59,7 @@
 }
 html[data-theme="light"] {
   --bg: #e7e4de;                /* the room at day: brushed alu + paper tape */
-  --darwin-wash: rgba(231,228,222,.90);   /* the native shell's page wash — v0.39.13 */
+  --darwin-wash: rgba(231,228,222,.88);   /* the native shell's page wash — v0.39.13; eased v0.45.1 */
   --text: #201d18;
   --muted: #5b564e;
   --dim: #655f56;
@@ -94,7 +94,7 @@ html[data-theme="light"] {
 }
 html[data-theme="amoled"] {
   --bg: #000000;                /* the room with the lights off */
-  --darwin-wash: rgba(0,0,0,.88);   /* the native shell's page wash — v0.39.13 */
+  --darwin-wash: rgba(0,0,0,.86);   /* the native shell's page wash — v0.39.13; eased v0.45.1 */
   --text: #eef0f3;
   --muted: #a6aeb8;
   --dim: #7e8794;
@@ -512,9 +512,19 @@ input[type="text"], input[type="number"], input[type="search"], textarea {
 }
 textarea { width: 100%; resize: vertical; font: 12.5px/1.5 "Martian Mono", ui-monospace, Menlo, Consolas, monospace; }
 select {
-  width: 100%; font: inherit; font-size: 13px; padding: 9px 10px;
+  width: 100%; font: inherit; font-size: 13px; padding: 9px 34px 9px 10px;
   border: 1px solid var(--line); border-radius: 8px;
-  background: var(--input-bg); color: var(--text);
+  background-color: var(--input-bg); color: var(--text);
+  -webkit-appearance: none; appearance: none;
+  /* the caret is drawn in the theme's ink, not borrowed from the OS: macOS
+     WKWebView otherwise keeps its bezel + double-chevron on selects and the
+     menu controls stop matching every other instrument (v0.45.1) */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat, no-repeat;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent-line); }
 select:focus-visible { border-color: var(--accent-line); }
