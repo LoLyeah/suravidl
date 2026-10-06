@@ -18,6 +18,15 @@ import tempfile
 import time
 from pathlib import Path
 
+# The first CI run of this script (v0.45.9's release) proved the lesson:
+# the runner's console encodes cp1252, and the box-drawing characters in
+# the final print raised UnicodeEncodeError inside main() AFTER the wait
+# loop — so the log we ached for was the one thing never shown. Print
+# ASCII, force stdout to UTF-8 anyway (errors=replace never raises), and
+# let the wait echo the log as it grows.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def main() -> int:
     if os.name != "nt":
@@ -48,14 +57,26 @@ def main() -> int:
     dummy.wait(timeout=60)
 
     text = ""
-    deadline = time.time() + 300
+    started = time.time()
+    deadline = started + 540
+    last_beat = started
     while time.time() < deadline:
         text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-        if "installer exit:" in text and not setup.exists():
+        if "installer exit:" in text:
             break
+        if time.time() - last_beat > 30:
+            last_beat = time.time()
+            print(f"[{int(time.time() - started)}s] still waiting; log so far:")
+            print(text or "(no log yet)")
         time.sleep(2)
+    # the exit line lands one statement before the deletion — give the
+    # Remove-Item a short grace, then let the asserts below speak
+    if "installer exit:" in text:
+        gone_by = time.time() + 10
+        while setup.exists() and time.time() < gone_by:
+            time.sleep(0.5)
 
-    print("═══ update.log ═══")
+    print("--- update.log ---")
     print(text or "(no log written)")
     ok = True
     if "app gone at" not in text:
