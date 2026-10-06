@@ -90,7 +90,10 @@ def test_rows_leave_instead_of_blinking_out():
     assert "function leaveRow(" in APP
     assert 'classList.add("leaving")' in APP
     assert "@keyframes leave" in CSS
-    assert "animationend" in APP and "remove()" in APP.split("function leaveRow(")[1][:900]
+    # v0.45.13 grew leaveRow (the keepView viewport anchor before the
+    # remove) — the window widens with it; the pin itself stays
+    seg = APP.split("function leaveRow(")[1][:2000]
+    assert "animationend" in APP and "remove()" in seg
 
 
 def test_the_exit_animates_transform_and_opacity_only():

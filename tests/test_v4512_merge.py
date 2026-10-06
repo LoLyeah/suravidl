@@ -48,7 +48,9 @@ def test_the_fixer_rides_the_download_path():
     src = (SRC / "suravidl_engine" / "extract.py").read_text(encoding="utf-8")
     assert "class StreamCopyFixPP(FFmpegPostProcessor):" in src
     i = src.index("def _attach_stream_copy_fix")
-    seg = src[i:i + 900]
+    # v0.45.13 grew the attach (the finished-download hook) — the window
+    # widens with it; the pins stay
+    seg = src[i:i + 2300]
     assert 'when="post_process"' in seg
     assert "chain.insert(0, pp)" in seg, "the metadata pass must meet it first"
     assert "_attach_stream_copy_fix(ydl)" in src.split("def extract_info")[1], \
