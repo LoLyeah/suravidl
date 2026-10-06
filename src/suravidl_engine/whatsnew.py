@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.11",
+        "title": "The strip",
+        "items": [
+            "Every blur renders for real now: the fades that lingered after landing kept Chromium from painting ANY frost beneath them — the Save strip, the queue bar, the popups, the FAQ cards were all silently flat.",
+            "Scroll the Settings card: rows melt under the Save strip, exactly the way it was always meant to look.",
+        ],
+    },
+    {
         "version": "0.45.10",
         "title": "The ring",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "The settings deck stopped changing size: its width followed whichever panel was open \u2014 every tab now keeps the deck\u2019s full measure.",
             "The Save strip frosts what scrolls beneath it \u2014 rows passing under the bar read as a smudge now, not a list.",
-        ],
-    },
-    {
-        "version": "0.45.1",
-        "title": "The pane",
-        "items": [
-            "The menus wear the app\u2019s skin now: dropdowns drew the operating system\u2019s own chrome on macOS \u2014 bezel and double-chevron \u2014 and now draw their own edge and caret like every other control.",
-            "The macOS room lets a little more of the desktop through: the page\u2019s wash eased a step on all three themes, still holding the text-contrast floor.",
         ],
     },
 ]
