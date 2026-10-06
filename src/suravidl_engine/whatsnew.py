@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.13",
+        "title": "The hook",
+        "items": [
+            "Fresh downloads now survive the junk-audio stream too: v0.45.12 only saved retries — a first download died even earlier, inside yt-dlp’s own cleanup. The stream is cleaned the moment it lands.",
+            "Deleting a job no longer moves your screen: the queue keeps your spot while rows leave (the deleted row used to visibly sail to the list’s end — it read as scrolling to the bottom).",
+        ],
+    },
+    {
         "version": "0.45.12",
         "title": "The merge",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "Every FAQ entry sits on its own glass card now \u2014 the same material as every popup \u2014 and the answers learned the current app: where updates live, how to pair the extension, and where the log hides when a download fails.",
             "Where things live, corrected: the updater is at Settings \u2192 General, and the cookies and the pairing token at Settings \u2192 Authentication.",
-        ],
-    },
-    {
-        "version": "0.45.3",
-        "title": "The summons",
-        "items": [
-            "The tour card\u2019s blur and transparency is the standard for every popup: the room behind a dialog dims but stays sharp, and the popup is the room\u2019s only frosted glass \u2014 nothing behind it smears flat anymore.",
-            "It\u2019s lighter on the machine too \u2014 one less full-screen blur pass rides every dialog.",
         ],
     },
 ]
