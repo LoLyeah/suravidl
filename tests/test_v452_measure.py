@@ -11,9 +11,11 @@ Two reports on the released desktop (2026-10-05):
    every centered `main` rule; the invariant below keeps it pinned.
 
 2. "Give more blurred background behind the save button." Rows scroll
-   beneath the sticky Save strip; on desktop the strip now frosts them
-   with the material blur. Phones keep their flat strip (composite cost
-   over the tab bar) and Android keeps its no-blur concession.
+   beneath the sticky Save strip; the strip frosts them with the material
+   blur. Phones and Android kept flat/solid strips at first (composite
+   cost); v0.45.12 removed both concessions — the owner asked for the
+   frost, and v0.45.11's fill:none fix made the blur actually render
+   under every host.
 """
 import re
 from pathlib import Path
@@ -44,11 +46,15 @@ def test_the_save_strip_frosts_on_desktop():
     assert "border-bottom-left-radius: 20px" in foot, "corners stay round"
 
 
-def test_phones_and_android_keep_the_flat_strip():
+def test_every_host_frosts_the_strip():
+    """v0.45.12: the flat-strip concessions are gone — phones and Android
+    frost like the desktop does."""
     chunks = CSS.split("#panel-settings .modal-foot {")
-    assert len(chunks) >= 3, "base + phone + android rules all exist"
+    assert len(chunks) >= 4, "base + phone + android rules all exist"
+    base = chunks[1].split("}")[0]
+    assert "backdrop-filter: var(--glass-blur);" in base
     phone = chunks[2].split("}")[0]   # the max-width:899 block
-    assert "backdrop-filter: none" in phone and "-webkit-backdrop-filter: none" in phone
+    assert "backdrop-filter: none" not in phone, "phones frost it since v0.45.12"
     android = chunks[3].split("}")[0]
-    assert "backdrop-filter: none" in android
-    assert "background: var(--panel-solid);" in android
+    assert "backdrop-filter: var(--glass-blur);" in android
+    assert "color-mix" in android, "the denser pour keeps the readout legible"
