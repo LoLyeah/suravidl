@@ -1289,7 +1289,7 @@ def _installed_exe() -> str | None:
 def _make_apply_update_action(window):
     """The desktop_actions["apply_update"] the courier's /update/apply calls.
 
-    Spawns the staged updater DETACHED (it must outlive us), then destroys
+    Spawns the staged updater hidden-console (it must outlive us), then destroys
     the window so the app exits and lets its files go — on Windows the
     silent installer, on macOS the bundle-swap script. A refusal with a
     REASON (a translocated or read-only copy) comes back as a string for
@@ -1309,9 +1309,15 @@ def _make_apply_update_action(window):
             try:
                 subprocess.Popen(
                     cmd, close_fds=True,
-                    # DETACHED_PROCESS | CREATE_NO_WINDOW: the upgrade keeps
-                    # running after this process (and its console) is gone
-                    creationflags=0x00000008 | 0x08000000)
+                    # CREATE_NO_WINDOW alone. DETACHED_PROCESS — with or
+                    # without company — is a trap for a console app: the
+                    # process spawns, exits 0, and executes NOTHING (probed
+                    # on a real Windows machine, 2026-10-06, six modes side
+                    # by side; this combo was this app's "Restart & Install
+                    # only quits and doesn't install"). A hidden console
+                    # keeps the chain genuinely running and still outlives
+                    # us: it holds no tie to our console or our exit.
+                    creationflags=_CREATE_NO_WINDOW)
             except Exception:  # noqa: BLE001 - the UI reports nothing staged ran
                 return False
             window.destroy()   # hand the locks back; the chain does the rest

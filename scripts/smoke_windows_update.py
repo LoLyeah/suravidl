@@ -40,7 +40,7 @@ def main() -> int:
         print(f"no setup at {src}")
         return 2
 
-    from suravidl_engine.__main__ import _windows_apply_command
+    from suravidl_engine.__main__ import _CREATE_NO_WINDOW, _windows_apply_command
 
     work = Path(tempfile.mkdtemp(prefix="suravidl-smoke-"))
     setup = work / "suravidl-windows-x64-setup.exe"
@@ -52,8 +52,10 @@ def main() -> int:
     dummy = subprocess.Popen([sys.executable, "-c",
                               "import time; time.sleep(4)"])
     argv = _windows_apply_command(str(setup), None, dummy.pid, str(log))
+    # CREATE_NO_WINDOW alone — DETACHED_PROCESS makes the console app a
+    # no-op (start, exit 0, run nothing; probed 2026-10-06)
     subprocess.Popen(argv, close_fds=True,
-                     creationflags=0x00000008 | 0x08000000)
+                     creationflags=_CREATE_NO_WINDOW)
     dummy.wait(timeout=60)
 
     text = ""

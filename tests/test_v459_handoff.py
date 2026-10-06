@@ -61,3 +61,18 @@ def test_the_fallback_wait_when_no_pid_was_handed_over():
 def test_the_applier_hands_over_its_own_pid():
     assert "_windows_apply_command(staged, _installed_exe()," in MAIN
     assert "os.getpid()" in MAIN
+
+
+def test_the_chain_spawn_is_not_detached():
+    """Probed on a real Windows machine (2026-10-06, six spawn modes side
+    by side): DETACHED_PROCESS PowerShell starts, exits 0, and executes
+    NOTHING — that was the genuine "Restart & Install only quits" bug.
+    CREATE_NO_WINDOW alone runs the chain and still outlives the app."""
+    src = (ROOT / "src/suravidl_engine/__main__.py").read_text(encoding="utf-8")
+    i = src.index("cmd = _windows_apply_command(staged")
+    seg = src[i:i + 1200]
+    assert "creationflags=_CREATE_NO_WINDOW" in seg
+    assert "0x00000008" not in seg and "0x08000000" not in seg
+    smoke = (ROOT / "scripts/smoke_windows_update.py").read_text(encoding="utf-8")
+    assert "creationflags=_CREATE_NO_WINDOW" in smoke
+    assert "0x00000008" not in smoke
