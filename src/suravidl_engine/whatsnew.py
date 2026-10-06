@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.12",
+        "title": "The merge",
+        "items": [
+            "The 953 MB download that died with \"Conversion failed!\" no longer does: a junk audio track inside the stream is dropped before the metadata pass, and the file lands as a real .mp4. Retry that job — no re-download needed.",
+            "The yt-dlp tab's Save floats now like Settings', and the Save strip frosts on Android too.",
+        ],
+    },
+    {
         "version": "0.45.11",
         "title": "The strip",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "The tour card\u2019s blur and transparency is the standard for every popup: the room behind a dialog dims but stays sharp, and the popup is the room\u2019s only frosted glass \u2014 nothing behind it smears flat anymore.",
             "It\u2019s lighter on the machine too \u2014 one less full-screen blur pass rides every dialog.",
-        ],
-    },
-    {
-        "version": "0.45.2",
-        "title": "The measure",
-        "items": [
-            "The settings deck stopped changing size: its width followed whichever panel was open \u2014 every tab now keeps the deck\u2019s full measure.",
-            "The Save strip frosts what scrolls beneath it \u2014 rows passing under the bar read as a smudge now, not a list.",
         ],
     },
 ]
