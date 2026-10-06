@@ -3,7 +3,7 @@
 **Status:** `suravidl 0.5.11` went up with v0.45.0 (the extension speaks
 Bahasa Indonesia, and its token hints follow Settings → Authentication),
 superseding `0.5.9` and `0.5.10` in the review queue. v0.45.1 through
-v0.45.9 ship no extension change — the pipeline's guard skips the AMO step when a
+v0.45.10 ship no extension change — the pipeline's guard skips the AMO step when a
 tag's extension version is unchanged since the last release (force it from
 the Actions tab when you mean it). `0.5.8` stays the live public version
 until a reviewer approves an update.

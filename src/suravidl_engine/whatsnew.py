@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.10",
+        "title": "The ring",
+        "items": [
+            "Every popup — What’s new, FAQ, the dialogs — shows the real room through its glass now: the dim rides the card itself (the tutorial ring’s exact trick) instead of darkening everything the card looks through.",
+            "Same card, same blur, one mechanism on every popup; the room behind stays dimmed exactly as before.",
+        ],
+    },
+    {
         "version": "0.45.9",
         "title": "The handoff",
         "items": [
@@ -84,16 +92,6 @@ ENTRIES = [
         "items": [
             "The menus wear the app\u2019s skin now: dropdowns drew the operating system\u2019s own chrome on macOS \u2014 bezel and double-chevron \u2014 and now draw their own edge and caret like every other control.",
             "The macOS room lets a little more of the desktop through: the page\u2019s wash eased a step on all three themes, still holding the text-contrast floor.",
-        ],
-    },
-    {
-        "version": "0.45.0",
-        "title": "The ledger",
-        "items": [
-            "The queue grew bulk actions: clear everything finished, or retry everything failed, in one move \u2014 the counts sit right above the list, and clearing asks once.",
-            "The verbose switch has a reader now: a Log card in the yt-dlp tab shows the last lines yt-dlp said, ready to copy. Turn Verbose log on for the deep one.",
-            "Settings keeps its promises: the sub-tabs take arrow keys, the appearance swatches say what is selected, and Test cookies checks what you typed without quietly saving the rest of the form.",
-            "The browser extension speaks Bahasa Indonesia too, following your browser\u2019s language \u2014 and the API token moved to Settings \u2192 Authentication, where its Copy button now lives.",
         ],
     },
 ]
