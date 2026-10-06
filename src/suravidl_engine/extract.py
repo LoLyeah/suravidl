@@ -34,11 +34,14 @@ answer.
 """
 from __future__ import annotations
 
+import json
 import os
+import subprocess
 import time
 from urllib.parse import urlparse
 
 import yt_dlp
+from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 
 from .download_opts import tiktok_safe_format
 
@@ -177,6 +180,110 @@ class ThumbnailExtFixPP(yt_dlp.postprocessor.PostProcessor):
         return [], info
 
 
+class StreamCopyFixPP(FFmpegPostProcessor):
+    """Drops streams that cannot survive a `-c copy` into an mp4.
+
+    HLS (mpegts) downloads can carry a second audio stream whose headers
+    never arrive — ffprobe reads it as `mp3, 0 channels`, the decoder
+    spams `Header missing`. yt-dlp's own metadata pass copies EVERY
+    stream (`-map 0 -c copy`), the mp4 muxer refuses the headerless one
+    (`Could not write header ... Invalid argument`) and the whole job
+    dies after a full download (2026-10-07 report: a 953 MB stream in,
+    nothing out). This drops only the unusable streams, by remuxing
+    once — before the metadata pass sees the file — and leaves every
+    healthy stream as it was. A healthy file pays one ffprobe and
+    nothing else. Modelled on the thumbnail fixer: best-effort, guarded,
+    never fatal.
+    """
+
+    def _usable(self, s: dict) -> bool:
+        kind = s.get("codec_type")
+        if kind == "video":
+            return bool(s.get("width")) and s.get("codec_name") not in (None, "none")
+        if kind == "audio":
+            try:
+                rate = int(s.get("sample_rate") or 0)
+            except (TypeError, ValueError):
+                rate = 0
+            return (bool(s.get("channels")) and rate > 0
+                    and s.get("codec_name") not in (None, "none"))
+        if kind == "subtitle":
+            return True
+        return False          # data streams: the metadata pass drops them too (-dn)
+
+    def _probe(self, path: str):
+        ffprobe = getattr(self, "probe_executable", None)
+        if not ffprobe:
+            return None
+        proc = subprocess.run(
+            [ffprobe, "-v", "error", "-print_format", "json",
+             "-show_streams", path],
+            capture_output=True, text=True)
+        if proc.returncode != 0:
+            return None
+        return json.loads(proc.stdout or "{}").get("streams") or None
+
+    def _remux(self, path: str, keep: list) -> bool:
+        ffmpeg = getattr(self, "executable", None)
+        if not ffmpeg:
+            return False
+        ext = os.path.splitext(path)[1].lstrip(".").lower() or "mp4"
+        tmp = f"{path}.streamfix.{ext}"
+        cmd = [ffmpeg, "-y", "-loglevel", "repeat+info", "-i", path]
+        for idx in keep:
+            cmd += ["-map", f"0:{idx}"]
+        cmd += ["-c", "copy"]
+        if ext in ("mp4", "m4v", "mov", "m4a"):
+            cmd += ["-movflags", "+faststart"]
+        cmd += [tmp]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0 or not os.path.isfile(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            return False
+        os.replace(tmp, path)
+        return True
+
+    def run(self, info):
+        try:
+            path = info.get("filepath")
+            if (not path or not os.path.isfile(path)
+                    or not getattr(self, "probe_available", False)):
+                return [], info
+            streams = self._probe(path)
+            if not streams:
+                return [], info
+            keep = [s.get("index") for s in streams if self._usable(s)]
+            keep = [i for i in keep if i is not None]
+            if not keep or len(keep) == len(streams):
+                return [], info          # nothing broken — fast path out
+            if self._remux(path, keep):
+                self.to_screen(
+                    f"Dropped {len(streams) - len(keep)} unusable stream(s) "
+                    "before the metadata pass")
+            return [], info
+        except Exception as exc:  # noqa: BLE001 — best-effort, like the thumb fixer
+            self.report_warning(f"stream-copy fix skipped: {exc}")
+            return [], info
+
+
+def _attach_stream_copy_fix(ydl) -> None:
+    """Insert the stream-copy fixer beside the thumbnail fixer, at the head
+    of the post-process chain — the metadata pass must never meet a stream
+    it cannot copy. `_pps` is private; guarded, ordering is best-effort."""
+    try:
+        pp = StreamCopyFixPP(ydl)
+        ydl.add_post_processor(pp, when="post_process")
+        chain = ydl._pps.get("post_process")
+        if chain and chain[-1] is pp and len(chain) > 1:
+            chain.remove(pp)
+            chain.insert(0, pp)
+    except Exception:  # noqa: BLE001 - best-effort ordering, never fatal
+        pass
+
+
 def _attach_thumbnail_ext_fix(ydl) -> None:
     """Insert the fixer at the head of the post-process chain.
 
@@ -228,6 +335,7 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
             with yt_dlp.YoutubeDL(run_opts) as ydl:
                 if download:
                     _attach_thumbnail_ext_fix(ydl)
+                    _attach_stream_copy_fix(ydl)
                 return ydl.sanitize_info(ydl.extract_info(url, download=download))
         except yt_dlp.utils.YoutubeDLError as exc:
             if (refresh_left and seen["bytes"] and is_expired_link(exc)

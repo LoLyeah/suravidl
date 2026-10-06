@@ -1147,6 +1147,16 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+/* the yt-dlp tab's Save floats like Settings' (v0.45.12): its options
+   list runs long and Save used to scroll away */
+#panel-ytdlp .foot-row {
+  position: sticky; z-index: 3; bottom: 12px;
+  margin: 14px 0 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 14px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
 .updrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .updmeta { margin-top: 6px; }
 .updmeta.bad { color: var(--err); }
@@ -1392,7 +1402,11 @@ footer .linkbtn { color: var(--accent-ink); }
     margin: 14px -14px -14px; padding: 12px 14px;
     border-top: 1px solid var(--line);
     background: var(--glass-bg-strong);
-    -webkit-backdrop-filter: none; backdrop-filter: none;  /* phones keep the flat strip (v0.45.2) */
+  }
+  /* phones frost the strip too since v0.45.12 — the fill:none fix made
+     the blur actually render everywhere, and the owner asked for it */
+  #panel-ytdlp .foot-row {
+    bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
   }
   #panel-settings .modal-foot .btn.prime { flex: 1 1 auto; justify-content: center; }
   .swatches { gap: 8px; }
@@ -1492,10 +1506,11 @@ html[data-host="android"] .modal {
    the same glass as everything else: the shell may lighten the radius,
    it never loses the material. */
 
-/* the Settings Save strip is the one foot that stays solid — content scrolls
-   UNDER it; the other dialogs' feet were never meant to be slabs (the
-   black bar behind Got it / Cancel / Delete, 2026-09-30) */
+/* the Settings Save strip used to stay solid on this host — the owner
+   asked for the frost here too (2026-10-07); the transport's denser pour
+   keeps the readout legible while content scrolls beneath it */
 html[data-host="android"] #panel-settings .modal-foot {
-  background: var(--panel-solid);
-  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: color-mix(in srgb, var(--panel-solid) 82%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
 }
