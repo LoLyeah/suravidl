@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.9",
+        "title": "The handoff",
+        "items": [
+            "On Windows, Restart & Install could quit the app and install nothing — the installer found a half-gone app and quietly asked a question nobody could see. It now waits for the app to fully exit first, then installs.",
+            "Every run leaves a short trail at .suravidl\\update.log in your user folder, so a hiccup is never invisible again.",
+        ],
+    },
+    {
         "version": "0.45.8",
         "title": "The reach",
         "items": [
@@ -86,14 +94,6 @@ ENTRIES = [
             "The verbose switch has a reader now: a Log card in the yt-dlp tab shows the last lines yt-dlp said, ready to copy. Turn Verbose log on for the deep one.",
             "Settings keeps its promises: the sub-tabs take arrow keys, the appearance swatches say what is selected, and Test cookies checks what you typed without quietly saving the rest of the form.",
             "The browser extension speaks Bahasa Indonesia too, following your browser\u2019s language \u2014 and the API token moved to Settings \u2192 Authentication, where its Copy button now lives.",
-        ],
-    },
-    {
-        "version": "0.44.0",
-        "title": "The phrasebook",
-        "items": [
-            "The whole interface speaks Bahasa Indonesia now \u2014 switch in Settings \u2192 Appearance \u2192 Language and every button, tab, toast and confirmation answers in Indonesian on the spot. English stays the default.",
-            "Also fixed: a faint 1px line sat above the top bar on desktop windows once you scrolled to the top. The bar meets the window chrome cleanly now.",
         ],
     },
 ]
