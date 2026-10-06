@@ -116,7 +116,7 @@ def test_the_tab_swap_starts_immediately_and_lands_in_a_beat():
     assert ".panel { animation: panelIn" not in CSS
     assert "@keyframes panelIn" not in CSS, "the .4s wash is still defined"
     assert "tabOut" not in CSS, "the serial exit is still defined"
-    assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }" in CSS
+    assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) none; }" in CSS
     into = _block("@keyframes tabIn")
     assert "opacity" in into
     assert "transform" not in into, \
@@ -137,7 +137,7 @@ def test_the_tab_swap_starts_immediately_and_lands_in_a_beat():
 def test_settings_subtabs_swap_with_a_transition():
     """The sub-tabs were the only navigation in the app with no transition;
     the abrupt cut read as a page jump."""
-    assert ".spanel-in { animation: spanelIn var(--t-fast) var(--e-out) both; }" \
+    assert ".spanel-in { animation: spanelIn var(--t-fast) var(--e-out) none; }" \
         in CSS
     blk = _block("@keyframes spanelIn")
     # v0.39.12: opacity-only — a transform here re-anchors the panel's fixed
