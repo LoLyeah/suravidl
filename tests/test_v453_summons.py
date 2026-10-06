@@ -9,6 +9,11 @@ v0.37.4 it stacked its own frost over the card's and smeared the room
 flat. The veil now dims like the tour ring (rgba(5,7,10,.55), no frost):
 the room stays sharp-dimmed, the popup card is the room's only frost,
 and all six .overlay dialogs inherit the tour card's material untouched.
+
+v0.45.10 "the ring" then moved the dim itself onto the card's own shadow
+(the ring's mechanism exactly), so the card blurs the REAL room instead
+of the darkened layer between — the veil as a layer made every popup read
+a shade darker than the tour card (2026-10-06 Windows report).
 """
 from pathlib import Path
 
@@ -38,15 +43,19 @@ MATERIAL = [
     "backdrop-filter: var(--glass-blur);",
     "-webkit-backdrop-filter: var(--glass-blur);",
     "background-image: var(--glass-gloss);",
-    "box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);",
+    "box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi)",
 ]
 
 
 def test_the_veil_dims_like_the_ring_without_frosting():
-    """Dim-only, the tour ring's exact density; the frost belongs to the card."""
+    """v0.45.10: the veil rides the card's own shadow — the ring's exact
+    mechanism — so the card blurs the real room, not a darkened copy."""
     blk = _block(".overlay {")
-    assert "background: rgba(5,7,10,.55);" in blk
+    assert "background: transparent;" in blk
     assert "backdrop-filter" not in blk
+    veil = "0 0 0 100vmax rgba(5, 7, 10, .55)"
+    assert veil in _block("\n.modal {")   # the card carries the dim now
+    assert veil in _block(".tour-ring {")  # one value, one mechanism
 
 
 def test_the_popup_cards_share_one_recipe():

@@ -7,6 +7,8 @@ spec so the next glass dispute has one authoritative sheet to point at.
 
 Superseded by v0.45.3: the veil mattes to the tour ring's dim — no frost of
 its own; the popup card is the room's only frost (the Popup Standard).
+v0.45.10: the dim now rides the card's own shadow — the ring's mechanism —
+so the card blurs the real room.
 """
 from pathlib import Path
 
@@ -31,11 +33,12 @@ def _block(marker, text=CSS):
 
 
 def test_the_veil_dims_without_frosting():
-    """v0.45.3: the veil dims like the tour ring and carries no frost;
-    the card is the only frost in the room."""
+    """v0.45.3 + v0.45.10: the veil rides the card's shadow (the ring's
+    mechanism) and carries no frost; the card is the room's only frost."""
     blk = _block(".overlay {")
-    assert "background: rgba(5,7,10,.55);" in blk
+    assert "background: transparent;" in blk
     assert "backdrop-filter" not in blk
+    assert "0 0 0 100vmax rgba(5, 7, 10, .55)" in _block("\n.modal {")
 
 
 def test_design_md_carries_the_material_spec():

@@ -77,7 +77,10 @@ def test_the_floating_glass_keeps_its_blur_on_the_phone():
     stay (a WebView that composites lights them up) and the android bar
     pours dense so the readout never shares pixels with the page."""
     assert "--glass-float" not in CSS, "the near-opaque float plates are back"
-    assert 'html[data-host="android"] .modal' not in CSS
+    # v0.45.10: android re-veils the CARD's shadow only — never the material
+    am = _block('html[data-host="android"] .modal {')
+    assert "0 0 0 100vmax rgba(3, 5, 12, .72)" in am
+    assert "backdrop-filter" not in am and "background:" not in am
     assert 'html[data-host="android"] .toast' not in CSS
     # the android transport may override the POUR only — never the material
     pour = _block('html[data-host="android"] .transport {')

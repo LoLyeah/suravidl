@@ -8,7 +8,8 @@
 2. "What's new pop up doesn't have blur" — the full-screen overlay was a
    flat veil; v0.37.4–v0.45.2 frosted the veil itself. v0.45.3 supersedes:
    the veil dims only (the tour ring's look); the popup card is the room's
-   only frost.
+   only frost. v0.45.10: the dim rides the card's own shadow — the ring's
+   mechanism — and the card blurs the real room.
 3. "the chosen Bottom bar tab needs a squircle outline instead of just one
    line" — the 2px top hairline became a rounded outline.
 """
@@ -45,15 +46,14 @@ def test_the_tab_arrival_never_transforms_the_panel():
 
 
 def test_the_veil_dims_and_leaves_the_frost_to_the_card():
-    """v0.45.3 (the Popup Standard): the veil dims like the tour ring, no
-    frost — the popup card is the room's only frost. The android host
+    """v0.45.3 (the Popup Standard) with v0.45.10's mechanism: the veil
+    rides the card's own shadow, no frost anywhere on it. The android host
     re-values the veil's COLOR only (its dense veil), nothing else."""
     blk = _block(".overlay {")
-    assert "background: rgba(5,7,10,.55);" in blk
+    assert "background: transparent;" in blk
     assert "backdrop-filter" not in blk
-    veil = _block('html[data-host="android"] .overlay {')
-    assert "rgba(3, 5, 12, .72)" in veil
-    assert "backdrop-filter" not in veil
+    veil = _block('html[data-host="android"] .modal {')
+    assert "0 0 0 100vmax rgba(3, 5, 12, .72)" in veil
 
 
 def test_the_chosen_tab_wears_a_squircle_outline():

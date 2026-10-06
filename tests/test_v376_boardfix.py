@@ -89,9 +89,9 @@ def test_the_phone_transport_pours_dense():
 
 
 def test_the_android_overlay_keeps_the_proven_veil():
-    """This device keeps its dense v0.36 veil; since v0.45.3 base veils
-    carry no frost at all, so there is nothing to unset here."""
-    veil = _block('html[data-host="android"] .overlay {')
-    assert "rgba(3, 5, 12, .72)" in veil
+    """This device keeps its dense v0.36 density; since v0.45.10 it rides
+    the card's shadow like everywhere else, and base veils carry no frost."""
+    veil = _block('html[data-host="android"] .modal {')
+    assert "0 0 0 100vmax rgba(3, 5, 12, .72)" in veil
     base = _block(".overlay {")
     assert "backdrop-filter" not in base
