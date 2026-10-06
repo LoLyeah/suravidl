@@ -2680,11 +2680,18 @@ function jobRow(j) {
   // the title ellipsises on a phone and nothing hover-reveals it there: a
   // tap unfolds the whole line (2026-10-01 report). v0.38.3: it is a real
   // button to the keyboard too — focus, Enter/Space, and the expanded state
-  // announced — while keeping the exact same click wiring.
+  // announced.
+  //
+  // v0.45.8: the fold hung off the title text alone, so the rest of the
+  // card — the pills, the stamp, the empty middle, the path row — did
+  // nothing, and on a phone the one live spot was a word at the top left
+  // (2026-10-06 report). The whole card flips it now; anything with its own
+  // job — buttons, links, fields, the error text with its own tap — is
+  // skipped by the guard.
   title.tabIndex = 0;
   title.setAttribute("role", "button");
   title.setAttribute("aria-expanded", "false");
-  title.onclick = () => {
+  const flip = () => {
     title.classList.toggle("open");
     // the row carries the state too (v0.39.12): the fold hung off :has(),
     // which older engines drop whole — the receipt could never expand there
@@ -2692,10 +2699,14 @@ function jobRow(j) {
     title.setAttribute("aria-expanded",
       title.classList.contains("open") ? "true" : "false");
   };
+  row.onclick = (e) => {
+    if (e.target.closest("button, a, input, select, textarea, .jerr")) return;
+    flip();
+  };
   title.onkeydown = (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    title.onclick();
+    flip();
   };
   top.append(title, el("span", "pill " + j.status, t(j.status)));
   // a finished take gets the stamp (v0.37.0: completion used to be a pill

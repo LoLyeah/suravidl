@@ -847,6 +847,7 @@ details.card { padding: 0 18px 6px; }
 .job {
   position: relative;
   padding: 14px 16px;
+  cursor: pointer;   /* v0.45.8: the whole card flips the fold */
   background: var(--glass-bg); border: 1px solid var(--line);
   border-radius: 12px;
   backdrop-filter: var(--glass-blur);
