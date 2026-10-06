@@ -63,6 +63,7 @@ def test_a_tap_unfolds_the_whole_title():
     # live in the 393px harness) — basis 100% + a wrapping row fix that
     assert "flex: 1 0 100%" in open_blk, open_blk
     assert ".job.open .jobtop { flex-wrap: wrap; }" in CSS
-    # the handler lives in jobRow and toggles the class
-    assert "title.onclick" in JS
+    # the handler lives in jobRow and toggles the class — on the row since
+    # v0.45.8 (the whole card flips it; buttons stay buttons)
+    assert "row.onclick" in JS
     assert 'title.classList.toggle("open")' in JS

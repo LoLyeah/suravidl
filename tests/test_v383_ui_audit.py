@@ -53,11 +53,12 @@ def test_escape_closes_the_whats_new_card():
 # ---------- 3. the expandable title is keyboard-operable ----------
 def test_job_title_expands_from_the_keyboard():
     i = APP.find('"jobtitle"')
-    seg = APP[i:i + 900]
+    seg = APP[i:i + 1400]
     assert 'title.tabIndex = 0' in seg
     assert 'role", "button"' in seg or 'role", "button' in seg
     assert 'aria-expanded' in seg
-    assert 'title.onclick = () =>' in seg       # the pinned wiring stays
+    assert 'const flip = () =>' in seg          # the pinned wiring stays
+    assert 'row.onclick' in seg                 # (on the row since v0.45.8)
     assert 'title.classList.toggle("open")' in seg
     assert 'title.onkeydown' in seg
     assert ".jobtitle:focus-visible" in CSS
