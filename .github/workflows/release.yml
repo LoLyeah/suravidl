@@ -133,6 +133,14 @@ jobs:
           & $iscc "/DAppVersion=$version" packaging/windows/suravidl.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Move-Item -Force packaging/windows/Output/suravidl-setup.exe suravidl-windows-x64-setup.exe
+      - name: Smoke the Windows update chain
+        if: matrix.os == 'windows-2022'
+        shell: pwsh
+        run: |
+          # the chain the app spawns for Restart & Install, executed for real
+          # on a real Windows machine against the setup this job just built
+          # (v0.45.9): wait-for-pid -> silent install -> cleanup -> log trail
+          python scripts/smoke_windows_update.py "$env:GITHUB_WORKSPACE\suravidl-windows-x64-setup.exe"
       - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.os }}

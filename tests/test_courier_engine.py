@@ -336,7 +336,8 @@ def test_the_silent_upgrade_command_keeps_its_flags():
     from suravidl_engine.__main__ import _windows_apply_command
 
     argv = _windows_apply_command("C:\\Temp\\suravidl-setup.exe",
-                                  "C:\\App\\suravidl.exe")
+                                  "C:\\App\\suravidl.exe", pid=99,
+                                  log_path="C:\\Temp\\up.log")
     # one opaque argument (v0.43.2): nothing for CreateProcess re-quoting
     # to mangle — decode and read the script it will run
     assert argv[0] == "powershell.exe" and "-EncodedCommand" in argv
@@ -344,6 +345,8 @@ def test_the_silent_upgrade_command_keeps_its_flags():
     assert "/SILENT" in script and "/SP-" in script
     assert "/NORESTART" in script          # we own the relaunch
     assert "/CLOSEAPPLICATIONS" in script  # stragglers let go via RM
+    assert "/SUPPRESSMSGBOXES" in script   # no unseen box may hang (v0.45.9)
+    assert "Get-Process -Id 99" in script  # waits for the app to die first
     assert "'C:\\Temp\\suravidl-setup.exe'" in script
     assert "'C:\\App\\suravidl.exe'" in script
     # the wait must survive a DETACHED process (no console): timeout.exe

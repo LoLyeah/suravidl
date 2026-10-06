@@ -114,20 +114,25 @@ def test_windows_apply_rides_as_one_encoded_argument():
 
     installer = r"C:\Users\Bob & O'Brien\AppData\Local\suravidl-setup.exe"
     relaunch = r"C:\Users\Bob & O'Brien\AppData\Local\Programs\suravidl\suravidl.exe"
-    argv = _windows_apply_command(installer, relaunch)
+    argv = _windows_apply_command(
+        installer, relaunch, pid=1234,
+        log_path=r"C:\Users\Bob & O'Brien\.suravidl\update.log")
     assert argv[0] == "powershell.exe"
     assert "-EncodedCommand" in argv
     encoded = argv[-1]
     assert encoded and " " not in encoded and '"' not in encoded
     script = base64.b64decode(encoded).decode("utf-16-le")
     # the chain's promises, preserved
-    assert "Start-Sleep" in script                     # let the app die first
+    assert "Start-Sleep" in script                     # the wait still rides
     assert "/CLOSEAPPLICATIONS" in script              # stragglers let go (RM)
+    assert "/SUPPRESSMSGBOXES" in script               # and no box can hang it
+    assert "Get-Process -Id 1234" in script            # v0.45.9: waits for the app
     assert script.index("Remove-Item") > script.index("/CLOSEAPPLICATIONS")
     assert "Bob & O''Brien" in script                  # PS quoting survives
     assert "Start-Process -FilePath" in script         # the app comes back
 
-    lone = _windows_apply_command(r"C:\Temp\setup.exe", None)
+    lone = _windows_apply_command(r"C:\Temp\setup.exe", None, pid=7,
+                                  log_path=r"C:\Temp\up.log")
     lone_script = base64.b64decode(lone[-1]).decode("utf-16-le")
     assert "suravidl.exe" not in lone_script           # nothing to relaunch
 
