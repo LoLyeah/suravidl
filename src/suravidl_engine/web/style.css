@@ -357,7 +357,14 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
    `position: fixed` transport, so the bar re-anchored to the page and sat
    stuck over the content after every tab switch (2026-10-01 phone photos;
    reproduced live: content-relative y 405, moved with scroll — 699 pinned) */
-.tab-in { animation: tabIn var(--t-fast) var(--e-out) both; }
+/* v0.45.11: fill: none on every ancestor fade — a retained (fill: both)
+   opacity animation keeps the element "animating" forever, which makes it
+   a backdrop root, and Chromium then silently refuses EVERY backdrop-filter
+   beneath it (the Save strip, the queue transport, the popup cards and the
+   FAQ cards were all dead frosts; stripe-tile variance rigs caught it —
+   9021 -> 1475 the moment this flipped). No-delay fades look identical
+   with fill: none; only the lingering root goes away. */
+.tab-in { animation: tabIn var(--t-fast) var(--e-out) none; }
 @keyframes tabIn { from { opacity: 0; } }
 
 /* ---------- layout: bins rail + the deck ---------- */
@@ -1020,7 +1027,7 @@ details.card { padding: 0 18px 6px; }
      no frost anywhere; the popup card is the room's only frost. */
   display: grid; place-items: center;
   padding: 18px;
-  animation: fade var(--t-base) var(--e-out) both;
+  animation: fade var(--t-base) var(--e-out) none;
 }
 @keyframes fade { from { opacity: 0; } }
 .modal {
@@ -1034,7 +1041,7 @@ details.card { padding: 0 18px 6px; }
      element's shadow, so it is NOT part of the backdrop the blur samples */
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi),
     0 0 0 100vmax rgba(5, 7, 10, .55);
-  animation: modalIn var(--t-base) var(--e-out) both;
+  animation: modalIn var(--t-base) var(--e-out) none;
 }
 html[data-theme="light"] .modal { box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi),
   0 0 0 100vmax rgba(30, 29, 24, .30); }
@@ -1105,7 +1112,7 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
    the app with no transition at all (2026-09-30). v0.39.12: opacity-only,
    the tabIn law — a transform here is a containing block for the panel's
    fixed transport for the length of the fade (the audit found it) */
-.spanel-in { animation: spanelIn var(--t-fast) var(--e-out) both; }
+.spanel-in { animation: spanelIn var(--t-fast) var(--e-out) none; }
 @keyframes spanelIn { from { opacity: 0; } }
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
@@ -1129,6 +1136,16 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
      and the Android host below switch the blur back off. */
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
+}
+/* v0.45.11: the strip's frost was a silent no-op in Chromium — the card
+   wrapper's own backdrop-filter makes it a backdrop root, and nested
+   filters are quietly refused (A/B: strip visible vs hidden read the
+   same pixels; WebKit differed, which is why Mac checks passed).
+   The card has nothing behind it but the flat room, so its blur has
+   nothing to lose; it yields, and the strip frosts for real. */
+#panel-settings .card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .updrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .updmeta { margin-top: 6px; }
