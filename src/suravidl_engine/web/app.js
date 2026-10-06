@@ -3106,14 +3106,36 @@ function showQueueTrouble(e) {
  *  ends, with a timer as a backstop for a hidden tab (where animations do not
  *  run and `animationend` never arrives), and the guard keeps a second poll
  *  from restarting an exit already in flight. */
-function leaveRow(node) {
+function leaveRow(node, keepView) {
   if (!node || node.classList.contains("leaving")) return;
   node.classList.add("leaving");
   let gone = false;
   const drop = () => {
     if (gone) return;
     gone = true;
+    // v0.45.13: the reader's spot must survive the drop. Remember the
+    // topmost row still visible, take the height away, put the view back
+    // where it was — Chromium's native anchoring can pick the DYING row
+    // as its anchor and then land the viewport anywhere (the 2026-10-07
+    // report: deleting a failed job scrolled the screen to the page's
+    // end). Only rows the ENGINE's list drops pass keepView; a chip
+    // filter hiding a row is the user's own doing and keeps the plain exit.
+    let anchor = null;
+    if (keepView) {
+      const vh = window.innerHeight;
+      for (const r of node.parentElement.children) {
+        if (r === node || !r.classList.contains("job")
+            || r.classList.contains("leaving")) continue;
+        const b = r.getBoundingClientRect();
+        if (b.bottom > 0 && b.top < vh) { anchor = { el: r, y: b.top }; break; }
+      }
+    }
     node.remove();
+    if (anchor && document.contains(anchor.el)) {
+      const sc = document.scrollingElement || document.documentElement;
+      const dy = anchor.el.getBoundingClientRect().top - anchor.y;
+      if (Math.abs(dy) > 4) sc.scrollTop = Math.max(0, sc.scrollTop + dy);
+    }
   };
   node.addEventListener("animationend", (e) => {
     if (e.target === node) drop();
@@ -3219,7 +3241,17 @@ async function refreshJobs() {
     const empty = box.querySelector(".empty");
     if (empty) leaveRow(empty);
 
-    const keep = new Set();
+    const keep = new Set(list.map((j) => j.id));
+    // v0.45.13: mark the dying rows BEFORE the placement loop. The loop
+    // used to run first, so its anchor chain walked onto the just-deleted
+    // row while it still looked ordinary — every other row was inserted
+    // IN FRONT of it and the deleted row visibly sailed to the end of the
+    // list while fading ("the screen scrolls to the bottom", 2026-10-07;
+    // it was content motion, not scrolling). Marking first lets the
+    // anchors skip the dying rows and everyone keeps their place.
+    box.querySelectorAll(".job").forEach((r) => {
+      if (!keep.has(r.dataset.id)) leaveRow(r, true);   // the reader's spot stays
+    });
     let prev = null;
     for (const j of list) {
       keep.add(j.id);
@@ -3231,13 +3263,20 @@ async function refreshJobs() {
       } else {
         row = updateJobRow(row, j);
       }
-      const anchor = prev ? prev.nextElementSibling : box.firstElementChild;
+      let anchor = prev ? prev.nextElementSibling : box.firstElementChild;
+      // v0.45.13: skip PAST dying rows when anchoring the order — the old
+      // chain could land on a `.leaving` sibling, so the deleted row's
+      // neighbours were inserted BEFORE it and the dying row visibly
+      // sailed to the end of the list (the 2026-10-07 "screen scrolls to
+      // the bottom" report — it was content motion, not scrolling).
+      // The dying row keeps its exact place while it fades; everyone
+      // else keeps theirs.
+      while (anchor && anchor.classList.contains("leaving")) {
+        anchor = anchor.nextElementSibling;
+      }
       if (row !== anchor) box.insertBefore(row, anchor);
       prev = row;
     }
-    box.querySelectorAll(".job").forEach((r) => {
-      if (!keep.has(r.dataset.id)) leaveRow(r);
-    });
     applyQueueFilter();          // v0.40.2: a repaint keeps the view
   } catch (e) {
     if (seq !== JOBS_SEQ) return;

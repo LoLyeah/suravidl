@@ -246,23 +246,39 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         os.replace(tmp, path)
         return True
 
+    def fix_file(self, path: str) -> bool:
+        """Probe -> drop the unusable streams -> replace the file, once.
+
+        Shared by the post-process pass and the finished-download hook —
+        the hook is what saves a FRESH download: yt-dlp runs its per-info
+        fixups (`additional_pps + self._pps` in run_all_pps) AHEAD of
+        every attached post-processor, so FixupM3u8's own `-map 0 -c
+        copy` meets the broken stream first and dies, and the attached
+        PP never gets a turn (first-download repro, 2026-10-07: our PP
+        entered zero times). The hook cleans the file before ANY
+        post-process pass runs; the PP remains for paths that skip the
+        hook and as a harmless second pass (clean file -> fast exit).
+        """
+        if (not path or not os.path.isfile(path)
+                or not getattr(self, "probe_available", False)):
+            return False
+        streams = self._probe(path)
+        if not streams:
+            return False
+        keep = [s.get("index") for s in streams if self._usable(s)]
+        keep = [i for i in keep if i is not None]
+        if not keep or len(keep) == len(streams):
+            return False                 # nothing broken — fast path out
+        if not self._remux(path, keep):
+            return False
+        self.to_screen(
+            f"Dropped {len(streams) - len(keep)} unusable stream(s) "
+            "before the metadata pass")
+        return True
+
     def run(self, info):
         try:
-            path = info.get("filepath")
-            if (not path or not os.path.isfile(path)
-                    or not getattr(self, "probe_available", False)):
-                return [], info
-            streams = self._probe(path)
-            if not streams:
-                return [], info
-            keep = [s.get("index") for s in streams if self._usable(s)]
-            keep = [i for i in keep if i is not None]
-            if not keep or len(keep) == len(streams):
-                return [], info          # nothing broken — fast path out
-            if self._remux(path, keep):
-                self.to_screen(
-                    f"Dropped {len(streams) - len(keep)} unusable stream(s) "
-                    "before the metadata pass")
+            self.fix_file(info.get("filepath") or "")
             return [], info
         except Exception as exc:  # noqa: BLE001 — best-effort, like the thumb fixer
             self.report_warning(f"stream-copy fix skipped: {exc}")
@@ -272,7 +288,15 @@ class StreamCopyFixPP(FFmpegPostProcessor):
 def _attach_stream_copy_fix(ydl) -> None:
     """Insert the stream-copy fixer beside the thumbnail fixer, at the head
     of the post-process chain — the metadata pass must never meet a stream
-    it cannot copy. `_pps` is private; guarded, ordering is best-effort."""
+    it cannot copy. `_pps` is private; guarded, ordering is best-effort.
+
+    v0.45.13: the chain head is not enough on a fresh download — yt-dlp's
+    per-info fixups run AHEAD of every attached PP (run_all_pps: the
+    `additional_pps` list first), and FixupM3u8's own `-map 0 -c copy`
+    dies on the same broken stream before our fixer is ever reached. A
+    progress hook at `finished` cleans the file before ANY post-process
+    pass sees it; the PP stays for retries and as a harmless second pass.
+    """
     try:
         pp = StreamCopyFixPP(ydl)
         ydl.add_post_processor(pp, when="post_process")
@@ -280,6 +304,15 @@ def _attach_stream_copy_fix(ydl) -> None:
         if chain and chain[-1] is pp and len(chain) > 1:
             chain.remove(pp)
             chain.insert(0, pp)
+
+        def _finished_hook(d):
+            try:
+                if d.get("status") == "finished" and d.get("filename"):
+                    pp.fix_file(d["filename"])
+            except Exception:  # noqa: BLE001 — never break a download
+                pass
+
+        ydl.add_progress_hook(_finished_hook)
     except Exception:  # noqa: BLE001 - best-effort ordering, never fatal
         pass
 
