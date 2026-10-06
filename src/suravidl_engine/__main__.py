@@ -1200,8 +1200,10 @@ def _try_tray(url: str, open_downloads: Path):
     return pystray.Icon("suravidl", Image.open(icon_file), "suravidl", menu)
 
 
-def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
-    """The silent-upgrade invocation the courier rides (v0.41.0; v0.43.2).
+def _windows_apply_command(installer: str, relaunch: str | None,
+                           pid: int | None = None,
+                           log_path: str | None = None) -> list[str]:
+    """The silent-upgrade invocation the courier rides (v0.41.0; v0.45.9).
 
     A detached PowerShell script, base64-encoded (`-EncodedCommand`). The
     v0.41 chain handed cmd.exe a multi-command string, and subprocess on
@@ -1212,30 +1214,64 @@ def _windows_apply_command(installer: str, relaunch: str | None) -> list[str]:
     opaque ASCII argument there is nothing left to re-quote — UTF-16LE
     base64 survives any username, path metacharacter or locale.
 
-    The script preserves the chain's promises: a short wait lets THIS
-    process die and hand back its file locks; the installer runs silent
-    (no wizard, no restart prompt, it closes stragglers through the
-    Restart Manager); the spent setup is deleted the moment the installer
-    exits; and even a failed install brings the app back up (statements
-    run in order regardless of any one step's outcome).
+    v0.45.9: the chain used to blind-wait two seconds and then start the
+    installer. On the 2026-10-06 report that was exactly wrong: the app's
+    window is destroyed before the installer runs, so a still-exiting
+    process has no window for the Restart Manager to close, the RM close
+    "fails", and Setup pops its Abort/Retry/Ignore box — which silent mode
+    still shows. Nobody was watching, so it waited forever: the app quit
+    and nothing installed. The chain now waits for THIS pid to actually
+    vanish first (bounded, like the macOS script waits before swapping),
+    passes /SUPPRESSMSGBOXES so no prompt can ever hang unattended, and
+    writes a short trail to a log file — a hiccup is never invisible.
+
+    The rest of the promises stand: the installer runs silent (no wizard,
+    no restart prompt); the spent setup is deleted the moment the
+    installer exits; and even a failed install brings the app back up
+    (statements run in order regardless of any one step's outcome).
     """
 
     def q(s: str) -> str:
         # PowerShell single-quoted literal: '' is the only escape it has
         return "'" + s.replace("'", "''") + "'"
 
+    log = log_path or str(Path.home() / ".suravidl" / "update.log")
     lines = [
         "$ErrorActionPreference = 'SilentlyContinue'",
-        # the wait is Start-Sleep, not ping/timeout: a detached process has
-        # no console, and timeout.exe exits instantly without one (v0.41.x
-        # audit, finding 10)
-        "Start-Sleep -Seconds 2   # let the app exit and drop its file locks",
-        f"Start-Process -FilePath {q(installer)} "
-        "-ArgumentList '/SILENT','/SP-','/NORESTART','/CLOSEAPPLICATIONS' -Wait",
+        f"$log = {q(log)}",
+        "\"=== $((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) ===\""
+        " | Out-File -Append -FilePath $log",
+    ]
+    if pid:
+        # the wait is Get-Process polling, not Wait-Process: it must ride
+        # out a pid that is already gone, and a detached process has no
+        # console (timeout.exe dies instantly without one — v0.41.x audit)
+        lines += [
+            "# wait for the app to actually exit (bounded): until then its",
+            "# exe is locked and the Restart Manager would fight over it",
+            "$deadline = (Get-Date).AddSeconds(90)",
+            f"while ((Get-Process -Id {int(pid)} -ErrorAction SilentlyContinue) "
+            "-and ((Get-Date) -lt $deadline)) {",
+            "    Start-Sleep -Milliseconds 250",
+            "}",
+            "\"app gone at $((Get-Date).ToString('HH:mm:ss'))\""
+            " | Out-File -Append -FilePath $log",
+        ]
+    else:
+        # no pid handed over: the old blind wait, kept as a floor
+        lines.append("Start-Sleep -Seconds 2")
+    lines += [
+        f"$p = Start-Process -FilePath {q(installer)} "
+        "-ArgumentList '/SILENT','/SP-','/NORESTART','/CLOSEAPPLICATIONS',"
+        "'/SUPPRESSMSGBOXES' -Wait -PassThru",
+        "\"installer exit: $($p.ExitCode)\" | Out-File -Append -FilePath $log",
         f"Remove-Item -LiteralPath {q(installer)} -Force",
     ]
     if relaunch:
-        lines.append(f"Start-Process -FilePath {q(relaunch)}")
+        lines += [
+            f"Start-Process -FilePath {q(relaunch)}",
+            "\"relaunched\" | Out-File -Append -FilePath $log",
+        ]
     script = "\r\n".join(lines)
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     return ["powershell.exe", "-NoProfile", "-NonInteractive",
@@ -1268,7 +1304,8 @@ def _make_apply_update_action(window):
         import subprocess
 
         if os.name == "nt":
-            cmd = _windows_apply_command(staged, _installed_exe())
+            cmd = _windows_apply_command(staged, _installed_exe(),
+                                           os.getpid())
             try:
                 subprocess.Popen(
                     cmd, close_fds=True,
