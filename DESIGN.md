@@ -352,9 +352,14 @@ all separation; never re-introduce grey shadows there.
 
 **The Popup Standard.** Every popup card carries the tour card's recipe —
 `--glass-bg-strong` fill, the material blur (`--glass-blur`), the gloss, the
-hairline and the shadow — over a dim-only veil (`rgba(5,7,10,.55)`, no frost
-on the veil). Blessed on the Mac, 2026-10-05: "this is the perfect blur and
-transparency ratio — make it the standard for pop up." 
+hairline and the shadow — and the veil rides the card itself, the tour ring's
+mechanism exactly (`0 0 0 100vmax rgba(5,7,10,.55)` on the card's own shadow,
+no frost anywhere on it), so the card blurs the REAL room instead of a
+darkened copy of it (v0.45.10; before that the veil was a layer between page
+and card, and every popup read a shade darker than the tour card it was
+meant to match — the Windows report, 2026-10-06). Blessed on the Mac,
+2026-10-05: "this is the perfect blur and transparency ratio — make it the
+standard for pop up." 
 
 ## Shapes
 

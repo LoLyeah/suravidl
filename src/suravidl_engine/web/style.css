@@ -1011,16 +1011,17 @@ details.card { padding: 0 18px 6px; }
 /* ---------- overlays & modals ---------- */
 .overlay {
   position: fixed; inset: 0; z-index: 70;
-  background: rgba(5,7,10,.55);
-  /* the veil dims like the tour ring — it does NOT frost. The popup card is
-     the only frost in the room (v0.45.3: the tour card became the popup
-     standard — "the perfect blur and transparency ratio", 2026-10-05; the
-     v0.37.4 veil frost reads as a flat smear behind every dialog). */
+  background: transparent;
+  /* the veil rides the CARD's own shadow since v0.45.10 — the tour ring's
+     exact mechanism (0 0 0 100vmax), so the card blurs the REAL room and
+     not a darkened copy of it. A veil layer between page and card made
+     every popup read a shade darker than the tour card it was meant to
+     match (2026-10-06 Windows report). The veil itself still only dims —
+     no frost anywhere; the popup card is the room's only frost. */
   display: grid; place-items: center;
   padding: 18px;
   animation: fade var(--t-base) var(--e-out) both;
 }
-html[data-theme="light"] .overlay { background: rgba(30,29,24,.30); }
 @keyframes fade { from { opacity: 0; } }
 .modal {
   width: min(640px, 100%); max-height: 86vh; overflow: auto;
@@ -1029,9 +1030,14 @@ html[data-theme="light"] .overlay { background: rgba(30,29,24,.30); }
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   background-image: var(--glass-gloss);
-  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi);
+  /* the six-line material + the veil, the ring's own way: the dim is this
+     element's shadow, so it is NOT part of the backdrop the blur samples */
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi),
+    0 0 0 100vmax rgba(5, 7, 10, .55);
   animation: modalIn var(--t-base) var(--e-out) both;
 }
+html[data-theme="light"] .modal { box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi),
+  0 0 0 100vmax rgba(30, 29, 24, .30); }
 @keyframes modalIn { from { opacity: 0; transform: translateY(10px); } }
 .overlay.closing { animation: none; opacity: 0; transition: opacity var(--t-fast) var(--e-in); }
 .overlay.closing .modal {
@@ -1451,11 +1457,12 @@ html[data-host="android"][data-glass="liquid"] {
 html[data-host="android"] .transport {
   background: color-mix(in srgb, var(--panel-solid) 85%, transparent);
 }
-/* and the full-page veil returns to the v0.36-proven density — this device
-   never frosted it either; the base rule keeps the frost for engines that
-   paint it */
-html[data-host="android"] .overlay {
-  background: rgba(3, 5, 12, .72);
+/* the android host keeps its own dense dim (v0.36-proven) — since
+   v0.45.10 it rides the card's shadow like everywhere else, so the card
+   blurs the real room here too */
+html[data-host="android"] .modal {
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-hi),
+    0 0 0 100vmax rgba(3, 5, 12, .72);
 }
 /* the veil has no frost to place since v0.45.3 — the popup card is the
    only frost; hosts keep their own dim density (see android above) */
