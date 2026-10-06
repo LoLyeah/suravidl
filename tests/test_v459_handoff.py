@@ -76,3 +76,5 @@ def test_the_chain_spawn_is_not_detached():
     smoke = (ROOT / "scripts/smoke_windows_update.py").read_text(encoding="utf-8")
     assert "creationflags=_CREATE_NO_WINDOW" in smoke
     assert "0x00000008" not in smoke
+    # the chain's Out-File writes UTF-16LE; the reader must sniff it
+    assert 'decode("utf-16"' in smoke

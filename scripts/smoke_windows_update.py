@@ -28,6 +28,19 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
+def read_log(path: Path, *, sniffer_path=None) -> str:
+    """The chain's Out-File on Windows PowerShell 5.1 writes UTF-16LE;
+    a plain utf-8 read turns every character into noise and every
+    substring check into a false FAIL (lived: 2026-10-06). Sniff by
+    BOM/NUL bytes and decode accordingly."""
+    if not path.exists():
+        return ""
+    raw = path.read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff") or (raw[:160].count(b"\x00") > 8):
+        return raw.decode("utf-16", errors="replace")
+    return raw.decode("utf-8", errors="replace")
+
+
 def main() -> int:
     if os.name != "nt":
         print("windows-only smoke — skipped")
@@ -63,7 +76,7 @@ def main() -> int:
     deadline = started + 540
     last_beat = started
     while time.time() < deadline:
-        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        text = read_log(log)
         if "installer exit:" in text:
             break
         if time.time() - last_beat > 30:
@@ -93,5 +106,19 @@ def main() -> int:
     return 0 if ok else 1
 
 
+def _sniff_selftest() -> None:
+    """One ASCII line, two encodings, same substrings — the reader must
+    pass both (utf-16 is what the chain actually writes)."""
+    import tempfile as _tf
+    line = "app gone at 12:00:01\ninstaller exit: 0\n"
+    for enc in ("utf-16", "utf-8"):
+        f = Path(_tf.mkdtemp()) / "selftest.log"
+        f.write_bytes(line.encode(enc))
+        got = read_log(f)
+        assert "app gone at" in got and "installer exit: 0" in got, enc
+    print("reader selftest ok")
+
+
 if __name__ == "__main__":
+    _sniff_selftest()
     sys.exit(main())
