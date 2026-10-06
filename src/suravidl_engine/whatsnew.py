@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.8",
+        "title": "The reach",
+        "items": [
+            "Expanding a queue card no longer needs a tap on one word at the top left — the whole card folds and unfolds it now, everything except the buttons and links that do their own thing.",
+            "The card reads as tappable everywhere, and the keyboard path is unchanged: Tab to the title, then Enter or Space.",
+        ],
+    },
+    {
         "version": "0.45.7",
         "title": "The sound",
         "items": [
@@ -86,13 +94,6 @@ ENTRIES = [
         "items": [
             "The whole interface speaks Bahasa Indonesia now \u2014 switch in Settings \u2192 Appearance \u2192 Language and every button, tab, toast and confirmation answers in Indonesian on the spot. English stays the default.",
             "Also fixed: a faint 1px line sat above the top bar on desktop windows once you scrolled to the top. The bar meets the window chrome cleanly now.",
-        ],
-    },
-    {
-        "version": "0.43.4",
-        "title": "The level",
-        "items": [
-            "Fixed: a toast clearing the settings Save strip floated a full row too high \u2014 over the Updates text you were reading. It now lands a breath above whatever is docked, exactly where it should.",
         ],
     },
 ]
