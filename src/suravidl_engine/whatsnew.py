@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.16",
+        "title": "The proof",
+        "items": [
+            "The fix no longer trusts stream warnings — it asks the actual copy whether each stream can pass, and only drops what the copy itself refuses. If your video vanished into a 60 MB file, that was this false alarm.",
+            "Every drop is still named in the log — and the video is only ever dropped as the last resort, after the copy has refused it twice.",
+        ],
+    },
+    {
         "version": "0.45.15",
         "title": "The keeper",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "TikTok picks could end with the sound dying at 1:00 — the site serves the video’s music as its own file, often a 60-second preview, and it was being used as the soundtrack. Picks now take the video’s own complete audio.",
             "For those videos that means the single complete copy with its real soundtrack; nothing else about the presets changes.",
-        ],
-    },
-    {
-        "version": "0.45.6",
-        "title": "The cover",
-        "items": [
-            "Covers that arrive without a usable file extension \u2014 TikTok\u2019s end in \u201c.image\u201d \u2014 no longer break a download with thumbnails turned on: the file\u2019s own bytes decide its name, so it converts and embeds cleanly.",
-            "That was the \u201cError opening output files: Invalid argument\u201d wall those downloads ended on; the fix rides the desktop and the phone alike.",
         ],
     },
 ]
