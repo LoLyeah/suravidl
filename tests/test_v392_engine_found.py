@@ -43,14 +43,23 @@ def _blocked(p: int):
 # -- the engine walks a ladder, never a random port ---------------------------
 
 def test_the_engine_port_ladder_is_fixed():
-    from suravidl_engine.__main__ import find_free_port
+    from suravidl_engine.__main__ import _port_candidates, find_free_port
 
     base = _free_port()
     assert find_free_port(base) == base
 
     b1, b2 = _blocked(base), _blocked(base + 1)
     try:
-        assert find_free_port(base) == base + 2, "a busy rung moves one step, not anywhere"
+        chosen = find_free_port(base)
+        # The exact rung cannot be pinned when `base` comes from the
+        # ephemeral range: the OS may hand base+2 to anything else on the
+        # runner between the probes (this flaked 2026-10-07, CI run
+        # 37696145975). Pin the CONTRACT instead — a busy rung is skipped,
+        # the answer stays on the ladder, and it is actually bindable.
+        assert chosen >= base + 2, "a busy rung moves at least one step"
+        assert chosen in _port_candidates(base), "and never off the ladder"
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", chosen))
     finally:
         b1.close()
         b2.close()
