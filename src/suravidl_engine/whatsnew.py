@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.14",
+        "title": "The oracle",
+        "items": [
+            "The merge fix now takes its verdict from ffmpeg itself, not the app’s tiny probe — on Android that probe reads every audio track as broken, which is why the fix kept missing. Healthy tracks are never touched now.",
+            "When the fix cannot apply, the log says so — it can never skip silently again.",
+        ],
+    },
+    {
         "version": "0.45.13",
         "title": "The hook",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "TikTok\u2019s \u201cunexpected response\u201d refusal is retried with a different browser identity each attempt \u2014 a refused fetch no longer repeats itself into the same wall.",
             "The first attempt stays exactly what you configured; only the retries step aside \u2014 and only for TikTok\u2019s challenge, never for a real error.",
-        ],
-    },
-    {
-        "version": "0.45.4",
-        "title": "The answers",
-        "items": [
-            "Every FAQ entry sits on its own glass card now \u2014 the same material as every popup \u2014 and the answers learned the current app: where updates live, how to pair the extension, and where the log hides when a download fails.",
-            "Where things live, corrected: the updater is at Settings \u2192 General, and the cookies and the pairing token at Settings \u2192 Authentication.",
         ],
     },
 ]
