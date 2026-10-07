@@ -101,9 +101,14 @@ def test_the_field_failure_is_reproduced_and_cured(tmp_path):
     meta = [FFMPEG, "-y", "-loglevel", "repeat+info", "-i", str(broken), "-map", "0",
             "-dn", "-ignore_unknown", "-c", "copy", "-write_id3v1", "1",
             "-metadata", "title=master"]
-    # 2) the exact failing command (pre-fix)
+    # 2) the exact failing command (pre-fix). The refusal's wording is
+    # ffmpeg-version-dependent — 8.x ends with "Conversion failed!", the
+    # CI runner's 6.1.1 says "Error opening output files: Invalid
+    # argument". Pin the SITUATION (the muxer refuses; nothing usable
+    # lands), not the string.
     r = subprocess.run(meta + [str(tmp_path / "pre.mp4")], capture_output=True, text=True)
-    assert r.returncode != 0 and "Conversion failed" in r.stderr
+    assert r.returncode != 0
+    assert "Invalid argument" in r.stderr, r.stderr[-400:]
 
     # 3) the fixer, as it rides the pipeline
     from suravidl_engine.extract import _attach_stream_copy_fix
