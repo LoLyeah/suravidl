@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.15",
+        "title": "The keeper",
+        "items": [
+            "The stream fix now removes only what it names as broken — anything it can’t read is kept untouched rather than silently gone. Re-add the link — it comes out whole now.",
+            "If the check can’t read a file’s stream report, it says so and leaves the file alone — never a silent guess.",
+        ],
+    },
+    {
         "version": "0.45.14",
         "title": "The oracle",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "Covers that arrive without a usable file extension \u2014 TikTok\u2019s end in \u201c.image\u201d \u2014 no longer break a download with thumbnails turned on: the file\u2019s own bytes decide its name, so it converts and embeds cleanly.",
             "That was the \u201cError opening output files: Invalid argument\u201d wall those downloads ended on; the fix rides the desktop and the phone alike.",
-        ],
-    },
-    {
-        "version": "0.45.5",
-        "title": "The disguise",
-        "items": [
-            "TikTok\u2019s \u201cunexpected response\u201d refusal is retried with a different browser identity each attempt \u2014 a refused fetch no longer repeats itself into the same wall.",
-            "The first attempt stays exactly what you configured; only the retries step aside \u2014 and only for TikTok\u2019s challenge, never for a real error.",
         ],
     },
 ]
