@@ -208,48 +208,65 @@ class StreamCopyFixPP(FFmpegPostProcessor):
 
     @staticmethod
     def _parse_stream_dump(err: str):
-        """Stream table + broken indices from `ffmpeg -i` stderr.
+        """Stream table {index: (kind, codec)} + broken indices, from `ffmpeg -i`.
 
         Stream lines look like:
           Stream #0:1[0x101]: Audio: mp3, 0 channels, s16p, start 0.167667
-          Stream #0:2[0x102]: Audio: aac (LC), 44100 Hz, stereo, 92 kb/s
-        and the broken ones are also named outright:
-          Could not find codec parameters for stream 0 (Audio: mp3, 0 ...)
+          Stream #0:2[0x102](und): Audio: aac (LC), 44100 Hz, stereo, 92 kb/s
+        — the optional `[0x101]` pid and `(und)` language tags both appear
+        in the wild; a line the regex fails to read makes the parse count
+        come up short, and the caller then refuses to act (v0.45.15: a
+        missed line once meant a "keep" list without the video and a
+        silent, audio-only output — the remux now maps ALL streams minus
+        the named ones, so this parse can only ever decide WHAT TO REMOVE,
+        never what to keep).
         """
         streams: dict = {}
         bad: set = set()
-        for m in re.finditer(r"Stream #0:(\d+)(?:\[[^\]]*\])?: (\w+):", err):
-            streams[int(m.group(1))] = m.group(2)
+        for m in re.finditer(
+                r"Stream #0:(\d+)(?:\[[^\]]*\])?(?:\([^)]*\))?: (\w+): ([^,\n]+)", err):
+            codec = m.group(3).strip().split(" ")[0]
+            streams[int(m.group(1))] = (m.group(2), codec)
         for m in re.finditer(r"Could not find codec parameters for stream (\d+)", err):
             bad.add(int(m.group(1)))
-        for m in re.finditer(r"Stream #0:(\d+)(?:\[[^\]]*\])?: Audio: ([^\n]+)", err):
+        for m in re.finditer(
+                r"Stream #0:(\d+)(?:\[[^\]]*\])?(?:\([^)]*\))?: Audio: ([^\n]+)", err):
             if re.search(r"(^|,)\s*0 channels", m.group(2)):
                 bad.add(int(m.group(1)))
         return streams, bad
 
     def _streams_by_ffmpeg(self, path: str):
+        """(streams, bad) — or () for no ffmpeg, None for an unreadable dump."""
         ffmpeg = getattr(self, "executable", None)
         if not ffmpeg:
-            return None
+            return ()
         # No output file: ffmpeg prints the input dump and exits with
         # "At least one output file must be specified" — that is expected.
         proc = subprocess.run(
             [ffmpeg, "-hide_banner", "-v", "info", "-i", path],
             capture_output=True, text=True)
-        streams, bad = self._parse_stream_dump(proc.stderr or "")
+        err = proc.stderr or ""
+        streams, bad = self._parse_stream_dump(err)
         if not streams:
+            return None
+        # completeness: every "Stream #0:N" the dump mentions must parse.
+        # A partial read must never drive a removal (v0.45.15).
+        if len(streams) != len(re.findall(r"Stream #0:\d+", err)):
             return None
         return streams, bad
 
-    def _remux(self, path: str, keep: list) -> bool:
+    def _remux(self, path: str, drop: list) -> bool:
         ffmpeg = getattr(self, "executable", None)
         if not ffmpeg:
             return False
         ext = os.path.splitext(path)[1].lstrip(".").lower() or "mp4"
         tmp = f"{path}.streamfix.{ext}"
-        cmd = [ffmpeg, "-y", "-loglevel", "repeat+info", "-i", path]
-        for idx in keep:
-            cmd += ["-map", f"0:{idx}"]
+        # `-map 0` maps EVERY stream ffmpeg sees; the negative maps remove
+        # only the ones we explicitly named. A stream the parse never saw
+        # is kept, never silently lost (v0.45.15).
+        cmd = [ffmpeg, "-y", "-loglevel", "repeat+info", "-i", path, "-map", "0"]
+        for idx in drop:
+            cmd += ["-map", f"-0:{idx}"]
         cmd += ["-c", "copy"]
         if ext in ("mp4", "m4v", "mov", "m4a"):
             cmd += ["-movflags", "+faststart"]
@@ -277,28 +294,35 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         post-process pass runs; the PP remains for paths that skip the
         hook and as a harmless second pass (clean file -> fast exit).
         """
-        if (not path or not os.path.isfile(path)
-                or not getattr(self, "executable", None)):
+        if not path or not os.path.isfile(path):
             return False
         got = self._streams_by_ffmpeg(path)
-        if not got:
+        if got is None:
+            self.report_warning(
+                "stream check could not read ffmpeg's report — "
+                "leaving the file as-is")
             return False
+        if not got:
+            return False                 # no ffmpeg — nothing we can do
         streams, bad = got
         if not bad:
             return False                 # nothing flagged — fast path out
-        # data streams are excluded from the remux (`-dn` drops them in the
-        # metadata pass anyway; mapping them into an mp4 can be refused)
-        keep = [i for i, kind in sorted(streams.items())
-                if i not in bad and kind in ("Video", "Audio", "Subtitle")]
-        if not keep or len(keep) == len(streams):
-            return False
-        if not self._remux(path, keep):
+        # remove the flagged streams — and data streams (`-dn` drops them
+        # in the metadata pass anyway; mapping them into an mp4 can be
+        # refused). Everything else is KEPT by construction: the remux
+        # maps all of `0` minus this list.
+        drop = sorted(bad | {i for i, (kind, _) in streams.items()
+                             if kind not in ("Video", "Audio", "Subtitle")})
+        if len(drop) == len(streams):
+            return False                 # nothing would be left — leave it be
+        names = ", ".join(f"{i}:{streams[i][0]}/{streams[i][1]}" for i in drop)
+        if not self._remux(path, drop):
             self.report_warning(
                 "stream-copy fix could not apply — the file is left as-is")
             return False
         self.to_screen(
-            f"Dropped {len(streams) - len(keep)} unusable stream(s) "
-            "before the metadata pass")
+            f"Dropped {len(drop)} unusable stream(s) "
+            f"before the metadata pass ({names})")
         return True
 
     def run(self, info):
