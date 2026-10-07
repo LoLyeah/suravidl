@@ -9,7 +9,7 @@ copies EVERY stream (-map 0 -c copy), the mp4 muxer refuses the
 headerless one ("sample rate not set" -> "Could not write header ...
 Invalid argument") and the job dies after the whole download.
 StreamCopyFixPP drops only the unusable streams, once, before the
-metadata pass — healthy files pay one ffprobe and nothing else.
+metadata pass — healthy files pay one ffmpeg pass and nothing else.
 Reproduced on Linux with the same ffmpeg build class before fixing; the
 exact failing command exits non-zero pre-fix and 0 post-fix.
 """
@@ -28,20 +28,21 @@ sys.path.insert(0, str(SRC))
 from suravidl_engine.extract import StreamCopyFixPP  # noqa: E402
 
 
-def _usable(**fields):
-    pp = StreamCopyFixPP.__new__(StreamCopyFixPP)   # no downloader needed
-    return pp._usable(fields)
-
-
 def test_the_stream_picker_drops_only_the_unusable():
-    # the field shape: a headerless mp3 beside a healthy aac
-    assert _usable(codec_type="audio", codec_name="mp3", channels=0, sample_rate="0") is False
-    assert _usable(codec_type="audio", codec_name="aac", channels=1, sample_rate="44100") is True
-    assert _usable(codec_type="audio", codec_name="mp3", channels=2, sample_rate="44100") is True
-    assert _usable(codec_type="video", codec_name="h264", width=320) is True
-    assert _usable(codec_type="video", codec_name="none", width=0) is False
-    assert _usable(codec_type="subtitle", codec_name="webvtt") is True
-    assert _usable(codec_type="data", codec_name="bin_data") is False
+    # v0.45.14: the picker reads ffmpeg's own dump — the ffprobe-JSON
+    # version of this test retired with `_usable` (the app's minimal
+    # ffprobe reads EVERY audio stream as `0 channels`, see v4514)
+    dump = (
+        "  Stream #0:0[0x100]: Video: h264 (High), yuv420p, 1920x1080\n"
+        "  Stream #0:1[0x101]: Audio: mp3, 0 channels, s16p\n"
+        "  Stream #0:2[0x102]: Audio: aac (LC), 44100 Hz, stereo, fltp\n"
+        "  Stream #0:3[0x103]: Data: bin_data\n"
+    )
+    streams, bad = StreamCopyFixPP._parse_stream_dump(dump)
+    keep = [i for i, kind in sorted(streams.items())
+            if i not in bad and kind in ("Video", "Audio", "Subtitle")]
+    assert bad == {1}, "only the headerless mp3 is flagged"
+    assert keep == [0, 2], "the healthy aac stays; data streams stay out"
 
 
 def test_the_fixer_rides_the_download_path():
