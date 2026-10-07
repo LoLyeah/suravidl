@@ -40,7 +40,7 @@ def test_the_parser_reads_the_field_dump():
         "  Stream #0:1[0x101]: Audio: aac (LC), 44100 Hz, stereo, fltp, 92 kb/s\n"
     )
     streams, bad = StreamCopyFixPP._parse_stream_dump(dump)
-    assert streams == {0: "Audio", 1: "Audio"}
+    assert streams == {0: ("Audio", "mp3"), 1: ("Audio", "aac")}
     assert bad == {0}, "the headerless mp3 is flagged; the healthy AAC is not"
 
 
@@ -48,7 +48,7 @@ def test_a_healthy_file_pays_nothing():
     streams, bad = StreamCopyFixPP._parse_stream_dump(
         "  Stream #0:0[0x100]: Video: h264 (High), yuv420p, 1920x1080, 30 fps\n"
         "  Stream #0:1[0x101]: Audio: aac (LC), 44100 Hz, stereo, fltp\n")
-    assert streams == {0: "Video", 1: "Audio"} and bad == set()
+    assert streams == {0: ("Video", "h264"), 1: ("Audio", "aac")} and bad == set()
 
 
 def test_data_streams_stay_out_of_the_remux():
@@ -56,9 +56,9 @@ def test_data_streams_stay_out_of_the_remux():
             "  Stream #0:1[0x101]: Audio: mp3, 0 channels, s16p\n"
             "  Stream #0:2[0x102]: Data: bin_data\n")
     streams, bad = StreamCopyFixPP._parse_stream_dump(dump)
-    keep = [i for i, kind in sorted(streams.items())
-            if i not in bad and kind in ("Video", "Audio", "Subtitle")]
-    assert keep == [0]
+    drop = sorted(bad | {i for i, (kind, _) in streams.items()
+                         if kind not in ("Video", "Audio", "Subtitle")})
+    assert drop == [1, 2], "the mp3 and the data stream go; the video stays"
 
 
 def test_a_remux_that_fails_says_so():
