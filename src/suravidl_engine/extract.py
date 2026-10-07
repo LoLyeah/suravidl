@@ -307,23 +307,65 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         streams, bad = got
         if not bad:
             return False                 # nothing flagged — fast path out
-        # remove the flagged streams — and data streams (`-dn` drops them
-        # in the metadata pass anyway; mapping them into an mp4 can be
-        # refused). Everything else is KEPT by construction: the remux
-        # maps all of `0` minus this list.
-        drop = sorted(bad | {i for i, (kind, _) in streams.items()
-                             if kind not in ("Video", "Audio", "Subtitle")})
-        if len(drop) == len(streams):
-            return False                 # nothing would be left — leave it be
-        names = ", ".join(f"{i}:{streams[i][0]}/{streams[i][1]}" for i in drop)
-        if not self._remux(path, drop):
-            self.report_warning(
-                "stream-copy fix could not apply — the file is left as-is")
-            return False
-        self.to_screen(
-            f"Dropped {len(drop)} unusable stream(s) "
-            f"before the metadata pass ({names})")
-        return True
+        for drop, real in self._attempt_ladder(streams, bad):
+            if len(drop) == len(streams):
+                continue                 # nothing would be left — skip
+            if self._remux(path, drop):
+                if real:
+                    names = ", ".join(
+                        f"{i}:{streams[i][0]}/{streams[i][1]}" for i in sorted(real))
+                    self.to_screen(
+                        f"Dropped {len(real)} unusable stream(s) "
+                        f"before the metadata pass ({names})")
+                return True
+        self.report_warning(
+            "stream-copy fix could not apply — the file is left as-is")
+        return False
+
+    @staticmethod
+    def _attempt_ladder(streams: dict, bad: set):
+        """Removal attempts, gentlest first, each judged by the mux itself.
+
+        The dump's warnings are NOT trustable as removals: with the
+        analyzeduration/probesize values this app runs with, `Could not
+        find codec parameters` appears on perfectly copyable streams
+        (reproduced 2026-10-07: a healthy video got dropped on that
+        warning, turning a 1 GB screen recording into its 62 MB audio
+        track). Only the mux knows what the mux can carry, so:
+
+          1. keep EVERYTHING real (drop only data streams) — succeeds
+             for the false-alarm case, costs one header-phase failure
+             when it doesn't;
+          2. drop the flagged AUDIO streams (the genuine killer class:
+             headerless mp3 with no channels/sample rate);
+          3. only if the mux still refuses, also drop the flagged
+             non-audio streams (a truly dead video — the honest,
+             NAMED, last resort).
+
+        Each failed attempt dies at mux-header time (fast); only the
+        attempt that succeeds copies the payload. Returns
+        [(drop_indices, reported_drops)].
+        """
+        nonav = {i for i, (kind, _) in streams.items()
+                 if kind not in ("Video", "Audio", "Subtitle")}
+        flagged_audio = {i for i in bad if streams.get(i, ("", ""))[0] == "Audio"}
+        flagged_other = set(bad) - flagged_audio
+        ladder = [(nonav, set())]
+        if flagged_audio:
+            ladder.append((nonav | flagged_audio, set(flagged_audio)))
+        if flagged_other:
+            ladder.append((nonav | flagged_audio | flagged_other,
+                           flagged_audio | flagged_other))
+        # dedupe while keeping order (a later rung with the same drop set
+        # adds nothing)
+        seen, out = set(), []
+        for drop, real in ladder:
+            key = frozenset(drop)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((sorted(drop), real))
+        return out
 
     def run(self, info):
         try:
