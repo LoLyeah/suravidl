@@ -39,10 +39,11 @@ def test_the_stream_picker_drops_only_the_unusable():
         "  Stream #0:3[0x103]: Data: bin_data\n"
     )
     streams, bad = StreamCopyFixPP._parse_stream_dump(dump)
-    drop = sorted(bad | {i for i, (kind, _) in streams.items()
-                         if kind not in ("Video", "Audio", "Subtitle")})
     assert bad == {1}, "only the headerless mp3 is flagged"
-    assert drop == [1, 3], "the mp3 and the data stream go; video + aac stay"
+    # v0.45.16: the removal decision is the attempt ladder's; its last
+    # rung names the mp3 (+ the data stream) and never the video/aac
+    ladder = StreamCopyFixPP._attempt_ladder(streams, bad)
+    assert ladder[-1] == ([1, 3], {1})
 
 
 def test_the_fixer_rides_the_download_path():
