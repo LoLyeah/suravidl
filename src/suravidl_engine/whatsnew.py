@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.21",
+        "title": "The start",
+        "items": [
+            "A claimed download now says so right away — a job stuck before its first byte used to sit at “Queued” forever instead of showing it was already running.",
+        ],
+    },
+    {
         "version": "0.45.20",
         "title": "The twin",
         "items": [
@@ -83,14 +90,6 @@ ENTRIES = [
         "items": [
             "The 953 MB download that died with \"Conversion failed!\" no longer does: a junk audio track inside the stream is dropped before the metadata pass, and the file lands as a real .mp4. Retry that job — no re-download needed.",
             "The yt-dlp tab's Save floats now like Settings', and the Save strip frosts on Android too.",
-        ],
-    },
-    {
-        "version": "0.45.11",
-        "title": "The strip",
-        "items": [
-            "Every blur renders for real now: the fades that lingered after landing kept Chromium from painting ANY frost beneath them — the Save strip, the queue bar, the popups, the FAQ cards were all silently flat.",
-            "Scroll the Settings card: rows melt under the Save strip, exactly the way it was always meant to look.",
         ],
     },
 ]

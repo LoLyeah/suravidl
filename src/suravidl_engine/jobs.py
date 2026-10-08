@@ -1043,6 +1043,15 @@ class JobManager:
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued
             return
+        # A worker has taken this job — say so at once. The label used to
+        # flip only on yt-dlp's first progress event, so a download that
+        # stalled inside the network layer before its first byte sat at
+        # QUEUED for its entire run (2026-10-08 field report: "why is it
+        # still queued?" — the job had been claimed and was hanging).
+        with self._lock:
+            if not _stop_requested(job):
+                job["status"] = "downloading"
+        self._save(job)
 
         class _Cancelled(Exception):
             pass
