@@ -40,10 +40,10 @@ def test_the_stream_picker_drops_only_the_unusable():
     )
     streams, bad = StreamCopyFixPP._parse_stream_dump(dump)
     assert bad == {1}, "only the headerless mp3 is flagged"
-    # v0.45.16: the removal decision is the attempt ladder's; its last
-    # rung names the mp3 (+ the data stream) and never the video/aac
+    # v0.45.17: the ladder's last rung drops the flagged mp3 only — the
+    # data stream is the remux's own -dn business and never a drop entry
     ladder = StreamCopyFixPP._attempt_ladder(streams, bad)
-    assert ladder[-1] == ([1, 3], {1})
+    assert ladder == [([], set()), ([1], {1})]
 
 
 def test_the_fixer_rides_the_download_path():

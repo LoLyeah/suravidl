@@ -47,9 +47,14 @@ def test_the_ladder_keeps_the_video_until_the_mux_refuses_it():
     streams = {0: ("Video", "h264"), 1: ("Audio", "mp3"),
                2: ("Audio", "aac"), 3: ("Data", "bin_data")}
     ladder = StreamCopyFixPP._attempt_ladder(streams, {0, 1})
-    assert ladder[0] == ([3], set()), "rung 1: keep every real stream"
-    assert ladder[1] == ([1, 3], {1}), "rung 2: the flagged audio only"
-    assert ladder[2] == ([0, 1, 3], {0, 1}), "rung 3: the named last resort"
+    # v0.45.17: keep-all first; then one lone rung per flagged stream
+    # (a false alarm on one track may never drag a healthy one out);
+    # the union only as the last resort. Data streams are the remux's
+    # own -dn business, never a drop-list entry.
+    assert ladder[0] == ([], set()), "rung 1: keep everything"
+    assert ladder[1] == ([0], {0}), "rung 2: the flagged video alone"
+    assert ladder[2] == ([1], {1}), "rung 3: the flagged audio alone"
+    assert ladder[3] == ([0, 1], {0, 1}), "rung 4: the named last resort"
 
 
 def test_audio_only_flags_need_no_video_rung():
@@ -57,6 +62,12 @@ def test_audio_only_flags_need_no_video_rung():
     ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
     assert [drop for drop, _ in ladder] == [[], [1]]
     assert all(0 not in drop for drop, _ in ladder), "video never a rung here"
+
+
+def test_the_ladder_final_rung_dedupes_with_the_most_informative_report():
+    streams = {0: ("Video", "h264"), 1: ("Audio", "mp3")}
+    ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
+    assert ladder[-1][1] == {1}, "the reported drops survive the dedupe"
 
 
 def _corrupt_mp3_pid(raw: bytes, pid: int) -> bytes:
