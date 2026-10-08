@@ -1415,6 +1415,18 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=404, detail="job not found") from None
         except (ValueError, PermissionError) as e:
             raise HTTPException(status_code=409, detail=str(e)) from None
+        except OSError as e:
+            # a file operation on the storage layer: actionable, not a 500
+            raise HTTPException(
+                status_code=409,
+                detail=f"could not delete: {e}") from None
+        except Exception as e:  # noqa: BLE001 - never a bare 500 with no cause
+            # anything unforeseen still answers with a cause the UI can
+            # show; "could not delete: 500" told the owner nothing
+            # (2026-10-08)
+            raise HTTPException(
+                status_code=409,
+                detail=f"could not delete: {type(e).__name__}: {e}") from None
 
     app.state.manager = manager
     app.state.download_dir = Path(manager.download_dir)

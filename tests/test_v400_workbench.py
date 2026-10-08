@@ -53,9 +53,11 @@ def test_a_batch_of_jobs_does_not_own_a_thread_each(tmp_path):
     release.set()
     assert _wait(lambda: all(mgr.get(i)["status"] == "completed"
                              for i in ids)), "every queued job still runs"
-    assert grew <= jobs_mod.POOL_SIZE, \
+    # +1: the stall watchdog (v0.45.22) — one standing thread that fails
+    # downloads whose source stops producing data
+    assert grew <= jobs_mod.POOL_SIZE + 1, \
         f"8 queued jobs grew the process by {grew} threads " \
-        f"(the pool is {jobs_mod.POOL_SIZE})"
+        f"(the pool is {jobs_mod.POOL_SIZE} + the watchdog)"
 
 
 def test_the_pool_is_a_fixed_named_daemon_set(tmp_path):
@@ -113,7 +115,7 @@ def test_resume_interrupted_feeds_the_pool_too(tmp_path):
     grew = threading.active_count() - before
     release.set()
     assert _wait(lambda: len(ran) == 6), "all six ran"
-    assert grew <= jobs_mod.POOL_SIZE, \
+    assert grew <= jobs_mod.POOL_SIZE + 1, \
         f"resuming six jobs grew the process by {grew} threads"
 
 

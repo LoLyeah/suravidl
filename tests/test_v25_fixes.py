@@ -245,12 +245,25 @@ def test_no_audio_reaches_yt_dlp_as_a_silent_format(tmp_path, monkeypatch):
         mgr = jobs_mod.JobManager(download_dir=tmp_path / "dl",
                                   db_path=str(tmp_path / "jobs.db"))
         mgr.create("https://example.invalid/v", fmt=fmt, overrides=overrides)
-        for _ in range(100):
-            if seen:
+        # `seen` is fed by a CLASS-level patch of YoutubeDL, so a worker
+        # left alive by another test can construct one inside our window
+        # and its capture (e.g. the no-fmt 'bv/b' shape) would land as
+        # ours — flaked under the full suite, 2026-10-08. Match only the
+        # options aimed at THIS run's unique download folder.
+        mine = str(tmp_path / "dl")
+        deadline = time.monotonic() + 10
+        ours = None
+        while time.monotonic() < deadline:
+            ours = next((o for o in seen
+                         if mine in str(o.get("outtmpl") or "")), None)
+            if ours:
                 break
             time.sleep(0.05)
-        assert seen, "the options never reached the downloader"
-        return seen[0]
+        assert ours, "the options never reached the downloader"
+        # settle our worker before the next sub-run shares `seen`
+        while mgr._running and time.monotonic() < deadline:
+            time.sleep(0.02)
+        return ours
 
     opts = run_one("137+bestaudio/best", {"no_audio": True})
     assert opts["format"] == "137"

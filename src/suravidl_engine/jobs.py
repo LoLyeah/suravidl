@@ -61,6 +61,15 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 ACTIVE_STATUSES = ("queued", "downloading", "merging")
 
+# A download that produces no event for STALL_LIMIT seconds is failed as
+# stalled: yt-dlp only bounds socket reads, and Android's resolver (netd)
+# has no bound at all, so a source that answers nothing could hold a
+# worker for hours while the row looked alive (2026-10-08 field report).
+# The worker thread may take a while longer to unwind; the ROW goes
+# honest at once and the app stays usable.
+STALL_LIMIT = 8 * 60.0     # seconds with no progress/postprocessor event
+STALL_POLL = 30.0          # watchdog cadence
+
 
 def _stop_requested(job: dict) -> bool:
     """Did the user ask this job to stop — cancel or pause?
@@ -336,6 +345,8 @@ class JobManager:
         self._pending: deque = deque()
         # the pool itself: started at the first enqueue, lives with the engine
         self._workers: list[threading.Thread] = []
+        # last engine-side activity per running job — feeds the stall watchdog
+        self._last_tick: dict[str, float] = {}
         self.on_complete = None  # optional callable(job) run after success
         # optional callable -> context manager yielding yt-dlp cookie opts
         self._cookie_session = cookie_session
@@ -884,12 +895,21 @@ class JobManager:
         # delete waits briefly for the worker to leave before it touches
         # any file, and still refuses a job that genuinely needs a cancel.
         deadline = time.monotonic() + 15
+        soft = time.monotonic() + 5
         while True:
             with self._lock:
                 live = job_id in self._running
             status = job.get("status")
             blocked = status in ("queued", "downloading", "merging") or live
             if not blocked:
+                break
+            # A row whose status is no longer active will not be written
+            # again: its worker is either unwinding or wedged on a dead
+            # socket. Waiting 15 s behind a wedged worker made the row
+            # effectively undeletable (the owner's "could not delete:
+            # 500", 2026-10-08) — a short beat, then proceed regardless
+            # of `live`.
+            if status not in ACTIVE_STATUSES and time.monotonic() > soft:
                 break
             if not live or time.monotonic() > deadline:
                 raise ValueError("cancel this download before deleting it")
@@ -1004,6 +1024,9 @@ class JobManager:
                                      name=f"suravidl-job-{i}", daemon=True)
                 t.start()
                 self._workers.append(t)
+            w = threading.Thread(target=self._stall_watch,
+                                 name="suravidl-stall-watch", daemon=True)
+            w.start()
 
     def _enqueue(self, job: dict, fmt: str | None,
                  extra_headers: dict | None) -> None:
@@ -1036,9 +1059,40 @@ class JobManager:
             finally:
                 with self._lock:
                     self._running.discard(job["id"])
+                    self._last_tick.pop(job["id"], None)
                 with self._cap_cv:
                     self._active -= 1
                     self._cap_cv.notify_all()
+
+    def _stall_watch(self) -> None:
+        """Fail jobs whose source stopped producing anything.
+
+        Only the ROW is rewritten (the worker thread may be wedged in a
+        read it cannot interrupt); a transfer that recovers and completes
+        later still lands as 'completed' on its final save.
+        """
+        while True:
+            time.sleep(STALL_POLL)
+            now = time.monotonic()
+            with self._lock:
+                running = list(self._running)
+            for jid in running:
+                with self._lock:
+                    job = self._jobs.get(jid)
+                    # only the network phase can stall on a silent source;
+                    # a merge is local compute and may legitimately run
+                    # for many minutes without an event
+                    if not job or job.get("status") != "downloading":
+                        continue
+                    tick = self._last_tick.get(jid)
+                    if tick is not None and now - tick <= STALL_LIMIT:
+                        continue
+                    job["status"] = "error"
+                    job["error"] = (f"the source stopped sending data — no "
+                                    f"progress for {int(STALL_LIMIT)}s; "
+                                    "the download was stopped")
+                    self._last_tick[jid] = now
+                self._save(job)
 
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued
@@ -1049,14 +1103,22 @@ class JobManager:
         # QUEUED for its entire run (2026-10-08 field report: "why is it
         # still queued?" — the job had been claimed and was hanging).
         with self._lock:
-            if not _stop_requested(job):
+            # flip only a row that is still waiting: a job pushed to a
+            # terminal state between enqueue and claim (cancelled, or a
+            # retry-lane switch that failed it first) must keep the word
+            # it was given — v0.45.21's flip clobbered it back to
+            # "downloading" and a retry then answered "cannot retry job
+            # in status 'downloading'" (caught under the loaded suite)
+            if not _stop_requested(job) and job.get("status") == "queued":
                 job["status"] = "downloading"
+            self._last_tick[job["id"]] = time.monotonic()
         self._save(job)
 
         class _Cancelled(Exception):
             pass
 
         def hook(d):
+            self._last_tick[job["id"]] = time.monotonic()
             if _stop_requested(job):  # stop requested mid-run
                 raise _Cancelled()
             d_info = d.get("info_dict") or {}

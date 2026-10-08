@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.22",
+        "title": "The watch",
+        "items": [
+            "A download whose source stops sending data no longer hangs forever — after eight silent minutes it fails with a clear message instead of staring at a stuck row.",
+            "Cancelled downloads always delete now, even when the engine is still cleaning up behind them.",
+        ],
+    },
+    {
         "version": "0.45.21",
         "title": "The start",
         "items": [
@@ -82,14 +90,6 @@ ENTRIES = [
         "items": [
             "Fresh downloads now survive the junk-audio stream too: v0.45.12 only saved retries — a first download died even earlier, inside yt-dlp’s own cleanup. The stream is cleaned the moment it lands.",
             "Deleting a job no longer moves your screen: the queue keeps your spot while rows leave (the deleted row used to visibly sail to the list’s end — it read as scrolling to the bottom).",
-        ],
-    },
-    {
-        "version": "0.45.12",
-        "title": "The merge",
-        "items": [
-            "The 953 MB download that died with \"Conversion failed!\" no longer does: a junk audio track inside the stream is dropped before the metadata pass, and the file lands as a real .mp4. Retry that job — no re-download needed.",
-            "The yt-dlp tab's Save floats now like Settings', and the Save strip frosts on Android too.",
         ],
     },
 ]

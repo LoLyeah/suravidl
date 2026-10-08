@@ -91,6 +91,15 @@ def test_deleting_a_job_never_removes_the_download_folder(tmp_path, monkeypatch)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_bytes(b"video")
     job = mgr.create("http://example.com/test")
+    # let the racing worker finish its (failing) fetch first: the fixture
+    # forces the status itself, and a still-live worker made the delete's
+    # wait race the teardown (flaked under a loaded suite, 2026-10-08)
+    import time as _time
+    _deadline = _time.monotonic() + 10
+    while _time.monotonic() < _deadline:
+        if job["id"] not in mgr._running:
+            break
+        _time.sleep(0.05)
     with mgr._lock:
         j = mgr._jobs[job["id"]]
         j["status"] = "completed"
