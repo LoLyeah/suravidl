@@ -43,7 +43,9 @@ def test_the_save_strip_frosts_on_desktop():
     foot = CSS.split("#panel-settings .modal-foot {")[1].split("}")[0]
     assert "backdrop-filter: var(--glass-blur);" in foot
     assert "-webkit-backdrop-filter: var(--glass-blur);" in foot
-    assert "border-bottom-left-radius: 20px" in foot, "corners stay round"
+    # v0.45.19: the strip floats like the yt-dlp Save — full border, 14px
+    # radius (the old bottom-radius-20 full-bleed shape retired)
+    assert "border: 1px solid var(--line); border-radius: 14px;" in foot
 
 
 def test_every_host_frosts_the_strip():

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.19",
+        "title": "The shadow",
+        "items": [
+            "The dim behind popups is back everywhere — the AMOLED theme had silently told CSS “no shadows” in a way that also erased every popup’s backdrop dim on phones. One token, fixed.",
+            "The Settings Save now floats as a proper glass card, exactly like the yt-dlp tab’s Save — same border, same frost (it used to be a flat full-width bar).",
+        ],
+    },
+    {
         "version": "0.45.18",
         "title": "The fallback",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "Every popup — What’s new, FAQ, the dialogs — shows the real room through its glass now: the dim rides the card itself (the tutorial ring’s exact trick) instead of darkening everything the card looks through.",
             "Same card, same blur, one mechanism on every popup; the room behind stays dimmed exactly as before.",
-        ],
-    },
-    {
-        "version": "0.45.9",
-        "title": "The handoff",
-        "items": [
-            "On Windows, Restart & Install could quit the app and install nothing — the installer found a half-gone app and quietly asked a question nobody could see. It now waits for the app to fully exit first, then installs.",
-            "Every run leaves a short trail at .suravidl\\update.log in your user folder, so a hiccup is never invisible again.",
         ],
     },
 ]

@@ -117,7 +117,12 @@ html[data-theme="amoled"] {
   --err: #ff8078;  --err-bg: rgba(255,128,120,.12); --err-line: rgba(255,128,120,.38);
   --warn: #e8a33e; --warn-bg: rgba(232,163,62,.12); --warn-line: rgba(232,163,62,.38);
   --pill-idle: rgba(255,255,255,.07);
-  --shadow: none;
+  /* `none` is illegal inside a shadow LIST — every composite using
+     `var(--shadow), …` (the modal veils included) silently died while
+     AMOLED was active, so phone modals lost their dim entirely
+     (2026-10-07 report). A transparent zero shadow is the list-legal
+     "no shadow" and restores every composite. */
+  --shadow: 0 0 #0000;
   --inset-hi: rgba(255,255,255,.10);
   --panel-solid: #0b0d10;
   --bar-bg: rgba(0,0,0,.85);
@@ -1128,12 +1133,15 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 }
 #panel-settings .modal-foot {
   position: sticky; z-index: 3; bottom: 12px;
-  margin: 14px -18px -18px; padding: 12px 18px;
-  border-top: 1px solid var(--line);
+  margin: 14px 0 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 14px;
   background: var(--glass-bg-strong);
-  border-bottom-left-radius: 20px; border-bottom-right-radius: 20px;
-  /* v0.45.2: rows scroll beneath this strip — frost them. The phone block
-     and the Android host below switch the blur back off. */
+  /* v0.45.2: rows scroll beneath this strip — frost them. v0.45.19: the
+     strip now FLOATS exactly like the yt-dlp tab's Save (same border,
+     radius and glass) — it used to be a full-bleed bar with only a top
+     border, which the owner read as a different, unblurred control
+     (2026-10-07). The phone block twins the shape; the Android host adds
+     its denser pour below. */
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
@@ -1399,8 +1407,8 @@ footer .linkbtn { color: var(--accent-ink); }
   #panel-settings .modal-foot {
     position: sticky; z-index: 3;
     bottom: calc(var(--tabbar-h) + 8px + env(safe-area-inset-bottom));
-    margin: 14px -14px -14px; padding: 12px 14px;
-    border-top: 1px solid var(--line);
+    margin: 14px 0 0; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 14px;
     background: var(--glass-bg-strong);
   }
   /* phones frost the strip too since v0.45.12 — the fill:none fix made

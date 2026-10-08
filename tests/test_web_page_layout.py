@@ -58,8 +58,10 @@ def test_the_sticky_save_bar_keeps_the_cards_shape():
     assert "position: sticky" in foot, "Save must stay in reach"
     assert "var(--glass-bg-strong)" in foot, "the bar keeps the card's glass"
     assert "var(--panel-solid)" not in foot, "no opaque slab over the glass"
-    assert "border-bottom-left-radius: 20px" in foot
-    assert "border-bottom-right-radius: 20px" in foot
+    # v0.45.19: the floating shape (full border + 14px radius) replaced the
+    # full-bleed bar; the intent — "it must not read as a slab that squares
+    # off the card" — carries over
+    assert "border: 1px solid var(--line); border-radius: 14px;" in foot
     # v0.45.2: the desktop strip frosts what scrolls beneath it (the Mac
     # report); phones and Android keep the flat strip — see test_v452_measure
     assert "backdrop-filter: var(--glass-blur);" in foot
