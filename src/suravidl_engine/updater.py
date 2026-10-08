@@ -314,11 +314,17 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
     h = hashlib.sha256()
     got = 0
 
+    stopped = False
+
     def cancelled() -> bool:
-        """The user asked to stop: clean up and end idle, voluntarily."""
+        """The user asked to stop — flag it; the file handle closes first.
+
+        Unlinking `part` while `open(part, "wb")` below still holds it is a
+        PermissionError on Windows (WinError 32), and `missing_ok` does not
+        cover that (v0.45.17 audit B/F10).
+        """
         if not _DL.get("cancel"):
             return False
-        part.unlink(missing_ok=True)
         _set_state(status="idle", name=None, path=None, bytes=0, total=0,
                    sha256_ok=None, error=None, cancel=False)
         return True
@@ -330,7 +336,8 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
             with open(part, "wb") as f:
                 while True:
                     if cancelled():
-                        return update_status()
+                        stopped = True
+                        break
                     chunk = r.read(65536)
                     if not chunk:
                         break
@@ -341,7 +348,8 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
     except Exception as e:  # noqa: BLE001 - reported through the state
         part.unlink(missing_ok=True)
         return _set_state(status="failed", error=str(e))
-    if cancelled():
+    if stopped or cancelled():
+        part.unlink(missing_ok=True)
         return update_status()
     _set_state(status="verifying")
     if h.hexdigest().lower() != str(sha256).strip().lower():
@@ -351,6 +359,7 @@ def download_asset(url: str, sha256, name: str, dest_dir) -> dict:
             error="sha256 mismatch — the download does not match the "
                   "release manifest")
     if cancelled():
+        part.unlink(missing_ok=True)
         return update_status()
     try:
         part.replace(dest)

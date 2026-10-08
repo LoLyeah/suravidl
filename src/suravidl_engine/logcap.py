@@ -25,6 +25,14 @@ def _push(msg: object) -> None:
         return
     for raw in text.splitlines() or [""]:
         line = raw.rstrip()
+        # the same wall as job errors and probes: a verbose log can carry
+        # signed stream URLs, and it exists to be copied out (v0.45.17
+        # audit B/F8 — PRODUCT.md: secrets never in logs)
+        try:
+            from .auth import scrub_secrets
+            line = scrub_secrets(line)
+        except Exception:  # noqa: BLE001 - logging must never raise
+            pass
         if len(line) > _MAX_LINE:
             line = line[:_MAX_LINE] + "…"
         with _LOCK:

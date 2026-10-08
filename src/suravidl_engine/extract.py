@@ -38,6 +38,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -231,7 +232,7 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             bad.add(int(m.group(1)))
         for m in re.finditer(
                 r"Stream #0:(\d+)(?:\[[^\]]*\])?(?:\([^)]*\))?: Audio: ([^\n]+)", err):
-            if re.search(r"(^|,)\s*0 channels", m.group(2)):
+            if re.search(r"(^|,)\s*0 (channels|Hz)", m.group(2)):
                 bad.add(int(m.group(1)))
         return streams, bad
 
@@ -242,16 +243,22 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             return ()
         # No output file: ffmpeg prints the input dump and exits with
         # "At least one output file must be specified" — that is expected.
-        proc = subprocess.run(
-            [ffmpeg, "-hide_banner", "-v", "info", "-i", path],
-            capture_output=True, text=True)
+        try:
+            proc = subprocess.run(
+                [ffmpeg, "-hide_banner", "-v", "info", "-i", path],
+                capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired:
+            return None
         err = proc.stderr or ""
         streams, bad = self._parse_stream_dump(err)
         if not streams:
             return None
-        # completeness: every "Stream #0:N" the dump mentions must parse.
-        # A partial read must never drive a removal (v0.45.15).
-        if len(streams) != len(re.findall(r"Stream #0:\d+", err)):
+        # completeness: every stream INDEX the dump mentions must have
+        # parsed. Unique-set compare so a diagnostic that repeats an index
+        # cannot fake a shortfall (v0.45.17, audit A/F4); a partial read
+        # must never drive a removal (v0.45.15).
+        mentioned = {int(i) for i in re.findall(r"Stream #0:(\d+)", err)}
+        if set(streams) != mentioned:
             return None
         return streams, bad
 
@@ -260,25 +267,58 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         if not ffmpeg:
             return False
         ext = os.path.splitext(path)[1].lstrip(".").lower() or "mp4"
-        tmp = f"{path}.streamfix.{ext}"
+        # unique temp name: two jobs racing the same output path must not
+        # share one scratch file (v0.45.17, audit A/F12)
+        stamp = f"{os.getpid():x}{threading.get_ident() % 0x10000:04x}"
+        tmp = f"{path}.streamfix.{stamp}.{ext}"
         # `-map 0` maps EVERY stream ffmpeg sees; the negative maps remove
         # only the ones we explicitly named. A stream the parse never saw
-        # is kept, never silently lost (v0.45.15).
-        cmd = [ffmpeg, "-y", "-loglevel", "repeat+info", "-i", path, "-map", "0"]
+        # is kept, never silently lost (v0.45.15). `-dn -ignore_unknown`
+        # mirror yt-dlp's own metadata pass so this command is exactly as
+        # tolerant as the pass it protects (v0.45.17, audit A/F5); data
+        # and unknown-codec streams are dropped by the mux itself.
+        cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", path, "-map", "0"]
         for idx in drop:
             cmd += ["-map", f"-0:{idx}"]
-        cmd += ["-c", "copy"]
+        cmd += ["-dn", "-ignore_unknown", "-c", "copy"]
         if ext in ("mp4", "m4v", "mov", "m4a"):
-            cmd += ["-movflags", "+faststart"]
+            # the mp4 muxer cannot copy text subtitles; convert them the
+            # way yt-dlp's own embedder does (mov_text). The encoder is in
+            # both ffmpeg builds this app ships (v0.45.17, audit A/F1).
+            cmd += ["-c:s", "mov_text", "-movflags", "+faststart"]
         cmd += [tmp]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        # a hung ffmpeg must not hold a worker slot forever; a copy of a
+        # multi-GB file on a phone is slow, so the cap is generous
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=1800)
+        except subprocess.TimeoutExpired:
+            self.report_warning(
+                "stream-copy fix timed out — the file is left as-is")
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            return False
         if proc.returncode != 0 or not os.path.isfile(tmp):
             try:
                 os.unlink(tmp)
             except OSError:
                 pass
             return False
-        os.replace(tmp, path)
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            # Windows can hold a read handle on the destination (player,
+            # indexer, AV) — WinError 32; never crash the job for it
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            self.report_warning(
+                "stream-copy fix could not replace the file (it is open?) "
+                "— left as-is")
+            return False
         return True
 
     def fix_file(self, path: str) -> bool:
@@ -296,6 +336,15 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         """
         if not path or not os.path.isfile(path):
             return False
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return False
+        fixed = getattr(self, "_fixed", None)
+        if fixed is None:
+            fixed = self._fixed = {}
+        if fixed.get(path) == mtime:
+            return False       # already fixed this run (hook then PP)
         got = self._streams_by_ffmpeg(path)
         if got is None:
             self.report_warning(
@@ -317,6 +366,10 @@ class StreamCopyFixPP(FFmpegPostProcessor):
                     self.to_screen(
                         f"Dropped {len(real)} unusable stream(s) "
                         f"before the metadata pass ({names})")
+                try:
+                    fixed[path] = os.path.getmtime(path)
+                except OSError:
+                    pass
                 return True
         self.report_warning(
             "stream-copy fix could not apply — the file is left as-is")
@@ -328,42 +381,43 @@ class StreamCopyFixPP(FFmpegPostProcessor):
 
         The dump's warnings are NOT trustable as removals: with the
         analyzeduration/probesize values this app runs with, `Could not
-        find codec parameters` appears on perfectly copyable streams
-        (reproduced 2026-10-07: a healthy video got dropped on that
-        warning, turning a 1 GB screen recording into its 62 MB audio
-        track). Only the mux knows what the mux can carry, so:
+        find codec parameters` appears on perfectly copyable streams —
+        healthy video, healthy audio (reproduced 2026-10-07 twice: once
+        losing a video to a warning-driven drop, once flagging both audio
+        tracks of a file whose only broken stream was one of them). Only
+        the mux knows what the mux can carry, so:
 
-          1. keep EVERYTHING real (drop only data streams) — succeeds
-             for the false-alarm case, costs one header-phase failure
-             when it doesn't;
-          2. drop the flagged AUDIO streams (the genuine killer class:
-             headerless mp3 with no channels/sample rate);
-          3. only if the mux still refuses, also drop the flagged
-             non-audio streams (a truly dead video — the honest,
-             NAMED, last resort).
+          1. keep EVERYTHING (the remux itself carries yt-dlp's
+             -dn -ignore_unknown, so data/unknown streams never need a
+             drop decision of ours) — succeeds for the false-alarm case,
+             one fast header-phase failure when it doesn't;
+          2. drop EACH flagged stream alone, one rung each — a false
+             alarm on one track must never drag a healthy one out with it
+             (audit A/F2, A/F9: the old single "drop flagged audio" rung
+             could silence a file whose only problem was one bad track);
+          3. only then the full flagged set — the honest named last
+             resort for genuinely dead streams.
 
         Each failed attempt dies at mux-header time (fast); only the
         attempt that succeeds copies the payload. Returns
         [(drop_indices, reported_drops)].
         """
-        nonav = {i for i, (kind, _) in streams.items()
-                 if kind not in ("Video", "Audio", "Subtitle")}
-        flagged_audio = {i for i in bad if streams.get(i, ("", ""))[0] == "Audio"}
-        flagged_other = set(bad) - flagged_audio
-        ladder = [(nonav, set())]
-        if flagged_audio:
-            ladder.append((nonav | flagged_audio, set(flagged_audio)))
-        if flagged_other:
-            ladder.append((nonav | flagged_audio | flagged_other,
-                           flagged_audio | flagged_other))
-        # dedupe while keeping order (a later rung with the same drop set
-        # adds nothing)
-        seen, out = set(), []
+        flagged = sorted(bad)
+        ladder = [([], set())]
+        for i in flagged:
+            ladder.append(([i], {i}))
+        if len(flagged) > 1:
+            ladder.append((flagged, set(flagged)))
+        # dedupe by drop set while keeping the most informative report
+        seen, out = {}, []
         for drop, real in ladder:
             key = frozenset(drop)
             if key in seen:
+                idx = seen[key]
+                if len(real) > len(out[idx][1]):
+                    out[idx] = (out[idx][0], real)
                 continue
-            seen.add(key)
+            seen[key] = len(out)
             out.append((sorted(drop), real))
         return out
 

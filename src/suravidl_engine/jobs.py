@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import uuid
 from collections import deque
 from contextlib import nullcontext
@@ -328,6 +329,9 @@ class JobManager:
         self._cap_cv = threading.Condition(threading.Lock())
         self._capacity = max(1, int(max_concurrent))
         self._active = 0
+        # jobs currently executing in a worker: delete must not unlink files
+        # out from under a live writer after a cancel (v0.45.17 audit B/F7)
+        self._running: set[str] = set()
         # queued work, FIFO: (job, fmt, extra_headers), served by the pool
         self._pending: deque = deque()
         # the pool itself: started at the first enqueue, lives with the engine
@@ -384,6 +388,11 @@ class JobManager:
                         # learns, and the delete could not find it
                         self._con.execute(
                             "ALTER TABLE jobs ADD COLUMN partials TEXT")
+                    if "replaced_by" not in cols:
+                        # the successor row's id: one paused row can only be
+                        # resumed once, restart included (v0.45.17 audit B/F2)
+                        self._con.execute(
+                            "ALTER TABLE jobs ADD COLUMN replaced_by TEXT")
                     if "download_dir" not in cols:
                         # the folder this job downloaded into: a later settings
                         # change must not make its files undeletable (v0.21.2)
@@ -482,6 +491,7 @@ class JobManager:
                 job["partials"] = None
         else:
             job["partials"] = None
+        job["replaced_by"] = job.get("replaced_by") or None
         job["size_bytes"] = _stat_size(job)
         return job
 
@@ -495,15 +505,17 @@ class JobManager:
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
-                " created_at, completed_at, files, partials, download_dir)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " created_at, completed_at, files, partials, download_dir,"
+                " replaced_by)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
                 " total_bytes=excluded.total_bytes, speed=excluded.speed,"
                 " eta=excluded.eta, completed_at=excluded.completed_at,"
                 " files=excluded.files, partials=excluded.partials,"
-                " download_dir=excluded.download_dir",
+                " download_dir=excluded.download_dir,"
+                " replaced_by=excluded.replaced_by",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -520,6 +532,7 @@ class JobManager:
                     json.dumps(job["files"]) if job.get("files") else None,
                     json.dumps(job["partials"]) if job.get("partials") else None,
                     job.get("download_dir") or str(self.download_dir),
+                    job.get("replaced_by"),
                 ),
             )
 
@@ -529,7 +542,9 @@ class JobManager:
                preset: str | None = None,
                playlist_items: str | None = None,
                raw_args: str | None = None,
-               overrides: dict | None = None) -> dict:
+               overrides: dict | None = None,
+               download_dir: str | None = None,
+               partials: list | None = None) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the
@@ -584,13 +599,19 @@ class JobManager:
             "status": "queued",
             "title": None,
             "filepath": None,
+            # a successor inherits the in-flight files it is about to reuse;
+            # without this, cancelling it early orphaned the .part forever
+            # (v0.45.17 audit B/F5)
+            "partials": list(partials) if partials else None,
             "error": None,
             "progress": {"downloaded_bytes": 0, "total_bytes": None,
                          "speed": None, "eta": None},
             "created_at": datetime.now(timezone.utc).isoformat(),
             # remember where this job downloaded: deleting it later must work
-            # even after the download folder changes (v0.21.2 audit)
-            "download_dir": str(self.download_dir),
+            # even after the download folder changes (v0.21.2 audit), and
+            # execution must honor it (a job resumed after a Settings folder
+            # change keeps its original folder — v0.45.17 audit B/F3)
+            "download_dir": str(download_dir or self.download_dir),
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -669,9 +690,17 @@ class JobManager:
         handing `create` a contradiction (v0.32.1 audit). A preset that
         expands to no intent (a pure bundle) clears the lane just the same.
         """
+        if src.get("replaced_by"):
+            raise ValueError(
+                "this job already has a newer attempt — open that one")
         patch = dict(patch or {})
-        overrides = {**(src.get("overrides") or {}),
-                     **(patch.get("overrides") or {})} or None
+        # an edit that names overrides REPLACES them: merging could never
+        # clear a failed override ({} merged over the old set is the old
+        # set; v0.45.17 audit B/F6)
+        if "overrides" in patch:
+            overrides = patch.get("overrides") or None
+        else:
+            overrides = src.get("overrides") or None
         fmt = patch.get("fmt", src.get("fmt"))
         preset = patch.get("preset", src.get("preset"))
         if "fmt" in patch and "preset" not in patch:
@@ -684,7 +713,9 @@ class JobManager:
                           preset=preset,
                           playlist_items=src.get("playlist_items"),
                           raw_args=patch.get("raw_args", src.get("raw_args")),
-                          overrides=overrides)
+                          overrides=overrides,
+                          download_dir=src.get("download_dir"),
+                          partials=src.get("partials"))
         # The successor owns everything on disk now: the source row keeps its
         # story (error, progress) but loses its claim on files — trashing the
         # stale card later must not take the successor's finished download
@@ -696,6 +727,10 @@ class JobManager:
                 live["filepath"] = None
                 live["partials"] = None
                 live["files"] = None
+                # one row, one successor: a second resume/retry of the same
+                # paused row used to queue a second writer on the same
+                # .part file (v0.45.17 audit B/F2)
+                live["replaced_by"] = job["id"]
         if live is not None:
             self._save(live)
         return job
@@ -724,7 +759,10 @@ class JobManager:
     # -- deleting one download (the trash button) -------------------------
     SIDECAR_SUFFIXES = (".info.json", ".description", ".annotations.xml",
                         ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt",
-                        ".ass", ".lrc", ".json", ".live_chat.json")
+                        ".ass", ".lrc", ".live_chat.json")
+    # no bare ".json": that is a user-document name, not a yt-dlp artifact
+    # (yt-dlp writes .info.json) — deleting a job once took a user's
+    # presentation.json with it (v0.45.17 audit B/F1)
     # the sidecars that carry language tags (`Name.en.vtt`): see the tagged
     # pass in `_sidecars_for`
     SUBTITLE_SUFFIXES = (".vtt", ".srt", ".ass", ".lrc")
@@ -840,9 +878,22 @@ class JobManager:
             job = self.get(job_id)
         except KeyError:
             raise KeyError(job_id) from None
-        status = job.get("status")
-        if status in ("queued", "downloading", "merging"):
-            raise ValueError("cancel this download before deleting it")
+        # cancel is cooperative: the worker returns at its next hook, and
+        # its file handles close a beat later. Deleting used to race that
+        # window (unlink-while-writing; v0.45.17 audit B/F7) — now the
+        # delete waits briefly for the worker to leave before it touches
+        # any file, and still refuses a job that genuinely needs a cancel.
+        deadline = time.monotonic() + 15
+        while True:
+            with self._lock:
+                live = job_id in self._running
+            status = job.get("status")
+            blocked = status in ("queued", "downloading", "merging") or live
+            if not blocked:
+                break
+            if not live or time.monotonic() > deadline:
+                raise ValueError("cancel this download before deleting it")
+            time.sleep(0.2)
         targets = self._job_file_targets(job)
         deleted = freed = 0
         for p in targets:
@@ -976,11 +1027,15 @@ class JobManager:
                     self._cap_cv.wait()
                 job, fmt, extra_headers = self._pending.popleft()
                 self._active += 1
+            with self._lock:
+                self._running.add(job["id"])
             try:
                 self._run(job, fmt, extra_headers)
             except Exception:  # noqa: BLE001 - a worker must survive a bad job
                 pass
             finally:
+                with self._lock:
+                    self._running.discard(job["id"])
                 with self._cap_cv:
                     self._active -= 1
                     self._cap_cv.notify_all()
@@ -1036,10 +1091,14 @@ class JobManager:
                 job["status"] = "merging"
                 self._save(job)
 
+        # the job's own folder, not "whatever Settings says today": a row
+        # resumed after a download-folder change must find its .part again
+        # (v0.45.17 audit B/F3)
+        target_dir = Path(job.get("download_dir") or self.download_dir)
         opts = {
             "quiet": True,
             "no_warnings": True,
-            "outtmpl": str(self.download_dir / "%(title).100B.%(ext)s"),
+            "outtmpl": str(target_dir / "%(title).100B.%(ext)s"),
             "progress_hooks": [hook],
             "postprocessor_hooks": [hook],
         }
@@ -1048,7 +1107,7 @@ class JobManager:
         user_pps: list[dict] = []
         if self._download_opts:
             settings_opts = dict(self._download_opts(
-                self.download_dir, raw_args=job.get("raw_args"),
+                target_dir, raw_args=job.get("raw_args"),
                 overrides=job.get("overrides")) or {})
             user_pps = list(settings_opts.pop("postprocessors", []) or [])
             opts.update(settings_opts)
@@ -1128,6 +1187,16 @@ class JobManager:
                         if sub_fp not in made:
                             made.append(sub_fp)
                 job["files"] = made or None
+                if not made:
+                    if opts.get("download_archive"):
+                        job["note"] = ("nothing new — every entry is "
+                                       "already in the archive")
+                    else:
+                        # "completed" over zero files is a lie the user only
+                        # discovers by opening the folder (v0.45.17 audit B/F4)
+                        raise RuntimeError(
+                            "the playlist produced no downloads — "
+                            "every entry failed or was skipped")
             else:
                 req = (info.get("requested_downloads") or [{}])[0]
                 job["title"] = info.get("title")

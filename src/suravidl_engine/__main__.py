@@ -85,6 +85,12 @@ def find_free_port(preferred: int) -> int:
     """First free port on the ladder, else whichever the OS offers."""
     def bindable(p: int) -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # the server itself binds with SO_REUSEADDR (uvicorn sets it in
+            # its config); without it here, a restart inside the TIME_WAIT
+            # window skipped healthy rungs and rapid restarts could exhaust
+            # the ladder into an ephemeral port the extensions never scan
+            # (v0.45.17 audit B/F9)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 s.bind(("127.0.0.1", p))
                 return True
