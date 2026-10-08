@@ -68,14 +68,59 @@ object Handoff {
         return post(base, token, "/sniff/rank", JSONObject().put("urls", arr))
     }
 
+    /**
+     * Queue a find like [download], but wait for an engine that is still
+     * starting. The phone's engine boots on a background thread (chaquopy
+     * warm-up, module import, DB load) while the in-app browser is already
+     * usable by design — so a tap made seconds after a sniff could hit a
+     * port that was not listening yet and read as "the engine refused it"
+     * (2026-10-08 field report: the toast "literally seconds after"
+     * sniffing). A failure that happened BEFORE anything was written can
+     * only be the engine's door being shut: the request never arrived, so
+     * retrying cannot double-queue. A request already on the wire is never
+     * retried — its outcome is unknown, and a surprise second copy of the
+     * job would be worse than a rare "try again".
+     */
+    fun downloadWhenReady(
+        base: String, token: String, url: String, headers: Map<String, String>,
+        attempts: Int = 24, delayMs: Long = 1500
+    ): String? {
+        repeat(attempts) { i ->
+            val (resp, retryable) = postOutcome(
+                base, token, "/jobs",
+                JSONObject().put("url", url).put("headers", JSONObject(headers)))
+            if (resp != null) return resp.optString("id").ifEmpty { null }
+            if (!retryable) return null
+            if (i < attempts - 1) {
+                try {
+                    Thread.sleep(delayMs)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+            }
+        }
+        return null
+    }
+
     private fun post(
         base: String, token: String, path: String, body: JSONObject
-    ): JSONObject? {
+    ): JSONObject? = postOutcome(base, token, path, body).first
+
+    /**
+     * [post], but honest about whether a retry is safe: the boolean is
+     * `true` only when the failure happened before the request body was
+     * written — the engine was not listening and nothing ever reached it.
+     */
+    private fun postOutcome(
+        base: String, token: String, path: String, body: JSONObject
+    ): Pair<JSONObject?, Boolean> {
         val conn = try {
             URL(base.trimEnd('/') + path).openConnection() as HttpURLConnection
         } catch (_: Throwable) {
-            return null
+            return null to false
         }
+        var sent = false
         return try {
             conn.requestMethod = "POST"
             conn.setRequestProperty("Authorization", "Bearer $token")
@@ -84,14 +129,17 @@ object Handoff {
             // /classify fetches the URL itself and yt-dlp may probe: give it room
             conn.readTimeout = 30_000
             conn.doOutput = true
-            conn.outputStream.use { it.write(body.toString().toByteArray()) }
+            conn.outputStream.use {
+                it.write(body.toString().toByteArray())
+                sent = true
+            }
             if (conn.responseCode !in 200..299) {
-                null
+                null to false
             } else {
-                JSONObject(conn.inputStream.bufferedReader().readText())
+                JSONObject(conn.inputStream.bufferedReader().readText()) to false
             }
         } catch (_: Throwable) {
-            null
+            null to !sent
         } finally {
             try {
                 conn.disconnect()

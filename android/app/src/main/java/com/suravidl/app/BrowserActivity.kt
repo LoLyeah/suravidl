@@ -762,7 +762,9 @@ class BrowserActivity : AppCompatActivity() {
         val headers = headersFor(c)
         toast("queueing…")
         worker.execute {
-            val id = Handoff.download(engineOrigin(), token, c.url, headers)
+            // patient: the engine may still be booting when the first
+            // tap lands moments after the sniff (see downloadWhenReady)
+            val id = Handoff.downloadWhenReady(engineOrigin(), token, c.url, headers)
             ui.post {
                 if (id == null) {
                     toast("the engine refused it — is it still running?")

@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.23",
+        "title": "The wait",
+        "items": [
+            "The in-app browser now waits for the engine when it is still starting — tapping a sniffed link seconds after opening the app queues it instead of saying the engine refused it.",
+        ],
+    },
+    {
         "version": "0.45.22",
         "title": "The watch",
         "items": [
@@ -82,14 +89,6 @@ ENTRIES = [
         "items": [
             "The merge fix now takes its verdict from ffmpeg itself, not the app’s tiny probe — on Android that probe reads every audio track as broken, which is why the fix kept missing. Healthy tracks are never touched now.",
             "When the fix cannot apply, the log says so — it can never skip silently again.",
-        ],
-    },
-    {
-        "version": "0.45.13",
-        "title": "The hook",
-        "items": [
-            "Fresh downloads now survive the junk-audio stream too: v0.45.12 only saved retries — a first download died even earlier, inside yt-dlp’s own cleanup. The stream is cleaned the moment it lands.",
-            "Deleting a job no longer moves your screen: the queue keeps your spot while rows leave (the deleted row used to visibly sail to the list’s end — it read as scrolling to the bottom).",
         ],
     },
 ]

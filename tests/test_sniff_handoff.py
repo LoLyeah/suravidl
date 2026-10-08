@@ -37,7 +37,10 @@ def test_the_handoff_headers_are_ones_the_engine_forwards():
 
 def test_a_found_stream_can_be_classified_and_downloaded_from_the_browser():
     src = BROWSER.read_text()
-    assert "Handoff.classify(" in src and "Handoff.download(" in src
+    assert "Handoff.classify(" in src
+    # v0.45.23: the handoff is patient about a booting engine (the tap that
+    # landed seconds after a sniff used to read "the engine refused it")
+    assert "Handoff.downloadWhenReady(" in src
     assert '"Download"' in src, "the row lost its download button"
     # the cookie comes from this WebView's own jar, the referer from the frame
     assert "CookieManager.getInstance().getCookie(c.url)" in src
