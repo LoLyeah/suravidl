@@ -262,7 +262,7 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             return None
         return streams, bad
 
-    def _remux(self, path: str, drop: list) -> bool:
+    def _remux(self, path: str, drop: list, convert_subs: bool = True) -> bool:
         ffmpeg = getattr(self, "executable", None)
         if not ffmpeg:
             return False
@@ -283,9 +283,17 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         cmd += ["-dn", "-ignore_unknown", "-c", "copy"]
         if ext in ("mp4", "m4v", "mov", "m4a"):
             # the mp4 muxer cannot copy text subtitles; convert them the
-            # way yt-dlp's own embedder does (mov_text). The encoder is in
-            # both ffmpeg builds this app ships (v0.45.17, audit A/F1).
-            cmd += ["-c:s", "mov_text", "-movflags", "+faststart"]
+            # way yt-dlp's own embedder does (mov_text). NOTE: the app's
+            # minimal ffmpeg cannot materialize that encoder at all —
+            # `--enable-encoder=mov_text` is accepted yet the binary
+            # reports "no encoders for it are available" (probed
+            # 2026-10-07) — so the ladder's final rung retries without
+            # the conversion and with the unconvertible subtitles dropped,
+            # named, instead of leaving the file unfixed. The full desktop
+            # build converts properly.
+            if convert_subs:
+                cmd += ["-c:s", "mov_text"]
+            cmd += ["-movflags", "+faststart"]
         cmd += [tmp]
         # a hung ffmpeg must not hold a worker slot forever; a copy of a
         # multi-GB file on a phone is slow, so the cap is generous
@@ -356,10 +364,10 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         streams, bad = got
         if not bad:
             return False                 # nothing flagged — fast path out
-        for drop, real in self._attempt_ladder(streams, bad):
+        for drop, real, convert in self._attempt_ladder(streams, bad):
             if len(drop) == len(streams):
                 continue                 # nothing would be left — skip
-            if self._remux(path, drop):
+            if self._remux(path, drop, convert):
                 if real:
                     names = ", ".join(
                         f"{i}:{streams[i][0]}/{streams[i][1]}" for i in sorted(real))
@@ -403,22 +411,30 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         [(drop_indices, reported_drops)].
         """
         flagged = sorted(bad)
-        ladder = [([], set())]
+        ladder = [([], set(), True)]
         for i in flagged:
-            ladder.append(([i], {i}))
+            ladder.append(([i], {i}, True))
         if len(flagged) > 1:
-            ladder.append((flagged, set(flagged)))
+            ladder.append((flagged, set(flagged), True))
+        # the last resort: subtitle tracks the mp4 muxer cannot copy and
+        # the minimal build cannot convert (mov_text absent there, probed
+        # 2026-10-07) — dropped WITH their names, so a captioned file
+        # still gets fixed instead of failing every rung
+        subs = [i for i, (kind, codec) in sorted(streams.items())
+                if kind == "Subtitle" and codec != "mov_text"]
+        if subs:
+            ladder.append((flagged + subs, set(flagged) | set(subs), False))
         # dedupe by drop set while keeping the most informative report
         seen, out = {}, []
-        for drop, real in ladder:
+        for drop, real, convert in ladder:
             key = frozenset(drop)
             if key in seen:
                 idx = seen[key]
                 if len(real) > len(out[idx][1]):
-                    out[idx] = (out[idx][0], real)
+                    out[idx] = (out[idx][0], real, out[idx][2])
                 continue
             seen[key] = len(out)
-            out.append((sorted(drop), real))
+            out.append((sorted(drop), real, convert))
         return out
 
     def run(self, info):

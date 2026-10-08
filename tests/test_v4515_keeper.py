@@ -75,5 +75,5 @@ def test_an_unreadable_dump_refuses_to_act(tmp_path):
 def test_the_fix_file_drops_by_name_not_by_keep():
     # v0.45.16 moved the decision into the attempt ladder — the drop set
     # now comes from there, still named in the line
-    assert "for drop, real in self._attempt_ladder(streams, bad):" in CLS
+    assert "for drop, real, convert in self._attempt_ladder(streams, bad):" in CLS
     assert 'f"before the metadata pass ({names})"' in CLS

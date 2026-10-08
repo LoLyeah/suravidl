@@ -50,24 +50,34 @@ def test_the_ladder_keeps_the_video_until_the_mux_refuses_it():
     # v0.45.17: keep-all first; then one lone rung per flagged stream
     # (a false alarm on one track may never drag a healthy one out);
     # the union only as the last resort. Data streams are the remux's
-    # own -dn business, never a drop-list entry.
-    assert ladder[0] == ([], set()), "rung 1: keep everything"
-    assert ladder[1] == ([0], {0}), "rung 2: the flagged video alone"
-    assert ladder[2] == ([1], {1}), "rung 3: the flagged audio alone"
-    assert ladder[3] == ([0, 1], {0, 1}), "rung 4: the named last resort"
+    # own -dn business, never a drop-list entry. No subtitles here, so
+    # no v0.45.18 subtitle-fallback rung.
+    assert ladder[0] == ([], set(), True), "rung 1: keep everything"
+    assert ladder[1] == ([0], {0}, True), "rung 2: the flagged video alone"
+    assert ladder[2] == ([1], {1}, True), "rung 3: the flagged audio alone"
+    assert ladder[3] == ([0, 1], {0, 1}, True), "rung 4: the named union"
 
 
 def test_audio_only_flags_need_no_video_rung():
     streams = {0: ("Video", "h264"), 1: ("Audio", "mp3")}
     ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
-    assert [drop for drop, _ in ladder] == [[], [1]]
-    assert all(0 not in drop for drop, _ in ladder), "video never a rung here"
+    assert [drop for drop, _, _ in ladder] == [[], [1]]
+    assert all(0 not in drop for drop, _, _ in ladder), "video never a rung here"
 
 
 def test_the_ladder_final_rung_dedupes_with_the_most_informative_report():
     streams = {0: ("Video", "h264"), 1: ("Audio", "mp3")}
     ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
     assert ladder[-1][1] == {1}, "the reported drops survive the dedupe"
+
+
+def test_the_subtitle_fallback_rung_is_named_and_last():
+    streams = {0: ("Video", "h264"), 1: ("Audio", "mp3"),
+               2: ("Subtitle", "webvtt")}
+    ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
+    drop, real, convert = ladder[-1]
+    assert drop == [1, 2] and real == {1, 2} and convert is False, \
+        "the last resort drops the flagged mp3 + the webvtt sub, no mov_text"
 
 
 def _corrupt_mp3_pid(raw: bytes, pid: int) -> bytes:
@@ -143,5 +153,5 @@ def test_a_false_alarm_on_the_video_does_not_cost_the_video(tmp_path):
 def test_the_ladder_dedupe_stays_ordered():
     streams = {0: ("Video", "h264"), 1: ("Audio", "mp3")}
     ladder = StreamCopyFixPP._attempt_ladder(streams, {1})
-    drops = [tuple(d) for d, _ in ladder]
+    drops = [tuple(d) for d, _, _ in ladder]
     assert drops == sorted(drops, key=len), "gentlest first"

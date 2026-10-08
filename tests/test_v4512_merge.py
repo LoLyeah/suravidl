@@ -43,7 +43,7 @@ def test_the_stream_picker_drops_only_the_unusable():
     # v0.45.17: the ladder's last rung drops the flagged mp3 only — the
     # data stream is the remux's own -dn business and never a drop entry
     ladder = StreamCopyFixPP._attempt_ladder(streams, bad)
-    assert ladder == [([], set()), ([1], {1})]
+    assert ladder == [([], set(), True), ([1], {1}, True)]
 
 
 def test_the_fixer_rides_the_download_path():

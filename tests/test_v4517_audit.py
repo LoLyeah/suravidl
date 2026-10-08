@@ -40,7 +40,10 @@ def test_the_remux_mirrors_yt_dlp_tolerance():
 
 
 def test_text_subtitles_convert_to_mov_text_for_mp4():
-    assert '["-c:s", "mov_text", "-movflags", "+faststart"]' in CLS
+    # v0.45.18: the conversion is conditional; the final rung retries
+    # without it and drops the unconvertible subs by name instead
+    assert 'cmd += ["-c:s", "mov_text"]' in CLS
+    assert 'cmd += ["-movflags", "+faststart"]' in CLS
 
 
 def test_subprocess_calls_carry_timeouts():
