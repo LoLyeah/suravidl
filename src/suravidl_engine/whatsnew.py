@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.18",
+        "title": "The fallback",
+        "items": [
+            "On phones the bundled ffmpeg cannot convert subtitles at all, so the fixer now drops a file-blocking subtitle track as its named last resort instead of failing the whole repair — desktop keeps converting it properly.",
+            "The v0.45.17 note claimed that conversion worked everywhere — it does not; this is the correction, verified against both real ffmpeg builds.",
+        ],
+    },
+    {
         "version": "0.45.17",
         "title": "The audit",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "On Windows, Restart & Install could quit the app and install nothing — the installer found a half-gone app and quietly asked a question nobody could see. It now waits for the app to fully exit first, then installs.",
             "Every run leaves a short trail at .suravidl\\update.log in your user folder, so a hiccup is never invisible again.",
-        ],
-    },
-    {
-        "version": "0.45.8",
-        "title": "The reach",
-        "items": [
-            "Expanding a queue card no longer needs a tap on one word at the top left — the whole card folds and unfolds it now, everything except the buttons and links that do their own thing.",
-            "The card reads as tappable everywhere, and the keyboard path is unchanged: Tab to the title, then Enter or Space.",
         ],
     },
 ]
