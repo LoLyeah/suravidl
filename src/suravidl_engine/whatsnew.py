@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.20",
+        "title": "The twin",
+        "items": [
+            "The Settings Save pours the same glass as the yt-dlp tab's Save now — on AMOLED the old denser pour read as a solid black card.",
+        ],
+    },
+    {
         "version": "0.45.19",
         "title": "The shadow",
         "items": [
@@ -84,14 +91,6 @@ ENTRIES = [
         "items": [
             "Every blur renders for real now: the fades that lingered after landing kept Chromium from painting ANY frost beneath them — the Save strip, the queue bar, the popups, the FAQ cards were all silently flat.",
             "Scroll the Settings card: rows melt under the Save strip, exactly the way it was always meant to look.",
-        ],
-    },
-    {
-        "version": "0.45.10",
-        "title": "The ring",
-        "items": [
-            "Every popup — What’s new, FAQ, the dialogs — shows the real room through its glass now: the dim rides the card itself (the tutorial ring’s exact trick) instead of darkening everything the card looks through.",
-            "Same card, same blur, one mechanism on every popup; the room behind stays dimmed exactly as before.",
         ],
     },
 ]

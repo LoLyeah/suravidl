@@ -45,3 +45,14 @@ def test_the_settings_strip_twins_the_ytdlp_save():
         assert "border-radius: 14px" in blk, name
     assert "border: 1px solid var(--line); border-radius: 14px;" in foot
     assert "margin: 14px 0 0" in foot, "floats, no longer full-bleed"
+
+
+def test_the_phone_pours_the_same_material_as_the_ytdlp_save():
+    # v0.45.20: the last visible delta was the android-only denser pour
+    # (panel-solid 82%) — on AMOLED it read as a solid black card beside
+    # the yt-dlp Save's glass. Now both pour --glass-bg-strong.
+    ytdlp = CSS.split("#panel-ytdlp .foot-row {")[1].split("}")[0]
+    android = CSS.split('html[data-host="android"] #panel-settings .modal-foot {')[1].split("}")[0]
+    assert "background: var(--glass-bg-strong);" in ytdlp
+    assert "background: var(--glass-bg-strong);" in android
+    assert "color-mix" not in android, "the denser pour is retired"

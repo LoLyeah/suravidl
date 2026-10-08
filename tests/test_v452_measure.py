@@ -59,4 +59,6 @@ def test_every_host_frosts_the_strip():
     assert "backdrop-filter: none" not in phone, "phones frost it since v0.45.12"
     android = chunks[3].split("}")[0]
     assert "backdrop-filter: var(--glass-blur);" in android
-    assert "color-mix" in android, "the denser pour keeps the readout legible"
+    # v0.45.20: the denser pour retired — the owner wanted the yt-dlp
+    # Save's exact material on AMOLED (the 82% solid read as a black card)
+    assert "background: var(--glass-bg-strong);" in android

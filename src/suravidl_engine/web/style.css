@@ -1518,7 +1518,11 @@ html[data-host="android"] .modal {
    asked for the frost here too (2026-10-07); the transport's denser pour
    keeps the readout legible while content scrolls beneath it */
 html[data-host="android"] #panel-settings .modal-foot {
-  background: color-mix(in srgb, var(--panel-solid) 82%, transparent);
+  /* v0.45.20: the same material as the yt-dlp tab's Save, exactly. The
+     denser pour (panel-solid at 82%) was meant to keep the readout
+     legible, but on AMOLED it read as a solid black card next to the
+     yt-dlp Save's glass — the owner asked for the match (2026-10-07). */
+  background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
