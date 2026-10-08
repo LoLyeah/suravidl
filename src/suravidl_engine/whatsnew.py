@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.17",
+        "title": "The audit",
+        "items": [
+            "The stream fixer: text subtitles are converted for mp4 instead of failing the whole fix, and every flagged track is tested alone before removal — a healthy track can no longer be lost with a bad one.",
+            "Engine audit fixes, the rest: deleting a download can neither take an unrelated file nor run while a job writes; resumed jobs find their partial file; dead playlists report an error; logs get secrets redacted.",
+        ],
+    },
+    {
         "version": "0.45.16",
         "title": "The proof",
         "items": [
@@ -84,14 +92,6 @@ ENTRIES = [
         "items": [
             "Expanding a queue card no longer needs a tap on one word at the top left — the whole card folds and unfolds it now, everything except the buttons and links that do their own thing.",
             "The card reads as tappable everywhere, and the keyboard path is unchanged: Tab to the title, then Enter or Space.",
-        ],
-    },
-    {
-        "version": "0.45.7",
-        "title": "The sound",
-        "items": [
-            "TikTok picks could end with the sound dying at 1:00 — the site serves the video’s music as its own file, often a 60-second preview, and it was being used as the soundtrack. Picks now take the video’s own complete audio.",
-            "For those videos that means the single complete copy with its real soundtrack; nothing else about the presets changes.",
         ],
     },
 ]
