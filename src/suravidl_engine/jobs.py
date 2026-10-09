@@ -69,6 +69,7 @@ ACTIVE_STATUSES = ("queued", "downloading", "merging")
 # honest at once and the app stays usable.
 STALL_LIMIT = 8 * 60.0     # seconds with no progress/postprocessor event
 STALL_POLL = 30.0          # watchdog cadence
+STALE_TICK_WAIT = 10.0     # "silent for this long" in the delete fast-path
 
 
 def _stop_requested(job: dict) -> bool:
@@ -916,14 +917,18 @@ class JobManager:
             blocked = status in ("queued", "downloading", "merging") or live
             if not blocked:
                 break
-            # A row whose status is no longer active will not be written
-            # again: its worker is either unwinding or wedged on a dead
-            # socket. Waiting 15 s behind a wedged worker made the row
-            # effectively undeletable (the owner's "could not delete:
-            # 500", 2026-10-08) — a short beat, then proceed regardless
-            # of `live`.
+            # A row whose status is no longer active is either unwinding
+            # (still ticking, maybe still writing) or wedged (silent on a
+            # dead socket). Only the SILENT one may skip the wait — a
+            # worker mid-unwind can still create a `.part` after the file
+            # scan and the delete would leave it behind (CI caught exactly
+            # that on a slow runner, 2026-10-08). Waiting 15 s behind a
+            # truly wedged worker made the row effectively undeletable,
+            # so silence is the fast path.
             if status not in ACTIVE_STATUSES and time.monotonic() > soft:
-                break
+                tick = self._last_tick.get(job_id)
+                if tick is None or time.monotonic() - tick > STALE_TICK_WAIT:
+                    break
             if not live or time.monotonic() > deadline:
                 raise ValueError("cancel this download before deleting it")
             time.sleep(0.2)

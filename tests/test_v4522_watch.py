@@ -95,11 +95,15 @@ def test_delete_proceeds_when_the_worker_is_wedged(tmp_path, monkeypatch):
     from suravidl_engine import jobs as jobs_mod
     from suravidl_engine.jobs import JobManager
 
+    # a few seconds of silence is all a wedged worker ever produces; the
+    # real constant (10 s) exists so an UNWINDING worker keeps the wait
+    monkeypatch.setattr(jobs_mod, "STALE_TICK_WAIT", 0.5)
+
     port, stop, held = _drip_server()
     mgr = JobManager(download_dir=tmp_path / "dl", db_path=tmp_path / "j.db",
                      auto_resume=True)
     job = mgr.create(f"http://127.0.0.1:{port}/stuck.mp4")
-    time.sleep(1.0)                      # worker is now wedged in the read
+    time.sleep(1.5)                      # worker is now wedged in the read
     mgr.cancel(job["id"])
 
     t0 = time.monotonic()

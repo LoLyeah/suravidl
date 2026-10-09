@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.27",
+        "title": "The silence",
+        "items": [
+            "Deleting a just-cancelled download waits for the writer to actually go quiet first — a race could leave a leftover fragment behind on slow machines.",
+        ],
+    },
+    {
         "version": "0.45.26",
         "title": "The column",
         "items": [
@@ -78,14 +85,6 @@ ENTRIES = [
         "items": [
             "On phones the bundled ffmpeg cannot convert subtitles at all, so the fixer now drops a file-blocking subtitle track as its named last resort instead of failing the whole repair — desktop keeps converting it properly.",
             "The v0.45.17 note claimed that conversion worked everywhere — it does not; this is the correction, verified against both real ffmpeg builds.",
-        ],
-    },
-    {
-        "version": "0.45.17",
-        "title": "The audit",
-        "items": [
-            "The stream fixer: text subtitles are converted for mp4 instead of failing the whole fix, and every flagged track is tested alone before removal — a healthy track can no longer be lost with a bad one.",
-            "Engine audit fixes, the rest: deleting a download can neither take an unrelated file nor run while a job writes; resumed jobs find their partial file; dead playlists report an error; logs get secrets redacted.",
         ],
     },
 ]
