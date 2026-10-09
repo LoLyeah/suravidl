@@ -404,6 +404,28 @@ def create_app(download_dir, auth_token: str | None = None,
         PayloadTooLarge,
         lambda request, exc: JSONResponse(
             {"detail": "request body too large"}, status_code=413))
+    # The last line of defense (added last: outermost): any unhandled
+    # exception answers with its own name and message as JSON instead of a
+    # bare FastAPI 500. The UI can only render a bare 500 as the string
+    # "500", which told the owner nothing ("could not delete: 500", twice,
+    # 2026-10-08, and no traceback anywhere). The full traceback goes to
+    # the engine's log buffer (Settings -> View log), through the same
+    # channel yt-dlp's lines use.
+    @app.middleware("http")
+    async def _unhandled_errors_are_honest(request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as e:  # noqa: BLE001 - the last line of defense
+            import traceback
+
+            from . import logcap
+
+            logcap.logger().error(
+                f"engine error on {request.method} {request.url.path}: "
+                f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
+            return JSONResponse(
+                {"detail": f"engine error ({type(e).__name__}): {e}"},
+                status_code=500)
     if settings_path is None and db_path:
         settings_path = Path(db_path).parent / "settings.json"
     settings = Settings(path=settings_path, default_download_dir=download_dir,

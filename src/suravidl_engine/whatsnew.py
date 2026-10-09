@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.25",
+        "title": "The trace",
+        "items": [
+            "If anything inside the engine ever fails unexpectedly, the app now says what failed — the error's own name and message — instead of a bare “500”.",
+        ],
+    },
+    {
         "version": "0.45.24",
         "title": "The spare",
         "items": [
@@ -80,14 +87,6 @@ ENTRIES = [
         "items": [
             "The fix no longer trusts stream warnings — it asks the actual copy whether each stream can pass, and only drops what the copy itself refuses. If your video vanished into a 60 MB file, that was this false alarm.",
             "Every drop is still named in the log — and the video is only ever dropped as the last resort, after the copy has refused it twice.",
-        ],
-    },
-    {
-        "version": "0.45.15",
-        "title": "The keeper",
-        "items": [
-            "The stream fix now removes only what it names as broken — anything it can’t read is kept untouched rather than silently gone. Re-add the link — it comes out whole now.",
-            "If the check can’t read a file’s stream report, it says so and leaves the file alone — never a silent guess.",
         ],
     },
 ]
