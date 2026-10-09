@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.24",
+        "title": "The spare",
+        "items": [
+            "A download stalled by a dead source no longer shrinks the engine — its worker is replaced, so a queue can never quietly stop moving.",
+        ],
+    },
+    {
         "version": "0.45.23",
         "title": "The wait",
         "items": [
@@ -81,14 +88,6 @@ ENTRIES = [
         "items": [
             "The stream fix now removes only what it names as broken — anything it can’t read is kept untouched rather than silently gone. Re-add the link — it comes out whole now.",
             "If the check can’t read a file’s stream report, it says so and leaves the file alone — never a silent guess.",
-        ],
-    },
-    {
-        "version": "0.45.14",
-        "title": "The oracle",
-        "items": [
-            "The merge fix now takes its verdict from ffmpeg itself, not the app’s tiny probe — on Android that probe reads every audio track as broken, which is why the fix kept missing. Healthy tracks are never touched now.",
-            "When the fix cannot apply, the log says so — it can never skip silently again.",
         ],
     },
 ]

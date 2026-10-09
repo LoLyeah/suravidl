@@ -1058,11 +1058,16 @@ class JobManager:
                 pass
             finally:
                 with self._lock:
+                    was_running = job["id"] in self._running
                     self._running.discard(job["id"])
                     self._last_tick.pop(job["id"], None)
-                with self._cap_cv:
-                    self._active -= 1
-                    self._cap_cv.notify_all()
+                if was_running:
+                    with self._cap_cv:
+                        self._active -= 1
+                        self._cap_cv.notify_all()
+                # a reaped slot (the stall watch freed it and spawned a
+                # spare) is not decremented again: double-counting would
+                # inflate the capacity the user set
 
     def _stall_watch(self) -> None:
         """Fail jobs whose source stopped producing anything.
@@ -1093,6 +1098,32 @@ class JobManager:
                                     "the download was stopped")
                     self._last_tick[jid] = now
                 self._save(job)
+                self._reap_stalled(jid)
+
+    def _reap_stalled(self, jid: str) -> None:
+        """Free a stalled worker's slot and put a spare on duty.
+
+        A wedged thread cannot be killed in Python, and its capacity slot
+        would otherwise stay eaten for the life of the process: after two
+        stalls the whole queue stops moving — jobs sit at "queued" and
+        nothing runs them (the phone's exact shape after a night of
+        stalls, 2026-10-08). The zombie thread stays parked (one thread
+        and one socket — harmless); the pool replaces it. The worker's
+        own `finally` checks membership first, so the slot is never
+        counted twice.
+        """
+        with self._cap_cv:
+            with self._lock:
+                reaped = jid in self._running
+                self._running.discard(jid)
+                self._last_tick.pop(jid, None)
+            if reaped:
+                self._active = max(0, self._active - 1)
+                t = threading.Thread(target=self._worker_loop,
+                                     name="suravidl-job-spare", daemon=True)
+                t.start()
+                self._workers.append(t)
+            self._cap_cv.notify_all()
 
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued
