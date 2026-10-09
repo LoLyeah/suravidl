@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.26",
+        "title": "The column",
+        "items": [
+            "A job database from an older version repairs itself on the first start — a missing column on upgraded installs had quietly broken new downloads and deleting jobs.",
+        ],
+    },
+    {
         "version": "0.45.25",
         "title": "The trace",
         "items": [
@@ -79,14 +86,6 @@ ENTRIES = [
         "items": [
             "The stream fixer: text subtitles are converted for mp4 instead of failing the whole fix, and every flagged track is tested alone before removal — a healthy track can no longer be lost with a bad one.",
             "Engine audit fixes, the rest: deleting a download can neither take an unrelated file nor run while a job writes; resumed jobs find their partial file; dead playlists report an error; logs get secrets redacted.",
-        ],
-    },
-    {
-        "version": "0.45.16",
-        "title": "The proof",
-        "items": [
-            "The fix no longer trusts stream warnings — it asks the actual copy whether each stream can pass, and only drops what the copy itself refuses. If your video vanished into a 60 MB file, that was this false alarm.",
-            "Every drop is still named in the log — and the video is only ever dropped as the last resort, after the copy has refused it twice.",
         ],
     },
 ]

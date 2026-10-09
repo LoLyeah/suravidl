@@ -31,7 +31,7 @@ POOL_SIZE = 4
 MAX_QUEUE = 500
 
 # Bumped when the migration block in `_init_db` changes shape.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # raised at v0.45.26: dbs stamped 1 need the replaced_by ALTER to run
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -370,45 +370,58 @@ class JobManager:
                     pass
             with self._con:
                 self._con.executescript(_SCHEMA)
-                # versioned migration: carry any older db forward, then
-                # stamp it so the checks run at most once per database.
-                # Columns gained over time: headers/preset/playlist_items/
-                # raw_args/overrides (v0.22.0), files (v0.21.1), partials
-                # (v0.26.0), download_dir (v0.21.2).
+                # Column alignment runs on EVERY boot, not only under a
+                # version stamp. v0.40.0 stamped user_version = 1 and the
+                # constant was never raised, so every column added after
+                # the stamp (last: replaced_by, v0.45.17) was skipped on
+                # EXISTING databases while fresh ones got it from the
+                # CREATE TABLE — and every job save on an upgraded install
+                # then died with "table jobs has no column named
+                # replaced_by" (2026-10-08 field report: a phone that
+                # worked on v0.45.1 bricked itself ever since). The checks
+                # are per-column guarded and one PRAGMA deep; running them
+                # always means a future release can never forget a bump
+                # again. Columns gained over time:
+                # headers/preset/playlist_items/raw_args/overrides
+                # (v0.22.0), files (v0.21.1), partials (v0.26.0),
+                # download_dir (v0.21.2), replaced_by (v0.45.17).
                 version = self._con.execute("PRAGMA user_version").fetchone()[0]
+                cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
+                if "headers" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
+                if "preset" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
+                if "playlist_items" not in cols:
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
+                if "raw_args" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN raw_args TEXT")
+                if "overrides" not in cols:
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN overrides TEXT")
+                if "files" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
+                if "partials" not in cols:
+                    # every target yt-dlp named while downloading (v0.26.0):
+                    # a playlist cancelled between entries strands the
+                    # in-flight one's `.part` under a name `files` never
+                    # learns, and the delete could not find it
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN partials TEXT")
+                if "replaced_by" not in cols:
+                    # the successor row's id: one paused row can only be
+                    # resumed once, restart included (v0.45.17 audit B/F2)
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN replaced_by TEXT")
+                if "download_dir" not in cols:
+                    # the folder this job downloaded into: a later settings
+                    # change must not make its files undeletable (v0.21.2)
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN download_dir TEXT")
                 if version < SCHEMA_VERSION:
-                    cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
-                    if "headers" not in cols:
-                        self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
-                    if "preset" not in cols:
-                        self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
-                    if "playlist_items" not in cols:
-                        self._con.execute(
-                            "ALTER TABLE jobs ADD COLUMN playlist_items TEXT")
-                    if "raw_args" not in cols:
-                        self._con.execute("ALTER TABLE jobs ADD COLUMN raw_args TEXT")
-                    if "overrides" not in cols:
-                        self._con.execute(
-                            "ALTER TABLE jobs ADD COLUMN overrides TEXT")
-                    if "files" not in cols:
-                        self._con.execute("ALTER TABLE jobs ADD COLUMN files TEXT")
-                    if "partials" not in cols:
-                        # every target yt-dlp named while downloading (v0.26.0):
-                        # a playlist cancelled between entries strands the
-                        # in-flight one's `.part` under a name `files` never
-                        # learns, and the delete could not find it
-                        self._con.execute(
-                            "ALTER TABLE jobs ADD COLUMN partials TEXT")
-                    if "replaced_by" not in cols:
-                        # the successor row's id: one paused row can only be
-                        # resumed once, restart included (v0.45.17 audit B/F2)
-                        self._con.execute(
-                            "ALTER TABLE jobs ADD COLUMN replaced_by TEXT")
-                    if "download_dir" not in cols:
-                        # the folder this job downloaded into: a later settings
-                        # change must not make its files undeletable (v0.21.2)
-                        self._con.execute(
-                            "ALTER TABLE jobs ADD COLUMN download_dir TEXT")
+                    # raise the stamp for carried-forward databases (1 -> 2
+                    # at v0.45.26); the gate stays for future versioned
+                    # steps, which now cannot be the only home of a column
                     self._con.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
                 # scrub cookie values persisted by earlier versions
                 scrubbed = self._scrub_persisted_cookies()
