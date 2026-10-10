@@ -18,8 +18,8 @@ android {
         applicationId "com.suravidl.app"
         minSdk 24
         targetSdk 35
-        versionCode 130
-        versionName "0.45.30"
+        versionCode 131
+        versionName "0.45.31"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters "arm64-v8a", "x86_64" }
     }
@@ -86,7 +86,9 @@ chaquopy {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.webkit:webkit:1.17.1'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.webkit:webkit:1.17.1'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestImplementation 'androidx.test:rules:1.6.0'
     androidTestImplementation 'junit:junit:4.13.2'

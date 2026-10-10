@@ -28,6 +28,10 @@ and refuse the same DRM for the same reasons. Shells collect; the engine judges.
   recognise. The URL prefilter is there to keep *network noise* out of the list,
   not to second-guess the player, and the engine still classifies every
   candidate before a row is drawn.
+- **A player inside a cross-origin frame is heard.** Since v0.45.31 the script
+  layers run in every frame — cross-origin included — through the WebView's
+  document-start injection (feature-detected; older WebViews keep the
+  same-origin walk and see such a frame's network requests, as before).
 - **A new link replaces the page.** "Open in the browser ↗" on a second link
   loads it even when the browser is already open (the previous find list goes
   with the previous page). In-page back still walks history, so nothing is lost
@@ -49,13 +53,14 @@ and refuse the same DRM for the same reasons. Shells collect; the engine judges.
   browser is a browser: if a page wants you to watch an ad or solve a challenge,
   you do that yourself. Nothing here defeats detections on purpose — that is how
   a downloader turns into a bot and the site turns into an arms race.
-- **A `blob:` stream inside a *cross-origin* frame on Android.** Android's
-  `shouldInterceptRequest` is never called for `blob:` URLs at all, so that stream
-  has to be seen by hooks *inside* that frame. Ours ride into same-origin frames
-  only; a cross-origin frame would need `androidx.webkit`'s document-start
-  injection (~100 KB), which is deliberately not taken yet. Its *network*
-  requests are still visible, so an ordinary `.m3u8` or `.mp4` inside such a
-  frame is found anyway.
+- **A `blob:` stream inside a *cross-origin* frame on Android, on WebViews
+  without document-start injection.** Android's `shouldInterceptRequest` is
+  never called for `blob:` URLs at all, so such a stream has to be seen by
+  hooks *inside* that frame. Since v0.45.31 the hooks reach every frame via
+  `androidx.webkit`'s document-start injection; a WebView too old for that
+  feature keeps the same-origin walk. Either way the frame's *network*
+  requests are visible, so an ordinary `.m3u8` or `.mp4` inside it is found
+  regardless.
 - **Segment-only MSE** — a player that never requests a manifest because the
   JavaScript builds one in memory. There is no URL to hand over.
 - **Live and growing streams.** A capture hands over a URL, and a live playlist

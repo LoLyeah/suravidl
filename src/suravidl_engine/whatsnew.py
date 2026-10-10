@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.31",
+        "title": "The frames",
+        "items": [
+            "The in-app browser's sniffer now runs inside cross-origin frames too — a player there is caught by the script layers, not only its network requests — and its DOM watching is debounced on heavy pages.",
+        ],
+    },
+    {
         "version": "0.45.30",
         "title": "The poster",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "items": [
             "A download whose source stops sending data no longer hangs forever — after eight silent minutes it fails with a clear message instead of staring at a stuck row.",
             "Cancelled downloads always delete now, even when the engine is still cleaning up behind them.",
-        ],
-    },
-    {
-        "version": "0.45.21",
-        "title": "The start",
-        "items": [
-            "A claimed download now says so right away — a job stuck before its first byte used to sit at “Queued” forever instead of showing it was already running.",
         ],
     },
 ]

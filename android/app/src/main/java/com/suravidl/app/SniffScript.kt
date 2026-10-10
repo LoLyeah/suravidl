@@ -17,12 +17,15 @@ import org.json.JSONObject
  * very early inline script, so the hooks also re-install at `onPageFinished`
  * and the layer-4 resource scan sweeps up anything that ran before them.
  *
- * Frames: hooks are re-installed into every *same-origin* child frame (found
- * by walking the DOM and watching for new iframes plus their `load` events),
- * and each report carries the frame's own URL — a signed media URL's referer
- * is usually the player iframe, not the page in the address bar. A
- * cross-origin frame's `blob:` player stays invisible to this layer; its plain
- * media URLs are still caught by the network layer, which sees every frame.
+ * Frames: hooks run in every frame — cross-origin included — through the
+ * WebView's document-start injection where the build supports it (v0.45.31,
+ * wired in BrowserActivity; feature-detected). The same-origin walk below is
+ * kept as the fallback for older WebViews, and each report carries the
+ * frame's own URL — a signed media URL's referer is usually the player
+ * iframe, not the page in the address bar. On a WebView without the
+ * feature, a cross-origin frame's `blob:` player stays invisible to this
+ * layer; its plain media URLs are still caught by the network layer, which
+ * sees every frame.
  */
 object SniffScript {
 
@@ -127,7 +130,13 @@ object SniffScript {
         } catch (e) {}
         srcs();
         injectFrames();
-        try { new MutationObserver(function () { srcs(); injectFrames(); }).observe(document.documentElement || document, { childList: true, subtree: true }); } catch (e) {}
+        var __svSoon = 0;
+        try {
+          new MutationObserver(function () {
+            if (__svSoon) return;
+            __svSoon = setTimeout(function () { __svSoon = 0; srcs(); injectFrames(); }, 250);
+          }).observe(document.documentElement || document, { childList: true, subtree: true });
+        } catch (e) {}
         try { window.addEventListener('load', function () { srcs(); injectFrames(); }); } catch (e) {}
     """.trimIndent()
 

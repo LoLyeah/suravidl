@@ -3,6 +3,7 @@ package com.suravidl.app
 import android.content.Intent
 import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.webkit.WebViewFeature
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -192,6 +193,59 @@ class SnifferTest {
             assertEquals("the player's own source is a 'player' find", "player", found!!.via)
             assertTrue("the frame the stream lives in must be recorded — it becomes the " +
                        "referer: " + found!!.frame, found!!.frame.contains("/noext-inner.html"))
+        } finally {
+            server.stop()
+        }
+    }
+
+    /**
+     * v0.45.31: the document-start injection hears the cross-origin frame.
+     *
+     * The fixture is the one line the same-origin walk cannot cross: an outer
+     * page on 127.0.0.1, a player served to `localhost` — the same server,
+     * a different origin. Before this version that frame's file was only ever
+     * seen as a network request; the script layers could not reach its
+     * document. The assertions are therefore about *via*: the element source
+     * must read "player" and the script fetch "fetch", which only happens
+     * when the hooks ran inside that frame. A WebView too old for the
+     * feature is skipped — the walk's known hole, not a failure.
+     */
+    @Test(timeout = 240_000)
+    fun aPlayerInsideACrossOriginFrameIsHeardByTheScriptLayers() {
+        val supported = try {
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        } catch (_: Throwable) {
+            false
+        }
+        org.junit.Assume.assumeTrue(
+            "this WebView build has no document-start injection — the walk's known hole",
+            supported)
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val server = FixtureServer().start()
+        SniffLog.clear()
+        try {
+            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                .putExtra(BrowserActivity.EXTRA_URL, server.url("/xframe.html"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+
+            var player: Sniffed? = null
+            var fetched: Sniffed? = null
+            val deadline = System.currentTimeMillis() + 120_000
+            while (System.currentTimeMillis() < deadline) {
+                val seen = SniffLog.snapshot()
+                player = seen.firstOrNull { it.url.endsWith("/xinner.mp4") }
+                fetched = seen.firstOrNull { it.url.endsWith("/xinner2.m3u8") }
+                if (player?.via == "player" && fetched?.via == "fetch") break
+                Thread.sleep(1000)
+            }
+            assertEquals("the cross-origin frame's player never reached the script layers — " +
+                         "only its network request was seen: " + dump(SniffLog.snapshot()),
+                         "player", player?.via)
+            assertTrue("the frame the stream lives in must be recorded as the cross-origin " +
+                       "one: " + dump(SniffLog.snapshot()),
+                       player!!.frame.contains("localhost"))
+            assertEquals("the cross-origin frame's script fetch never fired: " +
+                         dump(SniffLog.snapshot()), "fetch", fetched?.via)
         } finally {
             server.stop()
         }

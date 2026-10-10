@@ -96,6 +96,17 @@ class FixtureServer {
     /** a small mp4-shaped body: enough bytes that a download can be asserted on */
     private fun media(): ByteArray = ByteArray(4096)
 
+    /** The cross-origin fixture (v0.45.31): an outer page on 127.0.0.1
+     *  embedding a player served to `localhost` — the same server, a different
+     *  origin, which is the line the same-origin walk cannot cross. The port
+     *  has to be spliced in at build time, so this page is made, not a const. */
+    private fun xframePage(): String = """
+        <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+        <body style="margin:0;background:#000">
+        <iframe src="http://localhost:$port/xinner.html" style="width:320px;height:180px"></iframe>
+        </body>
+    """.trimIndent()
+
     private fun bodyFor(
         path: String, headers: Map<String, String>
     ): Triple<Int, String, ByteArray>? = when (path) {
@@ -103,6 +114,11 @@ class FixtureServer {
         "/inner.html" -> Triple(200, "text/html", INNER.toByteArray())
         "/guarded.html" -> Triple(200, "text/html", GUARDED_PAGE.toByteArray())
         "/noext.html" -> Triple(200, "text/html", NOEXT_PAGE.toByteArray())
+        "/xframe.html" -> Triple(200, "text/html", xframePage().toByteArray())
+        "/xinner.html" -> Triple(200, "text/html", XINNER.toByteArray())
+        "/xinner.mp4" -> Triple(200, "video/mp4", media())
+        "/xinner2.m3u8" -> Triple(200, "application/vnd.apple.mpegurl",
+                                  MANIFEST.toByteArray())
         "/noext-inner.html" -> Triple(200, "text/html", NOEXT_INNER.toByteArray())
         "/second.html" -> Triple(200, "text/html", SECOND_PAGE.toByteArray())
         "/fixture.m3u8" -> Triple(200, "application/vnd.apple.mpegurl",
@@ -173,6 +189,20 @@ class FixtureServer {
             <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
             <body style="margin:0;background:#000">
             <iframe src="/noext-inner.html" style="width:320px;height:180px"></iframe>
+            </body>
+        """.trimIndent()
+
+        /** The player that lives in the cross-origin frame: an element source
+         *  (the 'player' sighting) and a script fetch (the 'fetch' sighting) —
+         *  neither nameable from outside that frame's document. */
+        private val XINNER = """
+            <!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+            <body style="margin:0;background:#111"><video src="/xinner.mp4" muted></video>
+            <script>
+              setTimeout(function () {
+                fetch('/xinner2.m3u8').then(function (r) { return r.text(); });
+              }, 1200);
+            </script>
             </body>
         """.trimIndent()
 

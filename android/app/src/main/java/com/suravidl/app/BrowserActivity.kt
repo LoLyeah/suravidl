@@ -38,6 +38,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -128,6 +130,21 @@ class BrowserActivity : AppCompatActivity() {
             .getBoolean("desktop_ua", false)
         buildUi()
         webView.addJavascriptInterface(SniffBridge(), "SuravidlSniff")
+
+        // Cross-origin frames (v0.45.31): the script walk rides into same-origin
+        // frames only, so a player in a cross-origin frame was invisible to the
+        // script layers — docs/SNIFFING.md named the hole. Document-start
+        // injection reaches EVERY frame, cross-origin included, before the
+        // page's own scripts parse. Feature-detected: a WebView without it
+        // keeps the walk, and the network layer still sees that frame's
+        // requests either way.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            try {
+                WebViewCompat.addDocumentStartJavaScript(webView, SniffScript.js(), setOf("*"))
+            } catch (_: Throwable) {
+                // the same-origin walk remains the fallback
+            }
+        }
 
         // The engine owns the pattern list; the baked-in copy stands when it is
         // not answering yet, so nothing here blocks the browser from opening.
