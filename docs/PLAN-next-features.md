@@ -37,7 +37,7 @@ policy exists, 1.0 is earned — not before.
 - Field-test list handed over with each release; honest "not promised"
   entries updated when a limit is real (we write our refusals down).
 
-## Wave 1 — v0.46.0 "the toolbox"  (bulk paste + diagnostics)
+## Wave 1 — v0.46.0 "the toolbox"  (bulk paste + diagnostics) — SHIPPED
 
 Small, immediately felt, and they make every later wave faster to debug.
 

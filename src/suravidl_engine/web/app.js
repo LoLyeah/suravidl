@@ -744,6 +744,21 @@ const STRINGS = { en: {}, id: {
   "Their Gallery/Music copies go too.": "Salinan Gallery/Music-nya ikut terhapus.",
   "retrying {n}": "mencoba ulang {n}",
   "View log": "Lihat log",
+  "Check first": "Periksa dulu",
+  "Queue {n} checked": "Antre {n} terpilih",
+  "checked and refused — tick it anyway if you know better":
+    "dicek dan ditolak — centang saja kalau kamu tahu lebih baik",
+  "include this link": "sertakan tautan ini",
+  "queued for a check…": "menunggu pemeriksaan…",
+  "Copy diagnostics": "Salin diagnostik",
+  "Diagnostics": "Diagnostik",
+  "versions, the ffmpeg probe, settings (secrets redacted by the engine), the log tail — paste the whole block into a bug report":
+    "versi, probe ffmpeg, pengaturan (rahasia disunting oleh mesin), ekor log — tempel seluruh blok ke laporan bug",
+  "diagnostics copied — paste it into the report":
+    "diagnostik tersalin — tempel ke laporan",
+  "could not copy — select the text and copy it by hand":
+    "tidak bisa menyalin — pilih teksnya lalu salin manual",
+  "could not build diagnostics: {msg}": "tidak bisa membuat diagnostik: {msg}",
   "yt-dlp log": "log yt-dlp",
   "Refresh": "Muat ulang",
   "nothing logged yet — turn on Verbose log for the deep one": "belum ada catatan — nyalakan Verbose log untuk versi detailnya",
@@ -1120,6 +1135,34 @@ async function copyText(t) {
   } catch (_) {
     return false;
   }
+}
+
+/* ---------- diagnostics (v0.46.0) ---------- */
+/** One paste instead of five screenshots: versions, the ffmpeg probe,
+ *  redacted settings, the log tail. The engine redacts before the UI
+ *  ever sees it — nothing here holds a secret to leak. */
+function initDiagnostics() {
+  const open = $("diagOpen");
+  if (!open) return;
+  open.onclick = async () => {
+    open.classList.add("busy");
+    try {
+      const d = await api("/diagnostics");
+      $("diagBox").value = JSON.stringify(d, null, 2);
+      openModal($("diagModal"));
+      $("diagCopy").onclick = async () => {
+        const ok = await copyText($("diagBox").value);
+        toast(ok ? t("diagnostics copied \u2014 paste it into the report")
+                 : t("could not copy \u2014 select the text and copy it by hand"),
+              ok ? "ok" : "bad");
+      };
+    } catch (e) {
+      toast(t("could not build diagnostics: {msg}", { msg: e.message }), "bad");
+    } finally {
+      open.classList.remove("busy");
+    }
+  };
+  if ($("diagClose")) $("diagClose").onclick = () => closeModal($("diagModal"));
 }
 
 /* ---------- confirm modal ---------- */
@@ -2610,6 +2653,8 @@ async function loadLog() {
     box.textContent = t("could not read the log: {msg}", { msg: e.message });
   }
 }
+initDiagnostics();
+
 $("logOpen").onclick = async () => {
   $("logView").textContent = t("loading…");
   openModal($("logModal"));
@@ -5582,15 +5627,30 @@ function renderBatchRow() {
                { links: links, skipped: skipped ? " · " + skipped : "" })
     : urls.length > 1 ? say + t(" — queue them all?")
     : say;
-  $("batchBtn").disabled = over || urls.length < 2;
+  const check = $("batchCheck");
+  if (check) check.classList.toggle("hidden", !(urls.length > 1 && !over));
+  const ticked = BULK.filter((x) => x.ticked).length;
+  if ($("batchBtn")) {
+    $("batchBtn").textContent = BULK.length
+      ? t("Queue {n} checked", { n: ticked }) : t("Queue all");
+    const enough = BULK.length ? ticked > 0 : urls.length >= 2;
+    $("batchBtn").disabled = over || !enough;
+  }
 }
 
 function initBatch() {
   $("url").addEventListener("input", renderBatchRow);
   $("url").addEventListener("change", renderBatchRow);
+  // typing over the paste invalidates the check pass it came from
+  $("url").addEventListener("input", clearBulkPreview);
+  if ($("batchCheck")) $("batchCheck").onclick = checkBatch;
   $("batchBtn").onclick = async () => {
-    const urls = pastedUrls();
-    if (urls.length < 2) return;
+    // with a check pass on screen, only the ticked rows ride; without one,
+    // the whole paste does (v0.46.0)
+    const urls = BULK.length
+      ? BULK.filter((x) => x.ticked).map((x) => x.url)
+      : pastedUrls();
+    if (!urls.length) return;
     const body = { urls };
     if (OV.preset) body.preset = OV.preset;
     const overrides = readOv();
@@ -5602,6 +5662,7 @@ function initBatch() {
       $("url").value = "";
       renderBatchRow();
       clearOv();
+      clearBulkPreview();
       const n = (r.jobs || []).length;
       const skipped = r.skipped || [];
       if (skipped.length) {
@@ -5617,6 +5678,97 @@ function initBatch() {
       $("batchBtn").classList.remove("busy");
     }
   };
+}
+
+/* ---------- v0.46.0: the paste list looks before it leaps ----------
+ * The batch door existed (v0.40.5): paste, queue all, hear about failures
+ * afterwards. This adds the missing half — a check pass: every link is
+ * probed (bounded, three at a time) and becomes a row with its real name,
+ * its length and host, or its own honest refusal; tick what is good, then
+ * queue. Tapping a row goes the full single-link way (format picking). */
+let BULK = [];
+
+function clearBulkPreview() {
+  if (!BULK.length) return;
+  BULK = [];
+  const l = $("batchList");
+  if (l) { l.textContent = ""; l.classList.add("hidden"); }
+  renderBatchRow();
+}
+
+function bulkHost(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch (_) { return u; }
+}
+
+function bulkMeta(info, url) {
+  const bits = [];
+  const d = info && Number(info.duration);
+  if (d > 0) {
+    const s = Math.round(d);
+    const mm = s >= 3600 ? Math.floor(s / 3600) + ":" + String(Math.floor((s % 3600) / 60)).padStart(2, "0")
+                         : String(Math.floor(s / 60));
+    bits.push(mm + ":" + String(s % 60).padStart(2, "0"));
+  }
+  bits.push(bulkHost(url));
+  return bits.join(" \u00b7 ");
+}
+
+function bulkRow(it) {
+  const row = el("div", "bulk");
+  const box = el("input");
+  box.type = "checkbox";
+  box.checked = true;
+  box.setAttribute("aria-label", t("include this link"));
+  const name = el("span", "bulkname", t("queued for a check\u2026"));
+  const meta = el("span", "bulkmeta", "");
+  row.append(box, name, meta);
+  box.onchange = () => { it.ticked = box.checked; renderBatchRow(); };
+  row.onclick = (e) => {
+    if (e.target === box) return;
+    $("url").value = it.url;
+    renderBatchRow();
+    doProbe();
+  };
+  it.el = row; it.box = box; it.name = name; it.meta = meta;
+  return row;
+}
+
+async function probeInto(it) {
+  try {
+    const info = await api("/probe", {
+      method: "POST", body: JSON.stringify({ url: it.url }),
+    });
+    it.name.textContent = (info && info.title) || bulkHost(it.url);
+    it.meta.textContent = bulkMeta(info, it.url);
+    it.el.classList.add("ok");
+  } catch (e) {
+    it.ticked = false;
+    it.box.checked = false;
+    it.el.classList.add("bad");
+    it.name.textContent = t(humanErr(e.message, e.detail));
+    it.meta.textContent = t("checked and refused \u2014 tick it anyway if you know better");
+  }
+}
+
+async function checkBatch() {
+  const urls = pastedUrls();
+  if (urls.length < 2) return;
+  const list = $("batchList");
+  if (!list) return;
+  list.textContent = "";
+  list.classList.remove("hidden");
+  BULK = urls.map((u) => ({ url: u, ticked: true }));
+  for (const it of BULK) list.append(bulkRow(it));
+  renderBatchRow();
+  let i = 0;
+  const worker = async () => {
+    while (i < BULK.length) {
+      const it = BULK[i++];
+      await probeInto(it);
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  renderBatchRow();
 }
 
 /** The download archive used to be a black box (review #7): show what is in

@@ -1139,6 +1139,18 @@ def create_app(download_dir, auth_token: str | None = None,
         return {"path": str(archive_path) if archive_path else None,
                 "count": len(lines), "entries": lines[-200:]}
 
+    @app.get("/diagnostics")
+    def get_diagnostics(mgr: JobManager = Depends(require_auth)):
+        """The one-paste bug report (v0.46.0): versions, the ffmpeg probe
+        summary, redacted settings, the log tail, a jobs summary.
+
+        Redaction happens engine-side (diagnostics.build_payload) — the UI
+        never holds the secrets, so it cannot leak them."""
+        from . import diagnostics, logcap
+
+        return diagnostics.build_payload(
+            settings=settings.get(), logs=logcap.lines(), jobs=mgr.list())
+
     @app.get("/logs")
     def get_logs(_mgr: JobManager = Depends(require_auth)):
         """The last lines yt-dlp said — the detail behind the verbose switch.

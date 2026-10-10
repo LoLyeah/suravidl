@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.0",
+        "title": "The toolbox",
+        "items": [
+            "Several links at once now get checked before anything queues: each is probed, named, and given its own honest answer — tick what is good, then queue just those.",
+            "Copy diagnostics bundles a bug report in one paste — versions, what this ffmpeg can do, settings (secrets redacted by the engine), and the log tail.",
+        ],
+    },
+    {
         "version": "0.45.32",
         "title": "The slideshow",
         "items": [
@@ -76,13 +84,6 @@ ENTRIES = [
         "title": "The spare",
         "items": [
             "A download stalled by a dead source no longer shrinks the engine — its worker is replaced, so a queue can never quietly stop moving.",
-        ],
-    },
-    {
-        "version": "0.45.23",
-        "title": "The wait",
-        "items": [
-            "The in-app browser now waits for the engine when it is still starting — tapping a sniffed link seconds after opening the app queues it instead of saying the engine refused it.",
         ],
     },
 ]

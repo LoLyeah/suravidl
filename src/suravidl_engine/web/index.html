@@ -123,8 +123,10 @@
       </div>
       <div id="batchRow" class="audioRow hidden">
         <span class="muted" id="batchCount"></span>
+        <button id="batchCheck" class="btn sm hidden" data-i18n="Check first">Check first</button>
         <button id="batchBtn" class="btn sm" data-i18n="Queue all">Queue all</button>
       </div>
+      <div id="batchList" class="bulklist hidden" role="list"></div>
     </section>
 
     <!-- the scope strip: a finished probe lands here (v0.37.0) -->
@@ -799,7 +801,8 @@
             <input id="setVerbose" type="checkbox"/><span data-i18n=" Verbose log ">
             Verbose log </span><span class="muted" data-i18n="(yt-dlp&#x27;s full log — debugging)">(yt-dlp's full log — debugging)</span>
           </label>
-          <div class="jrow"><button id="logOpen" class="btn sm" type="button" data-i18n="View log">View log</button></div>
+          <div class="jrow"><button id="logOpen" class="btn sm" type="button" data-i18n="View log">View log</button>
+            <button id="diagOpen" class="btn sm" type="button" data-i18n="Copy diagnostics">Copy diagnostics</button></div>
         </div>
 
         <div class="field">
@@ -894,6 +897,19 @@
 <div id="toasts" aria-live="polite"></div>
 
 <!-- confirm modal -->
+<div id="diagModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="diagTitle">
+  <div class="modal glass">
+    <div class="modal-head"><h2 id="diagTitle" data-i18n="Diagnostics">Diagnostics</h2></div>
+    <p class="muted" data-i18n="versions, the ffmpeg probe, settings (secrets redacted by the engine), the log tail — paste the whole block into a bug report">versions, the ffmpeg probe, settings (secrets redacted by the engine), the log tail — paste the whole block into a bug report</p>
+    <textarea id="diagBox" readonly spellcheck="false" aria-label="diagnostics"></textarea>
+    <div class="modal-foot right">
+      <button id="diagCopy" class="btn sm" type="button" data-i18n="Copy">Copy</button>
+      <button id="diagClose" class="btn sm" type="button" data-i18n="Close">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="confirmModal" class="overlay hidden" role="dialog" aria-modal="true"
      aria-labelledby="confirmMsg">
   <div class="modal glass narrow">

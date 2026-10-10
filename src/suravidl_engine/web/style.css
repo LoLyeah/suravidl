@@ -930,6 +930,19 @@ details.card { padding: 0 18px 6px; }
 .jobhint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 /* the ⓘ on a finished-with-a-caveat hint (v0.45.29) */
 .jobhint .ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
+
+/* ---------- v0.46.0: the paste list looks before it leaps ---------- */
+.bulklist { margin-top: 8px; display: grid; gap: 6px; }
+.bulk {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px;
+  font-size: 12.5px; min-width: 0; cursor: pointer;
+}
+.bulk input { flex: none; margin: 0; }
+.bulk .bulkname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bulk .bulkmeta { margin-left: auto; flex: none; color: var(--dim); font-size: 11.5px; }
+.bulk.bad .bulkname { color: var(--err); }
+#diagBox { min-height: 240px; margin-top: 8px; }
 /* the FILED stamp — a take that landed */
 .job .stamp, .stamp {
   display: inline-block;
