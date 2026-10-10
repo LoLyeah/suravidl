@@ -9,8 +9,10 @@ follow Settings → Authentication), superseding `0.5.9` and `0.5.10` in the
 review queue. Product releases ship no extension change unless the extension
 changed — the pipeline's guard skips the AMO step when a
 tag's extension version is unchanged since the last release (force it from
-the Actions tab when you mean it). `0.5.8` stays the live public version
-until a reviewer approves an update.
+the Actions tab when you mean it). Reviews have been fast — `0.5.13` went
+live on AMO roughly four minutes after its submission (Oct 10, 2026), so
+the public copy tracks the newest submission closely rather than trailing
+by days.
 Earlier versions — `0.5.10` (multi-select across all of a tab’s
 finds), `0.5.9` (multi-select in the popup, right-click
 "Download with suravidl"), `0.5.8` (the tab-reset fix), `0.5.7` (readable
