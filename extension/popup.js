@@ -162,6 +162,8 @@ async function send(url, mode) {
         ? t("✓ Sent — this suravidl build downloads it straight away.")
         : t("✓ Sent — choose the quality in suravidl.");
     status(sentLine, "ok");
+    // the mirror catches up too, so the open moment shows the new job
+    api.runtime.sendMessage({ type: "recentJobs" }).then(renderRecent).catch(() => {});
     // long enough for the line to be read (and announced), then get out of the way
     setTimeout(() => { try { window.close(); } catch (_) { /* not a popup */ } }, 2400);
   } else {
@@ -292,6 +294,56 @@ function render() {
   refreshDoors();
 }
 
+// The mirror (v0.5.12): the engine's honest states and notes, at the door
+// the jobs came through. Same words the app uses; a note renders with the
+// same ⓘ the queue cards wear — a finished download that had to compromise
+// must say so wherever it is seen.
+const STATE_WORD = {
+  queued: "Queued",
+  downloading: "Downloading",
+  merging: "Finalizing",
+  completed: "Done",
+  failed: "Failed",
+  stopped: "Stopped",
+  cancelled: "Cancelled",
+  paused: "Paused",
+  interrupted: "Paused",
+};
+
+function jobHost(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch (_) { return ""; }
+}
+
+function renderRecent(rec) {
+  const plate = $("recent");
+  const list = $("recentList");
+  if (!plate || !list) return;
+  const jobs = (rec && rec.ok && rec.jobs) || [];
+  list.textContent = "";
+  plate.hidden = jobs.length === 0;
+  if (!jobs.length) return;
+  for (const j of jobs) {
+    const row = document.createElement("div");
+    row.className = "recent-row st-" + (j.status || "queued");
+    const dot = document.createElement("span");
+    dot.className = "rdot";
+    const name = document.createElement("span");
+    name.className = "rname";
+    name.textContent = j.title || jobHost(j.url) || t("Stream");
+    const state = document.createElement("span");
+    state.className = "rstate";
+    state.textContent = t(STATE_WORD[j.status] || "Queued");
+    row.append(dot, name, state);
+    list.append(row);
+    if (j.note) {
+      const note = document.createElement("div");
+      note.className = "rnote";
+      note.textContent = "\u24d8 " + j.note;
+      list.append(note);
+    }
+  }
+}
+
 function setEngine(state) {
   const chip = $("engine");
   if (state && state.ok) {
@@ -325,6 +377,9 @@ $("rescan").onclick = () => location.reload();
     $("empty").hidden = true;
     return;
   }
+  try {
+    renderRecent(await api.runtime.sendMessage({ type: "recentJobs" }));
+  } catch (_) { /* nothing to mirror */ }
   const res = await api.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
   ITEMS = (res && res.items) || [];
   try {

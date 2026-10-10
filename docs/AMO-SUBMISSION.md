@@ -1,9 +1,12 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.11` went up with v0.45.0 (the extension speaks
-Bahasa Indonesia, and its token hints follow Settings → Authentication),
-superseding `0.5.9` and `0.5.10` in the review queue. v0.45.1 through
-v0.45.30 ship no extension change — the pipeline's guard skips the AMO step when a
+**Status:** `suravidl 0.5.12` (share-link resolution, the recent-jobs mirror,
+checkbox rows) is submitted via `workflow_dispatch` — an extension-only
+change ships that way, no product tag required. Before it: `0.5.11` went up
+with v0.45.0 (the extension speaks Bahasa Indonesia, and its token hints
+follow Settings → Authentication), superseding `0.5.9` and `0.5.10` in the
+review queue. Product releases ship no extension change unless the extension
+changed — the pipeline's guard skips the AMO step when a
 tag's extension version is unchanged since the last release (force it from
 the Actions tab when you mean it). `0.5.8` stays the live public version
 until a reviewer approves an update.

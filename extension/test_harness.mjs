@@ -22,7 +22,7 @@ const ok = (cond, what) => {
 
 // -- a chrome stub with just enough surface ---------------------------------
 const listeners = { beforeRequest: [], beforeSendHeaders: [], headersReceived: [],
-                    beforeSendHeadersSpec: null, menuClicks: [] };
+                    beforeRedirect: [], beforeSendHeadersSpec: null, menuClicks: [] };
 const menusMade = [];
 const store = {};
 const badge = {};
@@ -73,6 +73,7 @@ globalThis.chrome = {
       },
     },
     onHeadersReceived: { addListener: (fn) => listeners.headersReceived.push(fn) },
+    onBeforeRedirect: { addListener: (fn) => listeners.beforeRedirect.push(fn) },
   },
   tabs: {
     onRemoved: { addListener: (fn) => onRemoved.push(fn) },
@@ -84,6 +85,25 @@ globalThis.chrome = {
 
 globalThis.fetch = async (url, opts = {}) => {
   fetchCalls.push({ url, opts });
+  if (/reddit\.com\/.*\/s\//i.test(url)) {
+    // the follow-redirect resolve: Chrome exempts extension fetches that
+    // hold host permissions, so the canonical address comes back
+    return { ok: true, status: 200,
+             url: "https://www.reddit.com/r/y/comments/zzz9/followed/",
+             json: async () => ({}) };
+  }
+  if (url.endsWith("/jobs")) {
+    if ((opts.method || "GET") === "GET") {
+      return { ok: true, status: 200, json: async () => ({ jobs: [
+        { id: "m2", title: "reddit video", status: "completed",
+          created_at: "2026-10-10T02:00:00Z",
+          note: "the thumbnail could not be embedded" },
+        { id: "m1", title: "clip", status: "downloading",
+          created_at: "2026-10-10T01:00:00Z" },
+      ] }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ id: "J9" }) };
+  }
   if (url.endsWith("/sniff/patterns")) {
     // an extension the baked-in fallback does not know: proof the engine's list
     // is what is in use
@@ -301,6 +321,35 @@ mCall = fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
 ok(mCall && JSON.parse(mCall.opts.body).url === "https://site/watch",
    "a page right-click hands over the page's own address");
 
+// — v0.5.12: a reddit-style share link resolves before it is sent. The
+// browser itself saw the redirect when the user opened the link; the next
+// send of that same link uses the canonical address, never the /s/ trap —
+listeners.beforeRedirect[0]({
+  url: "https://www.reddit.com/r/x/s/AbC123",
+  redirectUrl: "https://www.reddit.com/r/x/comments/abc123/the_thread/",
+});
+await settle();
+fetchCalls.length = 0;
+await clickMenu({ linkUrl: "https://www.reddit.com/r/x/s/AbC123", pageUrl: "https://site/p" },
+                { url: "https://site/p" });
+mCall = fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+ok(mCall && JSON.parse(mCall.opts.body).url ===
+   "https://www.reddit.com/r/x/comments/abc123/the_thread/",
+   "a share link is handed over resolved, not as the /s/ trap");
+
+// …and a share link the browser never visited resolves through the fetch
+// (Chrome exempts extension fetches holding host permissions)
+const fresh = await new Promise((resolve) => {
+  const keep = onMessage({ type: "sendToEngine",
+                           url: "https://www.reddit.com/r/y/s/Zz9" }, {}, resolve);
+  ok(keep === true, "sendToEngine answers asynchronously");
+});
+ok(!!fresh, "sendToEngine completes for a share link");
+const sCall = fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+ok(sCall && JSON.parse(sCall.opts.body).url ===
+   "https://www.reddit.com/r/y/comments/zzz9/followed/",
+   "…and a fresh share link rides the fetch's canonical address");
+
 // 6. the popup's quick door for several finds (v0.40.7): one batch call to
 // the engine's own batch endpoint — /jobs/batch, never N single jobs
 // v0.43.2: the batch rides each find's captured headers like the single
@@ -338,10 +387,11 @@ ok(batched && batched.ok && batched.queued === 2,
 // back silently.
 {
   const ff = {
-    listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [] },
+    listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [],
+                 beforeRedirect: [] },
     spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onUpdated: [], onMessage: null,
     jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
-    batchStatus: 200, batchSkipped: false,
+    batchStatus: 200, batchSkipped: false, jobsList: null, jobsListStatus: 200,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const readStore = (defaults) => {
@@ -383,6 +433,7 @@ ok(batched && batched.ok && batched.queued === 2,
         },
       },
       onHeadersReceived: { addListener: (fn) => ff.listeners.headersReceived.push(fn) },
+      onBeforeRedirect: { addListener: (fn) => ff.listeners.beforeRedirect.push(fn) },
     },
     tabs: {
       onRemoved: { addListener: (fn) => ff.onRemoved.push(fn) },
@@ -424,6 +475,11 @@ ok(batched && batched.ok && batched.queued === 2,
   globalThis.browser = browserStub;
   globalThis.fetch = async (url, opts = {}) => {
     ff.fetchCalls.push({ url, opts });
+    if (/reddit\.com\/.*\/s\//i.test(url)) {
+      // measured: Firefox background fetches are CORS-bound — a redirect
+      // fetch to another origin cannot read the answer there
+      throw new Error("TypeError: NetworkError when attempting to fetch resource.");
+    }
     if (url.endsWith("/sniff/patterns")) {
       return { ok: true, json: async () => ({ ext: ["mp4", "m3u8", "ts"] }) };
     }
@@ -458,6 +514,12 @@ ok(batched && batched.ok && batched.queued === 2,
                json: async () => ({ jobs: list.map((_, i) => ({ id: "B" + i })), skipped: [] }) };
     }
     if (url.endsWith("/jobs")) {
+      if ((opts.method || "GET") === "GET") {
+        if (ff.jobsListStatus === 401) {
+          return { ok: false, status: 401, text: async () => '{"detail":"unauthorized"}' };
+        }
+        return { ok: true, status: 200, json: async () => ({ jobs: ff.jobsList || [] }) };
+      }
       if (ff.jobsStatus === 200) {
         return { ok: true, status: 200, json: async () => ({ id: "J7" }) };
       }
@@ -578,6 +640,46 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(denied && !denied.ok && /token/i.test(denied.error || ""),
        "firefox: a 401 says the token is the problem");
 
+    // — v0.5.12: the share-link map resolves here too; an unmapped link
+    //   passes through unchanged (Firefox's background fetches are CORS-
+    //   bound, so the map — filled by the browser's own redirects — is the
+    //   path, and a miss must never mangle the link) —
+    ff.listeners.beforeRedirect[0]({
+      url: "https://www.reddit.com/r/x/s/AbC123",
+      redirectUrl: "https://www.reddit.com/r/x/comments/abc123/the_thread/",
+    });
+    await settle();
+    const fShare = await sendToBg({ type: "sendHandoff",
+      url: "https://www.reddit.com/r/x/s/AbC123", urls: [],
+      tabUrl: "https://www.reddit.com/r/x/s/AbC123" });
+    const fShareCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    const fShareBody = fShareCall && JSON.parse(fShareCall.opts.body);
+    ok(fShare && fShare.ok && fShareBody &&
+       fShareBody.url === "https://www.reddit.com/r/x/comments/abc123/the_thread/" &&
+       fShareBody.tab_url === "https://www.reddit.com/r/x/comments/abc123/the_thread/",
+       "firefox: a seen share redirect resolves the link and its tab");
+    const fFresh = await sendToBg({ type: "sendHandoff",
+      url: "https://www.reddit.com/r/never/s/Ww1", urls: [], tabUrl: "" });
+    const fFreshCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(fFresh && fFresh.ok &&
+       JSON.parse(fFreshCall.opts.body).url === "https://www.reddit.com/r/never/s/Ww1",
+       "firefox: an unmapped share link passes through unchanged, never mangled");
+
+    // — the mirror: recentJobs answers in the lean shape, newest first, the
+    //   caveat note included —
+    ff.jobsList = [
+      { id: "m1", title: "clip", url: "https://cdn/a.mp4", status: "downloading",
+        created_at: "2026-10-10T01:00:00Z", note: "" },
+      { id: "m2", title: "reddit video", url: "https://cdn/b.mp4", status: "completed",
+        created_at: "2026-10-10T02:00:00Z",
+        note: "the thumbnail could not be embedded" },
+    ];
+    const rec = await sendToBg({ type: "recentJobs" });
+    ok(rec && rec.ok && rec.jobs.length === 2 && rec.jobs[0].id === "m2",
+       "firefox: recentJobs sorts newest-first");
+    ok(rec && rec.jobs[0].note.indexOf("thumbnail") !== -1 && !("filepath" in rec.jobs[0]),
+       "firefox: …with the note, in the lean shape");
+
     // and the popup script itself, against that same environment (v0.39.0:
     // a doorman — plain words, a chooser only when the page offered several
     // streams, and ONE handoff; the quality pick happens in the app)
@@ -613,12 +715,12 @@ ok(batched && batched.ok && batched.queued === 2,
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
                  "headline", "subline", "pickgroup", "streams", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
-                 "optsLink", "ver", "allbtn"];
+                 "optsLink", "ver", "allbtn", "recent", "recentList"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
-      for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon"]) {
+      for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -788,6 +890,22 @@ ok(batched && batched.ok && batched.queued === 2,
        || String(nodes.allbtn.getAttribute("aria-pressed")) === "true",
        "firefox: …and the door says what a second press will do");
 
+    // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("firefox: the popup reload must load without throwing (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.recent.hidden === false && nodes.recentList.children.length === 3,
+       "firefox: the mirror lists the recent jobs");
+    ok(nodes.recentList.children[0].children[2].textContent === "Done" &&
+       nodes.recentList.children[2].children[2].textContent === "Downloading",
+       "firefox: …newest first, in the app's words");
+    ok(String(nodes.recentList.children[1].textContent).indexOf("thumbnail") !== -1,
+       "firefox: …and a caveat note rides under its job");
+
     // — a tab walking to a new page resets its list (same bug, this flavor) —
     ff.listeners.beforeRequest[0]({ tabId: 8, type: "media", url: "https://cdn/ff-old-page" });
     await settle();
@@ -834,6 +952,15 @@ ok(batched && batched.ok && batched.queued === 2,
   globalThis.document = saved.document;
 }
 
+
+// — v0.5.12: the chooser's boxes are drawn as checkboxes (squares with a
+//   tick) — this list is multi-select, and circles promise one choice —
+const cssSrc = readFileSync(join(here, "popup.css"), "utf8");
+const pickBlock = (/\.pickline input \{([^}]*)\}/.exec(cssSrc) || [])[1] || "";
+ok(pickBlock && !/border-radius:\s*50%/.test(pickBlock),
+   "the pick rows' boxes are not drawn as radio circles");
+ok(/\.pickline input:checked::after \{[\s\S]{0,220}?border-left: 2px solid[\s\S]{0,220}?rotate\(-45deg\)/.test(cssSrc),
+   "…they are squares with a tick");
 
 if (failures.length) {
   console.error("extension runtime: FAILED");

@@ -45,7 +45,7 @@ let storageChain = Promise.resolve();
 function update(mutate) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, (data) => {
+      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {} }, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -260,6 +260,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendBatchToEngine(msg.urls).then(sendResponse);
     return true;
   }
+  if (msg && msg.type === "recentJobs") {
+    recentJobs().then(sendResponse);
+    return true;
+  }
 });
 
 // Which of these is worth showing? The engine's answer, so the popup and the
@@ -286,6 +290,7 @@ async function rankWithEngine(items) {
 }
 
 async function sendToEngine(url) {
+  url = await resolveShareUrl(url);
   const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
   const eng = await resolveEngine();
@@ -328,10 +333,15 @@ async function sendBatchToEngine(urls) {
   // v0.43.2: the single quick door rides the captured request headers (an
   // auth-walled stream refuses without them) — the batch door must too.
   // One map keyed by URL; links with nothing captured fall back engine-side.
+  // v0.5.12: a share link resolves first; captured headers key on the URL
+  // the page actually used, so each send keeps its own lookup
+  const pairs = [];
+  for (const u of list) pairs.push({ from: u, url: await resolveShareUrl(u) });
+  const resolvedList = pairs.map((p) => p.url);
   const headersByUrl = {};
-  for (const u of list) {
-    const h = stored.reqHeaders[u] && stored.reqHeaders[u].headers;
-    if (h && Object.keys(h).length) headersByUrl[u] = h;
+  for (const p of pairs) {
+    const h = stored.reqHeaders[p.from] && stored.reqHeaders[p.from].headers;
+    if (h && Object.keys(h).length) headersByUrl[p.url] = h;
   }
   const eng = await resolveEngine();
   if (!eng.ok) {
@@ -347,8 +357,8 @@ async function sendBatchToEngine(urls) {
         "Authorization": "Bearer " + stored.engineToken,
       },
       body: JSON.stringify(Object.keys(headersByUrl).length
-        ? { urls: list, headers_by_url: headersByUrl }
-        : { urls: list }),
+        ? { urls: resolvedList, headers_by_url: headersByUrl }
+        : { urls: resolvedList }),
     });
   } catch (e) {
     RESOLVED = "";   // it moved: look again next time
@@ -362,7 +372,7 @@ async function sendBatchToEngine(urls) {
   }
   if (res.status === 404 || res.status === 405) {
     let queued = 0;
-    for (const u of list) {
+    for (const u of resolvedList) {
       const one = await sendToEngine(u);
       if (one.ok) queued += 1;
     }
@@ -378,6 +388,108 @@ async function sendBatchToEngine(urls) {
     return { ok: false, error: "the engine skipped every link: " + why };
   }
   return { ok: true, queued, skipped };
+}
+
+// ── share links (v0.5.12) ────────────────────────────────────────────────
+// Reddit-style "/…/s/…" share links only resolve inside a browser session:
+// a downloader fetching one gets "this link does not exist" (the app has
+// said so honestly since v0.45.28). The extension IS a session, so it
+// resolves them before anything is sent. Two sources, in order:
+//   1. the redirect the browser itself made when the user opened the link
+//      — observed live and remembered, no fetch needed (and the only path
+//      on Firefox: its background fetches are CORS-bound, measured, so an
+//      unmapped link there passes through unchanged);
+//   2. a follow-redirect fetch. Chrome exempts extension fetches that hold
+//      host permissions, so it resolves there even for a bare link.
+const SHARE_LINK = /^https?:\/\/(?:[a-z0-9-]+\.)*reddit\.com\/[^?#]*\/s\/[A-Za-z0-9]+/i;
+let SHARE_MAP = null;   // lazily read from storage; { shareUrl: canonical }
+
+async function shareMap() {
+  if (SHARE_MAP) return SHARE_MAP;
+  try {
+    const got = await api.storage.local.get({ shareMap: {} });
+    SHARE_MAP = got.shareMap || {};
+  } catch (_) { SHARE_MAP = {}; }
+  return SHARE_MAP;
+}
+
+function rememberShare(from, to) {
+  if (!from || !to || from === to) return;
+  update(({ shareMap }) => {
+    const map = Object.assign({}, shareMap || {});
+    map[from] = to;
+    const keys = Object.keys(map);
+    while (keys.length > 40) delete map[keys.shift()];
+    SHARE_MAP = map;
+    return { shareMap: map };
+  });
+}
+
+async function resolveShareUrl(url) {
+  if (!url || !SHARE_LINK.test(url)) return url;
+  try {
+    const map = await shareMap();
+    if (map[url]) return map[url];
+  } catch (_) { /* fall through to the fetch */ }
+  try {
+    const res = await fetch(url, { redirect: "follow", credentials: "include",
+                                   cache: "no-store" });
+    const final = (res && res.url) || "";
+    if (final && final !== url && !SHARE_LINK.test(final)) {
+      rememberShare(url, final);   // the next send needs no fetch at all
+      return final;
+    }
+  } catch (_) { /* CORS (Firefox) or offline: the link passes through */ }
+  return url;
+}
+
+// the browser's own redirects are the cheapest source — fired for the tab's
+// real navigations, so a link the user opened is resolved the moment it lands
+if (chrome.webRequest.onBeforeRedirect) {
+  chrome.webRequest.onBeforeRedirect.addListener(
+    (details) => {
+      try {
+        if (SHARE_LINK.test(details.url || "") && details.redirectUrl) {
+          rememberShare(details.url, details.redirectUrl);
+        }
+      } catch (_) { /* never fatal */ }
+    },
+    { urls: ["*://*.reddit.com/*"] }
+  );
+}
+
+// ── the popup's mirror (v0.5.12) ─────────────────────────────────────────
+// What the engine is doing with what was sent — the same states and the
+// same honest notes the app shows, where the hand-off was made. Read-only;
+// a failure is just "nothing to mirror", never an error on the popup.
+const RECENT_KEEP = 4;
+
+async function recentJobs() {
+  const stored = await api.storage.local.get({ engineToken: "" });
+  const eng = await resolveEngine();
+  if (!eng.ok) return { ok: false, jobs: [] };
+  try {
+    const res = await fetch(eng.base + "/jobs", {
+      headers: { Authorization: "Bearer " + stored.engineToken },
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, jobs: [] };
+    const body = await res.json();
+    const jobs = (body.jobs || [])
+      .slice()
+      .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+      .slice(0, RECENT_KEEP)
+      .map((j) => ({
+        id: j.id,
+        url: j.url || "",
+        title: j.title || "",
+        status: j.status || "",
+        note: j.note || "",
+      }));
+    return { ok: true, jobs };
+  } catch (_) {
+    return { ok: false, jobs: [] };
+  }
 }
 
 // The engine's port ladder. Keep in sync with _port_candidates() in
@@ -452,6 +564,9 @@ async function engineState() {
 // the quality choice happens where the formats are real. An older engine
 // (no /handoff) falls back to the one-shot job this extension used to send.
 async function sendHandoff(url, urls, tabUrl) {
+  url = await resolveShareUrl(url);
+  tabUrl = await resolveShareUrl(tabUrl);
+  urls = await Promise.all((urls || []).map(resolveShareUrl));
   const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
   const eng = await resolveEngine();
