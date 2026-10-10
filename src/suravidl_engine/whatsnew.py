@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.1",
+        "title": "The recorder",
+        "items": [
+            "Live streams are recorded now, not chased: a LIVE link shows ● REC with time on air and bytes — no fake percentage — and Stop & keep keeps everything recorded so far.",
+        ],
+    },
+    {
         "version": "0.46.0",
         "title": "The toolbox",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The trace",
         "items": [
             "If anything inside the engine ever fails unexpectedly, the app now says what failed — the error's own name and message — instead of a bare “500”.",
-        ],
-    },
-    {
-        "version": "0.45.24",
-        "title": "The spare",
-        "items": [
-            "A download stalled by a dead source no longer shrinks the engine — its worker is replaced, so a queue can never quietly stop moving.",
         ],
     },
 ]

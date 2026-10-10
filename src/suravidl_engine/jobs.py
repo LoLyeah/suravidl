@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     completed_at TEXT,
     files TEXT,
     partials TEXT,
-    download_dir TEXT
+    download_dir TEXT,
+    live INTEGER DEFAULT 0
 )
 """
 
@@ -414,6 +415,12 @@ class JobManager:
                     # resumed once, restart included (v0.45.17 audit B/F2)
                     self._con.execute(
                         "ALTER TABLE jobs ADD COLUMN replaced_by TEXT")
+                if "live" not in cols:
+                    # a live recording (v0.46.1 "the recorder"): the stall
+                    # watchdog must never write it off — a quiet stream is
+                    # not a wedge, it is a stream between segments
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN live INTEGER DEFAULT 0")
                 if "download_dir" not in cols:
                     # the folder this job downloaded into: a later settings
                     # change must not make its files undeletable (v0.21.2)
@@ -517,6 +524,7 @@ class JobManager:
         else:
             job["partials"] = None
         job["replaced_by"] = job.get("replaced_by") or None
+        job["live"] = bool(job.get("live"))
         job["size_bytes"] = _stat_size(job)
         return job
 
@@ -531,8 +539,8 @@ class JobManager:
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at, files, partials, download_dir,"
-                " replaced_by)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " replaced_by, live)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -540,7 +548,8 @@ class JobManager:
                 " eta=excluded.eta, completed_at=excluded.completed_at,"
                 " files=excluded.files, partials=excluded.partials,"
                 " download_dir=excluded.download_dir,"
-                " replaced_by=excluded.replaced_by",
+                " replaced_by=excluded.replaced_by,"
+                " live=excluded.live",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -558,6 +567,7 @@ class JobManager:
                     json.dumps(job["partials"]) if job.get("partials") else None,
                     job.get("download_dir") or str(self.download_dir),
                     job.get("replaced_by"),
+                    1 if job.get("live") else 0,
                 ),
             )
 
@@ -569,7 +579,8 @@ class JobManager:
                raw_args: str | None = None,
                overrides: dict | None = None,
                download_dir: str | None = None,
-               partials: list | None = None) -> dict:
+               partials: list | None = None,
+               live: bool = False) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the
@@ -637,6 +648,10 @@ class JobManager:
             # execution must honor it (a job resumed after a Settings folder
             # change keeps its original folder — v0.45.17 audit B/F3)
             "download_dir": str(download_dir or self.download_dir),
+            # a live recording (v0.46.1): the card shows REC, the watchdog
+            # leaves it alone; yt-dlp's own is_live can also flip this
+            # mid-flight (the belt to the UI's suspenders)
+            "live": bool(live),
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -1107,6 +1122,11 @@ class JobManager:
                     # for many minutes without an event
                     if not job or job.get("status") != "downloading":
                         continue
+                    # a live recording is exempt (v0.46.1): a stream between
+                    # segments is quiet by nature, and killing the row would
+                    # throw away a recording that is working
+                    if job.get("live"):
+                        continue
                     tick = self._last_tick.get(jid)
                     if tick is not None and now - tick <= STALL_LIMIT:
                         continue
@@ -1168,6 +1188,8 @@ class JobManager:
 
         def hook(d):
             self._last_tick[job["id"]] = time.monotonic()
+            if not job.get("live") and (d.get("info_dict") or {}).get("is_live"):
+                job["live"] = True
             if _stop_requested(job):  # stop requested mid-run
                 raise _Cancelled()
             d_info = d.get("info_dict") or {}

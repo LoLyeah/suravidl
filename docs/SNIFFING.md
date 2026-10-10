@@ -63,11 +63,17 @@ and refuse the same DRM for the same reasons. Shells collect; the engine judges.
   regardless.
 - **Segment-only MSE** — a player that never requests a manifest because the
   JavaScript builds one in memory. There is no URL to hand over.
-- **Live and growing streams.** A capture hands over a URL, and a live playlist
-  is a snapshot; recording it is a different feature (see the plan's backlog).
+- **A live stream's earlier parts, if the site no longer serves them.** A
+  capture hands over a URL, and a live recording starts from wherever the
+  site still has (or from the beginning when the site serves it and the
+  setting asks for it); what already scrolled out of the window is gone.
 - **Subtitles for captured streams.** They are not sniffed, because they are not
   media requests. Downloading a video without its subtitles beats not
   downloading it.
+- **A live recording keeps working through the app.** The row shows `● REC`
+  with time on air and bytes on disk, the stall watchdog leaves a quiet
+  stream alone (a stream between segments is not a wedge), and **Stop &
+  keep** finalizes what was recorded — the bytes are never thrown away.
 - **Any hosted, public version of this.** The engine is loopback-only on
   purpose.
 

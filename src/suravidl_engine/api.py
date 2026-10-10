@@ -30,6 +30,8 @@ from . import site_memory
 class JobRequest(BaseModel):
     url: str
     fmt: str | None = None
+    # a live recording (v0.46.1): the probe knew, the job carries it
+    live: bool = False
     headers: dict | None = None
     preset: str | None = None
     playlist_items: str | None = None
@@ -961,7 +963,8 @@ def create_app(download_dir, auth_token: str | None = None,
                          preset=preset,
                          playlist_items=body.playlist_items,
                          raw_args=raw,
-                         overrides=overrides)
+                         overrides=overrides,
+                         live=body.live)
         remember_site_quality(body.url, body.fmt)
         return redact_job(job)
 

@@ -82,7 +82,7 @@ report into one paste.
   fields, and that `/logs` output is what it claims.
 - **Risks**: none real; the redaction test is the whole game.
 
-## Wave 2 — v0.46.1 "the recorder"  (live streams, first-class)
+## Wave 2 — v0.46.1 "the recorder"  (live streams, first-class) — SHIPPED
 
 Half of this exists: `live_from_start` is a setting the downloader
 already honours, and the probe card already reads `is_live`. What is

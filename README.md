@@ -24,6 +24,8 @@ reviews: [docs/audits/](docs/audits/)
 - **Probe first**: paste a link, see the real formats, pick one, download.
 - **Paste a list**: several links at once are each checked and named before
   anything queues — tick the good ones, queue just those.
+- **Live streams**: a live link records while it plays (● REC, time on air,
+  no fake percentage); **Stop & keep** keeps everything recorded so far.
 - **Playlists and channels**: browse entries, tick the ones you want or type a range.
 - **Audio only**: keep the native stream, or convert to m4a / MP3 192–320k / FLAC / Opus.
 - **Subtitles**: pick a language from what the site actually offers; download as

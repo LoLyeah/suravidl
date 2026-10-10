@@ -559,6 +559,12 @@ const STRINGS = { en: {}, id: {
   "path to cookies.txt (Netscape format)": "path ke cookies.txt (format Netscape)",
   "pause failed: {msg}": "gagal menjeda: {msg}",
   "paused": "dijeda",
+  "Stop & keep": "Berhenti & simpan",
+  "recording": "merekam",
+  "recorded": "terekam",
+  "recorded (stopped)": "terekam (dihentikan)",
+  "record from the beginning": "rekam dari awal",
+  "{t} on air": "{t} mengudara",
   "per-site tweaks as ": "penyesuaian per situs sebagai ",
   "pick at least one item first": "pilih minimal satu item dulu",
   "pick items first": "pilih item dulu",
@@ -1347,6 +1353,8 @@ function forceQueueRepaint() {
 
 /* ---------- probe ---------- */
 let PROBE_SEQ = 0;
+let PROBE_LIVE = false;          // the current probe is a live stream (v0.46.1)
+let LIVE_START_DEFAULT = false;  // the setting decides the box's default
 
 async function doProbe() {
   const url = $("url").value.trim();
@@ -1387,6 +1395,7 @@ async function doProbe() {
 function showProbeFailure(msg, detail, url) {
   LAST_FAIL = { msg: msg, detail: detail };
   LAST_PROBE = null;
+  PROBE_LIVE = false;
   // the engine explains a failure (it owns the "sign-in wall" judgement and
   // says so in its own words) — the UI does not second-guess it
   $("probeMsg").textContent = t("probe failed: {msg}", { msg: msg });
@@ -1758,7 +1767,13 @@ function renderProbe(url, info) {
 
   // the probe has always carried these three; the UI now shows them
   const live = info.is_live === true || info.live_status === "is_live";
+  PROBE_LIVE = live;
   $("liveRow").classList.toggle("hidden", !live);
+  if (live && $("liveStartBox")) {
+    // the setting decides the default; ticking it here is a one-download
+    // override that rides the job (v0.46.1 "the recorder")
+    $("liveStartBox").checked = !!LIVE_START_DEFAULT;
+  }
   SUBS_EXPANDED = false;              // every probe starts folded
   renderSubsChips(info);
   syncSubLangsWithProbe(info);        // a pick this video lacks goes now
@@ -2106,6 +2121,13 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     // "best quality", or the whole playlist: no_audio is the engine's key
     // for "do not pair this video with the site's audio" (2026-09-27)
     if ($("noSound").checked) ov = { ...(ov || {}), no_audio: true };
+    if (PROBE_LIVE) {
+      // a live recording: the flag the card and the watchdog ride on, and
+      // the one-off "from the beginning" pick, explicit both ways
+      body.live = true;
+      ov = { ...(ov || {}),
+             live_from_start: !!($("liveStartBox") && $("liveStartBox").checked) };
+    }
     if (ov) body.overrides = ov;
     // say what rode — and what a format pick silently replaced: jobs used to
     // report a bare "Added to downloads" either way (v0.35.0)
@@ -2542,6 +2564,23 @@ function jobSig(j) {
 
 function metaParts(j) {
   const downloading = j.status === "downloading";
+  if (j.live && downloading) {
+    // a live recording has no total and no honest ETA: time on air and
+    // bytes on disk are the truth it has (v0.46.1 "the recorder")
+    const started = Date.parse(j.created_at || "");
+    const secs = started ? Math.max(0, Math.round((Date.now() - started) / 1000)) : null;
+    const onAir = secs != null
+      ? (secs >= 3600 ? Math.floor(secs / 3600) + ":" +
+            String(Math.floor((secs % 3600) / 60)).padStart(2, "0")
+        : String(Math.floor(secs / 60))) + ":" + String(secs % 60).padStart(2, "0")
+      : "";
+    // the ffmpeg downloader emits no per-byte progress for a live:
+    // downloaded_bytes can sit at 0 while the file on disk grows — the
+    // stat is the truth a recorder should report
+    const bytes = (j.progress && j.progress.downloaded_bytes) || j.size_bytes || 0;
+    return [...(onAir ? [t("{t} on air", { t: onAir })] : []),
+            ...(bytes ? [humanBytes(bytes) + " " + t("recorded")] : [])];
+  }
   const pct = Math.round(progressPct(j));
   const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
   const eta = j.progress && j.progress.eta != null
@@ -2772,7 +2811,11 @@ function jobRow(j) {
     e.preventDefault();
     flip();
   };
-  top.append(title, el("span", "pill " + j.status, t(j.status)));
+  const pillWord = j.live
+    ? (j.status === "downloading" ? t("recording")
+      : j.status === "paused" ? t("recorded (stopped)") : t(j.status))
+    : t(j.status);
+  top.append(title, el("span", "pill " + j.status, pillWord));
   // a finished take gets the stamp (v0.37.0: completion used to be a pill
   // you never saw flip in a tab you were not on)
   if (j.status === "completed") {
@@ -2803,14 +2846,16 @@ function jobRow(j) {
     // Every active state gets a bar: "downloading" carries real progress, and
     // queued/merging get an indeterminate track. A 15–45s ffmpeg mux with no
     // motion anywhere reads as a hung engine (motion review).
-    const downloading = j.status === "downloading";
+    // a live recording never gets a percentage: there is no total, and a
+    // fake one would be a lie that moves (v0.46.1 "the recorder")
+    const sized = j.status === "downloading" && !j.live;
     const bar = el("div", "bar");
     bar.setAttribute("role", "progressbar");
     bar.setAttribute("aria-valuemin", "0");
     bar.setAttribute("aria-valuemax", "100");
-    if (downloading) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
-    const fill = el("div", "fill active" + (downloading ? "" : " indet"));
-    fill.style.width = downloading ? progressPct(j).toFixed(1) + "%" : "100%";
+    if (sized) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
+    const fill = el("div", "fill active" + (sized ? "" : " indet"));
+    fill.style.width = sized ? progressPct(j).toFixed(1) + "%" : "100%";
     bar.append(fill);
     row.append(bar);
     const meta = el("div", "jmeta");
@@ -2967,7 +3012,9 @@ function jobRow(j) {
   if (ACTIVE.has(j.status)) {
     // pause keeps the bytes already fetched; cancel throws them away
     // (v0.22.0 review #6)
-    const pause = el("button", "ghost-sm", t("Pause"));
+    // on a live recording the pause IS the product: stop the recording,
+    // keep every byte (v0.46.1 "the recorder")
+    const pause = el("button", "ghost-sm", t(j.live ? "Stop & keep" : "Pause"));
     pause.onclick = () => api(`/jobs/${j.id}/pause`, { method: "POST" })
       .then(refreshJobs)
       .catch((e) => toast(t("pause failed: {msg}", { msg: e.message }), "bad"));
@@ -4464,6 +4511,7 @@ function markSettingsDirty(on) {
 async function loadSettings() {
   try {
     const s = await api("/settings");
+    LIVE_START_DEFAULT = !!s.live_from_start;
     SETTINGS_SNAPSHOT = s;
     CURRENT = { theme: s.theme, glass: s.glass, accent: s.accent };
     $("setDir").value = s.download_dir || "";

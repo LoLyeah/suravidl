@@ -71,9 +71,10 @@ def test_the_progress_glide_is_paired_with_the_poll_interval():
 
 def test_queued_and_merging_get_an_indeterminate_bar():
     """They showed nothing at all — and merging is a 15-45s ffmpeg mux, long
-    enough to read as a hung engine."""
-    assert 'const downloading = j.status === "downloading"' in APP
-    assert '"fill active" + (downloading ? "" : " indet")' in APP
+    enough to read as a hung engine. A live recording joins them (v0.46.1):
+    there is no total, and a fake percentage would be a lie that moves."""
+    assert 'const sized = j.status === "downloading" && !j.live;' in APP
+    assert '"fill active" + (sized ? "" : " indet")' in APP
     assert ".bar .fill.indet" in CSS
     # and the poll must not overwrite the indeterminate width with a "0%"
     assert 'fill && !fill.classList.contains("indet")' in APP
