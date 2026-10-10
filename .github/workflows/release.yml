@@ -99,6 +99,32 @@ jobs:
           test ! -e "$WORK/installed/suravidl.app/Contents/OLD"
           test ! -e "$WORK/update.zip"     # the carrier is consumed (v0.42.1)
           echo "swap dry-run ok"
+          # a lingering old process (the v0.46.3 field report) must be
+          # reaped — politely then firmly — before the reopen; the guard
+          # checks the pid still IS the app by its executable name
+          mkdir -p "$WORK/fake.app/Contents/MacOS"
+          cp /bin/sleep "$WORK/fake.app/Contents/MacOS/suravidl-linger"
+          cat > "$WORK/fake.app/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>CFBundleExecutable</key><string>suravidl-linger</string>
+          </dict></plist>
+          PLIST
+          mkdir -p "$WORK/new2/suravidl.app/Contents"
+          echo new > "$WORK/new2/suravidl.app/Contents/NEW"
+          ditto -c -k --keepParent "$WORK/new2/suravidl.app" "$WORK/update2.zip"
+          "$WORK/fake.app/Contents/MacOS/suravidl-linger" 300 &
+          LINGER=$!
+          SURAVIDL_APPLY_DRYRUN=1 SURAVIDL_APPLY_WAIT_TICKS=4 \
+            bash src/suravidl_engine/macos_swap.sh \
+            suravidl-apply "$WORK/installed/suravidl.app" "$WORK/update2.zip" "$LINGER"
+          if kill -0 "$LINGER" 2>/dev/null; then
+            echo "the lingering process survived the swap — it must not" >&2
+            exit 1
+          fi
+          test -f "$WORK/installed/suravidl.app/Contents/NEW"
+          echo "linger dry-run ok"
           # rollback: a zip carrying no bundle must leave the app untouched
           echo nope > "$WORK/notanapp.txt"
           ditto -c -k "$WORK/notanapp.txt" "$WORK/bad.zip"

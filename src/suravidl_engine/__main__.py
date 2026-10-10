@@ -1348,6 +1348,20 @@ def _make_apply_update_action(window):
             except Exception:  # noqa: BLE001
                 return False
             window.destroy()   # the script waits for this pid to go
+            # the belt to the script's suspenders (v0.46.3 "the comeback"):
+            # if threads outlive the window and this process lingers, the
+            # swap would wait its bounded time and then reopen into a live
+            # old pid. Give the clean teardown a moment; then leave,
+            # deliberately. (The report: "update and restart on macOS just
+            # shuts down" — 2026-10-10.)
+            import threading as _threading
+            import time as _time
+
+            def _leave():
+                _time.sleep(8)
+                os._exit(0)
+
+            _threading.Thread(target=_leave, daemon=True).start()
             return True
 
         return False

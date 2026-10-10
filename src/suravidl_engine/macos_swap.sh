@@ -1,33 +1,84 @@
 #!/bin/bash
-# suravidl's macOS self-update swap (v0.42.0 "the crossing").
+# suravidl's macOS self-update swap (v0.42.0 "the crossing"; the relaunch
+# hardened in v0.46.3 "the comeback").
 #
 # Called detached by the app as it quits:
 #   bash macos_swap.sh suravidl-apply <app-bundle> <update-zip> <app-pid>
 #
-# It waits for the old process to die, extracts the new bundle BESIDE the
-# old one (same filesystem — the swap below is a rename, and renames never
-# cross devices), then swaps by rename: a running bundle can be renamed,
-# deleting its files mid-run is what breaks. Any failure rolls the old
-# bundle back and still reopens it — the user must never be left with
-# nothing to launch.
+# It waits for the old process to die — and ENDS it if the window is gone
+# but the process lingers, because a lingering window-less process is
+# exactly what a plain `open` activates instead of launching fresh (the
+# field's "update and restart just shuts down", user report 2026-10-10).
+# Then it extracts the new bundle BESIDE the old one (same filesystem —
+# the swap below is a rename, and renames never cross devices), and swaps
+# by rename: a running bundle can be renamed, deleting its files mid-run
+# is what breaks. Any failure rolls the old bundle back and still reopens
+# it — the user must never be left with nothing to launch.
+#
+# The relaunch is the one leg no CI dry-run can ride (the dry-run stops
+# before the app comes back up) — and it used to fail in total silence.
+# Now every attempt is logged (~/Library/Logs/suravidl-update.log), the
+# reopen forces a FRESH instance (`open -n`), and a direct-exec fallback
+# covers LaunchServices saying no. Silence was the real bug.
 set -u
 APP="$2"
 ZIP="$3"
 PID="$4"
 DIR="$(dirname "$APP")"
 BASE="$(basename "$APP")"
+EXEC="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' \
+        "$APP/Contents/Info.plist" 2>/dev/null || basename "$APP" .app)"
+LOG="${SURAVIDL_UPDATE_LOG:-$HOME/Library/Logs/suravidl-update.log}"
+WAIT_TICKS="${SURAVIDL_APPLY_WAIT_TICKS:-180}"   # CI shrinks this
+
+say() {
+  { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; } >>"$LOG" 2>/dev/null || true
+}
 
 relaunch() {
   # the CI dry-run stops before the app comes back up
   [ -n "${SURAVIDL_APPLY_DRYRUN:-}" ] && return 0
-  open "$1"
+  # open -n: force a new instance. A plain open can activate a stale,
+  # window-less registration — the user sees nothing come back.
+  if open -n "$1" 2>>"$LOG"; then
+    say "relaunch: open -n ok -> $1"
+    return 0
+  fi
+  # LaunchServices said no; exec the inside directly — a GUI app spawned
+  # from a user-session script still gets the Aqua session.
+  INNER="$1/Contents/MacOS/$EXEC"
+  if [ -x "$INNER" ]; then
+    nohup "$INNER" >/dev/null 2>&1 &
+    say "relaunch: open -n failed; inner executable spawned -> $INNER"
+    return 0
+  fi
+  say "relaunch: FAILED both ways — the app is at $1"
+  return 1
 }
 
-# 1) wait for the app to exit (bounded: 90s), then a breath for its locks
-for _ in $(seq 1 180); do
+# 1) wait for the app to exit (bounded), then a breath for its locks
+for _ in $(seq 1 "$WAIT_TICKS"); do
   kill -0 "$PID" 2>/dev/null || break
   sleep 0.5
 done
+if kill -0 "$PID" 2>/dev/null; then
+  # Still here: the window is gone (the app destroys it before spawning
+  # us) but the process lingers. End it — politely, then firmly — or the
+  # reopen lands on a dead instance. Guarded: only when the pid still IS
+  # the app's executable (never a recycled pid).
+  case "$(ps -p "$PID" -o comm= 2>/dev/null)" in
+    *"$EXEC"*)
+      say "the old process lingered; ending it (pid $PID)"
+      kill -TERM "$PID" 2>/dev/null
+      for _ in $(seq 1 10); do
+        kill -0 "$PID" 2>/dev/null || break
+        sleep 0.5
+      done
+      kill -KILL "$PID" 2>/dev/null
+      ;;
+    *) say "pid $PID lingers but is not the app any more; leaving it" ;;
+  esac
+fi
 sleep 1
 
 # 2) extract the new bundle beside the old one
@@ -68,5 +119,6 @@ fi
 rm -rf "$STAGE"
 
 # 4) come back up
+say "swap done; relaunching $APP"
 relaunch "$APP"
 exit 0

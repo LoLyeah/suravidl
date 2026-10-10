@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.3",
+        "title": "The comeback",
+        "items": [
+            "macOS updates come back on their own. The reopen after an update now forces a fresh instance, ends a lingering old process, and writes every attempt to ~/Library/Logs/suravidl-update.log.",
+        ],
+    },
+    {
         "version": "0.46.2",
         "title": "The follower",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The silence",
         "items": [
             "Deleting a just-cancelled download waits for the writer to actually go quiet first — a race could leave a leftover fragment behind on slow machines.",
-        ],
-    },
-    {
-        "version": "0.45.26",
-        "title": "The column",
-        "items": [
-            "A job database from an older version repairs itself on the first start — a missing column on upgraded installs had quietly broken new downloads and deleting jobs.",
         ],
     },
 ]

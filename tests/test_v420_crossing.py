@@ -85,6 +85,28 @@ def test_the_swap_script_waits_swaps_and_rolls_back():
     assert 'relaunch "$APP"' in s
 
 
+def test_the_relaunch_is_hardened_and_leaves_a_trace():
+    """v0.46.3 "the comeback". The reopen is the leg no CI dry-run rides,
+    and in the field it failed silently: "update and restart just shuts
+    down". A plain open can activate a stale window-less registration;
+    a lingering old process makes it worse; and nothing wrote anywhere."""
+    s = SWAP.read_text()
+    assert "open -n" in s, "the reopen must force a FRESH instance"
+    assert "suravidl-update.log" in s, "a failed relaunch must leave a trace"
+    assert 'INNER="$1/Contents/MacOS/$EXEC"' in s, "the direct-exec fallback"
+    assert 'kill -TERM "$PID"' in s and 'kill -KILL "$PID"' in s, \
+        "a lingering old process must be ended, or the reopen lands on it"
+    assert 'ps -p "$PID" -o comm=' in s, "never kill a recycled pid"
+    assert 'SURAVIDL_APPLY_WAIT_TICKS' in s, "CI must be able to shrink the wait"
+
+
+def test_the_app_leaves_deliberately_when_the_window_is_gone():
+    src = (SRC / "__main__.py").read_text()
+    assert "os._exit(0)" in src, \
+        "after the update destroys the window, a lingering process must \n" \
+        "leave on its own — the swap waits on exactly that pid"
+
+
 def test_the_script_is_valid_bash():
     r = subprocess.run(["bash", "-n", str(SWAP)],
                        capture_output=True, text=True)
