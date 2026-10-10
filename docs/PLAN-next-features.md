@@ -9,6 +9,24 @@ the recorder is the flagship and deserves a quiet base; the follower is
 last because it is the most "away-from-keyboard" feature and should be
 built on everything the recorder taught about long-running jobs.
 
+## Versioning: this campaign is the 0.46 arc
+
+The second digit is the arc; every `x.y.0` opens a titled one (0.43.0
+"the refresh", 0.44.0 "the phrasebook", 0.45.0 "the ledger") and the
+`x.y.z` releases inside belong to it. 0.45.x was the ledger —
+reliability, honest messages, migrations. These four features are new
+capability, so the campaign opens **0.46** and the waves are 0.46.0 →
+0.46.1 → 0.46.2.
+
+**Why not 1.0:** 1.0 is a promise — that a 1.x.y update never breaks an
+older extension, an older app, or an existing database. This project
+moves its engine API, its schema and its companion contracts every week
+(both were touched in this very arc), so 1.0 would be a boast, not a
+fact. The gate for it: the recorder and the follower land, and the
+API/schema/companion compat story is written into a policy (old
+things keep working by rule, deprecations get a window). When that
+policy exists, 1.0 is earned — not before.
+
 ## Ground rules (every wave)
 
 - One tag = one release; extensions untouched unless they change.
@@ -19,7 +37,7 @@ built on everything the recorder taught about long-running jobs.
 - Field-test list handed over with each release; honest "not promised"
   entries updated when a limit is real (we write our refusals down).
 
-## Wave 1 — v0.45.33 "the toolbox"  (bulk paste + diagnostics)
+## Wave 1 — v0.46.0 "the toolbox"  (bulk paste + diagnostics)
 
 Small, immediately felt, and they make every later wave faster to debug.
 
@@ -64,7 +82,7 @@ report into one paste.
   fields, and that `/logs` output is what it claims.
 - **Risks**: none real; the redaction test is the whole game.
 
-## Wave 2 — v0.45.34 "the recorder"  (live streams, first-class)
+## Wave 2 — v0.46.1 "the recorder"  (live streams, first-class)
 
 Half of this exists: `live_from_start` is a setting the downloader
 already honours, and the probe card already reads `is_live`. What is
@@ -96,7 +114,7 @@ that never finish, and a "stop" must never eat the recording.
   Storage: the size is on the card the whole time; stop is always one
   tap.
 
-## Wave 3 — v0.45.35 "the follower"  (watch list)
+## Wave 3 — v0.46.2 "the follower"  (watch list)
 
 Turn suravidl from a tool you visit into one that works for you: follow
 a playlist or channel, grab what's new, skip what you already have.
