@@ -757,6 +757,21 @@ const STRINGS = { en: {}, id: {
   "include this link": "sertakan tautan ini",
   "queued for a check…": "menunggu pemeriksaan…",
   "Copy diagnostics": "Salin diagnostik",
+  "Follow": "Ikuti",
+  "Following": "Mengikuti",
+  "Watch list": "Daftar pantau",
+  "Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.":
+    "Ikuti daftar putar atau kanal dan video barunya datang sendiri — mengikuti dimulai dari sekarang, pemeriksaan berjalan selama aplikasi hidup.",
+  "following “{name}” — new videos will arrive on their own":
+    "mengikuti “{name}” — video baru akan datang sendiri",
+  "could not follow: {msg}": "tidak bisa mengikuti: {msg}",
+  "every {n}h": "tiap {n} jam",
+  "never checked": "belum pernah diperiksa",
+  "checked {when}": "diperiksa {when}",
+  "{n} new": "{n} baru",
+  "watch list: {n} new, {q} queued": "daftar pantau: {n} baru, {q} diantre",
+  "watch list": "daftar pantau",
+  "stop following “{name}”?": "berhenti mengikuti “{name}”?",
   "Diagnostics": "Diagnostik",
   "versions, the ffmpeg probe, settings (secrets redacted by the engine), the log tail — paste the whole block into a bug report":
     "versi, probe ffmpeg, pengaturan (rahasia disunting oleh mesin), ekor log — tempel seluruh blok ke laporan bug",
@@ -1143,6 +1158,89 @@ async function copyText(t) {
   }
 }
 
+/* ---------- the watch list (v0.46.2 "the follower") ---------- */
+let FOLLOWS = [];
+
+function followRow(f) {
+  const row = el("div", "follows-row");
+  const info = el("div", "fmain");
+  info.append(el("div", "fname", f.label || f.url));
+  const bits = [t("every {n}h", { n: f.cadence_hours || 6 })];
+  let when = "";
+  if (f.last_checked) {
+    const ts = Date.parse(f.last_checked);
+    if (!isNaN(ts)) when = humanSince(ts);
+  }
+  bits.push(when ? t("checked {when}", { when: when }) : t("never checked"));
+  if (f.last_new > 0) bits.push(t("{n} new", { n: f.last_new }));
+  info.append(el("div", "fmeta small", bits.join(" \u00b7 ")));
+  if (f.last_error) info.append(el("div", "ferr small", f.last_error));
+  const acts = el("div", "facts");
+  const check = el("button", "ghost-sm", t("Check now"));
+  check.onclick = async () => {
+    check.classList.add("busy");
+    try {
+      const r = await api(`/follows/${f.id}/check`, { method: "POST" });
+      if (r && r.error) toast(t("could not follow: {msg}", { msg: r.error }), "bad");
+      else toast(t("watch list: {n} new, {q} queued", { n: r.new, q: r.queued }), "info");
+      await renderFollows();
+    } catch (e) {
+      toast(t("could not follow: {msg}", { msg: e.message }), "bad");
+    } finally {
+      check.classList.remove("busy");
+    }
+  };
+  const rem = el("button", "ghost-sm", t("Remove"));
+  rem.onclick = async () => {
+    if (!(await askConfirm(t("stop following \u201c{name}\u201d?",
+                              { name: f.label || f.url }),
+                           { okText: t("Remove"), danger: true }))) return;
+    await api(`/follows/${f.id}/delete`, { method: "POST" }).catch(() => {});
+    await renderFollows();
+  };
+  acts.append(check, rem);
+  row.append(info, acts);
+  return row;
+}
+
+async function renderFollows() {
+  const box = $("followsList");
+  if (!box) return;
+  try {
+    const r = await api("/follows");
+    FOLLOWS = (r && r.follows) || [];
+  } catch (_) {
+    FOLLOWS = [];
+  }
+  box.textContent = "";
+  for (const f of FOLLOWS) box.append(followRow(f));
+  if ($("followsNote")) $("followsNote").classList.toggle("hidden", FOLLOWS.length > 0);
+}
+
+function initFollows() {
+  if ($("followBtn")) {
+    $("followBtn").onclick = async () => {
+      const url = PROBE_URL || $("url").value.trim();
+      if (!url) return;
+      $("followBtn").classList.add("busy");
+      try {
+        const f = await api("/follows", {
+          method: "POST", body: JSON.stringify({ url: url }),
+        });
+        toast(t("following \u201c{name}\u201d \u2014 new videos will arrive on their own",
+                { name: f.label || url }), "ok");
+        if ($("followSay")) $("followSay").textContent = t("Following");
+        await renderFollows();
+      } catch (e) {
+        toast(t("could not follow: {msg}", { msg: e.message }), "bad");
+      } finally {
+        $("followBtn").classList.remove("busy");
+      }
+    };
+  }
+  renderFollows();
+}
+
 /* ---------- diagnostics (v0.46.0) ---------- */
 /** One paste instead of five screenshots: versions, the ffmpeg probe,
  *  redacted settings, the log tail. The engine redacts before the UI
@@ -1354,6 +1452,7 @@ function forceQueueRepaint() {
 /* ---------- probe ---------- */
 let PROBE_SEQ = 0;
 let PROBE_LIVE = false;          // the current probe is a live stream (v0.46.1)
+let PROBE_URL = "";              // the URL the last good probe read
 let LIVE_START_DEFAULT = false;  // the setting decides the box's default
 
 async function doProbe() {
@@ -1768,6 +1867,7 @@ function renderProbe(url, info) {
   // the probe has always carried these three; the UI now shows them
   const live = info.is_live === true || info.live_status === "is_live";
   PROBE_LIVE = live;
+  PROBE_URL = url;
   $("liveRow").classList.toggle("hidden", !live);
   if (live && $("liveStartBox")) {
     // the setting decides the default; ticking it here is a one-download
@@ -1784,6 +1884,7 @@ function renderProbe(url, info) {
 
   if (info.playlist) {
     $("playlistRow").classList.remove("hidden");
+    if ($("followSay")) $("followSay").textContent = t("Follow");
     $("qualityRow").classList.add("hidden");
     $("soundRow").classList.add("hidden");
     $("probeMeta").textContent =
@@ -2693,6 +2794,7 @@ async function loadLog() {
   }
 }
 initDiagnostics();
+initFollows();
 
 $("logOpen").onclick = async () => {
   $("logView").textContent = t("loading…");
@@ -2830,6 +2932,10 @@ function jobRow(j) {
       t("{name} preset", { name: j.preset.replace("audio-", "") }));
     chip.title = t("audio preset: {name}", { name: j.preset });
     top.append(chip);
+  }
+  if (j.follow_id) {
+    // grabbed by the watch list (v0.46.2): a quiet tag, not a siren
+    top.append(el("span", "chip tag", t("watch list")));
   }
   if (extra) {
     const chip = el("span", "chip tag",

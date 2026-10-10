@@ -931,6 +931,16 @@ details.card { padding: 0 18px 6px; }
 /* the ⓘ on a finished-with-a-caveat hint (v0.45.29) */
 .jobhint .ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
 
+/* ---------- v0.46.2: the watch list ---------- */
+.follows-row { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-top: 1px solid var(--line-soft); font-size: 12.5px; }
+.follows-row:first-child { border-top: 0; }
+.follows-row .fmain { min-width: 0; flex: 1; }
+.follows-row .fname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.follows-row .fmeta { color: var(--dim); }
+.follows-row .ferr { color: var(--err); margin-top: 2px; }
+.follows-row .facts { flex: none; display: flex; gap: 6px; }
+
 /* ---------- v0.46.0: the paste list looks before it leaps ---------- */
 .bulklist { margin-top: 8px; display: grid; gap: 6px; }
 .bulk {

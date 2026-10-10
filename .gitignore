@@ -18,3 +18,6 @@ x_skip/
 # impeccable design-tool state (PRODUCT.md / DESIGN.md are committed; the
 # tool's own cache is not)
 .impeccable/
+
+# the watch list's store lives beside jobs.db, never in the repo
+follows.db

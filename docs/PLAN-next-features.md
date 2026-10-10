@@ -114,7 +114,7 @@ that never finish, and a "stop" must never eat the recording.
   Storage: the size is on the card the whole time; stop is always one
   tap.
 
-## Wave 3 — v0.46.2 "the follower"  (watch list)
+## Wave 3 — v0.46.2 "the follower"  (watch list) — SHIPPED
 
 Turn suravidl from a tool you visit into one that works for you: follow
 a playlist or channel, grab what's new, skip what you already have.

@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     files TEXT,
     partials TEXT,
     download_dir TEXT,
-    live INTEGER DEFAULT 0
+    live INTEGER DEFAULT 0,
+    video_id TEXT,
+    follow_id TEXT
 )
 """
 
@@ -421,6 +423,17 @@ class JobManager:
                     # not a wedge, it is a stream between segments
                     self._con.execute(
                         "ALTER TABLE jobs ADD COLUMN live INTEGER DEFAULT 0")
+                if "video_id" not in cols:
+                    # the site's own id for this video (v0.46.2 "the
+                    # follower"): the watch list's dedupe key — a video
+                    # already downloaded any other way is never re-grabbed
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN video_id TEXT")
+                if "follow_id" not in cols:
+                    # which watch-list entry grabbed this (v0.46.2): the
+                    # card wears a quiet tag and the panel can count
+                    self._con.execute(
+                        "ALTER TABLE jobs ADD COLUMN follow_id TEXT")
                 if "download_dir" not in cols:
                     # the folder this job downloaded into: a later settings
                     # change must not make its files undeletable (v0.21.2)
@@ -525,6 +538,8 @@ class JobManager:
             job["partials"] = None
         job["replaced_by"] = job.get("replaced_by") or None
         job["live"] = bool(job.get("live"))
+        job["video_id"] = job.get("video_id") or None
+        job["follow_id"] = job.get("follow_id") or None
         job["size_bytes"] = _stat_size(job)
         return job
 
@@ -539,8 +554,8 @@ class JobManager:
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at, files, partials, download_dir,"
-                " replaced_by, live)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " replaced_by, live, video_id, follow_id)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -549,7 +564,9 @@ class JobManager:
                 " files=excluded.files, partials=excluded.partials,"
                 " download_dir=excluded.download_dir,"
                 " replaced_by=excluded.replaced_by,"
-                " live=excluded.live",
+                " live=excluded.live,"
+                " video_id=excluded.video_id,"
+                " follow_id=excluded.follow_id",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -568,6 +585,8 @@ class JobManager:
                     job.get("download_dir") or str(self.download_dir),
                     job.get("replaced_by"),
                     1 if job.get("live") else 0,
+                    job.get("video_id"),
+                    job.get("follow_id"),
                 ),
             )
 
@@ -580,7 +599,9 @@ class JobManager:
                overrides: dict | None = None,
                download_dir: str | None = None,
                partials: list | None = None,
-               live: bool = False) -> dict:
+               live: bool = False,
+               video_id: str | None = None,
+               follow_id: str | None = None) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the
@@ -652,6 +673,10 @@ class JobManager:
             # leaves it alone; yt-dlp's own is_live can also flip this
             # mid-flight (the belt to the UI's suspenders)
             "live": bool(live),
+            # the watch list's keys (v0.46.2): the site's own video id and
+            # which follow grabbed it (None for a hand-made job)
+            "video_id": (video_id or None),
+            "follow_id": (follow_id or None),
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -664,6 +689,17 @@ class JobManager:
             job = dict(self._jobs[job_id])
         job["size_bytes"] = _stat_size(job)
         return job
+
+    def has_video(self, video_id: str) -> bool:
+        """Was this exact video completed before, however it was grabbed?
+        The watch list's dedupe question (v0.46.2)."""
+        if not video_id:
+            return False
+        with self._lock:
+            for j in self._jobs.values():
+                if j.get("video_id") == video_id and j.get("status") == "completed":
+                    return True
+        return False
 
     def list(self) -> list[dict]:
         with self._lock:
@@ -1370,6 +1406,8 @@ class JobManager:
                     # is still a stop: claiming "completed" (and firing the
                     # completion action) would contradict the user (v0.21.2)
                     return
+                if info and not job.get("video_id"):
+                    job["video_id"] = str(info.get("id") or "") or None
                 extra = notices + list((info or {}).get("__sv_notices") or [])
                 if extra:
                     # a finished job with a caveat says so on its card

@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.2",
+        "title": "The follower",
+        "items": [
+            "Follow a playlist or channel: its new videos come in on their own. Following starts from now, nothing is ever grabbed twice, and a watch-list grab wears a quiet tag on its card.",
+        ],
+    },
+    {
         "version": "0.46.1",
         "title": "The recorder",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The column",
         "items": [
             "A job database from an older version repairs itself on the first start — a missing column on upgraded installs had quietly broken new downloads and deleting jobs.",
-        ],
-    },
-    {
-        "version": "0.45.25",
-        "title": "The trace",
-        "items": [
-            "If anything inside the engine ever fails unexpectedly, the app now says what failed — the error's own name and message — instead of a bare “500”.",
         ],
     },
 ]

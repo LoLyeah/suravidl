@@ -26,6 +26,8 @@ reviews: [docs/audits/](docs/audits/)
   anything queues — tick the good ones, queue just those.
 - **Live streams**: a live link records while it plays (● REC, time on air,
   no fake percentage); **Stop & keep** keeps everything recorded so far.
+- **Watch list**: follow a playlist or channel — new videos come in on their
+  own, and nothing you already have is ever grabbed again.
 - **Playlists and channels**: browse entries, tick the ones you want or type a range.
 - **Audio only**: keep the native stream, or convert to m4a / MP3 192–320k / FLAC / Opus.
 - **Subtitles**: pick a language from what the site actually offers; download as

@@ -461,6 +461,28 @@ def create_app(download_dir, auth_token: str | None = None,
         cookie_session=lambda: cookie_session(settings.get()),
         download_opts=_download_opts,
     )
+    # the watch list (v0.46.2 "the follower"): its store lives beside the
+    # jobs database and the checker runs on the engine's own lifetime —
+    # on Android that is the app's lifetime, and the panel says so
+    from .follows import FollowChecker, FollowStore, check_one, flat_entries
+
+    follows_path = (Path(db_path).with_name("follows.db") if db_path
+                    else ":memory:")
+    follows_store = FollowStore(follows_path)
+
+    def _follow_fetch(url: str):
+        return flat_entries(url, settings.get())
+
+    def _follow_queue(entry: dict, follow: dict):
+        if manager.has_video(entry["id"]):
+            return None                # already had this one: never re-grab
+        job = manager.create(entry["url"], preset=follow.get("preset"),
+                             video_id=entry["id"], follow_id=follow["id"])
+        return job["id"]
+
+    follow_checker = FollowChecker(follows_store, _follow_fetch, _follow_queue)
+    follow_checker.start()
+
     acts = desktop_actions or {}
 
     def remember_site_quality(url: str, fmt: str | None) -> None:
@@ -1465,8 +1487,65 @@ def create_app(download_dir, auth_token: str | None = None,
                 status_code=409,
                 detail=f"could not delete: {type(e).__name__}: {e}") from None
 
+    # -- the watch list (v0.46.2 "the follower") ---------------------------
+    class FollowRequest(BaseModel):
+        url: str
+        cadence_hours: float | None = None
+        preset: str | None = None
+        auto_queue: bool | None = None
+
+    @app.get("/follows")
+    def list_follows(_mgr: JobManager = Depends(require_auth)):
+        return {"follows": follows_store.list()}
+
+    @app.post("/follows")
+    def add_follow(body: FollowRequest,
+                   _mgr: JobManager = Depends(require_auth)):
+        """Follow a playlist/channel. Following starts from NOW: every
+        current entry is seeded as seen, so the first check never queues
+        a hundred-back backlog (the panel says the same sentence)."""
+        url = (body.url or "").strip()
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400,
+                                detail="a follow needs a page URL")
+        if any(f["url"] == url for f in follows_store.list()):
+            raise HTTPException(status_code=409,
+                                detail="already following this page")
+        try:
+            entries, title = _follow_fetch(url)
+        except Exception as e:  # noqa: BLE001 - the reason goes to the client
+            raise HTTPException(status_code=400,
+                                detail=f"could not read that page: {e}") from e
+        if not entries:
+            raise HTTPException(
+                status_code=400,
+                detail="that page has no list of videos to follow")
+        cadence = (body.cadence_hours
+                   if body.cadence_hours and body.cadence_hours > 0 else 6.0)
+        return follows_store.add(
+            url, label=title, cadence_hours=cadence, preset=body.preset,
+            auto_queue=(body.auto_queue is not False),
+            seed=[e["id"] for e in entries])
+
+    @app.post("/follows/{fid}/check")
+    def check_follow(fid: str, _mgr: JobManager = Depends(require_auth)):
+        """Check now: one bounded pass, the answer inline (the manual
+        button in the panel waits for exactly this)."""
+        f = follows_store.get(fid)
+        if not f:
+            raise HTTPException(status_code=404, detail="no such follow")
+        return check_one(f, follows_store, fetch=_follow_fetch,
+                         queue=_follow_queue)
+
+    @app.post("/follows/{fid}/delete")
+    def remove_follow(fid: str, _mgr: JobManager = Depends(require_auth)):
+        if not follows_store.remove(fid):
+            raise HTTPException(status_code=404, detail="no such follow")
+        return {"ok": True}
+
     app.state.manager = manager
     app.state.download_dir = Path(manager.download_dir)
+    app.state.follows = follows_store
     return app
 
 

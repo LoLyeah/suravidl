@@ -42,7 +42,8 @@
     <circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="12" r="2.1"/><circle cx="14" cy="17" r="2.1"/></symbol>
   <symbol id="i-cmd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M4 5.5h16v13H4z"/><path d="M8 10.2l2.3 2.3L8 14.8M12.5 15h4"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.8l6.1-.8z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="11" cy="11" r="6"/><path d="M15.6 15.6 20 20"/></symbol>
   <symbol id="i-battery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="8" width="15" height="9" rx="2.2"/><path d="M21 11v3"/>
@@ -127,6 +128,14 @@
         <button id="batchBtn" class="btn sm" data-i18n="Queue all">Queue all</button>
       </div>
       <div id="batchList" class="bulklist hidden" role="list"></div>
+    </section>
+
+    <!-- the watch list (v0.46.2 "the follower"): follow a playlist and its
+         new videos arrive on their own — checks run while the app does -->
+    <section class="card" id="followsCard">
+      <div class="lbl" data-i18n="Watch list">Watch list</div>
+      <div id="followsNote" class="muted small" data-i18n="Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.">Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.</div>
+      <div id="followsList"></div>
     </section>
 
     <!-- the scope strip: a finished probe lands here (v0.37.0) -->
@@ -224,6 +233,7 @@
         <input id="playlistItems" type="text" spellcheck="false" aria-label="Playlist items to download" data-i18n-aria="Playlist items to download"
                placeholder="blank = all · e.g. 1-10,15" data-i18n-ph="blank = all · e.g. 1-10,15"/>
         <button id="playlistBtn" class="btn sm" data-i18n="Download playlist">Download playlist</button>
+        <button id="followBtn" class="btn sm"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg><span id="followSay" data-i18n="Follow">Follow</span></button>
         <button id="plAll" class="btn ghost-sm" data-i18n="All">All</button>
         <button id="plNone" class="btn ghost-sm" data-i18n="None">None</button>
         <span id="plCount" class="muted"></span>
