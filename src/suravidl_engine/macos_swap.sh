@@ -73,11 +73,15 @@ done
 if alive "$PID"; then
   # Still here: the window is gone (the app destroys it before spawning
   # us) but the process lingers. End it — politely, then firmly — or the
-  # reopen lands on a dead instance. Guarded: only when the pid still IS
-  # the app's executable (never a recycled pid).
-  case "$(ps -p "$PID" -o comm= 2>/dev/null)" in
-    *"$EXEC"*)
-      say "the old process lingered; ending it (pid $PID)"
+  # reopen lands on a dead instance. Guarded: only when the pid still
+  # LOOKS like the app — its executable name, or the bundle's own name
+  # anywhere in its command (never a recycled stranger). The guard must
+  # stay WIDE: reading one ps field failed closed on macOS (v0.46.4's CI
+  # red), and failing closed here means the reap never fires at all.
+  COMM="$(ps -p "$PID" -o comm= -o command= 2>/dev/null)"
+  case "$COMM" in
+    *"$EXEC"*|*"$BASE"*)
+      say "the old process lingered; ending it (pid $PID: $COMM)"
       kill -TERM "$PID" 2>/dev/null
       for _ in $(seq 1 10); do
         alive "$PID" || break
@@ -85,7 +89,7 @@ if alive "$PID"; then
       done
       kill -KILL "$PID" 2>/dev/null
       ;;
-    *) say "pid $PID lingers but is not the app any more; leaving it" ;;
+    *) say "pid $PID lingers but reads as '${COMM:-nothing}' — not the app; leaving it" ;;
   esac
 fi
 sleep 1
