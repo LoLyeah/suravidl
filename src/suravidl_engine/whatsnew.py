@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.32",
+        "title": "The slideshow",
+        "items": [
+            "A TikTok photo post now says what it is — a slideshow, not a video, with nothing for a downloader to save and where its audio might still be caught.",
+        ],
+    },
+    {
         "version": "0.45.31",
         "title": "The frames",
         "items": [
@@ -76,14 +83,6 @@ ENTRIES = [
         "title": "The wait",
         "items": [
             "The in-app browser now waits for the engine when it is still starting — tapping a sniffed link seconds after opening the app queues it instead of saying the engine refused it.",
-        ],
-    },
-    {
-        "version": "0.45.22",
-        "title": "The watch",
-        "items": [
-            "A download whose source stops sending data no longer hangs forever — after eight silent minutes it fails with a clear message instead of staring at a stuck row.",
-            "Cancelled downloads always delete now, even when the engine is still cleaning up behind them.",
         ],
     },
 ]

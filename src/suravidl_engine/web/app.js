@@ -533,6 +533,7 @@ const STRINGS = { en: {}, id: {
   "no domains": "tidak ada domain",
   "no downloaded files": "tidak ada berkas unduhan",
   "no extractor knows this page — open it in the browser, press play, then Scan for the stream": "halaman ini tidak dikenali — buka di browser, tekan play, lalu pakai Scan untuk menangkap stream-nya",
+  "this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable": "ini postingan foto TikTok — slideshow berisi musik, bukan video, jadi tidak ada yang bisa diunduh; buka di browser lalu pakai Scan — audionya mungkin bisa ditangkap",
   "no formats found": "format tidak ditemukan",
   "no readout — see the message above": "tidak ada hasil — lihat pesan di atas",
   "none picked": "belum ada yang dipilih",
@@ -820,8 +821,13 @@ function ico(name) {
  *  the details disagreed, and the summary was wrong.) */
 function humanErr(s, detail, url) {
   s = String(s == null ? "" : s);
-  if (detail && detail.unsupported)
+  if (detail && detail.unsupported) {
+    // a TikTok photo post is not a video at all — say that, not "no
+    // extractor" (owner report, 2026-10-10)
+    if (/photo post|tiktok[^\s"']*\/photo\//i.test(s + " " + String((detail && detail.hint) || "")))
+      return t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable");
     return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
+  }
   if (/HTTP Error 404|not found|does not exist/i.test(s)) {
     // Reddit's /s/ "share" links resolve only inside a browser (a session
     // flow a downloader never gets); fetching one returns the 404 that
@@ -834,8 +840,11 @@ function humanErr(s, detail, url) {
     return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
   if (/HTTP Error 429|too many requests/i.test(s))
     return "the site is rate-limiting this address (429) — wait a bit, then try once more";
-  if (/unsupported url|no (suitable )?extractor/i.test(s))
+  if (/unsupported url|no (suitable )?extractor/i.test(s)) {
+    if (/photo post|tiktok[^\s"']*\/photo\//i.test(s))
+      return t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable");
     return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
+  }
   if (/\bsign[ -]?in\b|\blog[ -]?in\b|login required|private video|\bage\b/i.test(s))
     return "the site wants a signed-in session — load cookies in Settings → Authentication";
   if (/encoder not found/i.test(s))

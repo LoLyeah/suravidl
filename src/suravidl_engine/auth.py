@@ -164,19 +164,38 @@ UNSUPPORTED_HINT = (
     "extension does the same)."
 )
 
+# A TikTok photo post (/@user/photo/<id>) is a slideshow of images with a
+# music track — not a video at all, and yt-dlp has no extractor for it. The
+# share link resolves fine and then dies as "Unsupported URL", which sent the
+# owner hunting for a broken thing that was never a download (2026-10-10):
+# say what it actually is. The resolved /photo/ address rides inside the
+# yt-dlp error text, so the pattern is checkable even when the input was a
+# vt.tiktok.com short link.
+UNSUPPORTED_PHOTO_HINT = (
+    "this is a TikTok photo post — a slideshow of images with music, not a "
+    "video, so there is nothing for a downloader to save; open it in the "
+    "browser and Scan — the audio track is often a plain media file the "
+    "sniffer can catch."
+)
+_TIKTOK_PHOTO = re.compile(r"tiktok\.com/\S*/photo/", re.IGNORECASE)
+
 
 def unsupported_error(text: str) -> dict | None:
     """Is yt-dlp simply refusing to guess this site?
 
     "Unsupported URL" is not a failure to explain away — it is the signal that
     a sniffer is the way to this video, so the UI must be able to tell it
-    apart from a real error (which stays a plain string).
+    apart from a real error (which stays a plain string). A TikTok photo post
+    gets its own sentence: it is not a video, and "no extractor" would be
+    true but useless.
     """
     text = scrub_secrets(text)
     if "unsupported url" not in text.lower():
         return None
-    return {"message": f"{text} — {UNSUPPORTED_HINT}",
-            "unsupported": True, "hint": UNSUPPORTED_HINT}
+    hint = (UNSUPPORTED_PHOTO_HINT if _TIKTOK_PHOTO.search(text)
+            else UNSUPPORTED_HINT)
+    return {"message": f"{text} — {hint}",
+            "unsupported": True, "hint": hint}
 
 
 def check_auth(settings: dict, url: str | None = None) -> dict:
