@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.30",
+        "title": "The poster",
+        "items": [
+            "A cover image that cannot be embedded no longer kills the download — the thumbnail step failing (this phone cannot read some image formats) leaves the video intact and says so on the card.",
+        ],
+    },
+    {
         "version": "0.45.29",
         "title": "The note",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The start",
         "items": [
             "A claimed download now says so right away — a job stuck before its first byte used to sit at “Queued” forever instead of showing it was already running.",
-        ],
-    },
-    {
-        "version": "0.45.20",
-        "title": "The twin",
-        "items": [
-            "The Settings Save pours the same glass as the yt-dlp tab's Save now — on AMOLED the old denser pour read as a solid black card.",
         ],
     },
 ]

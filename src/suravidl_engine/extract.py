@@ -450,6 +450,43 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             return [], info
 
 
+def _install_safe_thumbnail_embed(ydl) -> None:
+    """The thumbnail embed must never kill a finished job.
+
+    yt-dlp falls back to ffmpeg for mp4 covers (mutagen/AtomicParsley do
+    not ship in this app), and that ffmpeg must READ the thumbnail's
+    bytes — the phone build has no webp decoder while reddit serves webp,
+    so the embed crashed the WHOLE job after its video had already
+    downloaded ("Unable to embed using ffprobe & ffmpeg; Conversion
+    failed!", 2026-10-10). The engine swaps in a subclass whose failure
+    warns and lands on the card as a caveat (__sv_notices) instead.
+    """
+    try:
+        from yt_dlp.postprocessor.embedthumbnail import EmbedThumbnailPP
+
+        class SafeThumbnailEmbedPP(EmbedThumbnailPP):  # noqa: F811
+            def run(self, info):
+                try:
+                    return super().run(info)
+                except Exception as e:  # noqa: BLE001 - a cover is not the job
+                    self.report_warning(f"thumbnail embed skipped: {e}")
+                    try:
+                        info.setdefault("__sv_notices", []).append(
+                            "the thumbnail could not be embedded (this phone's "
+                            "ffmpeg cannot read its image format) — the video "
+                            "itself is complete")
+                    except Exception:  # noqa: BLE001
+                        pass
+                    return [], info
+
+        chain = ydl._pps.get("post_process") or []
+        for idx, pp in enumerate(list(chain)):
+            if isinstance(pp, EmbedThumbnailPP):
+                chain[idx] = SafeThumbnailEmbedPP(ydl)
+    except Exception:  # noqa: BLE001 - best-effort, never fatal
+        pass
+
+
 def _attach_stream_copy_fix(ydl) -> None:
     """Insert the stream-copy fixer beside the thumbnail fixer, at the head
     of the post-process chain — the metadata pass must never meet a stream
@@ -541,6 +578,7 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
                 if download:
                     _attach_thumbnail_ext_fix(ydl)
                     _attach_stream_copy_fix(ydl)
+                    _install_safe_thumbnail_embed(ydl)
                 return ydl.sanitize_info(ydl.extract_info(url, download=download))
         except yt_dlp.utils.YoutubeDLError as exc:
             if (refresh_left and seen["bytes"] and is_expired_link(exc)

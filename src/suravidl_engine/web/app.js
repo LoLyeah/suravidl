@@ -844,6 +844,8 @@ function humanErr(s, detail, url) {
     return "the site never answered in time — check the connection and retry";
   if (/certificate|SSL/i.test(s))
     return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
+  if (/unable to embed using|embed thumbnail/i.test(s))
+    return "the thumbnail could not be embedded — this phone's ffmpeg cannot read its image format; the video itself is fine";
   if (/ffmpeg/i.test(s))
     return "the last step needs ffmpeg — audio “keep original” avoids the conversion";
   const line = s.split("\n")[0];
