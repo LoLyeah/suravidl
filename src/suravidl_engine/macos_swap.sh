@@ -35,6 +35,15 @@ say() {
   { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; } >>"$LOG" 2>/dev/null || true
 }
 
+alive() {
+  # kill -0 lies about a zombie: a just-killed process whose parent has not
+  # reaped it still answers signals (macOS's bash 3.2 reaps lazily — this
+  # made the CI linger check fail on a process that was already dead).
+  # A zombie is dead for our purposes; so is a vanished pid.
+  st="$(ps -p "$1" -o stat= 2>/dev/null)" || return 1
+  case "$st" in Z*) return 1 ;; *) return 0 ;; esac
+}
+
 relaunch() {
   # the CI dry-run stops before the app comes back up
   [ -n "${SURAVIDL_APPLY_DRYRUN:-}" ] && return 0
@@ -58,10 +67,10 @@ relaunch() {
 
 # 1) wait for the app to exit (bounded), then a breath for its locks
 for _ in $(seq 1 "$WAIT_TICKS"); do
-  kill -0 "$PID" 2>/dev/null || break
+  alive "$PID" || break
   sleep 0.5
 done
-if kill -0 "$PID" 2>/dev/null; then
+if alive "$PID"; then
   # Still here: the window is gone (the app destroys it before spawning
   # us) but the process lingers. End it — politely, then firmly — or the
   # reopen lands on a dead instance. Guarded: only when the pid still IS
@@ -71,7 +80,7 @@ if kill -0 "$PID" 2>/dev/null; then
       say "the old process lingered; ending it (pid $PID)"
       kill -TERM "$PID" 2>/dev/null
       for _ in $(seq 1 10); do
-        kill -0 "$PID" 2>/dev/null || break
+        alive "$PID" || break
         sleep 0.5
       done
       kill -KILL "$PID" 2>/dev/null

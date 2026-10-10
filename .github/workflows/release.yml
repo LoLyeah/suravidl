@@ -119,10 +119,14 @@ jobs:
           SURAVIDL_APPLY_DRYRUN=1 SURAVIDL_APPLY_WAIT_TICKS=4 \
             bash src/suravidl_engine/macos_swap.sh \
             suravidl-apply "$WORK/installed/suravidl.app" "$WORK/update2.zip" "$LINGER"
-          if kill -0 "$LINGER" 2>/dev/null; then
-            echo "the lingering process survived the swap — it must not" >&2
-            exit 1
-          fi
+          # a zombie is dead (macOS's bash reaps lazily; kill -0 would lie)
+          ST="$(ps -p "$LINGER" -o stat= 2>/dev/null || true)"
+          case "$ST" in
+            ""|Z*) echo "the lingering process was ended (state: ${ST:-gone})" ;;
+            *) echo "the lingering process is genuinely alive ($ST) — it must not be" >&2
+               exit 1 ;;
+          esac
+          wait "$LINGER" 2>/dev/null || true   # reap it before moving on
           test -f "$WORK/installed/suravidl.app/Contents/NEW"
           echo "linger dry-run ok"
           # rollback: a zip carrying no bundle must leave the app untouched

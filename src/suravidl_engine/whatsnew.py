@@ -15,7 +15,7 @@ from . import __version__
 
 ENTRIES = [
     {
-        "version": "0.46.3",
+        "version": "0.46.4",
         "title": "The comeback",
         "items": [
             "macOS updates come back on their own. The reopen after an update now forces a fresh instance, ends a lingering old process, and writes every attempt to ~/Library/Logs/suravidl-update.log.",

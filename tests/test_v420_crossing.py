@@ -98,6 +98,8 @@ def test_the_relaunch_is_hardened_and_leaves_a_trace():
         "a lingering old process must be ended, or the reopen lands on it"
     assert 'ps -p "$PID" -o comm=' in s, "never kill a recycled pid"
     assert 'SURAVIDL_APPLY_WAIT_TICKS' in s, "CI must be able to shrink the wait"
+    assert "alive()" in s and "Z*" in s, \
+        "kill -0 lies about zombies — liveness must read the process state"
 
 
 def test_the_app_leaves_deliberately_when_the_window_is_gone():
