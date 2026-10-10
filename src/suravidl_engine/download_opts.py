@@ -12,13 +12,51 @@ exposes, including its ordering rules:
 """
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
 from yt_dlp.utils import download_range_func
 
 SUBTITLE_MODES = ("off", "sidecar", "embed")
+
+# Encoder capability of the ffmpeg this engine will actually run, per
+# (binary, encoder). The Android build ACCEPTS --enable-encoder=mov_text
+# in its configure line yet the binary never materializes it (probed
+# 2026-10-10 on the shipped build's replica: aac/flac/srt/webvtt are
+# real, mov_text is not) — and a chain that needs a missing encoder
+# fails the whole post-process pass with "Error opening output files:
+# Encoder not found" (the owner's reddit job died exactly there).
+# Probe the BINARY, never the build script (.18 doctrine).
+_FF_ENCODER_CACHE: dict[tuple[str, str], bool] = {}
+
+
+def ffmpeg_can_encode(name: str) -> bool:
+    """True when the engine's ffmpeg provides `name` as an encoder.
+
+    No ffmpeg found or a failed probe answers True: never silently
+    degrade a chain when unsure — the failure itself is honest.
+    """
+    exe = os.environ.get("SURAVIDL_FFMPEG", "").strip() or shutil.which("ffmpeg")
+    if not exe:
+        return True
+    key = (exe, name)
+    got = _FF_ENCODER_CACHE.get(key)
+    if got is not None:
+        return got
+    can = True
+    try:
+        proc = subprocess.run([exe, "-hide_banner", "-encoders"],
+                              capture_output=True, text=True, timeout=15)
+        can = re.search(rf"^\s*[A-Z.]{{5,6}}\s+{re.escape(name)}\b",
+                        proc.stdout or "", re.M) is not None
+    except Exception:  # noqa: BLE001 - uncertain means capable
+        can = True
+    _FF_ENCODER_CACHE[key] = can
+    return can
 CONTAINERS = ("auto", "mp4", "mkv")
 SUBFOLDER_MODES = ("off", "playlist", "site")
 SPONSORBLOCK_MODES = ("off", "mark", "remove")
@@ -604,8 +642,17 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
             pps.append({"key": "FFmpegSubtitlesConvertor", "format": "srt",
                         "when": "before_dl"})
         if sub_mode == "embed":
-            pps.append({"key": "FFmpegEmbedSubtitle",
-                        "already_have_subtitle": True})
+            # Embedding text subs into an MP4 converts them to mov_text —
+            # an ENCODE the phone's ffmpeg cannot do (see the probe above).
+            # MKV carries text subs by COPY, so it needs no encoder. When
+            # neither holds, the subs stay what writesubtitles already
+            # made them: sidecar files beside the video, instead of the
+            # whole post-process pass dying on "Encoder not found"
+            # (2026-10-10 field report).
+            if (settings.get("video_container") or "auto") == "mkv" or \
+                    ffmpeg_can_encode("mov_text"):
+                pps.append({"key": "FFmpegEmbedSubtitle",
+                            "already_have_subtitle": True})
 
     # -- sponsorblock (mirrors CLI: SponsorBlock then ModifyChapters) ------
     sb_mode = settings.get("sponsorblock_mode", "off")

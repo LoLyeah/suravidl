@@ -818,12 +818,18 @@ function ico(name) {
  *  some other story. (v0.38.6: a bare `age` alternative matched "page",
  *  so every unsupported-URL line read as a sign-in wall — the summary and
  *  the details disagreed, and the summary was wrong.) */
-function humanErr(s, detail) {
+function humanErr(s, detail, url) {
   s = String(s == null ? "" : s);
   if (detail && detail.unsupported)
     return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
-  if (/HTTP Error 404|not found|does not exist/i.test(s))
+  if (/HTTP Error 404|not found|does not exist/i.test(s)) {
+    // Reddit's /s/ "share" links resolve only inside a browser (a session
+    // flow a downloader never gets); fetching one returns the 404 that
+    // this arm used to misread as "you copied it wrong" (2026-10-10).
+    if (/reddit\.com\/[^\s"']*\/s\//i.test(String(url || "") + " " + s))
+      return "Reddit share links (“/s/” shortcuts) only open in a browser — open it once, copy the full address (it becomes /r/…/comments/…), and paste that";
     return "the site says this link does not exist (404) — check it was copied whole";
+  }
   if (/HTTP Error 403|forbidden/i.test(s))
     return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
   if (/HTTP Error 429|too many requests/i.test(s))
@@ -832,6 +838,8 @@ function humanErr(s, detail) {
     return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
   if (/\bsign[ -]?in\b|\blog[ -]?in\b|login required|private video|\bage\b/i.test(s))
     return "the site wants a signed-in session — load cookies in Settings → Authentication";
+  if (/encoder not found/i.test(s))
+    return "the phone's ffmpeg can't convert subtitles for this container — set Subtitles to \u201csidecar\u201d in Settings or use the MKV container, then retry";
   if (/timed? ?out|timeout/i.test(s))
     return "the site never answered in time — check the connection and retry";
   if (/certificate|SSL/i.test(s))
@@ -2755,7 +2763,7 @@ function jobRow(j) {
   } else if (j.status === "error" || j.status === "interrupted") {
     // the human consequence leads; the engine's own dialect goes below,
     // behind the toggle (v0.37.0 — it used to be the first thing you read)
-    row.append(el("div", "jerrsay", t(humanErr(j.error || ""))));
+    row.append(el("div", "jerrsay", t(humanErr(j.error || "", undefined, j.url))));
     // The whole message. A 160-char slice in a single ellipsised line cut
     // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
     // says what to do next was exactly the part that was hidden. Long text

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.28",
+        "title": "The captions",
+        "items": [
+            "Subtitles no longer break a download on the phone: the app checks what its ffmpeg can really do and keeps them as files beside the video when it cannot embed them (MKV still embeds).",
+            "Reddit share links (“/s/” shortcuts) now say what they are: browser-only shortcuts, with the trick to get the full link.",
+        ],
+    },
+    {
         "version": "0.45.27",
         "title": "The silence",
         "items": [
@@ -77,14 +85,6 @@ ENTRIES = [
         "items": [
             "The dim behind popups is back everywhere — the AMOLED theme had silently told CSS “no shadows” in a way that also erased every popup’s backdrop dim on phones. One token, fixed.",
             "The Settings Save now floats as a proper glass card, exactly like the yt-dlp tab’s Save — same border, same frost (it used to be a flat full-width bar).",
-        ],
-    },
-    {
-        "version": "0.45.18",
-        "title": "The fallback",
-        "items": [
-            "On phones the bundled ffmpeg cannot convert subtitles at all, so the fixer now drops a file-blocking subtitle track as its named last resort instead of failing the whole repair — desktop keeps converting it properly.",
-            "The v0.45.17 note claimed that conversion worked everywhere — it does not; this is the correction, verified against both real ffmpeg builds.",
         ],
     },
 ]
