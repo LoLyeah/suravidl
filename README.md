@@ -16,6 +16,7 @@ extension, desktop app, Android app. It downloads anything yt-dlp understands
 
 [releases](https://github.com/LoLyeah/suravidl/releases/latest) ·
 history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
+next: [docs/PLAN-next-features.md](docs/PLAN-next-features.md) ·
 reviews: [docs/audits/](docs/audits/)
 
 ## What it does
