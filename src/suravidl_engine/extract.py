@@ -342,6 +342,7 @@ class StreamCopyFixPP(FFmpegPostProcessor):
         post-process pass runs; the PP remains for paths that skip the
         hook and as a harmless second pass (clean file -> fast exit).
         """
+        self.last_notice = None   # fresh per call; the finished hook reads it
         if not path or not os.path.isfile(path):
             return False
         try:
@@ -374,6 +375,9 @@ class StreamCopyFixPP(FFmpegPostProcessor):
                     self.to_screen(
                         f"Dropped {len(real)} unusable stream(s) "
                         f"before the metadata pass ({names})")
+                    self.last_notice = (
+                        f"{len(real)} unusable stream(s) were removed "
+                        f"before saving ({names})")
                 try:
                     fixed[path] = os.path.getmtime(path)
                 except OSError:
@@ -470,6 +474,13 @@ def _attach_stream_copy_fix(ydl) -> None:
             try:
                 if d.get("status") == "finished" and d.get("filename"):
                     pp.fix_file(d["filename"])
+                    note = getattr(pp, "last_notice", None)
+                    if note:
+                        # the job still succeeds; the card must say what
+                        # was removed (owner's request, 2026-10-10)
+                        info = d.get("info_dict")
+                        if isinstance(info, dict):
+                            info.setdefault("__sv_notices", []).append(note)
             except Exception:  # noqa: BLE001 — never break a download
                 pass
 

@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.45.29",
+        "title": "The note",
+        "items": [
+            "A download that finishes with a caveat now wears an ⓘ and says why — subtitles kept as files instead of embedded, an unusable stream removed — so a successful job never hides what it could not do.",
+        ],
+    },
+    {
         "version": "0.45.28",
         "title": "The captions",
         "items": [
@@ -77,14 +84,6 @@ ENTRIES = [
         "title": "The twin",
         "items": [
             "The Settings Save pours the same glass as the yt-dlp tab's Save now — on AMOLED the old denser pour read as a solid black card.",
-        ],
-    },
-    {
-        "version": "0.45.19",
-        "title": "The shadow",
-        "items": [
-            "The dim behind popups is back everywhere — the AMOLED theme had silently told CSS “no shadows” in a way that also erased every popup’s backdrop dim on phones. One token, fixed.",
-            "The Settings Save now floats as a proper glass card, exactly like the yt-dlp tab’s Save — same border, same frost (it used to be a flat full-width bar).",
         ],
     },
 ]

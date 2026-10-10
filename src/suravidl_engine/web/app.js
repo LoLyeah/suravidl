@@ -2891,7 +2891,15 @@ function jobRow(j) {
     details.append(grid);
     title.setAttribute("aria-controls", details.id);
     row.append(details);
-    if (j.note) row.append(el("div", "jobhint", j.note));
+    if (j.note) {
+      // a caveat on a job that still succeeded: the ⓘ is the point — the
+      // app must say when something it was asked to do could not be done,
+      // though the file itself arrived (owner request, 2026-10-10)
+      const hint = el("div", "jobhint");
+      hint.append(ico("info"));
+      hint.append(document.createTextNode(j.note));
+      row.append(hint);
+    }
   }
 
   if (j.raw_args) {

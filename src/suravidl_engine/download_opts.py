@@ -628,6 +628,10 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     if settings.get("live_from_start"):
         opts["live_from_start"] = True
 
+    # things the settings asked for but this ffmpeg cannot do: the job
+    # still succeeds and the finished card quotes these (owner's request,
+    # 2026-10-10 — a caveat must never ride silently)
+    notices: list[str] = []
     # -- subtitles ---------------------------------------------------------
     sub_mode = settings.get("subtitles_mode", "off")
     if sub_mode != "off":
@@ -653,6 +657,11 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
                     ffmpeg_can_encode("mov_text"):
                 pps.append({"key": "FFmpegEmbedSubtitle",
                             "already_have_subtitle": True})
+            else:
+                notices.append(
+                    "subtitles are kept as files beside the video — this "
+                    "phone's ffmpeg cannot embed them into MP4 (the MKV "
+                    "container can)")
 
     # -- sponsorblock (mirrors CLI: SponsorBlock then ModifyChapters) ------
     sb_mode = settings.get("sponsorblock_mode", "off")
@@ -720,6 +729,10 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     opts["outtmpl"] = outtmpl
     if pps:
         opts["postprocessors"] = pps
+    if notices:
+        # jobs pops this before yt-dlp sees the opts; the finished card
+        # quotes it (see _execute)
+        opts["__sv_notices"] = notices
 
     # -- raw arguments (Advanced tier, default-OFF) ------------------------
     # Applied last: a power user's explicit flags win over the settings they

@@ -1225,10 +1225,15 @@ class JobManager:
         opts.update(ffmpeg_opts())
         # settings-derived options (template, subtitles, embed, network, ...)
         user_pps: list[dict] = []
+        notices: list[str] = []
         if self._download_opts:
             settings_opts = dict(self._download_opts(
                 target_dir, raw_args=job.get("raw_args"),
                 overrides=job.get("overrides")) or {})
+            # what the settings asked for but the engine could not do
+            # (e.g. subtitle embed without the encoder): the job still
+            # succeeds and the card says why the delivery differs
+            notices = list(settings_opts.pop("__sv_notices", []) or [])
             user_pps = list(settings_opts.pop("postprocessors", []) or [])
             opts.update(settings_opts)
         # preset postprocessors run first (e.g. extract audio), then the
@@ -1343,6 +1348,11 @@ class JobManager:
                     # is still a stop: claiming "completed" (and firing the
                     # completion action) would contradict the user (v0.21.2)
                     return
+                extra = notices + list((info or {}).get("__sv_notices") or [])
+                if extra:
+                    # a finished job with a caveat says so on its card
+                    job["note"] = "; ".join(
+                        ([job["note"]] if job.get("note") else []) + extra)
                 job["status"] = "completed"
                 job["completed_at"] = datetime.now(timezone.utc).isoformat()
         except _Cancelled:
