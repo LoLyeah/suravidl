@@ -53,12 +53,12 @@ function update(mutate) {
   return storageChain;
 }
 
-function remember(tabId, url) {
+function remember(tabId, url, via) {
   update(({ tabMedia, reqHeaders }) => {
     const list = tabMedia[tabId] || [];
     let added = false;
     if (!list.some((m) => m.url === url)) {
-      list.push({ url, foundAt: Date.now() });
+      list.push({ url, foundAt: Date.now(), via: via || "network" });
       tabMedia[tabId] = list.slice(-KEEP_PER_TAB);
       added = true;
     }
@@ -263,6 +263,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "recentJobs") {
     recentJobs().then(sendResponse);
     return true;
+  }
+  if (msg && msg.type === "pageFind") {
+    // the page-side layer (v0.5.13): only a content script can send this —
+    // the message always carries the sender's tab, and nothing else does.
+    // The page itself cannot reach this (isolated world), so a "find" is
+    // never forgeable by the page being visited.
+    const tabId = _sender && _sender.tab ? _sender.tab.id : undefined;
+    if (typeof tabId === "number" && tabId >= 0 && msg.url) {
+      remember(tabId, String(msg.url), msg.via === "player" ? "player" : "page");
+      sendResponse({ ok: true });
+      return false;
+    }
+    sendResponse({ ok: false });
+    return false;
   }
 });
 

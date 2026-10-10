@@ -546,6 +546,24 @@ ok(batched && batched.ok && batched.queued === 2,
     const got = await sendToBg({ type: "getMedia", tabId: 7 });
     ok(got && got.items && got.items.length === 1, "firefox: getMedia answers with the find");
 
+    // — v0.5.13: a content-script report lands in the tab's find list with
+    //   its via; a report without a real sender tab is refused —
+    const pf = await new Promise((resolve) =>
+      ff.onMessage({ type: "pageFind", url: "https://cdn/from-player/noext", via: "player" },
+                   { tab: { id: 12 } }, resolve));
+    await settle();
+    ok(pf && pf.ok, "firefox: a page-side find is accepted");
+    ok(((ff.store.tabMedia || {})[12] || []).some(
+      (m) => m.url === "https://cdn/from-player/noext" && m.via === "player"),
+      "firefox: …stored, with how it was found");
+    const forged = await new Promise((resolve) =>
+      ff.onMessage({ type: "pageFind", url: "https://cdn/forged" }, {}, resolve));
+    await settle();
+    ok(forged && forged.ok === false &&
+       !Object.values(ff.store.tabMedia || {}).some(
+         (l) => (l || []).some((m) => m.url === "https://cdn/forged")),
+       "firefox: a report without a sender tab is refused");
+
     await sendToBg({ type: "rank", items: [{ url: "https://cdn/ff.mp4" }] });
     ok(ff.fetchCalls.some((c) => c.url.endsWith("/sniff/rank")),
        "firefox: rank reaches the engine through the promise namespace");
@@ -952,6 +970,72 @@ ok(batched && batched.ok && batched.queued === 2,
   globalThis.document = saved.document;
 }
 
+
+// — v0.5.13: the page side. The content script reads the PLAYER itself — a
+//   source the player pointed at is evidence whatever it looks like, even
+//   when the element never requested anything; blob/MSE sources are proof of
+//   streaming, not finds; and the scan recovers what ran before it loaded —
+{
+  const pageSrc = readFileSync(join(here, "pagefind.js"), "utf8");
+  const realSetTimeout = setTimeout;
+  const runPage = ({ els = [], entries = [], patterns = ["mp4", "m3u8"] } = {}) => {
+    const sent = [];
+    const observers = [];
+    const doc = {
+      querySelectorAll: (sel) =>
+        els.filter((e) => sel.toLowerCase().includes(e.tagName.toLowerCase())),
+      documentElement: { node: true },
+    };
+    class FakeMO { constructor(cb) { observers.push(cb); } observe() {} }
+    const api = {
+      runtime: { sendMessage: (m) => sent.push(m) },
+      storage: { local: { get: () => Promise.resolve({ patterns }) } },
+    };
+    new Function("chrome", "browser", "document", "location", "performance",
+      "MutationObserver", "URL", "setTimeout", "addEventListener", pageSrc)(
+      api, undefined, doc, { href: "https://site/watch" },
+      { getEntriesByType: () => entries }, FakeMO, URL,
+      (fn) => realSetTimeout(fn, 0), () => {});
+    return { sent, observers };
+  };
+
+  const els = [
+    { tagName: "VIDEO", currentSrc: "https://cdn/from-player-noext", src: "" },
+    { tagName: "VIDEO", currentSrc: "blob:https://site/abcd", src: "" },
+    { tagName: "SOURCE", currentSrc: "", src: "/relative/stream.mp4" },
+  ];
+  const r = runPage({
+    els,
+    entries: [
+      { name: "https://cdn/timeline.m3u8?tok=1", initiatorType: "fetch" },
+      { name: "https://cdn/logo.png", initiatorType: "img" },
+      { name: "https://cdn/timeline-noext", initiatorType: "video" },
+    ],
+  });
+  await settle();
+  ok(r.sent.length && r.sent.every((m) => m.type === "pageFind"),
+     "page side: reports are pageFind messages");
+  ok(r.sent.some((m) => m.url === "https://cdn/from-player-noext" && m.via === "player"),
+     "page side: a player source is reported whatever it looks like");
+  ok(!r.sent.some((m) => /^blob:/.test(m.url)),
+     "page side: a blob source is not a find");
+  ok(r.sent.some((m) => m.url === "https://site/relative/stream.mp4"),
+     "page side: a relative source resolves against the page");
+  ok(r.sent.some((m) => m.url === "https://cdn/timeline.m3u8?tok=1" && m.via === "scan"),
+     "page side: the timeline scan reports a pattern match");
+  ok(r.sent.some((m) => m.url === "https://cdn/timeline-noext" && m.via === "player"),
+     "page side: a video-initiated timeline request is evidence");
+  ok(!r.sent.some((m) => m.url === "https://cdn/logo.png"),
+     "page side: the scan keeps network noise out");
+
+  const late = [];
+  const r2 = runPage({ els: late });
+  late.push({ tagName: "VIDEO", currentSrc: "https://cdn/late-player", src: "" });
+  r2.observers[0]();
+  await settle();
+  ok(r2.sent.some((m) => m.url === "https://cdn/late-player"),
+     "page side: the observer catches a player added later");
+}
 
 // — v0.5.12: the chooser's boxes are drawn as checkboxes (squares with a
 //   tick) — this list is multi-select, and circles promise one choice —

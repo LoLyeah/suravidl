@@ -1,8 +1,9 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.12` (share-link resolution, the recent-jobs mirror,
-checkbox rows) is submitted via `workflow_dispatch` — an extension-only
-change ships that way, no product tag required. Before it: `0.5.11` went up
+**Status:** `suravidl 0.5.13` (the page side: the extension reads the
+player itself) submitted via `workflow_dispatch`, together with `0.5.12`
+(share-link resolution, the recent-jobs mirror, checkbox rows) — an
+extension-only change ships that way, no product tag required. Before it: `0.5.11` went up
 with v0.45.0 (the extension speaks Bahasa Indonesia, and its token hints
 follow Settings → Authentication), superseding `0.5.9` and `0.5.10` in the
 review queue. Product releases ship no extension change unless the extension

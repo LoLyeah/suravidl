@@ -78,6 +78,15 @@ media (`Content-Type: video/*`), so a stream whose URL looks like nothing is
 still found. Only media-ish requests are ever inspected — ordinary browsing's
 cookies never reach extension storage.
 
+It also reads the **player itself**, the layer the phone's in-app browser has
+always had: every `<video>`/`<source>` source is reported **whatever it looks
+like** and even when the player has not requested it yet (`preload="none"`, a
+pre-roll gate), plus a scan of the page's performance timeline for anything
+that loaded before the script did. What the player points at is evidence — the
+same rule, the same engine verdict. `blob:`/MSE sources are not listed on
+desktop: they prove the player is streaming, not what to download. The script
+runs in the extension's isolated world, so a page can never forge a find.
+
 ## Android (in-app browser)
 
 Download tab → **🔍 Find a video on a page**:
