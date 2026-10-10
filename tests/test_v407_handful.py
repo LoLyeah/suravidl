@@ -23,8 +23,8 @@ def test_every_extension_version_string_agrees():
     m3 = json.loads((ROOT / "extension/manifest.json").read_text())
     m2 = json.loads((ROOT / "extension/firefox/manifest.json").read_text())
     html = (ROOT / "extension/popup.html").read_text()
-    assert m3["version"] == m2["version"] == "0.5.13"
-    assert "v0.5.13" in html
+    assert m3["version"] == m2["version"] == "0.5.14"
+    assert "v0.5.14" in html
 
 
 def test_each_manifest_gets_the_permission_its_browser_has():
@@ -34,6 +34,16 @@ def test_each_manifest_gets_the_permission_its_browser_has():
     assert "menus" in m2["permissions"]
     assert "contextMenus" not in m2["permissions"], \
         "Firefox's name for it is menus; contextMenus is not a Firefox permission"
+
+
+def test_the_extension_points_a_fresh_install_to_the_app():
+    """A reviewer's or a stranger's first run: extension installed, engine
+    unknown. The popup's not-running plate and the options page must both
+    point at the install page, or the extension reads as broken."""
+    popup = (ROOT / "extension/popup.html").read_text()
+    options = (ROOT / "extension/options.html").read_text()
+    for name, src in (("popup", popup), ("options", options)):
+        assert "github.com/LoLyeah/suravidl#install" in src, name
 
 
 def test_the_store_notes_carry_the_new_doors():

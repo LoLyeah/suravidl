@@ -1,7 +1,8 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.13` (the page side: the extension reads the
-player itself) submitted via `workflow_dispatch`, together with `0.5.12`
+**Status:** `suravidl 0.5.14` (install pointers for a fresh extension —
+popup + options) submitted via `workflow_dispatch`, on top of `0.5.13`
+(the page side: the extension reads the player itself), `0.5.12`
 (share-link resolution, the recent-jobs mirror, checkbox rows) — an
 extension-only change ships that way, no product tag required. Before it: `0.5.11` went up
 with v0.45.0 (the extension speaks Bahasa Indonesia, and its token hints

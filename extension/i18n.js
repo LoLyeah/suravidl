@@ -22,6 +22,8 @@ const I18N = {
   "Open the suravidl app, then try again.": "Buka aplikasi suravidl, lalu coba lagi.",
   "Try again": "Coba lagi",
   "Engine settings…": "Pengaturan mesin…",
+  "Not installed yet?": "Belum terpasang?",
+  "Get suravidl from GitHub ↗": "Dapatkan suravidl dari GitHub ↗",
   "Playlist": "Daftar putar",
   "Video": "Video",
   "Fragment": "Fragmen",
