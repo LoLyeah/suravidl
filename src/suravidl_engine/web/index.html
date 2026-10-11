@@ -43,6 +43,7 @@
   <symbol id="i-cmd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M4 5.5h16v13H4z"/><path d="M8 10.2l2.3 2.3L8 14.8M12.5 15h4"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.8l6.1-.8z"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6.5 9.5h11L12 15.5z"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="11" cy="11" r="6"/><path d="M15.6 15.6 20 20"/></symbol>
   <symbol id="i-battery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -392,6 +393,7 @@
   <section class="panel hidden" id="panel-queue" role="tabpanel" aria-labelledby="tabQueue">
     <section class="card">
       <h2 data-i18n="Downloads">Downloads</h2>
+      <div id="queueState" class="qstate"></div>
       <div id="queueFilters" class="hidden" role="group" aria-label="Filter the queue" data-i18n-aria="Filter the queue">
         <button class="btn sm pick" data-qfilter="all" aria-pressed="true" data-i18n="All">All</button>
         <button class="btn sm" data-qfilter="active" aria-pressed="false" data-i18n="Active">Active</button>
@@ -400,7 +402,7 @@
       </div>
       <div id="queueActions" class="hidden">
         <button id="queueRetryFailed" class="btn sm hidden" type="button" data-i18n="Retry failed">Retry failed</button>
-        <button id="queueClearFiled" class="btn sm hidden" type="button" data-i18n="Clear filed">Clear filed</button>
+        <button id="queueClearFiled" class="btn sm hidden" type="button" data-i18n="Delete filed files">Delete filed files</button>
       </div>
       <div id="jobs" role="list"><div class="empty muted" id="jobsInitial" data-i18n="Checking the queue…">Checking the queue…</div></div>
       <div id="filterEmpty" class="hidden" role="status"><span class="muted small say"></span>

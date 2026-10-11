@@ -53,13 +53,16 @@ def test_escape_closes_the_whats_new_card():
 # ---------- 3. the expandable title is keyboard-operable ----------
 def test_job_title_expands_from_the_keyboard():
     i = APP.find('"jobtitle"')
-    seg = APP[i:i + 1400]
+    # v0.46.7: the caret's build lines sit above flip() — the window
+    # grew with them (the pinned wiring below is unchanged)
+    seg = APP[i:i + 2000]
     assert 'title.tabIndex = 0' in seg
     assert 'role", "button"' in seg or 'role", "button' in seg
     assert 'aria-expanded' in seg
     assert 'const flip = () =>' in seg          # the pinned wiring stays
     assert 'row.onclick' in seg                 # (on the row since v0.45.8)
-    assert 'title.classList.toggle("open")' in seg
+    # v0.46.7: flip() passes the target state explicitly
+    assert 'title.classList.toggle("open", open)' in seg
     assert 'title.onkeydown' in seg
     assert ".jobtitle:focus-visible" in CSS
 

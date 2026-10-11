@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.7",
+        "title": "The brief",
+        "items": [
+            "The queue gives you the brief: counts on the filters, one state line (nothing running · 2 filed · 3 failed), failures gathered below the finished takes, and each failure one red sentence.",
+        ],
+    },
+    {
         "version": "0.46.6",
         "title": "The flare",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The poster",
         "items": [
             "A cover image that cannot be embedded no longer kills the download — the thumbnail step failing (this phone cannot read some image formats) leaves the video intact and says so on the card.",
-        ],
-    },
-    {
-        "version": "0.45.29",
-        "title": "The note",
-        "items": [
-            "A download that finishes with a caveat now wears an ⓘ and says why — subtitles kept as files instead of embedded, an unusable stream removed — so a successful job never hides what it could not do.",
         ],
     },
 ]

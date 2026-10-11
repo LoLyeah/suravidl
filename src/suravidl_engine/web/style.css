@@ -892,12 +892,31 @@ details.card { padding: 0 18px 6px; }
 }
 .jobtitle:focus-visible { outline: 2px solid var(--ring, var(--accent)); outline-offset: 2px; border-radius: 4px; }
 .job .jmeta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
-.job .jmeta.settled { margin-top: 6px; color: var(--dim); font-size: 11.5px;
+/* v0.46.7 "the brief": the queue's own summary — state line, counts, the
+   failures gathered under a quiet caption, and the fold's drawn caret */
+.qstate { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin: 2px 0 10px; font-size: 11.5px; letter-spacing: .04em; color: var(--muted);
+  font-family: "Martian Mono", ui-monospace, Menlo, monospace; }
+.qstate .qsep { color: var(--dim); }
+.qstate .sdot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.qstate .sdot.amber { background: var(--accent); }
+.qstate .sdot.green { background: var(--ok, #4ecf83); }
+.qstate .sdot.rose { background: var(--err); }
+.qstate .sdot.dim { background: var(--dim); }
+.jgroup { margin: 14px 0 2px; font-size: 11px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--dim);
+  font-family: "Martian Mono", ui-monospace, Menlo, monospace; }
+.jobtitle .chev { display: inline-flex; width: 9px; height: 9px; flex: none;
+  margin-right: 7px; color: var(--dim); transition: transform .15s ease;
+  vertical-align: baseline; }
+.jobtitle .chev svg { width: 9px; height: 9px; fill: currentColor; }
+.job.open .jobtitle .chev { transform: rotate(180deg); }
+.job .jmeta.settled { margin-top: 6px; color: var(--muted); font-size: 11.5px;
   font-family: "Martian Mono", ui-monospace, Menlo, monospace; }
 .job .jrow { margin-top: 9px; }
 .job .path {
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
-  font-size: 11.5px; color: var(--dim);
+  font-size: 11.5px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   flex: 1; min-width: 0;
   /* v0.46.6: elide the START, not the tail — the filename is the point
@@ -933,7 +952,7 @@ details.card { padding: 0 18px 6px; }
 .job.open .jdetails .jdgrid {
   padding-top: 8px; border-top-color: var(--line-soft);
 }
-.jdetails .jdlbl { color: var(--dim); }
+.jdetails .jdlbl { color: var(--muted); }
 .jdetails .jdval, .jdetails .jdpath { color: var(--text); overflow-wrap: anywhere; }
 /* the compact ellipsised path in the actions row is redundant once the
    receipt carries the full one (v0.38.5: "when expanding you don't need
@@ -1020,7 +1039,7 @@ details.card { padding: 0 18px 6px; }
 /* failed rows: the human line first, the machine text behind an affordance */
 .jerrsay { margin-top: 8px; font-size: 13px; color: var(--err); }
 .jerr {
-  margin-top: 6px; font-size: 12px; color: var(--err);
+  margin-top: 6px; font-size: 12px; color: var(--muted);
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
   line-height: 1.5; overflow-wrap: anywhere;
 }
@@ -1029,6 +1048,8 @@ details.card { padding: 0 18px 6px; }
   -webkit-line-clamp: 2; overflow: hidden; cursor: pointer;
 }
 .jerr.clamp.open { display: block; overflow: visible; }
+/* v0.46.7: closed by default — and [hidden] must beat .clamp's display */
+.jerr[hidden] { display: none; }
 .jobfiles { margin-top: 10px; display: grid; gap: 6px; }
 .jitem {
   display: flex; align-items: center; gap: 8px;

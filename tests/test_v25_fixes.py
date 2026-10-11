@@ -44,7 +44,9 @@ def test_a_failed_row_shows_the_whole_error():
         "the row must render the whole message"
     assert 'classList.add("clamp")' in seg, \
         "a long message starts clamped to two lines"
-    assert "tap to show the whole message" in seg
+    # v0.46.7: the text's own tap retired — the toggle is the one door,
+    # and it starts closed (the design's own "behind Show details")
+    assert "jrr-toggle" in seg and 't("Show details")' in seg
 
 
 def test_the_error_clamp_lifts_on_tap():

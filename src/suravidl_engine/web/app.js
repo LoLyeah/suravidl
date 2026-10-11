@@ -751,7 +751,18 @@ const STRINGS = { en: {}, id: {
   "start 1:30": "mulai 1:30",
   "end 2:45": "akhir 2:45",
   "Retry failed ({n})": "Coba ulang yang gagal ({n})",
-  "Clear filed ({n})": "Bersihkan yang selesai ({n})",
+  "Delete filed files ({n})": "Hapus berkas selesai ({n})",
+  "deletes the filed files from your downloads folder":
+    "menghapus berkas selesai dari folder unduhan Anda",
+  "Delete the {n} filed files?": "Hapus {n} berkas selesai?",
+  "They leave your downloads folder.": "Berkas-berkas itu keluar dari folder unduhan Anda.",
+  "The file on disk goes too.": "Berkas di disk ikut terhapus.",
+  "{n} running": "{n} berjalan",
+  "nothing running": "tidak ada yang berjalan",
+  "{n} filed": "{n} selesai",
+  "{n} failed": "{n} gagal",
+  "{n} downloads running": "{n} unduhan berjalan",
+  "{n} downloads failed": "{n} unduhan gagal",
   "Delete the {n} filed downloads?": "Hapus {n} unduhan yang selesai?",
   "Their Gallery/Music copies go too.": "Salinan Gallery/Music-nya ikut terhapus.",
   "retrying {n}": "mencoba ulang {n}",
@@ -2082,6 +2093,14 @@ function renderQueueBadge(jobs) {
   badge.textContent = n > 9 ? "9+" : String(n);
   badge.classList.toggle("hidden", !n);
   badge.classList.toggle("bad", !active && !!failed);
+  // v0.46.7: the badge says what it counts (it baked silently into the
+  // tab's accessible name before — critique round 2)
+  const why = active
+    ? t("{n} downloads running", { n: active })
+    : t("{n} downloads failed", { n: failed });
+  badge.title = n ? why : "";
+  if (n) badge.setAttribute("aria-label", why);
+  else badge.removeAttribute("aria-label");
   if (n && !was) {
     // it appears: a quick scale-in, so a started download never just pops a
     // number into the corner (v0.42.1)
@@ -2751,13 +2770,42 @@ async function settleThenDelete(job) {
    per row. Two counters do the bulk work — retry everything failed, clear
    everything filed — each behind its own single confirm. */
 function renderQueueActions(jobs) {
+  const list = jobs || [];
+  const failed = list.filter((j) => QUEUE_BUCKETS.error.includes(j.status)).length;
+  const filed = list.filter((j) => QUEUE_BUCKETS.filed.includes(j.status)).length;
+  // v0.46.7 "the brief": the queue answers its own question before you
+  // scroll — counts on the chips and one mono state line (critique round 2)
+  const counts = { all: list.length, active: 0, filed: 0, error: 0 };
+  for (const j of list) counts[queueBucket(j.status)] += 1;
+  const filters = $("queueFilters");
+  if (filters) {
+    for (const b of filters.querySelectorAll("[data-qfilter]")) {
+      const base = t(b.dataset.i18n || b.textContent);
+      const n = counts[b.dataset.qfilter] || 0;
+      b.textContent = n ? base + " " + n : base;
+    }
+  }
+  const st = $("queueState");
+  if (st) {
+    const parts = [];
+    parts.push(counts.active
+      ? [t("{n} running", { n: counts.active }), "amber"]
+      : [t("nothing running"), "dim"]);
+    if (counts.filed) parts.push([t("{n} filed", { n: counts.filed }), "green"]);
+    if (counts.error) parts.push([t("{n} failed", { n: counts.error }), "rose"]);
+    st.replaceChildren();
+    parts.forEach(([text, tone], i) => {
+      if (i) st.append(el("span", "qsep", "\u00b7"));
+      st.append(el("span", "sdot " + tone));
+      st.append(el("span", "", text));
+    });
+  }
   const box = $("queueActions");
   if (!box) return;
-  const failed = (jobs || []).filter((j) => QUEUE_BUCKETS.error.includes(j.status)).length;
-  const filed = (jobs || []).filter((j) => QUEUE_BUCKETS.filed.includes(j.status)).length;
   const rb = $("queueRetryFailed"), cb = $("queueClearFiled");
   rb.textContent = t("Retry failed ({n})", { n: failed });
-  cb.textContent = t("Clear filed ({n})", { n: filed });
+  cb.textContent = t("Delete filed files ({n})", { n: filed });
+  cb.title = t("deletes the filed files from your downloads folder");
   rb.classList.toggle("hidden", !failed);
   cb.classList.toggle("hidden", !filed);
   box.classList.toggle("hidden", !failed && !filed);
@@ -2780,7 +2828,8 @@ async function clearFiledJobs() {
   const { jobs } = await api("/jobs").catch(() => ({ jobs: [] }));
   const filed = (jobs || []).filter((j) => QUEUE_BUCKETS.filed.includes(j.status));
   if (!filed.length) return;
-  const msg = t("Delete the {n} filed downloads?", { n: filed.length })
+  const msg = t("Delete the {n} filed files?", { n: filed.length })
+    + " " + t("They leave your downloads folder.")
     + (GALLERY() ? " " + t("Their Gallery/Music copies go too.") : "")
     + " " + t("This cannot be undone.");
   if (!(await askConfirm(msg, { okText: t("Delete") }))) return;
@@ -2860,11 +2909,14 @@ function deleteButton(j) {
   b.onclick = async () => {
     const name = j.filepath ? baseName(j.filepath)
       : String(j.title || j.url).slice(0, 60);
+    // v0.46.7: the copy is no longer inverted — a file row says the file
+    // dies, a fileless row is just a list removal and stops borrowing the
+    // "cannot be undone" gravity (critique round 2)
     const msg = (running ? t("Stop “{name}” and delete the partial file?", { name: name })
-      : j.filepath ? t("Delete “{name}”?", { name: name })
+      : j.filepath ? t("Delete “{name}”?", { name: name }) + " " + t("The file on disk goes too.")
         : t("Remove “{name}” from the list?", { name: name }))
       + (j.filepath && GALLERY() ? " " + t("Its Gallery/Music copy goes too.") : "")
-      + " " + t("This cannot be undone.");
+      + (j.filepath || running ? " " + t("This cannot be undone.") : "");
     if (!(await askConfirm(msg, { okText: running ? t("Stop and delete") : t("Delete") }))) {
       return;
     }
@@ -2918,7 +2970,12 @@ function jobRow(j) {
   // liveryOf() lived only on the probe card until the queue critique)
   const lv = liveryOf(j.url);
   if (lv) row.dataset.livery = lv;
-  const title = el("span", "jobtitle", j.title || j.url);
+  const title = el("span", "jobtitle");
+  // a drawn caret, not a guessed cursor (v0.46.7): the fold had no
+  // affordance — cursor:pointer never reaches touch (critique round 2)
+  const chev = el("span", "chev");
+  chev.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chev"/></svg>';
+  title.append(chev, document.createTextNode(j.title || j.url));
   title.title = j.url;
   // the title ellipsises on a phone and nothing hover-reveals it there: a
   // tap unfolds the whole line (2026-10-01 report). v0.38.3: it is a real
@@ -2935,12 +2992,17 @@ function jobRow(j) {
   title.setAttribute("role", "button");
   title.setAttribute("aria-expanded", "false");
   const flip = () => {
-    title.classList.toggle("open");
-    // the row carries the state too (v0.39.12): the fold hung off :has(),
-    // which older engines drop whole — the receipt could never expand there
-    row.classList.toggle("open", title.classList.contains("open"));
-    title.setAttribute("aria-expanded",
-      title.classList.contains("open") ? "true" : "false");
+    const open = !title.classList.contains("open");
+    // one owner for the fold state (v0.46.7): class + row class + aria +
+    // the receipt's a11y tree membership move together, never apart
+    title.classList.toggle("open", open);
+    row.classList.toggle("open", open);
+    title.setAttribute("aria-expanded", open ? "true" : "false");
+    const det = row.querySelector(".jdetails");
+    if (det) {
+      if (open) det.removeAttribute("aria-hidden");
+      else det.setAttribute("aria-hidden", "true");
+    }
   };
   row.onclick = (e) => {
     if (e.target.closest("button, a, input, select, textarea, .jerr")) return;
@@ -3044,29 +3106,24 @@ function jobRow(j) {
     const errText = j.error || "";
     const errEl = el("div", "jerr", errText);
     errEl.id = "jerr-" + j.id;   // the details toggle names its region
-    if (errText.length > 90) {
-      errEl.classList.add("clamp");
-      errEl.title = t("tap to show the whole message");
-      errEl.onclick = () => {
-        const open = errEl.classList.toggle("open");
-        errEl.title = open ? t("tap to collapse") : t("tap to show the whole message");
-      };
-    }
+    if (errText.length > 90) errEl.classList.add("clamp");
+    // v0.46.7: the machine dialect starts CLOSED — the design's own rule
+    // ("the raw text sits clamped behind Show details"). The human sentence
+    // above carries the row's only rose; the toggle is the one door and the
+    // one owner of this state (the text's own tap desynced the two).
+    errEl.hidden = true;
     row.append(errEl);
     const r = el("div", "jrow");
-    if (errEl.classList.contains("clamp")) {
-      // a visible affordance, not just a hidden cursor (v0.37.0)
-      const more = el("button", "linkbtn jrr-toggle", t("Show details"));
-      more.setAttribute("aria-expanded", "false");
-      more.setAttribute("aria-controls", errEl.id || "");
-      more.onclick = () => {
-        const open = errEl.classList.toggle("open");
-        errEl.title = open ? t("tap to collapse") : t("tap to show the whole message");
-        more.textContent = open ? t("Hide details") : t("Show details");
-        more.setAttribute("aria-expanded", open ? "true" : "false");
-      };
-      r.append(more);
-    }
+    const more = el("button", "linkbtn jrr-toggle", t("Show details"));
+    more.setAttribute("aria-expanded", "false");
+    more.setAttribute("aria-controls", errEl.id);
+    more.onclick = () => {
+      const open = more.getAttribute("aria-expanded") !== "true";
+      errEl.hidden = !open;
+      more.textContent = open ? t("Hide details") : t("Show details");
+      more.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    r.append(more);
     const copy = el("button", "ghost-sm", t("Copy"));
     copy.title = t("copy the whole message");
     copy.onclick = async () => {
@@ -3150,6 +3207,7 @@ function jobRow(j) {
     // us the file size and the location too — it's expanding for a reason").
     // Collapsed rows keep the compact strip; the title tap unfolds both.
     const details = el("div", "jdetails");
+    details.setAttribute("aria-hidden", "true");   // folded = out of the tree (v0.46.7)
     details.id = "jd-" + j.id;   // the title button names what it controls
     const grid = el("div", "jdgrid");   // the shrinkable row the fold animates
     grid.append(
@@ -3266,6 +3324,8 @@ function updateJobRow(row, j) {
         ftitle.classList.add("open");
         ftitle.setAttribute("aria-expanded", "true");
       }
+      const fdet = fresh.querySelector(".jdetails");
+      if (fdet) fdet.removeAttribute("aria-hidden");
     }
     fresh.classList.add("swap");
     row.replaceWith(fresh);
@@ -3301,6 +3361,9 @@ function queueBucket(status) {
 function applyQueueFilter() {
   const box = $("jobs");
   if (!box) return;
+  // the failure caption belongs to the All view only (v0.46.7)
+  box.querySelectorAll(".jgroup").forEach((g) =>
+    g.classList.toggle("hidden", QFILTER !== "all"));
   let hidden = 0;
   for (const row of box.querySelectorAll(".job")) {
     const show = QFILTER === "all" ||
@@ -3521,8 +3584,17 @@ async function refreshJobs() {
     // the static boot line ("Checking the queue…") yields to real content
     const boot = box.querySelector("#jobsInitial");
     if (boot) boot.remove();
-    const list = jobs.sort(
-      (a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+    // v0.46.7: success leads — running first, then filed, then failures
+    // gathered at the end under a quiet caption (critique round 2: newest-
+    // first landed three rose rows above the two finished takes)
+    const rank = (j) => {
+      const b = queueBucket(j.status);
+      return b === "active" ? 0 : b === "filed" ? 1 : 2;
+    };
+    const list = jobs.sort((a, b) => {
+      const d = rank(a) - rank(b);
+      return d !== 0 ? d : (b.created_at || "").localeCompare(a.created_at || "");
+    });
     // a finish that speaks: the FIRST poll that sees a job become completed
     // says so — once (v0.37.0)
     const seen = new Set();
@@ -3562,6 +3634,22 @@ async function refreshJobs() {
     box.querySelectorAll(".job").forEach((r) => {
       if (!keep.has(r.dataset.id)) leaveRow(r, true);   // the reader's spot stays
     });
+    // the failures gather under a quiet caption when success leads above
+    // (v0.46.7) — it disappears whenever either side empties or a filter
+    // other than All is on
+    box.querySelectorAll(".jgroup").forEach((g) => g.remove());
+    {
+      const firstFailed = box.querySelector(
+        '.job[data-status="error"], .job[data-status="interrupted"]');
+      const firstFiled = box.querySelector('.job[data-status="completed"]');
+      if (firstFailed && firstFiled) {
+        const failedN = list.filter((j) =>
+          QUEUE_BUCKETS.error.includes(j.status)).length;
+        const g = el("div", "jgroup", t("{n} failed", { n: failedN }));
+        if (QFILTER !== "all") g.classList.add("hidden");
+        box.insertBefore(g, firstFailed);
+      }
+    }
     let prev = null;
     for (const j of list) {
       keep.add(j.id);

@@ -66,4 +66,5 @@ def test_a_tap_unfolds_the_whole_title():
     # the handler lives in jobRow and toggles the class — on the row since
     # v0.45.8 (the whole card flips it; buttons stay buttons)
     assert "row.onclick" in JS
-    assert 'title.classList.toggle("open")' in JS
+    # v0.46.7: flip() computes the target once and passes it explicitly
+    assert 'title.classList.toggle("open", open)' in JS
