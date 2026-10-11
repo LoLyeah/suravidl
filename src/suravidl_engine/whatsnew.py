@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.5",
+        "title": "The desk",
+        "items": [
+            "Download names its three jobs: Link, Batch, Watch list. Batch gets its own box — a multi-link paste carries over in one tap — and the Watch list label counts what you follow.",
+        ],
+    },
+    {
         "version": "0.46.4",
         "title": "The comeback",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "items": [
             "Subtitles no longer break a download on the phone: the app checks what its ffmpeg can really do and keeps them as files beside the video when it cannot embed them (MKV still embeds).",
             "Reddit share links (“/s/” shortcuts) now say what they are: browser-only shortcuts, with the trick to get the full link.",
-        ],
-    },
-    {
-        "version": "0.45.27",
-        "title": "The silence",
-        "items": [
-            "Deleting a just-cancelled download waits for the writer to actually go quiet first — a race could leave a leftover fragment behind on slow machines.",
         ],
     },
 ]

@@ -104,6 +104,15 @@
 
   <!-- ============================ Download ============================ -->
   <section class="panel" id="panel-download" role="tabpanel" aria-labelledby="tabDownload">
+
+    <!-- the desk (v0.46.5): three jobs, named. Link stays the default. -->
+    <div class="subnav" id="subNav" role="tablist" aria-label="Download modes" data-i18n-aria="Download modes">
+      <button class="subbtn on" id="subLinkBtn" role="tab" aria-selected="true" aria-controls="subLink" data-sub="link"><span data-i18n="Link">Link</span></button>
+      <button class="subbtn" id="subBatchBtn" role="tab" aria-selected="false" aria-controls="subBatch" data-sub="batch"><span data-i18n="Batch">Batch</span></button>
+      <button class="subbtn" id="subFollowsBtn" role="tab" aria-selected="false" aria-controls="subFollows" data-sub="follows"><span data-i18n="Watch list">Watch list</span><span id="subFollowCount" class="subcount hidden"></span></button>
+    </div>
+
+    <div class="subpanel" id="subLink" role="tabpanel" aria-labelledby="subLinkBtn">
     <section class="card paste-card">
       <label class="lbl" for="url" data-i18n="Source">Source</label>
       <div class="paste">
@@ -122,20 +131,10 @@
         <button id="sniffBtn" class="btn sm"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg></span><span data-i18n="Find a video on a page">Find a video on a page</span></button>
         <span class="muted" data-i18n="opens a browser with a sniffer — press play, then Scan">opens a browser with a sniffer — press play, then Scan</span>
       </div>
-      <div id="batchRow" class="audioRow hidden">
-        <span class="muted" id="batchCount"></span>
-        <button id="batchCheck" class="btn sm hidden" data-i18n="Check first">Check first</button>
-        <button id="batchBtn" class="btn sm" data-i18n="Queue all">Queue all</button>
+      <div id="multiHint" class="audioRow hidden">
+        <span class="muted" id="multiSay"></span>
+        <button id="multiGoBatch" class="btn sm" data-i18n="Open Batch">Open Batch</button>
       </div>
-      <div id="batchList" class="bulklist hidden" role="list"></div>
-    </section>
-
-    <!-- the watch list (v0.46.2 "the follower"): follow a playlist and its
-         new videos arrive on their own — checks run while the app does -->
-    <section class="card" id="followsCard">
-      <div class="lbl" data-i18n="Watch list">Watch list</div>
-      <div id="followsNote" class="muted small" data-i18n="Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.">Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.</div>
-      <div id="followsList"></div>
     </section>
 
     <!-- the scope strip: a finished probe lands here (v0.37.0) -->
@@ -357,6 +356,35 @@
         or manage bundles in Settings → Presets.</div>
       </div>
     </details>
+
+    </div><!-- /subLink -->
+
+    <!-- the batch door, on its own (v0.46.5): many links were a guest in the
+         Source card; now they have a desk of their own -->
+    <div class="subpanel hidden" id="subBatch" role="tabpanel" aria-labelledby="subBatchBtn">
+      <section class="card">
+        <label class="lbl" for="batchUrls" data-i18n="Batch">Batch</label>
+        <textarea id="batchUrls" rows="6" spellcheck="false"
+          placeholder="Paste up to 20 links, one per line" data-i18n-ph="Paste up to 20 links, one per line"></textarea>
+        <div id="batchHint" class="muted small" data-i18n="one per line — up to 20 per batch; Check first looks before anything queues">one per line — up to 20 per batch; Check first looks before anything queues</div>
+        <div id="batchRow" class="audioRow hidden">
+          <span class="muted" id="batchCount"></span>
+          <button id="batchCheck" class="btn sm hidden" data-i18n="Check first">Check first</button>
+          <button id="batchBtn" class="btn sm" data-i18n="Queue all">Queue all</button>
+        </div>
+        <div id="batchList" class="bulklist hidden" role="list"></div>
+      </section>
+    </div>
+
+    <!-- the watch list (v0.46.2 "the follower"): follow a playlist and its
+         new videos arrive on their own — checks run while the app does -->
+    <div class="subpanel hidden" id="subFollows" role="tabpanel" aria-labelledby="subFollowsBtn">
+      <section class="card" id="followsCard">
+        <div class="lbl" data-i18n="Watch list">Watch list</div>
+        <div id="followsNote" class="muted small" data-i18n="Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.">Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.</div>
+        <div id="followsList"></div>
+      </section>
+    </div>
 
   </section>
 

@@ -60,7 +60,9 @@ def test_the_dialog_scroller_wears_a_hairline_and_loses_it_on_touch():
     for sel in (".optlist", ".folderlist", ".wnlist", ".subtabs", "textarea",
                 ".modal"):
         assert sel in rule, sel
-    blk = CSS.split("@media (pointer: coarse)")[1]
+    # v0.46.5: a second coarse block exists (the sub-nav's 44px targets);
+    # scan every coarse block, not just the first one
+    blk = "".join(CSS.split("@media (pointer: coarse)")[1:])
     assert ".wnlist::-webkit-scrollbar" in blk, \
         "touch still gets a drag handle it cannot use"
     assert "scrollbar-width: none" in blk

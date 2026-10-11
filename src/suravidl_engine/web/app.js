@@ -759,6 +759,14 @@ const STRINGS = { en: {}, id: {
   "Copy diagnostics": "Salin diagnostik",
   "Follow": "Ikuti",
   "Following": "Mengikuti",
+  "Link": "Tautan",
+  "Batch": "Batch",
+  "Open Batch": "Buka Batch",
+  "{n} links — better in Batch": "{n} tautan — lebih baik di Batch",
+  "one per line — up to 20 per batch; Check first looks before anything queues":
+    "satu per baris — maksimal 20 per batch; Periksa dulu sebelum ada yang masuk antrean",
+  "Download modes": "Mode unduhan",
+  "Paste up to 20 links, one per line": "Tempel maksimal 20 tautan, satu per baris",
   "Watch list": "Daftar pantau",
   "Follow a playlist or channel and its new videos arrive on their own — following starts from now, checks run while the app does.":
     "Ikuti daftar putar atau kanal dan video barunya datang sendiri — mengikuti dimulai dari sekarang, pemeriksaan berjalan selama aplikasi hidup.",
@@ -1215,6 +1223,11 @@ async function renderFollows() {
   box.textContent = "";
   for (const f of FOLLOWS) box.append(followRow(f));
   if ($("followsNote")) $("followsNote").classList.toggle("hidden", FOLLOWS.length > 0);
+  const badge = $("subFollowCount");
+  if (badge) {
+    badge.textContent = FOLLOWS.length ? String(FOLLOWS.length) : "";
+    badge.classList.toggle("hidden", !FOLLOWS.length);
+  }
 }
 
 function initFollows() {
@@ -5753,7 +5766,8 @@ function initFolderSheet() {
 const BARE_HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/\S*)?$/i;
 
 function pastedTokens() {
-  const text = $("url").value.trim();
+  const box = $("batchUrls");
+  const text = box ? box.value.trim() : "";
   return text ? text.split(/\s+/) : [];
 }
 
@@ -5766,9 +5780,12 @@ function renderBatchRow() {
   const tokens = pastedTokens();
   const urls = pastedUrls();
   const junk = tokens.length - urls.length;
-  const show = tokens.length > 1 || urls.length > 1;
+  // the desk (v0.46.5): the batch box is its own room, so ONE link pasted
+  // here still gets the row (it used to need two in the shared Source box)
+  const show = tokens.length >= 1;
   const over = urls.length > 20;          // the engine's own batch ceiling
   $("batchRow").classList.toggle("hidden", !show);
+  if ($("batchHint")) $("batchHint").classList.toggle("hidden", show);
   const links = urls.length === 1
     ? t("1 link") : t("{n} links", { n: urls.length });
   // v0.40.5: a line the paste cannot use is named, not silently uncounted
@@ -5787,16 +5804,39 @@ function renderBatchRow() {
   if ($("batchBtn")) {
     $("batchBtn").textContent = BULK.length
       ? t("Queue {n} checked", { n: ticked }) : t("Queue all");
-    const enough = BULK.length ? ticked > 0 : urls.length >= 2;
+    const enough = BULK.length ? ticked > 0 : urls.length >= 1;
     $("batchBtn").disabled = over || !enough;
   }
 }
 
 function initBatch() {
-  $("url").addEventListener("input", renderBatchRow);
-  $("url").addEventListener("change", renderBatchRow);
-  // typing over the paste invalidates the check pass it came from
-  $("url").addEventListener("input", clearBulkPreview);
+  if ($("batchUrls")) {
+    $("batchUrls").addEventListener("input", renderBatchRow);
+    // typing over the paste invalidates the check pass it came from
+    $("batchUrls").addEventListener("input", clearBulkPreview);
+  }
+  // the desk (v0.46.5): the sub-nav, and the hint that CARRIES a multi-link
+  // paste from Link into Batch instead of letting the probe eat it
+  for (const b of document.querySelectorAll(".subbtn")) {
+    b.onclick = () => showSub(b.dataset.sub);
+  }
+  if ($("url")) $("url").addEventListener("input", renderMultiHint);
+  if ($("multiGoBatch")) {
+    $("multiGoBatch").onclick = () => {
+      const carry = $("url").value.trim();
+      if (carry && $("batchUrls")) $("batchUrls").value = carry;
+      $("url").value = "";
+      renderMultiHint();
+      renderBatchRow();
+      showSub("batch");
+      if ($("batchUrls")) $("batchUrls").focus();
+    };
+  }
+  // NO eager renderBatchRow() here: it reads BULK, and BULK's `let` runs
+  // later in the file — calling at load dies in TDZ and takes the whole
+  // script (and the sub-nav) with it. The row paints on input, and when
+  // the Batch room opens (showSub). (Caught by the rig, v0.46.5.)
+  renderMultiHint();
   if ($("batchCheck")) $("batchCheck").onclick = checkBatch;
   $("batchBtn").onclick = async () => {
     // with a check pass on screen, only the ticked rows ride; without one,
@@ -5813,7 +5853,7 @@ function initBatch() {
     try {
       const r = await api("/jobs/batch",
         { method: "POST", body: JSON.stringify(body) });
-      $("url").value = "";
+      if ($("batchUrls")) $("batchUrls").value = "";
       renderBatchRow();
       clearOv();
       clearBulkPreview();
@@ -5832,6 +5872,43 @@ function initBatch() {
       $("batchBtn").classList.remove("busy");
     }
   };
+}
+
+/* ---------- v0.46.5 "the desk": Download's three jobs, named ----------
+ * Link (default) keeps the single flow; Batch owns the many-links box;
+ * Watch list owns the follows. Naming the jobs is the discoverability —
+ * the features stop hiding in one long column. */
+let SUBTAB = "link";
+
+function showSub(name, opts) {
+  SUBTAB = ["link", "batch", "follows"].includes(name) ? name : "link";
+  for (const n of ["link", "batch", "follows"]) {
+    const id = "sub" + n[0].toUpperCase() + n.slice(1);
+    const panel = $(id);
+    const btn = $(id + "Btn");
+    const on = n === SUBTAB;
+    if (panel) panel.classList.toggle("hidden", !on);
+    if (btn) {
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    }
+  }
+  if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });
+  if (SUBTAB === "follows") renderFollows();
+  if (SUBTAB === "batch") renderBatchRow();
+}
+
+function renderMultiHint() {
+  const hint = $("multiHint");
+  if (!hint || !$("url")) return;
+  const text = $("url").value.trim();
+  const urls = text ? text.split(/\s+/).filter((s) =>
+    /^(https?|ftp|magnet):/i.test(s) || BARE_HOST.test(s)) : [];
+  hint.classList.toggle("hidden", urls.length < 2);
+  if (urls.length >= 2 && $("multiSay")) {
+    $("multiSay").textContent =
+      t("{n} links — better in Batch", { n: urls.length });
+  }
 }
 
 /* ---------- v0.46.0: the paste list looks before it leaps ----------
@@ -5880,7 +5957,9 @@ function bulkRow(it) {
   row.onclick = (e) => {
     if (e.target === box) return;
     $("url").value = it.url;
+    renderMultiHint();
     renderBatchRow();
+    showSub("link");      // the probe lands in the Link room (v0.46.5)
     doProbe();
   };
   it.el = row; it.box = box; it.name = name; it.meta = meta;

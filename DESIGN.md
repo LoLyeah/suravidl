@@ -427,6 +427,18 @@ open a receipt — the real bytes on disk and the saved path in mono — and the
 open state rides an explicit row class (no `:has()`), so engines without it
 still expand it.
 
+### The desk (Download's sub-nav)
+
+Download's three jobs are named on a switchgear row — Link · Batch ·
+Watch list — because a feature buried in a long column does not exist.
+Link (default) keeps the single paste → probe → take flow, including
+the Follow button on a playlist probe; Batch owns the many-links box
+and its check pass; Watch list owns the follows, its label carrying a
+quiet count. One column per job; the row is the room's, not a second
+tab stripe: hairline base, amber underline on the live label, 44px
+targets under coarse pointers. A multi-link paste into Link is never
+eaten — a hint carries it into Batch in one tap.
+
 ### The FILED TAKES rail (≥1080px)
 Newest takes first: bin title + mono file name, count badge in amber. The
 rail is a shelf, not a second queue — its items open the take.
@@ -457,6 +469,11 @@ ships without a press state.
 **The Finish Speaks Rule.** Completion is an event, not a pill flip: one
 transition-fired toast with real actions, a stamp on the row, the take in the
 bins. Nothing important settles silently in a tab nobody is watching.
+
+**The Named Jobs Rule.** A job that lives in the interface carries its
+name on the selector — Link, Batch, Watch list. Depth may sit one step
+away, but it must be announced at the surface; a capability with no
+name is a capability nobody has.
 
 **The Measured Lane Rule.** A floating lane never guesses: it measures what
 is actually docked at the bottom right now and lifts above it; nothing

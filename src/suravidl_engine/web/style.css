@@ -931,6 +931,23 @@ details.card { padding: 0 18px 6px; }
 /* the ⓘ on a finished-with-a-caveat hint (v0.45.29) */
 .jobhint .ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
 
+/* ---------- v0.46.5: the desk's job selector ---------- */
+.subnav { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line-soft); }
+.subbtn { appearance: none; background: transparent; border: 0; color: var(--dim);
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center;
+  gap: 7px; padding: 10px 6px 9px; font: inherit; font-size: 11px; font-weight: 600;
+  letter-spacing: .07em; text-transform: uppercase; cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s ease, border-color .15s ease; }
+.subbtn:active { transform: scale(.97); }
+.subbtn.on { color: var(--accent); border-bottom-color: var(--accent-line); }
+.subbtn .subcount { font-family: "Martian Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0; color: var(--dim);
+  background: var(--smoked-glass-strong); border-radius: 999px; padding: 1px 7px; }
+.subbtn.on .subcount { color: var(--accent); }
+@media (hover: hover) { .subbtn:hover { color: var(--ink); } }
+@media (pointer: coarse) { .subbtn { min-height: 44px; } }
+
 /* ---------- v0.46.2: the watch list ---------- */
 .follows-row { display: flex; align-items: center; gap: 10px; padding: 8px 0;
   border-top: 1px solid var(--line-soft); font-size: 12.5px; }

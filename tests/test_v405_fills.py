@@ -95,6 +95,8 @@ def test_the_batch_line_names_what_it_skipped():
     assert "pastedTokens()" in seg and "pastedUrls()" in seg
     assert "skipped — not" in seg, "a skipped line is named, not uncounted"
     assert 'urls.length === 1' in seg and 't("1 link") : t("{n} links", { n: urls.length })' in seg, "one link is one link"
-    assert "urls.length >= 2" in seg and "ticked > 0" in seg, \
-        "one link is not a batch (nor is an empty tick set) — the button stays off"
+    # v0.46.5: paste lives in its own Batch room now — ONE link pasted
+    # there is deliberate, so Queue all may ride; an empty tick set still may not
+    assert "urls.length >= 1" in seg and "ticked > 0" in seg, \
+        "one deliberate link queues; an empty tick set never does"
     assert "only 20 fit in one batch" in seg, "the cap still speaks"
