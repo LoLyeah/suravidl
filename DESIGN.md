@@ -396,6 +396,10 @@ the readout returns to "best available".
 Quality chips, format-row Take buttons and audio picks ARM — they never
 start a download. Armed = `data-pick` match: amber border, faint wash. A
 second tap disarms. Labels stay human ("this file" for a bare direct link).
+The armed look is a TOP-LEVEL `.picked` rule and `aria-pressed` rides the
+same toggle — scoped under a parent, the light dies silently on every row
+outside it (the audio picks were dark for a whole release: armed take, no
+lamp; a control that can't light is a control that doesn't exist).
 
 ### The Scope Strip
 Three scopes — SOURCE · FORMATS · LARGEST — each a tiny uppercase label, an
@@ -438,6 +442,14 @@ quiet count. One column per job; the row is the room's, not a second
 tab stripe: hairline base, amber underline on the live label, 44px
 targets under coarse pointers. A multi-link paste into Link is never
 eaten — a hint carries it into Batch in one tap.
+
+### The guide (the watch list's cold start)
+The Watch list opens with an add row (paste a link, Follow — Enter too)
+and, until the first follow exists, a lead line plus three numbered steps
+(numbered because the order carries information). The how-to hides the
+moment a follow lands; the add row stays. Icons here follow the drawn
+system (`span.ico`, 16px) — a class the stylesheet doesn't define fails
+silently and the SVG balloons (`.ic`, caught only on a phone).
 
 ### The FILED TAKES rail (≥1080px)
 Newest takes first: bin title + mono file name, count badge in amber. The
@@ -504,6 +516,9 @@ a bug with a delay.
   material.
 
 ### Don't:
+- Reference a class that isn't in the stylesheet — the element keeps
+  default sizing and nothing warns (`.ic` ballooned a 16px star to fill
+  its card on Android). Check the class exists before using it.
 - **Don't** add accent hues beyond the two sanctioned voices (signal amber,
   pine & cream) and the three state lights; a third decorative hue is how
   this room stops reading as one instrument.
