@@ -638,13 +638,25 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 }
 .audioRow .muted { font-size: 12.5px; margin-right: 2px; }
 .audioRow .qrow { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+/* v0.46.8 "the guide": the watch list's cold start — an add row that works
+   from zero, and the three steps, numbered because the order matters */
+.followadd { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+.followadd input { flex: 1 1 220px; min-width: 0; }
+.follows-how { display: grid; gap: 7px; margin: 10px 0 4px; }
+.follows-how .fh-step { display: flex; gap: 10px; font-size: 12.5px;
+  color: var(--muted); line-height: 1.45; }
+.follows-how .fh-n { flex: none; width: 14px; color: var(--accent);
+  font-family: "Martian Mono", ui-monospace, Menlo, monospace; font-size: 12px; }
 .qrow { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .qrow .btn { border-radius: 8px; padding: 5px 10px; font-size: 12.5px; }
 .qrow .btn.pick, .btn.pick {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent-line, var(--accent));
 }
-.qrow .btn.picked {
+.qrow .btn.picked, .btn.picked {
+  /* v0.46.8: renderTake lights [data-pick] buttons with .picked — but the
+     look lived under .qrow only, so the audio row and the format rows lit
+     nothing at all (the phone screenshots caught it: take armed, no light) */
   border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }

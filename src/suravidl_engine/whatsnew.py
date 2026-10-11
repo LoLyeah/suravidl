@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.8",
+        "title": "The guide",
+        "items": [
+            "The watch list teaches itself: paste a link and Follow works from zero, with a three-step how-to until the first follow — and the audio-only picks light up.",
+        ],
+    },
+    {
         "version": "0.46.7",
         "title": "The brief",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The frames",
         "items": [
             "The in-app browser's sniffer now runs inside cross-origin frames too — a player there is caught by the script layers, not only its network requests — and its DOM watching is debounced on heavy pages.",
-        ],
-    },
-    {
-        "version": "0.45.30",
-        "title": "The poster",
-        "items": [
-            "A cover image that cannot be embedded no longer kills the download — the thumbnail step failing (this phone cannot read some image formats) leaves the video intact and says so on the card.",
         ],
     },
 ]

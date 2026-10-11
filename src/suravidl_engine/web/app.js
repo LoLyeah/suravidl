@@ -5,7 +5,10 @@ const H = () => ({
 });
 
 async function api(path, opts = {}) {
-  const r = await fetch(path, { ...opts, headers: H() });
+  // v0.46.8: every API read is live state — a cache serving a stale
+  // /follows or /queue would lie to the user (a rig caught the browser
+  // handing renderFollows a response older than its own delete)
+  const r = await fetch(path, { cache: "no-store", ...opts, headers: H() });
   if (!r.ok) {
     let msg = `${r.status}`;
     let detail = null;
@@ -763,6 +766,17 @@ const STRINGS = { en: {}, id: {
   "{n} failed": "{n} gagal",
   "{n} downloads running": "{n} unduhan berjalan",
   "{n} downloads failed": "{n} unduhan gagal",
+  "Paste a playlist or channel link": "Tempel tautan daftar putar atau kanal",
+  "Nothing followed yet — how it works:": "Belum ada yang diikuti — cara kerjanya:",
+  "Probe a playlist or channel link — the star appears on the result.":
+    "Probe tautan daftar putar atau kanal — bintangnya muncul di hasilnya.",
+  "Tap Follow — everything already in it is marked seen, so nothing old gets grabbed.":
+    "Ketuk Ikuti — semua yang sudah ada ditandai terlihat, jadi yang lama tidak ikut terunduh.",
+  "New videos arrive on their own — checks run while the app does.":
+    "Video baru datang sendiri — pemeriksaan berjalan selama aplikasi hidup.",
+  "audio": "audio",
+  "following “{name}” — new videos will arrive on their own":
+    "mengikuti “{name}” — video baru akan datang sendiri",
   "Delete the {n} filed downloads?": "Hapus {n} unduhan yang selesai?",
   "Their Gallery/Music copies go too.": "Salinan Gallery/Music-nya ikut terhapus.",
   "retrying {n}": "mencoba ulang {n}",
@@ -995,9 +1009,14 @@ function renderTake() {
   const lamp = $("bestBtn");
   if (!say || !lamp) return;
   const armed = TAKE.fmt || TAKE.preset;
+  // v0.46.8: the transport take is a glance, not a sentence — "audio ·
+  // keep original" truncated to "audio · k…" on a phone; the START button
+  // already spells the full take, so the reading just says "audio"
   say.textContent = armed
-    ? (TAKE.preset ? t("audio · {label}", { label: t(TAKE.label) })
-                   : t(TAKE.label))
+    ? (TAKE.preset
+        ? (TAKE.label === "keep original" ? t("audio")
+           : t("audio · {label}", { label: t(TAKE.label) }))
+        : t(TAKE.label))
     : t("best available");
   say.classList.toggle("set", !!armed);
   lamp.textContent = armed
@@ -1006,7 +1025,10 @@ function renderTake() {
   // the armed pick stays lit wherever it lives (chips, format rows, audio) —
   // and ONLY the armed one: a commit spends the take and every light goes out
   document.querySelectorAll("[data-pick]").forEach((b) => {
-    b.classList.toggle("picked", b.dataset.pick === armed);
+    const on = b.dataset.pick === armed;
+    b.classList.toggle("picked", on);
+    // v0.46.8: the light gets a voice too (the chips' own pattern)
+    b.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 
@@ -1247,6 +1269,7 @@ async function renderFollows() {
   box.textContent = "";
   for (const f of FOLLOWS) box.append(followRow(f));
   if ($("followsNote")) $("followsNote").classList.toggle("hidden", FOLLOWS.length > 0);
+  if ($("followsHow")) $("followsHow").classList.toggle("hidden", FOLLOWS.length > 0);
   const badge = $("subFollowCount");
   if (badge) {
     badge.textContent = FOLLOWS.length ? String(FOLLOWS.length) : "";
@@ -1255,6 +1278,31 @@ async function renderFollows() {
 }
 
 function initFollows() {
+  // v0.46.8 "the guide": the watch list adds from zero — paste a link,
+  // press Follow, no probe needed first (the star path stays for decks)
+  if ($("followAddBtn")) {
+    const addFollow = async () => {
+      const url = $("followUrl").value.trim();
+      if (!url) return;
+      $("followAddBtn").classList.add("busy");
+      try {
+        const f = await api("/follows", { method: "POST",
+                                          body: JSON.stringify({ url: url }) });
+        toast(t("following “{name}” — new videos will arrive on their own",
+                { name: (f && f.label) || url }), "ok");
+        $("followUrl").value = "";
+        await renderFollows();
+      } catch (e) {
+        toast(t("could not follow: {msg}", { msg: e.message }), "bad");
+      } finally {
+        $("followAddBtn").classList.remove("busy");
+      }
+    };
+    $("followAddBtn").onclick = addFollow;
+    $("followUrl").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); addFollow(); }
+    });
+  }
   if ($("followBtn")) {
     $("followBtn").onclick = async () => {
       const url = PROBE_URL || $("url").value.trim();
