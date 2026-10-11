@@ -452,8 +452,23 @@ system (`span.ico`, 16px) — a class the stylesheet doesn't define fails
 silently and the SVG balloons (`.ic`, caught only on a phone).
 
 ### The FILED TAKES rail (≥1080px)
-Newest takes first: bin title + mono file name, count badge in amber. The
-rail is a shelf, not a second queue — its items open the take.
+Newest takes first: bin title + mono **size · filed-time** (the queue row's
+own pattern — the filename was the title's echo by construction and the
+236px rail cut it at 34%; the full path lives in the tooltip and the
+player's head), count badge in amber. The rail is a shelf, not a second
+queue — its items open the take.
+
+### The cut (the player's marks)
+Mark in / Mark out write the player's own clock into the clip fields
+(truncate for the in, ceil for the out — a mark may give back a frame,
+never take one) and the player's head reads the range back
+("clip 0:12–0:48"). **Cut this take** trims the file being played with
+ffmpeg (`-ss/-to -c copy`, local, no network) and files the result as
+its own completed take — named `<stem> — clip 0.12–0.48.mp4`, noted
+"cut locally at the nearest keyframes". The old path pointed at a
+re-download that could not work (the output existed; yt-dlp skipped it
+and the job claimed success); the pre-download clip fields remain for
+sources you have NOT fetched yet.
 
 ### Toasts
 Near-opaque plate, 12px radius, a state dot (green / rose / amber), message
@@ -477,6 +492,12 @@ so in a toast. Under the pine scheme the theme previews wear the pine lamp.
 **The Machined Press Rule.** Every control answers a press physically before
 it answers with state: scale .97 down, then the work. No tappable surface
 ships without a press state.
+
+**The Kept Promise Rule.** A control's promise is kept in the room where it
+is made. The player's marks once wrote into a hidden form for a re-download
+that could not work; now they cut the take on screen. When a button's
+outcome lives two tabs away, the button is in the wrong room — or the
+outcome is.
 
 **The Finish Speaks Rule.** Completion is an event, not a pill flip: one
 transition-fired toast with real actions, a stamp on the row, the take in the

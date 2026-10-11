@@ -775,6 +775,15 @@ const STRINGS = { en: {}, id: {
   "New videos arrive on their own — checks run while the app does.":
     "Video baru datang sendiri — pemeriksaan berjalan selama aplikasi hidup.",
   "audio": "audio",
+  "Cut this take": "Potong take ini",
+  "trim the file you are watching — no download":
+    "potong berkas yang sedang Anda tonton — tanpa unduhan",
+  "mark both ends first — in and out": "tandai kedua ujungnya dulu — awal dan akhir",
+  "cut filed — {name}": "potongan tersimpan — {name}",
+  "the cut failed: {msg}": "potongan gagal: {msg}",
+  "clip {a}–{b}": "klip {a}–{b}",
+  "in {a} — mark the out": "awal {a} — tandai akhirnya",
+  "out {b} — mark the in": "akhir {b} — tandai awalnya",
   "following “{name}” — new videos will arrive on their own":
     "mengikuti “{name}” — video baru akan datang sendiri",
   "Delete the {n} filed downloads?": "Hapus {n} unduhan yang selesai?",
@@ -980,6 +989,7 @@ let TAKE = { fmt: null, preset: null, label: "" };
 let AUDIO_LANG = "";
 // v0.40.4 — the marks: the media element the player modal holds, if any
 let PLAY_NODE = null;
+let PLAY_JOB = null;         // v0.46.9: the take the player is showing
 let QUALITY_EST = {};   // v0.40.5: per-probe sizes, keyed by quality chip
 let LAST_PROBE = null;  // {url, info} — the on-deck readout, for relabelling
 let LAST_FAIL = null;   // {msg, detail} — the last probe failure, same reason
@@ -3601,8 +3611,15 @@ function renderBins(list) {
     b.type = "button";
     b.title = j.filepath || j.url;
     b.append(el("span", "bin-title", j.title || j.url));
-    const file = j.filepath ? baseName(j.filepath) : "";
-    if (file) b.append(el("span", "bin-meta mono", file));
+    // v0.46.9: the second line carries what DIFFERS — size and when it
+    // filed (the queue row's own pattern). The filename was the title's
+    // echo by construction (the default template derives it from the
+    // title) and the 236px rail cut it at 34% (critique round 3); the
+    // full path lives in the tooltip and the player's head.
+    const bits = [];
+    if (j.size_bytes) bits.push(humanBytes(j.size_bytes));
+    if (j.completed_at) bits.push(humanSince(Date.parse(j.completed_at)));
+    if (bits.length) b.append(el("span", "bin-meta mono", bits.join(" · ")));
     b.onclick = () => { if (j.filepath) openPlayer(j); };
     box.append(b);
   }
@@ -5796,6 +5813,7 @@ checkHandoff();
 function openPlayer(job, file) {
   // one entry of a playlist row plays by basename; everything else plays the
   // job's own filepath (2026-09-27: playlist rows had no Play at all)
+  PLAY_JOB = job;              // v0.46.9: the cut needs the take itself
   const stream = `/jobs/${encodeURIComponent(job.id)}/stream?`;
   if (file) {
     const name = baseName(file);
@@ -5844,9 +5862,17 @@ function openPlayerSrc(title, src, ext) {
   PLAY_NODE = node;            // v0.40.4: what the marks read
   $("markIn").classList.toggle("hidden", !isVideo);
   $("markOut").classList.toggle("hidden", !isVideo);
+  // v0.46.9: the cut appears for a playable take with a real file behind
+  // it; the reading starts from the fields' current marks
+  $("cutTake").classList.toggle(
+    "hidden", !(isVideo && PLAY_JOB && PLAY_JOB.filepath));
+  renderMarkSay();
   // the lifecycle, not a class poke (the audit): a close timer still
   // pending from 170ms ago could execute and hide the just-opened player
   openModal($("playModal"));
+  // v0.46.9: focus the take, not "Mark in" — Enter right after opening
+  // used to write 0:00 into the clip start (critique round 3, minor)
+  try { if (node.focus) node.focus(); } catch (_) { /* not focusable */ }
 }
 
 function closePlayer() {
@@ -5854,6 +5880,7 @@ function closePlayer() {
   // hidden player cannot keep playing; closing used to hard-cut (motion review)
   closeModal($("playModal"));
   PLAY_NODE = null;            // v0.40.4: nothing left to mark
+  PLAY_JOB = null;             // v0.46.9: and nothing left to cut
   setTimeout(() => $("playBody").replaceChildren(), motionMs(180));
 }
 
@@ -5863,19 +5890,68 @@ function closePlayer() {
 function markClip(which) {
   const node = PLAY_NODE;
   if (!node) return;
-  const t = node.currentTime;
-  if (typeof t !== "number" || !isFinite(t)) return;
-  const v = clock(t);
+  const at = node.currentTime;
+  if (typeof at !== "number" || !isFinite(at)) return;
+  // v0.46.9: `const t = …` here shadowed the i18n helper — every mark
+  // threw right after the write, so the toast never spoke and the option
+  // chip stayed stale (critique round 3, P1). The seconds truncate for
+  // the in and ceil for the out: a mark may give back a frame, never
+  // take one.
+  const v = clock(which === "in" ? Math.floor(at) : Math.ceil(at));
   if (which === "in") $("ovClipStart").value = v;
   else $("ovClipEnd").value = v;
+  renderOvCount();
+  renderMarkSay();
   toast(which === "in" ? t("clip starts at {v}", { v: v })
                        : t("clip ends at {v}", { v: v }));
+}
+
+/** The marks' own reading in the player's head (v0.46.9): the buttons
+ *  wrote into a hidden form and nothing on screen ever said so. */
+function renderMarkSay() {
+  const say = $("markSay");
+  if (!say) return;
+  const a = $("ovClipStart").value.trim();
+  const b = $("ovClipEnd").value.trim();
+  say.textContent = a && b ? t("clip {a}–{b}", { a: a, b: b })
+    : a ? t("in {a} — mark the out", { a: a })
+      : b ? t("out {b} — mark the in", { b: b }) : "";
+}
+
+/** v0.46.9 "the cut": the marks trim the file you are watching. The old
+ *  path pointed at a re-download that could not work (the output already
+ *  existed; yt-dlp skipped it and the job claimed success — critique
+ *  round 3's P0). Local, lossless, no network. */
+async function cutTake() {
+  const job = PLAY_JOB;
+  if (!job || !job.filepath) return;
+  const start = $("ovClipStart").value.trim();
+  const end = $("ovClipEnd").value.trim();
+  if (!start || !end) {
+    toast(t("mark both ends first — in and out"), "info");
+    return;
+  }
+  const btn = $("cutTake");
+  btn.classList.add("busy");
+  try {
+    const r = await api(`/jobs/${encodeURIComponent(job.id)}/cut`, {
+      method: "POST",
+      body: JSON.stringify({ start: start, end: end }),
+    });
+    toast(t("cut filed — {name}", { name: (r.job && r.job.title) || "" }), "ok");
+    refreshJobs();
+  } catch (e) {
+    toast(t("the cut failed: {msg}", { msg: e.message }), "bad");
+  } finally {
+    btn.classList.remove("busy");
+  }
 }
 
 function initPlayer() {
   $("playClose").onclick = closePlayer;
   $("markIn").onclick = () => markClip("in");
   $("markOut").onclick = () => markClip("out");
+  $("cutTake").onclick = cutTake;
   $("playModal").onclick = (e) => {
     if (e.target === $("playModal")) closePlayer();
   };

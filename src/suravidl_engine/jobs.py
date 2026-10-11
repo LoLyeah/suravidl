@@ -684,6 +684,47 @@ class JobManager:
         self._enqueue(job, fmt, extra_headers)
         return self.get(job_id)
 
+    def add_take(self, *, title: str, url: str, filepath: str,
+                 download_dir: str | None = None,
+                 video_id: str | None = None,
+                 note: str | None = None) -> dict:
+        """A take born local (v0.46.9 "the cut"): a file that already
+        exists — trimmed out of another take — files as its own completed
+        row, so the bins rail, Play, Delete and the queue treat it like
+        any other take. No worker ever runs for it."""
+        job_id = uuid.uuid4().hex[:12]
+        now = datetime.now(timezone.utc).isoformat()
+        job = {
+            "id": job_id,
+            "url": url,
+            "fmt": None,
+            "preset": None,
+            "playlist_items": None,
+            "raw_args": None,
+            "overrides": None,
+            "headers": None,
+            "status": "completed",
+            "title": title,
+            "filepath": filepath,
+            "partials": None,
+            "error": None,
+            "progress": {"downloaded_bytes": 0, "total_bytes": None,
+                         "speed": None, "eta": None},
+            "created_at": now,
+            "completed_at": now,
+            "files": [filepath],
+            "download_dir": str(download_dir or self.download_dir),
+            "live": False,
+            "video_id": video_id or None,
+            "follow_id": None,
+        }
+        if note:
+            job["note"] = note
+        with self._lock:
+            self._jobs[job_id] = job
+        self._save(job)
+        return self.get(job_id)
+
     def get(self, job_id: str) -> dict:
         with self._lock:
             job = dict(self._jobs[job_id])
@@ -1390,6 +1431,21 @@ class JobManager:
                     job["filepath"] = str(self.download_dir)
                 if not job["filepath"]:
                     raise RuntimeError("download finished but no filepath reported")
+                # v0.46.9 "the cut": yt-dlp skips an existing output and
+                # still exits 0 — verified live, requested_downloads[0]
+                # carries __real_download: False on the skip and points at
+                # the PRE-EXISTING file. A ranged "download" that fetched
+                # nothing must not read as a section delivered (critique
+                # round 3's P0: 0.216s, 0 bytes, "Filed").
+                if (req.get("__real_download") is False
+                        and not opts.get("download_archive")):
+                    if opts.get("download_ranges"):
+                        raise RuntimeError(
+                            "nothing was fetched — the file already exists "
+                            "on disk, so the section was never cut. Use the "
+                            "player's Cut this take, or delete the file to "
+                            "fetch the section fresh.")
+                    job["note"] = "already on disk — nothing was fetched"
                 # the finished file (after any conversion) is what the row
                 # owns; the hook may also have recorded the pre-conversion
                 # name, which is fine — a missing target is skipped on delete

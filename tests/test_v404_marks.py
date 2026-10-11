@@ -27,7 +27,10 @@ def test_the_player_gains_mark_buttons():
 def test_the_marks_write_the_clip_fields_from_the_players_clock():
     seg = _seg(APP, "function markClip(")
     assert '"ovClipStart"' in seg and '"ovClipEnd"' in seg
-    assert "clock(t)" in seg, "the fields take h:mm:ss; the clock speaks it"
+    # v0.46.9: the local is `at` (it used to shadow the i18n `t`), and
+    # the seconds truncate for the in / ceil for the out
+    assert "clock(which === \"in\" ? Math.floor(at) : Math.ceil(at))" in seg, \
+        "the fields take h:mm:ss; the clock speaks it"
     assert "currentTime" in seg
     assert "clip starts at " in seg and "clip ends at " in seg, \
         "a mark says where it landed"

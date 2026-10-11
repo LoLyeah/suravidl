@@ -1494,6 +1494,65 @@ def create_app(download_dir, auth_token: str | None = None,
         preset: str | None = None
         auto_queue: bool | None = None
 
+    class CutRequest(BaseModel):
+        """The player's marks: two clock readings ('1:23' / '0:12:34')."""
+        start: str = ""
+        end: str = ""
+
+    @app.post("/jobs/{job_id}/cut")
+    def cut_job(job_id: str, body: CutRequest,
+                mgr: JobManager = Depends(require_auth)):
+        """Trim a filed take locally (v0.46.9 "the cut").
+
+        The player's marks produce a real file: ffmpeg copies the range
+        out of the file already on disk — no network, no second
+        download. A stream copy snaps to the nearest keyframes; the
+        take's note says so. The result files as its own completed take.
+        """
+        from .cut import clip_label, cut_file, parse_time
+
+        try:
+            job = mgr.get(job_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        raw = job.get("filepath")
+        if not raw:
+            raise HTTPException(status_code=409,
+                                detail="this take has no file to cut")
+        src = Path(str(raw))
+        try:
+            mgr._require_inside(src, None)       # noqa: SLF001
+        except PermissionError:
+            raise HTTPException(
+                status_code=403,
+                detail="that file is outside the download folder") from None
+        if not src.is_file():
+            raise HTTPException(status_code=404, detail="the file is gone")
+        start = parse_time(body.start)
+        end = parse_time(body.end)
+        if start is None or end is None:
+            raise HTTPException(
+                status_code=400,
+                detail="the marks must look like 1:23 or 0:12:34")
+        if end <= start:
+            raise HTTPException(status_code=400,
+                                detail="the out must come after the in")
+        out_dir = Path(job.get("download_dir") or mgr.download_dir)
+        try:
+            out = cut_file(src, start, end, out_dir)
+        except RuntimeError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
+        take = mgr.add_take(
+            title=f"{(job.get('title') or src.stem)} — clip "
+                  f"{clip_label(start, end)}",
+            url=job.get("url") or str(src),
+            filepath=str(out),
+            download_dir=str(out_dir),
+            video_id=job.get("video_id"),
+            note="cut locally at the nearest keyframes",
+        )
+        return {"job": take}
+
     @app.get("/follows")
     def list_follows(_mgr: JobManager = Depends(require_auth)):
         return {"follows": follows_store.list()}

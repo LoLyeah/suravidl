@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.9",
+        "title": "The cut",
+        "items": [
+            "The marks keep their promise: Cut this take trims the file you are playing — local, lossless, filed as its own take. A section re-download of an existing file now says nothing was fetched.",
+        ],
+    },
+    {
         "version": "0.46.8",
         "title": "The guide",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The slideshow",
         "items": [
             "A TikTok photo post now says what it is — a slideshow, not a video, with nothing for a downloader to save and where its audio might still be caught.",
-        ],
-    },
-    {
-        "version": "0.45.31",
-        "title": "The frames",
-        "items": [
-            "The in-app browser's sniffer now runs inside cross-origin frames too — a player there is caught by the script layers, not only its network requests — and its DOM watching is debounced on heavy pages.",
         ],
     },
 ]
