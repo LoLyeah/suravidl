@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.6",
+        "title": "The flare",
+        "items": [
+            "Failures now speak everywhere: a download that dies tells you wherever you are — one toast, a rose count on the Queue tab — and settled rows carry size · time · site.",
+        ],
+    },
+    {
         "version": "0.46.5",
         "title": "The desk",
         "items": [
@@ -76,14 +83,6 @@ ENTRIES = [
         "title": "The note",
         "items": [
             "A download that finishes with a caveat now wears an ⓘ and says why — subtitles kept as files instead of embedded, an unusable stream removed — so a successful job never hides what it could not do.",
-        ],
-    },
-    {
-        "version": "0.45.28",
-        "title": "The captions",
-        "items": [
-            "Subtitles no longer break a download on the phone: the app checks what its ffmpeg can really do and keeps them as files beside the video when it cannot embed them (MKV still embeds).",
-            "Reddit share links (“/s/” shortcuts) now say what they are: browser-only shortcuts, with the trick to get the full link.",
         ],
     },
 ]

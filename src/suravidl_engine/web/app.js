@@ -308,6 +308,12 @@ const STRINGS = { en: {}, id: {
   "Resume": "Lanjutkan",
   "Retries": "Percobaan ulang",
   "Retry": "Coba lagi",
+  "Show queue": "Lihat antrean",
+  "Couldn't download \u201c{name}\u201d \u2014 {why}": "Gagal mengunduh \u201c{name}\u201d \u2014 {why}",
+  "the engine could not find that address — check the link is spelled whole, then retry":
+    "mesin tidak menemukan alamat itu — periksa tautannya sudah lengkap, lalu coba lagi",
+  "the engine could not reach that address — check the connection, then retry":
+    "mesin tidak bisa mencapai alamat itu — periksa koneksi, lalu coba lagi",
   "START commits a take": "MULAI mengunduh pilihanmu",
   "START · best": "MULAI · terbaik",
   "START · {label}": "MULAI · {label}",
@@ -895,6 +901,13 @@ function humanErr(s, detail, url) {
     return "the phone's ffmpeg can't convert subtitles for this container — set Subtitles to \u201csidecar\u201d in Settings or use the MKV container, then retry";
   if (/timed? ?out|timeout/i.test(s))
     return "the site never answered in time — check the connection and retry";
+  // local/network failures had no arm, so the fallback echoed the raw line
+  // into the "human" slot — the queue showed the same red sentence twice
+  // (queue critique, 2026-10-11)
+  if (/failed to resolve|name or service not known|nodename nor servname/i.test(s))
+    return t("the engine could not find that address — check the link is spelled whole, then retry");
+  if (/connection refused|errno 111|network is unreachable|errno 101|no route to host|connection reset|errno 104/i.test(s))
+    return t("the engine could not reach that address — check the connection, then retry");
   if (/certificate|SSL/i.test(s))
     return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
   if (/unable to embed using|embed thumbnail/i.test(s))
@@ -2056,12 +2069,20 @@ function renderQualityRow(url, remembered) {
 function renderQueueBadge(jobs) {
   const badge = $("queueCount");
   if (!badge) return;
-  const active = (jobs || []).filter((j) =>
+  const list = jobs || [];
+  const active = list.filter((j) =>
     ["queued", "downloading", "merging"].includes(j.status)).length;
+  // v0.46.6: when nothing is in flight but failures exist, the badge
+  // carries the failure count in rose — a dead download must never hide
+  // behind a clean tab (queue critique, 2026-10-11)
+  const failed = active ? 0 : list.filter((j) =>
+    j.status === "error" || j.status === "interrupted").length;
+  const n = active || failed;
   const was = !badge.classList.contains("hidden");
-  badge.textContent = active > 9 ? "9+" : String(active);
-  badge.classList.toggle("hidden", !active);
-  if (active && !was) {
+  badge.textContent = n > 9 ? "9+" : String(n);
+  badge.classList.toggle("hidden", !n);
+  badge.classList.toggle("bad", !active && !!failed);
+  if (n && !was) {
     // it appears: a quick scale-in, so a started download never just pops a
     // number into the corner (v0.42.1)
     badge.classList.remove("badge-in");
@@ -2893,6 +2914,10 @@ function jobRow(j) {
   row.setAttribute("role", "listitem");
   row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   const top = el("div", "jobtop");
+  // the direction contract: each source site tints its rows (v0.46.6 —
+  // liveryOf() lived only on the probe card until the queue critique)
+  const lv = liveryOf(j.url);
+  if (lv) row.dataset.livery = lv;
   const title = el("span", "jobtitle", j.title || j.url);
   title.title = j.url;
   // the title ellipsises on a phone and nothing hover-reveals it there: a
@@ -2959,6 +2984,24 @@ function jobRow(j) {
   }
   row.append(top);
 
+  // a settled row carries its record (v0.46.6): size · finished · site —
+  // it used to hide every number in the receipt (queue critique, 2026-10-11)
+  if (j.status === "completed") {
+    const bits = [];
+    if (j.size_bytes) bits.push(humanBytes(j.size_bytes));
+    const ts = Date.parse(j.completed_at || j.created_at || "");
+    if (!isNaN(ts)) bits.push(humanSince(ts));
+    if (lv) bits.push(lv);
+    else if (j.url) {
+      try { bits.push(new URL(j.url).hostname.replace(/^www\./, "")); } catch (_) {}
+    }
+    if (bits.length) {
+      const meta = el("div", "jmeta settled");
+      for (const b of bits) meta.append(el("span", "", b));
+      row.append(meta);
+    }
+  }
+
   let trashHost = null;   // the button row the trash belongs to
 
   if (ACTIVE.has(j.status)) {
@@ -2982,8 +3025,15 @@ function jobRow(j) {
     row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
     // the human consequence leads; the engine's own dialect goes below,
-    // behind the toggle (v0.37.0 — it used to be the first thing you read)
-    row.append(el("div", "jerrsay", t(humanErr(j.error || "", undefined, j.url))));
+    // behind the toggle (v0.37.0 — it used to be the first thing you read).
+    // v0.46.6: when humanErr has no arm and would just echo the raw first
+    // line, the sentence is suppressed — one red line, never the same one
+    // twice (queue critique, 2026-10-11)
+    const say = humanErr(j.error || "", undefined, j.url);
+    const rawLine = String(j.error || "").split("\n")[0];
+    const fallbackEcho = say === rawLine ||
+      say === (rawLine.length > 140 ? rawLine.slice(0, 140) + "\u2026" : rawLine);
+    if (!fallbackEcho) row.append(el("div", "jerrsay", t(say)));
     // The whole message. A 160-char slice in a single ellipsised line cut
     // yt-dlp's explanation down to "ERROR: Unable to down…" — the part that
     // says what to do next was exactly the part that was hidden. Long text
@@ -3230,7 +3280,10 @@ function updateJobRow(row, j) {
     const bar = row.querySelector(".bar");
     if (bar) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
   }
-  const meta = row.querySelector(".jmeta");
+  // v0.46.6: the settled strip shares the .jmeta look but is not live data —
+  // the poll's metaParts rewrite belongs to the ACTIVE row only (the rig
+  // caught the strip being overwritten with speed/ETA on the next poll)
+  const meta = row.querySelector(".jmeta:not(.settled)");
   if (meta) meta.replaceChildren(...metaParts(j).map((s) => el("span", "", s)));
   return row;
 }
@@ -3402,6 +3455,23 @@ function onFiled(j) {
   toast(t("Filed — {name}", { name: name }), "ok", { actions: actions });
 }
 
+/** A failure that speaks (v0.46.6 "the flare"): the FIRST poll that sees a
+ *  job enter error/interrupted says so wherever the user is, with the two
+ *  actions that matter. Success had this since v0.37.0; the outcome that
+ *  costs the user time settled in silence (queue critique, 2026-10-11). */
+function onFailed(j) {
+  const name = j.title || j.url;
+  const why = humanErr(j.error || "", undefined, j.url);
+  const actions = [
+    { label: t("Retry"), prime: true,
+      onClick: () => api(`/jobs/${j.id}/retry`, { method: "POST" })
+        .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad")) },
+    { label: t("Show queue"), onClick: () => showTab("queue") },
+  ];
+  toast(t("Couldn't download \u201c{name}\u201d \u2014 {why}",
+          { name: name, why: why }), "bad", { actions: actions });
+}
+
 /** The bins rail: the last few finished takes, newest first (v0.37.0). */
 function renderBins(list) {
   const box = $("binsList");
@@ -3460,6 +3530,8 @@ async function refreshJobs() {
       seen.add(j.id);
       const prev = JOB_STATE.get(j.id);
       if (j.status === "completed" && prev && prev !== "completed") onFiled(j);
+      else if ((j.status === "error" || j.status === "interrupted") &&
+               prev && prev !== "error" && prev !== "interrupted") onFailed(j);
       JOB_STATE.set(j.id, j.status);
     }
     for (const id of [...JOB_STATE.keys()]) if (!seen.has(id)) JOB_STATE.delete(id);

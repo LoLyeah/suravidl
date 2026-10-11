@@ -155,7 +155,9 @@ def test_settings_subtabs_swap_with_a_transition():
 def test_the_error_row_reads_at_full_width():
     """The raw engine text shared one flex line with Show details / Copy /
     Retry and wrapped to about one word per line on a phone (photo 2)."""
-    seg = APP.split('j.status === "error" || j.status === "interrupted"')[1] \
+    # v0.46.6: the bare status string also appears in renderQueueBadge's
+    # failed-count filter — anchor on the jobRow branch line itself
+    seg = APP.split('} else if (j.status === "error" || j.status === "interrupted") {')[1] \
         .split("} else if (j.filepath)")[0]
     assert "row.append(errEl)" in seg, "the message is boxed into the button row"
     assert "r.append(errEl)" not in seg

@@ -344,6 +344,8 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
 }
 .badge.badge-in { animation: badgeIn var(--t-fast) var(--e-out) both; }
+/* v0.46.6: nothing in flight but failures exist — the count rides in rose */
+.badge.bad { background: var(--err); color: #14181d; }
 @keyframes badgeIn { from { transform: scale(.4); opacity: 0; } }
 /* an unsaved Settings edit dots the tab — it scales in, never pops
    (v0.42.1 motion audit: the dot blinked into being) */
@@ -706,11 +708,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .probe-head .chip { flex: none; }
 
 /* source livery: each site tints its own take */
-.card[data-livery="youtube"]   { --livery: #ff5252; }
-.card[data-livery="twitter"]   { --livery: #8ab4f8; }
-.card[data-livery="vimeo"]     { --livery: #6fd3ff; }
-.card[data-livery="instagram"] { --livery: #e178c8; }
-.card[data-livery="tiktok"]    { --livery: #7fe3d4; }
+.card[data-livery="youtube"], .job[data-livery="youtube"]   { --livery: #ff5252; }
+.card[data-livery="twitter"], .job[data-livery="twitter"]   { --livery: #8ab4f8; }
+.card[data-livery="vimeo"],   .job[data-livery="vimeo"]     { --livery: #6fd3ff; }
+.card[data-livery="instagram"], .job[data-livery="instagram"] { --livery: #e178c8; }
+.card[data-livery="tiktok"],  .job[data-livery="tiktok"]    { --livery: #7fe3d4; }
+/* the row's LED: 7px, lit by the site's own colour (v0.46.6) */
+.job[data-livery] .jobtop::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--livery, transparent); margin-right: 7px;
+}
 .card[data-livery] #probeMeta {
   color: var(--livery, var(--dim));
   border-color: color-mix(in srgb, var(--livery, var(--dim)) 40%, transparent);
@@ -885,12 +892,17 @@ details.card { padding: 0 18px 6px; }
 }
 .jobtitle:focus-visible { outline: 2px solid var(--ring, var(--accent)); outline-offset: 2px; border-radius: 4px; }
 .job .jmeta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.job .jmeta.settled { margin-top: 6px; color: var(--dim); font-size: 11.5px;
+  font-family: "Martian Mono", ui-monospace, Menlo, monospace; }
 .job .jrow { margin-top: 9px; }
 .job .path {
   font-family: "Martian Mono", ui-monospace, Menlo, monospace;
   font-size: 11.5px; color: var(--dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   flex: 1; min-width: 0;
+  /* v0.46.6: elide the START, not the tail — the filename is the point
+     (the collapsed path used to show only /home/ubuntu/… ) */
+  direction: rtl; text-align: left; unicode-bidi: plaintext;
 }
 /* the unfolded card reads like a receipt: size + the full saved path
    (v0.38.2 report — "other than name show us the file size and the

@@ -91,7 +91,8 @@ def test_the_queue_badge_pops_in_only_when_it_appears():
     assert ".badge.badge-in" in CSS and "@keyframes badgeIn" in CSS
     body = _fn("renderQueueBadge")
     assert 'const was = !badge.classList.contains("hidden")' in body
-    assert "if (active && !was)" in body
+    # v0.46.6 "the flare": the badge pops in for the failure count too
+    assert "if (n && !was)" in body
     assert 'badge.classList.add("badge-in")' in body
     assert "void badge.offsetWidth" in body, "retrigger needs the reflow"
 
