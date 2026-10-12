@@ -217,6 +217,7 @@ const STRINGS = { en: {}, id: {
   "Gallery/Music copies kept": "salinan Gallery/Music dipertahankan",
   "General": "Umum",
   "Get it": "Ambil",
+  "Get it once: Firefox from Mozilla Add-ons, Chrome or Edge from the release zip (load unpacked). Then pair it — the token from Settings → Authentication goes into the extension's Options.": "Pasang sekali: Firefox dari Mozilla Add-ons, Chrome atau Edge dari zip rilis (load unpacked). Lalu pasangkan — token dari Pengaturan → Autentikasi dimasukkan ke Options ekstensi.",
   "Get {v}": "Ambil {v}",
   "Glass style": "Gaya kaca",
   "Glass: {name}": "Kaca: {name}",
@@ -224,6 +225,7 @@ const STRINGS = { en: {}, id: {
   "Hide details": "Sembunyikan detail",
   "Hide files ({n})": "Sembunyikan berkas ({n})",
   "How do I update?": "Bagaimana cara memperbarui?",
+  "How it works": "Cara kerjanya",
   "I'll remind you tomorrow": "Aku ingatkan besok",
   "IPv4 only": "Hanya IPv4",
   "IPv4-only fixes downloads that stall or reset on a network with broken IPv6.": "Hanya IPv4 memperbaiki unduhan yang macet atau terputus di jaringan dengan IPv6 bermasalah.",
@@ -256,6 +258,7 @@ const STRINGS = { en: {}, id: {
   "Media": "Media",
   "Minimize to tray": "Kecilkan ke tray",
   "More audio presets": "Preset audio lainnya",
+  "Most links need none of this — paste and Probe reads them. This is for the pages that hide their player: the companion extension sees what the page really plays and hands it to this room.": "Sebagian besar tautan tidak butuh ini — tempel lalu Probe membacanya. Ini untuk halaman yang menyembunyikan playernya: ekstensi pendamping melihat apa yang benar-benar diputar halaman itu dan menyerahkannya ke ruangan ini.",
   "Named switches for the options that come up most — no syntax to remember. They apply to downloads, and the network ones to probing too, so a restricted video can still be listed.": "Tombol bernama untuk opsi yang paling sering dipakai — tanpa sintaks untuk dihafal. Opsi ini berlaku untuk unduhan, dan yang jaringan juga untuk pengecekan, jadi video terbatas pun tetap bisa didaftar.",
   "Network": "Jaringan",
   "Next": "Lanjut",
@@ -267,12 +270,14 @@ const STRINGS = { en: {}, id: {
   "Off": "Mati",
   "Off — enable “raw yt-dlp arguments” in Settings → Advanced to edit them.": "Mati — aktifkan “argumen mentah yt-dlp” di Pengaturan → Lanjutan untuk mengeditnya.",
   "Off — everything in one folder": "Mati — semuanya dalam satu folder",
+  "On the phone there is no extension — the app's own browser is the catcher: open the page in it, press play, then Scan.": "Di ponsel tidak ada ekstensi — browser bawaan aplikasi yang menangkap: buka halaman di sana, tekan play, lalu Scan.",
   "On this machine alone, in the app's own data folder, readable only by your user account. They never leave your devices.": "Hanya di perangkat ini, di folder data aplikasi, hanya bisa dibaca oleh akun penggunamu. Cookie tidak pernah meninggalkan perangkatmu.",
   "One per playlist or channel": "Satu per daftar putar atau kanal",
   "One per site": "Satu per situs",
   "Open": "Buka",
   "Open folder": "Buka folder",
   "Open in the browser": "Buka di browser",
+  "Open the extension and press “Choose quality in suravidl” — the stream lands on this deck, probed. Pick the quality, press START.": "Buka ekstensinya dan tekan “Choose quality in suravidl” — stream-nya mendarat di dek ini, sudah di-probe. Pilih kualitasnya, tekan START.",
   "Open the releases page": "Buka halaman rilis",
   "Parallel fragments": "Fragmen paralel",
   "Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link": "Tempel URL video — situs apa pun yang dikenal yt-dlp, atau tautan mp4/m3u8 langsung",
@@ -281,6 +286,7 @@ const STRINGS = { en: {}, id: {
   "Pause": "Jeda",
   "Pine & cream": "Pinus & krem",
   "Play": "Putar",
+  "Play the page for a second in your browser — the extension only sees what the page actually requests.": "Putar halaman itu sebentar di browser — ekstensi hanya melihat apa yang benar-benar diminta halaman.",
   "Playlist added to downloads": "Daftar putar masuk ke unduhan",
   "Playlist items to download": "Item daftar putar untuk diunduh",
   "Playlist items:": "Item daftar putar:",
@@ -313,6 +319,9 @@ const STRINGS = { en: {}, id: {
   "Retry": "Coba lagi",
   "Show queue": "Lihat antrean",
   "Couldn't download \u201c{name}\u201d \u2014 {why}": "Gagal mengunduh \u201c{name}\u201d \u2014 {why}",
+  "What travels: the stream you picked, plus the session details for exactly that stream — nothing else. Settings → Authentication shows what is held and clears it on ask.": "Yang ikut terkirim: stream yang kamu pilih, plus detail sesi untuk stream itu saja — tidak yang lain. Pengaturan → Autentikasi menunjukkan apa yang disimpan dan menghapusnya saat diminta.",
+  "When a page hides its player": "Saat halaman menyembunyikan playernya",
+  "no extractor knows this page — play it in your browser, then hand the stream over with the extension": "tidak ada extractor yang mengenali halaman ini — putar di browser, lalu serahkan stream-nya lewat ekstensi",
   "the engine could not find that address — check the link is spelled whole, then retry":
     "mesin tidak menemukan alamat itu — periksa tautannya sudah lengkap, lalu coba lagi",
   "the engine could not reach that address — check the connection, then retry":
@@ -542,6 +551,8 @@ const STRINGS = { en: {}, id: {
   "no domains": "tidak ada domain",
   "no downloaded files": "tidak ada berkas unduhan",
   "no extractor knows this page — open it in the browser, press play, then Scan for the stream": "halaman ini tidak dikenali — buka di browser, tekan play, lalu pakai Scan untuk menangkap stream-nya",
+  "the extension, step by step": "ekstensinya, langkah demi langkah",
+  "the release zip": "zip rilis",
   "this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable": "ini postingan foto TikTok — slideshow berisi musik, bukan video, jadi tidak ada yang bisa diunduh; buka di browser lalu pakai Scan — audionya mungkin bisa ditangkap",
   "no formats found": "format tidak ditemukan",
   "no readout — see the message above": "tidak ada hasil — lihat pesan di atas",
@@ -573,6 +584,8 @@ const STRINGS = { en: {}, id: {
   "recorded": "terekam",
   "recorded (stopped)": "terekam (dihentikan)",
   "record from the beginning": "rekam dari awal",
+  "this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; play it in your browser — the extension may catch its audio": "ini postingan foto TikTok — slideshow berisi musik, bukan video, jadi tidak ada yang bisa diunduh; putar di browser — ekstensinya mungkin bisa menangkap audionya",
+  "this page hides its player from the engine — the companion extension can hand the stream over": "halaman ini menyembunyikan playernya dari mesin — ekstensi pendamping bisa menyerahkan stream-nya",
   "{t} on air": "{t} mengudara",
   "per-site tweaks as ": "penyesuaian per situs sebagai ",
   "pick at least one item first": "pilih minimal satu item dulu",
@@ -909,12 +922,19 @@ function ico(name) {
  *  the details disagreed, and the summary was wrong.) */
 function humanErr(s, detail, url) {
   s = String(s == null ? "" : s);
+  // one need, two truths (v0.46.16): the phone carries its own browser
+  // and Scan; the desktop's catcher is the companion extension.
+  const phone = !!(typeof window !== "undefined" && window.AndroidHost);
   if (detail && detail.unsupported) {
     // a TikTok photo post is not a video at all — say that, not "no
     // extractor" (owner report, 2026-10-10)
     if (/photo post|tiktok[^\s"']*\/photo\//i.test(s + " " + String((detail && detail.hint) || "")))
-      return t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable");
-    return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
+      return phone
+        ? t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable")
+        : t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; play it in your browser — the extension may catch its audio");
+    return phone
+      ? t("no extractor knows this page — open it in the browser, press play, then Scan for the stream")
+      : t("no extractor knows this page — play it in your browser, then hand the stream over with the extension");
   }
   if (/HTTP Error 404|not found|does not exist/i.test(s)) {
     // Reddit's /s/ "share" links resolve only inside a browser (a session
@@ -930,8 +950,12 @@ function humanErr(s, detail, url) {
     return "the site is rate-limiting this address (429) — wait a bit, then try once more";
   if (/unsupported url|no (suitable )?extractor/i.test(s)) {
     if (/photo post|tiktok[^\s"']*\/photo\//i.test(s))
-      return t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable");
-    return "no extractor knows this page — open it in the browser, press play, then Scan for the stream";
+      return phone
+        ? t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable")
+        : t("this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; play it in your browser — the extension may catch its audio");
+    return phone
+      ? t("no extractor knows this page — open it in the browser, press play, then Scan for the stream")
+      : t("no extractor knows this page — play it in your browser, then hand the stream over with the extension");
   }
   if (/\bsign[ -]?in\b|\blog[ -]?in\b|login required|private video|\bage\b/i.test(s))
     return "the site wants a signed-in session — load cookies in Settings → Authentication";
@@ -1629,15 +1653,23 @@ function showProbeFailure(msg, detail, url) {
    again on the next probe — never left pointing at a URL the user replaced. */
 function offerBrowser(err, url) {
   const row = $("browserOffer");
+  const ext = $("extOffer");
   if (!row) return;
   const detail = (err && err.detail) || {};
   const asked = detail.unsupported === true ||
     /unsupported url/i.test((err && err.message) || "");
-  if (!asked || !window.AndroidHost || !window.AndroidHost.openBrowser) {
+  const phone = !!(window.AndroidHost && window.AndroidHost.openBrowser);
+  if (!asked) {
     row.classList.add("hidden");
+    if (ext) ext.classList.add("hidden");
     return;
   }
-  row.classList.remove("hidden");
+  // one need, two truths (v0.46.16): the phone carries its own browser and
+  // Scan; the desktop's catcher is the companion extension — offering the
+  // phone's route on a desktop was offering a button that is not there.
+  row.classList.toggle("hidden", !phone);
+  if (ext) ext.classList.toggle("hidden", phone);
+  if (!phone) return;
   $("browserOfferBtn").onclick = () => {
     try { window.AndroidHost.openBrowser(url); } catch (_) { }
   };
@@ -4426,7 +4458,8 @@ const FAQ = [
   ["Where do my downloads go?",
    "The folder shown at the bottom of the screen — press Open folder next to it. On a phone, finished downloads get Open and Share buttons instead; files land in Gallery (video) or Music (audio) under suravidl."],
   ["A link says 'unsupported URL'. What now?",
-   "Some pages cannot hand a plain link over. Play it in your browser for a second: the extension (on desktop) or the browser offer right here catches the stream, and you pick the quality here before anything downloads."],
+   "Some pages cannot hand a plain link over. Play it in your browser for a second: the extension (on desktop) or the browser offer right here catches the stream, and you pick the quality here before anything downloads.",
+   { label: "the extension, step by step", open: openExtGuide }],
   ["A page keeps bouncing me at ads.",
    "The phone app's built-in browser refuses off-site jumps and pop-ups while you hunt for a stream — the page, and the find list, stay put. If a refused hop was one you meant, tap the note on screen to follow it anyway."],
   ["A site asks me to turn off my ad blocker.",
@@ -4436,7 +4469,8 @@ const FAQ = [
   ["Where are the cookies kept?",
    "On this machine alone, in the app's own data folder, readable only by your user account. They never leave your devices."],
   ["The extension finds nothing, or says the app isn't running.",
-   "Update both sides first, and pair them once: the token from Settings → Authentication goes into the extension's Options. They find each other along a short row of nearby ports, so a busy port is fine. If the popup was open while the app started, press Check again."],
+   "Update both sides first, and pair them once: the token from Settings → Authentication goes into the extension's Options. They find each other along a short row of nearby ports, so a busy port is fine. If the popup was open while the app started, press Check again.",
+   { label: "the extension, step by step", open: openExtGuide }],
   ["A site won't offer 1080p or 4K.",
    "That is the site, not the app: some pages publish only up to a certain quality, or as separate video and audio streams — suravidl merges separate streams automatically."],
   ["A link or a direct stream — which one do I paste?",
@@ -4453,7 +4487,7 @@ function buildFaqList() {
   // one painter for the list: boot builds it lazily, a language switch asks
   // it to repaint (relabelUI), so the two can never drift
   box.replaceChildren();
-  for (const [q, a] of FAQ) {
+  for (const [q, a, link] of FAQ) {
     const it = document.createElement("details");
     it.className = "faq-item";
     const s = document.createElement("summary");
@@ -4461,6 +4495,12 @@ function buildFaqList() {
     const wrap = document.createElement("div");
     wrap.className = "faq-body";   // the FAQ folds like the deck's bay door
     wrap.append(el("p", "muted", t(a)));
+    if (link) {
+      const lb = el("button", "linkbtn", t(link.label));
+      lb.type = "button";
+      lb.onclick = link.open;
+      wrap.append(lb);
+    }
     it.append(s, wrap);
     box.append(it);
   }
@@ -4472,6 +4512,24 @@ function openFaq() {
   const box = $("faqList");
   if (box && !box.childElementCount) buildFaqList();
   openModal($("faqModal"));
+}
+
+/* The two doors the guide's get-it step opens (v0.46.16). */
+const EXT_AMO = "https://addons.mozilla.org/en-US/firefox/addon/suravidl/";
+const EXT_ZIP = "https://github.com/LoLyeah/suravidl/releases/latest/download/suravidl-extension-chrome.zip";
+
+/** The guide sheet behind the offer row and the FAQ's extension answers.
+ *  A desktop story with a phone footnote — and it says up front that most
+ *  links need none of it (v0.46.16). */
+function openExtGuide() {
+  const phone = !!window.AndroidHost;
+  const steps = $("extDesktopSteps");
+  if (steps) steps.classList.toggle("hidden", phone);
+  const line = $("extPhoneLine");
+  if (line) line.classList.toggle("hidden", !phone);
+  const faq = $("faqModal");   // a likely caller — one frost at a time
+  if (faq && !faq.classList.contains("hidden")) closeModal(faq);
+  openModal($("extModal"));
 }
 
 /* The tour points at the places a first run actually shows, so every step
@@ -4576,6 +4634,15 @@ function wireWelcome() {
   on("tourSkip", tourEnd);
   on("tourBack", tourBack);
   on("tourNext", tourNext);
+  on("extOfferBtn", openExtGuide);
+  on("extClose", () => closeModal($("extModal")));
+  on("extDone", () => closeModal($("extModal")));
+  const extModal = $("extModal");
+  if (extModal) extModal.onclick = (e) => { if (e.target === extModal) closeModal(extModal); };
+  const ff = $("extGetFf");
+  if (ff) ff.onclick = () => openExternal(EXT_AMO);
+  const zip = $("extGetChrome");
+  if (zip) zip.onclick = () => openExternal(EXT_ZIP);
 }
 
 // the tour declares itself a modal dialog, so it must behave like one:
@@ -5331,6 +5398,8 @@ document.addEventListener("keydown", (e) => {
   if (TOUR_ON) { tourEnd(); return; }
   // the FAQ card answers on Escape like every dialog (v0.39.4)
   if (!$("faqModal").classList.contains("hidden")) { closeModal($("faqModal")); return; }
+  // the extension guide answers on Escape like every dialog (v0.46.16)
+  if (!$("extModal").classList.contains("hidden")) { closeModal($("extModal")); return; }
   // the what's-new card: a real dialog, so Escape is its way out (v0.38.3)
   if (wnVersion) { dismissWhatsNew(wnVersion); return; }
   // only when Settings is really open: this used to close it from any tab and

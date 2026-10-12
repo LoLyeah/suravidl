@@ -488,6 +488,21 @@ preview of the room it opens; the chosen one wears the accent edge with a
 soft ring, and picking re-dresses the whole room in one transition and says
 so in a toast. Under the pine scheme the theme previews wear the pine lamp.
 
+### The companion offer (the at-need door, v0.46.16)
+When a probe meets a page no extractor knows, the room offers the way
+through instead of a dead end, and the route is platform-true: the phone
+keeps its own door (`#browserOffer` — Open in the browser + Scan), the
+desktop gets the extension's (`#extOffer` — "How it works" opens the guide
+sheet). The human error sentence branches with it; the desktop never says
+"Scan". The sheet (`#extModal`) is the welcome-mat family's third card:
+an optional-first line ("Most links need none of this"), three numbered
+steps carrying the popup's real words ("Choose quality in suravidl"), the
+honesty line (what travels — the picked stream + its session details), a
+phone footnote that swaps in for the steps on Android, and the two get-it
+doors (openExternal → Mozilla Add-ons / the release zip). Entry points:
+the offer row and the FAQ's two extension answers. Not the tour, never a
+first-run step — an optional capability must not tax the happy path.
+
 ### Named Rules
 **The Machined Press Rule.** Every control answers a press physically before
 it answers with state: scale .97 down, then the work. No tappable surface
@@ -512,6 +527,14 @@ name is a capability nobody has.
 is actually docked at the bottom right now and lifts above it; nothing
 docked, it falls to the host's own corner. A fixed lift tuned for one tab is
 a bug with a delay.
+
+**The At-Need Rule.** An optional capability is taught where the need
+appears and nowhere else. The extension is invisible to anyone who never
+meets a page it can help with; the offer row and the guide open exactly at
+the failed probe, and the FAQ's answers carry the door for the reader who
+arrives by question. When one need has two platform truths, the copy
+carries both (the phone's Scan, the desktop's extension) — a route the
+reader cannot take is a lie with a button.
 
 ## Do's and Don'ts
 

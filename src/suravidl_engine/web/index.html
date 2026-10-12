@@ -128,6 +128,10 @@
         <button id="browserOfferBtn" class="btn sm" data-i18n="Open in the browser">Open in the browser</button>
         <span class="muted" data-i18n="this page has a player yt-dlp cannot read — press play there, then Scan">this page has a player yt-dlp cannot read — press play there, then Scan</span>
       </div>
+      <div id="extOffer" class="audioRow hidden">
+        <button id="extOfferBtn" class="btn sm" data-i18n="How it works">How it works</button>
+        <span class="muted" data-i18n="this page hides its player from the engine — the companion extension can hand the stream over">this page hides its player from the engine — the companion extension can hand the stream over</span>
+      </div>
       <div id="sniffRow" class="audioRow hidden">
         <button id="sniffBtn" class="btn sm"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg></span><span data-i18n="Find a video on a page">Find a video on a page</span></button>
         <span class="muted" data-i18n="opens a browser with a sniffer — press play, then Scan">opens a browser with a sniffer — press play, then Scan</span>
@@ -1052,6 +1056,38 @@
     <div id="faqList" class="faqlist"></div>
     <div class="modal-foot right">
       <button id="faqDone" class="btn prime" data-i18n="Got it">Got it</button>
+    </div>
+  </div>
+</div>
+
+<!-- The companion extension, taught at the moment of need (v0.46.16): the
+     offer row appears when a probe meets a page it cannot read. -->
+<div id="extModal" class="overlay hidden" role="dialog" aria-modal="true"
+     aria-labelledby="extTitle">
+  <div class="modal glass">
+    <div class="modal-head">
+      <span id="extTitle" class="title" data-i18n="When a page hides its player">When a page hides its player</span>
+      <span class="spacer"></span>
+      <button id="extClose" class="btn ghost-sm" data-i18n="Close">Close</button>
+    </div>
+    <div class="extguide">
+      <p class="muted" data-i18n="Most links need none of this — paste and Probe reads them. This is for the pages that hide their player: the companion extension sees what the page really plays and hands it to this room.">Most links need none of this — paste and Probe reads them. This is for the pages that hide their player: the companion extension sees what the page really plays and hands it to this room.</p>
+      <div id="extDesktopSteps">
+        <ol>
+          <li data-i18n="Get it once: Firefox from Mozilla Add-ons, Chrome or Edge from the release zip (load unpacked). Then pair it — the token from Settings → Authentication goes into the extension's Options.">Get it once: Firefox from Mozilla Add-ons, Chrome or Edge from the release zip (load unpacked). Then pair it — the token from Settings → Authentication goes into the extension's Options.</li>
+          <li data-i18n="Play the page for a second in your browser — the extension only sees what the page actually requests.">Play the page for a second in your browser — the extension only sees what the page actually requests.</li>
+          <li data-i18n="Open the extension and press “Choose quality in suravidl” — the stream lands on this deck, probed. Pick the quality, press START.">Open the extension and press “Choose quality in suravidl” — the stream lands on this deck, probed. Pick the quality, press START.</li>
+        </ol>
+      </div>
+      <p id="extPhoneLine" class="muted hidden" data-i18n="On the phone there is no extension — the app's own browser is the catcher: open the page in it, press play, then Scan.">On the phone there is no extension — the app's own browser is the catcher: open the page in it, press play, then Scan.</p>
+      <p class="muted" data-i18n="What travels: the stream you picked, plus the session details for exactly that stream — nothing else. Settings → Authentication shows what is held and clears it on ask.">What travels: the stream you picked, plus the session details for exactly that stream — nothing else. Settings → Authentication shows what is held and clears it on ask.</p>
+      <div class="linksrow">
+        <button id="extGetFf" class="linkbtn" type="button">Mozilla Add-ons</button>
+        <button id="extGetChrome" class="linkbtn" type="button" data-i18n="the release zip">the release zip</button>
+      </div>
+    </div>
+    <div class="modal-foot right">
+      <button id="extDone" class="btn prime" data-i18n="Got it">Got it</button>
     </div>
   </div>
 </div>

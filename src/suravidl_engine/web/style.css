@@ -641,6 +641,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 }
 .audioRow .muted { font-size: 12.5px; margin-right: 2px; }
 .audioRow .qrow { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* the extension guide sheet: steps read as steps (v0.46.16) */
+.extguide { display: grid; gap: 10px; }
+.extguide p { margin: 0; }
+.extguide ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+.extguide .linksrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 /* v0.46.8 "the guide": the watch list's cold start — an add row that works
    from zero, and the three steps, numbered because the order matters */
 .followadd { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }

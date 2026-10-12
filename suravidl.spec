@@ -59,7 +59,7 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-# Two Windows flavors from one spec (v0.46.15): the default single-file
+# Two Windows flavors from one spec (v0.46.16): the default single-file
 # exe is the PORTABLE download; SURAVIDL_WINDOWS_FLAVOR=onedir emits the
 # FOLDER the installer installs. The installed app used to be the
 # single-file exe too — it unpacked itself into %TEMP%\_MEIxxxxx at every
@@ -101,7 +101,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.46.15",
+            "CFBundleShortVersionString": "0.46.16",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

@@ -50,8 +50,13 @@ def _human_err_source() -> str:
     return src[i:j + 1]
 
 
-def _run(cases):
-    script = (_human_err_source()
+def _run(cases, phone=False):
+    # v0.46.16: humanErr branches per platform and wears t(), so the harness
+    # shims both — the phone host for the other catcher, a passthrough t
+    shim = "const t = (s) => s;\n"
+    if phone:
+        shim += "globalThis.window = { AndroidHost: { openBrowser: () => {} } };\n"
+    script = (shim + _human_err_source()
               + "\nconst cases = " + json.dumps(cases) + ";"
               + "\nconsole.log(JSON.stringify(cases.map(([s, d]) => humanErr(s, d))));")
     r = subprocess.run([NODE, "-e", script], capture_output=True, text=True,
@@ -86,7 +91,14 @@ def test_the_verdicts_are_truthful():
     unsupported, plain, signin, agerestricted, page, storage, e403, e429, suitable = out
     for got in (unsupported, plain, suitable):
         assert "cookies" not in got, got
-        assert "play" in got and "Scan" in got, got
+        # the desktop's catcher is the extension — never the phone's Scan
+        # (v0.46.16: it used to say Scan on every platform)
+        assert "play" in got and "extension" in got, got
+        assert "Scan" not in got, got
+    # the phone keeps its own route: same verdicts, the other catcher
+    phone_out = _run(cases, phone=True)
+    for got in (phone_out[0], phone_out[1], phone_out[8]):
+        assert "Scan" in got and "extension" not in got, got
     assert "cookies" in signin and "Scan" not in signin
     assert "cookies" in agerestricted
     assert "cookies" not in page, page

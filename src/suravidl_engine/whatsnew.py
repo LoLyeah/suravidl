@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.16",
+        "title": "The pickup",
+        "items": [
+            "When a page hides its player, the desktop now points the way through: the companion extension hands the stream over, probed — a short guide opens right there, linked from the FAQ. The phone keeps browser + Scan.",
+        ],
+    },
+    {
         "version": "0.46.15",
         "title": "The settle",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The brief",
         "items": [
             "The queue gives you the brief: counts on the filters, one state line (nothing running · 2 filed · 3 failed), failures gathered below the finished takes, and each failure one red sentence.",
-        ],
-    },
-    {
-        "version": "0.46.6",
-        "title": "The flare",
-        "items": [
-            "Failures now speak everywhere: a download that dies tells you wherever you are — one toast, a rose count on the Queue tab — and settled rows carry size · time · site.",
         ],
     },
 ]

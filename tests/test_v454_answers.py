@@ -57,6 +57,6 @@ def test_every_faq_string_ships_translated():
     d = json.loads("{" + m.group(1) + "}")
     block = re.search(r"const FAQ = \[(.*?)\n\];", APP, re.S).group(1)
     strings = re.findall(r'"([^"]+)"', block)
-    assert len(strings) == 22, "11 entries, question + answer"
+    assert len(strings) == 24, "11 entries, question + answer, + 2 guide links"
     for s in strings:
         assert s in d, f"untranslated FAQ string: {s[:70]}"
