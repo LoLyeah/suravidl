@@ -87,3 +87,21 @@ The newer copy wins **by version**, always: if an app update ever ships
 something newer than the staged copy, the stage is removed on the next
 boot. Nothing staged ever lingers as a partial: a crashed download or a
 torn extraction is swept at startup.
+
+
+## "Failed to load Python DLL" right after an update (Windows)
+
+The installed Windows app used to be a single self-unpacking file: every
+launch unpacked a copy of itself into `%TEMP%\_MEIxxxxx` and ran from
+there. The first launch of a freshly-updated copy could lose a file in
+that unpack — almost always antivirus scanning the new binary, sometimes
+a temp cleaner — and died with `Failed to load Python DLL
+'...\_MEI...\python311.dll'` (field report 2026-10-12). Starting the app
+again usually works (the scan's verdict is cached by then); if it keeps
+failing, allow the item in Windows Security → Protection history, or add
+`%LOCALAPPDATA%\Programs\suravidl` as an exclusion.
+
+Since v0.46.15 the installer ships the app as a folder — no unpack at
+launch, so this cannot happen to the installed copy. The single-file
+portable download still unpacks (that is what makes it portable); the
+same workaround applies if a portable copy ever hits it.

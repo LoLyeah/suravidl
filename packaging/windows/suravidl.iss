@@ -46,7 +46,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\suravidl.exe"; DestDir: "{app}"; Flags: ignoreversion
+; the installed app is the FOLDER flavor (v0.46.15): the single-file exe
+; unpacked itself into %TEMP%\_MEIxxxxx at every launch, and the first
+; launch after an update could die there — "Failed to load Python DLL
+; ...\python311.dll" (antivirus scanning the fresh update is the classic
+; cause; field report 2026-10-12). A folder has no unpack.
+Source: "dist\suravidl-onedir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; start menu shortcut in user programs folder ({userprograms}\suravidl.lnk)

@@ -2,7 +2,18 @@
 
 ## Compiler Command
 
-To compile the per-user installer from the repository root (after building `dist\suravidl.exe` with PyInstaller):
+To compile the per-user installer from the repository root (after building
+the **folder** flavor with PyInstaller — v0.46.15; the installer no longer
+ships the single-file exe, which unpacked itself into `%TEMP%` at every
+launch and could lose a file to antivirus there):
+
+```powershell
+$env:SURAVIDL_WINDOWS_FLAVOR = "onedir"
+pyinstaller suravidl.spec --noconfirm
+```
+
+The portable download is still the single-file build (`pyinstaller
+suravidl.spec` with no flavor set → `dist\suravidl.exe`). Then compile:
 
 ```cmd
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=0.41.0 packaging\windows\suravidl.iss
@@ -29,6 +40,7 @@ choco install innosetup -y --no-progress
 - **Desktop icon**: Includes an optional `desktopicon` task, unchecked by default to avoid cluttering the desktop.
 - **Uninstaller in Windows Settings**: Registers uninstall metadata under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{E8F67C29-7B1A-4D3E-9A52-3E6B20261004}_is1`, appearing in Windows Settings -> Installed Apps.
 - **User data preservation**: On uninstall, `[UninstallDelete]` removes cached update installers in `{localappdata}\suravidl\updates`, but preserves the parent `{localappdata}\suravidl` directory (`jobs.db`, `settings.json`, cookies, and sessions).
+- **Folder install**: The payload is a folder of files (`dist\suravidl-onedir\*`), not a self-extracting exe — nothing unpacks at launch (v0.46.15).
 - **Post-install launch**: Offers to launch `suravidl.exe` after an interactive install (`nowait postinstall skipifsilent`). Silent updates skip the auto-launch because the application engine handles its own restart.
 
 ## Silent Upgrade Invocation

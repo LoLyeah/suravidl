@@ -1,5 +1,6 @@
 # PyInstaller spec for suravidl desktop binaries.
 # Usage: pyinstaller suravidl.spec  (run from repo root)
+import os
 import sys
 from pathlib import Path
 
@@ -58,13 +59,18 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
-    name="suravidl",
+# Two Windows flavors from one spec (v0.46.15): the default single-file
+# exe is the PORTABLE download; SURAVIDL_WINDOWS_FLAVOR=onedir emits the
+# FOLDER the installer installs. The installed app used to be the
+# single-file exe too — it unpacked itself into %TEMP%\_MEIxxxxx at every
+# launch, and the first launch after an update could lose a file in that
+# unpack ("Failed to load Python DLL ...\python311.dll" — antivirus
+# scanning the fresh update is the classic cause; field report
+# 2026-10-12). A folder has no unpack, and the app starts faster.
+_onedir = (sys.platform == "win32" and
+           os.environ.get("SURAVIDL_WINDOWS_FLAVOR", "").strip().lower()
+           == "onedir")
+_exe_opts = dict(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -78,6 +84,14 @@ exe = EXE(
     icon=str(ROOT / ("assets/icon.ico" if sys.platform == "win32"
                      else "assets/logo.png")),
 )
+if _onedir:
+    exe = EXE(pyz, a.scripts, [], exclude_binaries=True,
+              name="suravidl", **_exe_opts)
+    coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False,
+                   upx_exclude=[], name="suravidl-onedir")
+else:
+    exe = EXE(pyz, a.scripts, a.binaries, a.datas, [],
+              name="suravidl", **_exe_opts)
 
 # macOS: wrap the one-file binary in a real .app bundle.
 if sys.platform == "darwin":
@@ -87,7 +101,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.46.14",
+            "CFBundleShortVersionString": "0.46.15",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },

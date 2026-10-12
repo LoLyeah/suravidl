@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.15",
+        "title": "The settle",
+        "items": [
+            "The Windows app installs as a folder now instead of one self-unpacking file: the unpack could lose a file to antivirus (the \"Failed to load Python DLL\" error) — a folder cannot, and the app starts faster.",
+        ],
+    },
+    {
         "version": "0.46.14",
         "title": "The round",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The flare",
         "items": [
             "Failures now speak everywhere: a download that dies tells you wherever you are — one toast, a rose count on the Queue tab — and settled rows carry size · time · site.",
-        ],
-    },
-    {
-        "version": "0.46.5",
-        "title": "The desk",
-        "items": [
-            "Download names its three jobs: Link, Batch, Watch list. Batch gets its own box — a multi-link paste carries over in one tap — and the Watch list label counts what you follow.",
         ],
     },
 ]

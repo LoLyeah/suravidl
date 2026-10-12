@@ -89,6 +89,10 @@ def test_windows_installer_script_is_per_user(tmp_path):
     # a stable installer file name — the updater downloads and runs exactly it
     assert "suravidl-setup" in iss
     assert "AppId" in iss
+    # v0.46.15: the installed app is the FOLDER flavor — the single-file
+    # exe unpacked itself into %TEMP% at every launch and could lose a
+    # file to antivirus there ("Failed to load Python DLL", 2026-10-12)
+    assert "dist\\suravidl-onedir" in iss
     # an interactive install may offer to launch; silent upgrades must not
     assert "skipifsilent" in iss
     # the staged-update cache lives under the engine's cache home
@@ -99,6 +103,23 @@ def test_windows_installer_script_is_per_user(tmp_path):
     # constant, and a bare {userprofile} aborted ISCC at the v0.41.1 cut
     assert '"{userprofile}\\.cache' not in iss
     assert "{localappdata}\\suravidl\\updates" not in iss
+
+
+def test_the_installed_windows_flavor_is_a_folder():
+    """v0.46.15 "the settle": the onefile exe unpacks itself into
+    %TEMP%\_MEIxxxxx at every launch; the first launch after an update
+    died there on the 2026-10-12 field report ("Failed to load Python
+    DLL ...\python311.dll" — antivirus scanning the fresh update is the
+    classic cause). The installed flavor is a folder now: nothing to
+    unpack, and it starts faster. The portable download stays one file."""
+    spec = (ROOT / "suravidl.spec").read_text(encoding="utf-8")
+    assert "SURAVIDL_WINDOWS_FLAVOR" in spec
+    assert "exclude_binaries=True" in spec
+    assert 'name="suravidl-onedir"' in spec
+    yml = (ROOT / ".github" / "workflows" / "release.yml").read_text(
+        encoding="utf-8")
+    assert "SURAVIDL_WINDOWS_FLAVOR: onedir" in yml
+    assert "dist\\suravidl-onedir\\suravidl.exe" in yml
 
 
 def test_the_release_workflow_builds_and_attaches_the_installer():

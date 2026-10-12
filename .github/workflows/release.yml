@@ -143,6 +143,23 @@ jobs:
           test -f "$WORK/installed/suravidl.app/Contents/NEW"
           test -f "$WORK/bad.zip"          # a failed swap keeps the carrier
           echo "rollback dry-run ok"
+      - name: Build the installed flavor (a folder)
+        if: matrix.os == 'windows-2022'
+        shell: pwsh
+        env:
+          # the spec reads this and emits the onedir flavor (v0.46.15):
+          # the single-file exe unpacked itself into %TEMP% at every
+          # launch, and the first launch after an update could lose a
+          # file there — "Failed to load Python DLL" (2026-10-12).
+          SURAVIDL_WINDOWS_FLAVOR: onedir
+        run: |
+          # --clean: this is the second build in the same workpath; the
+          # onefile cache must not leak into the folder flavor
+          pyinstaller suravidl.spec --noconfirm --clean
+          if (-not (Test-Path "dist\suravidl-onedir\suravidl.exe")) {
+            echo "the folder flavor did not build" >&2
+            exit 1
+          }
       - name: Build Windows installer
         if: matrix.os == 'windows-2022'
         shell: pwsh
