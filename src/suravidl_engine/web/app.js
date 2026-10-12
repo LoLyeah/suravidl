@@ -3738,7 +3738,13 @@ async function refreshJobs() {
       // the bottom" report — it was content motion, not scrolling).
       // The dying row keeps its exact place while it fades; everyone
       // else keeps theirs.
-      while (anchor && anchor.classList.contains("leaving")) {
+      // v0.46.13: skip the failure caption too — it is decoration this
+      // same function inserted before the first failed row, and the walk
+      // used to land on it, so EVERY failed row was torn out and
+      // re-inserted past it on EVERY poll. Re-inserting a row restarts
+      // its `enter` fade — the field's blinking error card (2026-10-12).
+      while (anchor && (anchor.classList.contains("leaving") ||
+                        anchor.classList.contains("jgroup"))) {
         anchor = anchor.nextElementSibling;
       }
       if (row !== anchor) box.insertBefore(row, anchor);

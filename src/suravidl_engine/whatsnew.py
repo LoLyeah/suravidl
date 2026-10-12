@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.13",
+        "title": "The still",
+        "items": [
+            "The queue stops blinking: a failed card next to finished takes was re-inserted on every poll — its fade replaying every second. The failure caption now keeps its place above the failures, and the cards hold still.",
+        ],
+    },
+    {
         "version": "0.46.12",
         "title": "The walk",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The comeback",
         "items": [
             "macOS updates come back on their own. The reopen after an update now forces a fresh instance, ends a lingering old process, and writes every attempt to ~/Library/Logs/suravidl-update.log.",
-        ],
-    },
-    {
-        "version": "0.46.2",
-        "title": "The follower",
-        "items": [
-            "Follow a playlist or channel: its new videos come in on their own. Following starts from now, nothing is ever grabbed twice, and a watch-list grab wears a quiet tag on its card.",
         ],
     },
 ]

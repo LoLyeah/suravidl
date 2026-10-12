@@ -37,10 +37,25 @@ def test_dying_rows_are_marked_before_the_placement_loop():
 def test_anchors_skip_dying_rows():
     seg = _fn("refreshJobs")
     i = seg.index("let anchor = prev ? prev.nextElementSibling")
-    chunk = seg[i:i + 700]
+    chunk = seg[i:i + 1200]
     assert 'classList.contains("leaving")' in chunk, \
         "the anchor chain must skip past dying rows"
     assert "anchor = anchor.nextElementSibling" in chunk
+
+
+def test_anchors_skip_the_failure_caption():
+    """v0.46.13: the "N failed" caption is decoration inserted before the
+    first failed row — the anchor chain used to land on it, so EVERY failed
+    row was torn out and re-inserted past it on every poll; re-inserting a
+    row restarts its `enter` fade, which the field saw as a blinking error
+    card (2026-10-12, phone). The chain must skip it like it skips dying
+    rows, and the caption keeps its place above the failures."""
+    seg = _fn("refreshJobs")
+    i = seg.index("let anchor = prev ? prev.nextElementSibling")
+    chunk = seg[i:i + 1100]
+    assert 'classList.contains("jgroup")' in chunk, \
+        "the anchor chain must skip the failure caption"
+    assert "the field's blinking error card" in APP
 
 
 def test_leave_row_keeps_the_readers_spot():
