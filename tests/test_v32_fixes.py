@@ -48,6 +48,16 @@ def test_the_notes_start_with_the_current_version():
     assert whatsnew.ENTRIES[0]["version"] == __version__
 
 
+def test_the_eta_reads_as_a_clock_not_a_raw_float():
+    """v0.46.14, field report 2026-10-12: 19s of ETA printed as
+    19.126124260462905s — the raw engine float is fake precision."""
+    appjs = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text(
+        encoding="utf-8")
+    assert 't("ETA {t}", { t: clock(j.progress.eta) })' in appjs
+    assert '"ETA {n}s"' not in appjs
+    assert '"ETA {t}": "sisa {t}",' in appjs
+
+
 def test_every_entry_is_shaped_and_newest_first():
     def tup(v):
         return tuple(int(x) if x.isdigit() else 0 for x in str(v).split("."))

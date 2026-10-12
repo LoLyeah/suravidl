@@ -197,7 +197,7 @@ const STRINGS = { en: {}, id: {
   "Downloading…": "Mengunduh…",
   "Downloads": "Unduhan",
   "Downloads land in the app's own folder, which a file manager cannot open. \"Delete app copies\" frees that folder and keeps the Gallery/Music copy you can open; \"Delete downloaded files\" removes both. \"Clear app cache\" frees only the player data yt-dlp re-fetches — no download is touched.": "Unduhan mendarat di folder aplikasi sendiri, yang tidak bisa dibuka oleh pengelola berkas. \"Hapus salinan aplikasi\" membebaskan folder itu dan menyimpan salinan Galeri/Musik yang bisa kamu buka; \"Hapus berkas unduhan\" menghapus keduanya. \"Bersihkan cache aplikasi\" hanya membebaskan data pemutar yang diambil ulang yt-dlp — tidak ada unduhan yang tersentuh.",
-  "ETA {n}s": "sisa {n} dtk",
+  "ETA {t}": "sisa {t}",
   "Edit & retry": "Ubah & coba lagi",
   "Embed into the video": "Sematkan ke video",
   "Errors": "Eror",
@@ -2799,8 +2799,12 @@ function metaParts(j) {
   }
   const pct = Math.round(progressPct(j));
   const spd = j.progress && j.progress.speed ? humanBytes(j.progress.speed) + "/s" : "";
+  // an ETA is an estimate, not a measurement: it reads in the same clock
+  // voice as every other duration (0:19, 2:05, 1:02:03) — the raw engine
+  // float (19.126124260462905) was fake precision on the readout
+  // (2026-10-12, field report)
   const eta = j.progress && j.progress.eta != null
-    ? t("ETA {n}s", { n: j.progress.eta }) : "";
+    ? t("ETA {t}", { t: clock(j.progress.eta) }) : "";
   const pl = j.progress && j.progress.playlist_index && j.progress.playlist_count
     ? t("video {i}/{n}", { i: j.progress.playlist_index,
                           n: j.progress.playlist_count }) : "";

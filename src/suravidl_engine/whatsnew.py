@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.14",
+        "title": "The round",
+        "items": [
+            "The ETA reads like a time, not a calculator tape: 19s of estimate used to print as 19.126124260462905s — it now wears the same clock as every other duration (0:19, 2:05, 1:02:03).",
+        ],
+    },
+    {
         "version": "0.46.13",
         "title": "The still",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The desk",
         "items": [
             "Download names its three jobs: Link, Batch, Watch list. Batch gets its own box — a multi-link paste carries over in one tap — and the Watch list label counts what you follow.",
-        ],
-    },
-    {
-        "version": "0.46.4",
-        "title": "The comeback",
-        "items": [
-            "macOS updates come back on their own. The reopen after an update now forces a fresh instance, ends a lingering old process, and writes every attempt to ~/Library/Logs/suravidl-update.log.",
         ],
     },
 ]
