@@ -1,5 +1,6 @@
 package com.suravidl.app
 
+import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -23,10 +24,14 @@ class FileHandoffTest {
 
     @Test(timeout = 120_000)
     fun a_download_in_the_app_folder_can_be_handed_to_another_app() {
-        // Downloads live under external-files-path, which is the only root the
-        // provider exposes — the app-private files dir (cookie session copy,
-        // jobs.db) is deliberately out of reach (v0.21.1 audit).
-        val dir = File(ctx.getExternalFilesDir(null), "handoff").apply { mkdirs() }
+        // Downloads live under external-files-path/Movies/suravidl — the
+        // provider's scoped root (v0.46.10 audit B/F9: the whole external
+        // dir used to be exposed; only the download folders are now — see
+        // files_outside_the_download_folder_are_not_shareable). The
+        // app-private files dir (cookie session copy, jobs.db) stays out
+        // of reach (v0.21.1 audit).
+        val dir = File(ctx.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+                       "suravidl").apply { mkdirs() }
         val f = File(dir, "handoff-test.mp4")
         f.writeBytes(ByteArray(4096) { 0x33 })
         try {
@@ -58,6 +63,29 @@ class FileHandoffTest {
             assertTrue("the provider must not hand out app-private files", refused)
         } finally {
             f.delete()
+        }
+    }
+
+    @Test(timeout = 120_000)
+    fun files_outside_the_download_folder_are_not_shareable() {
+        // v0.46.10 audit B/F9, pinned on device: the provider's roots are
+        // the download folders, not the whole external files dir — a path
+        // outside them is refused instead of exposed.
+        val dir = File(ctx.getExternalFilesDir(null), "handoff").apply { mkdirs() }
+        val f = File(dir, "out-of-scope.mp4")
+        f.writeBytes(ByteArray(64) { 0x77 })
+        try {
+            var refused = false
+            try {
+                FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", f)
+            } catch (_: IllegalArgumentException) {
+                refused = true
+            }
+            assertTrue("the provider must not hand out files outside the " +
+                       "download folders", refused)
+        } finally {
+            f.delete()
+            dir.delete()
         }
     }
 

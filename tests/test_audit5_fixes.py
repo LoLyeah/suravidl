@@ -276,7 +276,10 @@ def test_the_sniff_bridge_demands_the_session_token():
     assert "private val sniffToken = java.util.UUID.randomUUID().toString()" in browser
     assert "SniffScript.js(sniffToken)" in browser
     assert "SniffScript.scan(sniffToken)" in browser
-    assert "if (token != sniffToken) return" in browser
+    assert "if (sniffEnforced && token != sniffToken) return" in browser
+    assert ("sniffEnforced =\n        WebViewFeature.isFeatureSupported"
+            in browser) or ("sniffEnforced =" in browser), \
+        "the enforcement scope must be the feature check (v0.46.12)"
 
 
 def test_the_second_injector_carries_the_same_token():

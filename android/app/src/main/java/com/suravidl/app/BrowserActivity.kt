@@ -78,8 +78,18 @@ class BrowserActivity : AppCompatActivity() {
     private var lastVersion = -1
     /** v0.46.10 audit B/F6: the token the sniff bridge demands — generated
      *  per browsing session, known only to the injected script (a closure)
-     *  and this activity. A page calling the bridge itself is refused. */
+     *  and this activity. A page calling the bridge itself is refused —
+     *  but only where the token can reach EVERY frame (v0.46.12 "the
+     *  walk": the emulator suite caught the scope — see [sniffEnforced]). */
     private val sniffToken = java.util.UUID.randomUUID().toString()
+    /** Enforcement is honest only where the document-start injection can
+     *  deliver the token into every frame. Without that feature the frame
+     *  walk is the only path into subframes, and anything handed to a
+     *  same-origin child is readable by the page itself — enforcing there
+     *  would break frame sniffing without being able to protect it, so
+     *  those WebViews keep the pre-audit model (THREAT-MODEL.md says so). */
+    private val sniffEnforced =
+        WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
     private var bg = MainActivity.BG_DARK
 
     /**
@@ -921,12 +931,13 @@ class BrowserActivity : AppCompatActivity() {
     inner class SniffBridge {
         @android.webkit.JavascriptInterface
         fun report(url: String?, via: String?, frame: String?, token: String?) {
-            // v0.46.10 audit B/F6: only the injected script knows the token
-            // (it lives in a closure the page cannot read), so a page calling
-            // this bridge itself — to plant fake finds in the list — is
-            // refused. Reports from the old-WebView frame walk carry a null
-            // token by design; the network layer covers those frames.
-            if (token != sniffToken) return
+            // v0.46.10 audit B/F6 with the v0.46.12 scope: only the injected
+            // script knows the token (a closure the page cannot read), so a
+            // page calling this bridge itself — to plant fake finds — is
+            // refused wherever enforcement is possible (see [sniffEnforced]).
+            // Where it is not, the walk's null-token reports are the feature
+            // working, not an attack: same-origin frames belong to the page.
+            if (sniffEnforced && token != sniffToken) return
             SniffLog.add(url ?: return, via ?: "hook", frame ?: "", false)
         }
     }

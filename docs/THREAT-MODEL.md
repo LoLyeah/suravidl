@@ -98,7 +98,13 @@ The in-app browser's JS bridge (Android) takes the same posture for its own
 surface: the injected sniff script carries a per-session token the page
 cannot read, and the bridge refuses any report that does not present it
 (v0.46.10) — a remote page can no longer plant fake media "finds" in the
-sniff list.
+sniff list. The enforcement is scoped honestly (v0.46.12): it is active
+exactly where the WebView's document-start injection can deliver the token
+into every frame (every current device). On a WebView without that feature
+the frame walk is the only path into subframes, and a same-origin frame is
+the page's own trust domain — anything handed there is readable by the
+page — so those builds keep the pre-v0.46.10 model rather than break frame
+sniffing without being able to protect it.
 
 ## Reporting
 

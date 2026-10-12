@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.12",
+        "title": "The walk",
+        "items": [
+            "The seal's bridge check now applies only where it can protect every frame: older WebViews keep the frame walk's pre-seal model, so media inside players' iframes is found again.",
+        ],
+    },
+    {
         "version": "0.46.11",
         "title": "The solder",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The follower",
         "items": [
             "Follow a playlist or channel: its new videos come in on their own. Following starts from now, nothing is ever grabbed twice, and a watch-list grab wears a quiet tag on its card.",
-        ],
-    },
-    {
-        "version": "0.46.1",
-        "title": "The recorder",
-        "items": [
-            "Live streams are recorded now, not chased: a LIVE link shows ● REC with time on air and bytes — no fake percentage — and Stop & keep keeps everything recorded so far.",
         ],
     },
 ]
