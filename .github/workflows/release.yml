@@ -157,7 +157,7 @@ jobs:
           # onefile cache must not leak into the folder flavor
           pyinstaller suravidl.spec --noconfirm --clean
           if (-not (Test-Path "dist\suravidl-onedir\suravidl.exe")) {
-            echo "the folder flavor did not build" >&2
+            Write-Error "the folder flavor did not build"
             exit 1
           }
       - name: Build Windows installer
