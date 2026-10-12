@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.10",
+        "title": "The seal",
+        "items": [
+            "Holes closed, quietly: the engine's page no longer hands out its token to anything that asks — the app opens it with a key, and a bare address is refused with a sentence.",
+            "A second resume of a paused download is refused instead of writing the file twice; proxy passwords and login headers never reach the log card or a diagnostics bundle.",
+            "Small truths: live recordings show their real size on disk, cuts work for takes from before a folder change, and the Firefox extension stopped asking for a permission it never used.",
+        ],
+    },
+    {
         "version": "0.46.9",
         "title": "The cut",
         "items": [
@@ -76,13 +85,6 @@ ENTRIES = [
         "items": [
             "Several links at once now get checked before anything queues: each is probed, named, and given its own honest answer — tick what is good, then queue just those.",
             "Copy diagnostics bundles a bug report in one paste — versions, what this ffmpeg can do, settings (secrets redacted by the engine), and the log tail.",
-        ],
-    },
-    {
-        "version": "0.45.32",
-        "title": "The slideshow",
-        "items": [
-            "A TikTok photo post now says what it is — a slideshow, not a video, with nothing for a downloader to save and where its audio might still be caught.",
         ],
     },
 ]

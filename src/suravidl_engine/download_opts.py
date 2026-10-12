@@ -365,6 +365,11 @@ DENIED_RAW_FLAGS: dict[str, str] = {
     "--print-to-file": "writes files the app does not manage",
     "--postprocessor-args": "postprocessor arguments are app-managed",
     "--ppa": "postprocessor arguments are app-managed",
+    # v0.46.10 audit A/F5: these hand raw argv to child processes the same
+    # way --postprocessor-args does — the denylist missed the pair
+    # (live probe: `--downloader-args ffmpeg:-loglevel quiet` passed)
+    "--downloader-args": "downloader arguments are app-managed",
+    "--external-downloader-args": "downloader arguments are app-managed",
 }
 
 DENIED_RAW_KEYS: dict[str, str] = {
@@ -392,6 +397,7 @@ DENIED_RAW_KEYS: dict[str, str] = {
     "print": "--print",
     "print_to_file": "--print-to-file",
     "postprocessor_args": "--postprocessor-args",
+    "external_downloader_args": "--external-downloader-args",
 }
 
 DEFAULT_TEMPLATE = "%(title).100B.%(ext)s"

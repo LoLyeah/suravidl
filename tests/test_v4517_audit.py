@@ -92,7 +92,11 @@ def test_no_bare_json_in_the_sidecar_list():
 
 
 def test_one_paused_row_has_one_successor():
-    assert 'if src.get("replaced_by"):' in JOBS
+    # v0.46.10 audit A/F2: the check reads the LIVE row under the lock —
+    # two concurrent resumes each used to pass on their own unlocked
+    # snapshot and queue two writers on the same .part
+    assert 'live_src.get("replaced_by")' in JOBS
+    assert 'live_src.get("_requeue_claim")' in JOBS
     assert 'live["replaced_by"] = job["id"]' in JOBS
     assert "replaced_by=excluded.replaced_by" in JOBS, "persisted"
 

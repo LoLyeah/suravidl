@@ -40,7 +40,13 @@ def test_the_page_script_sweeps_the_player_and_reports():
 
 def test_the_background_only_accepts_reports_with_a_sender_tab():
     src = (ROOT / "extension/background.js").read_text()
-    i = src.index('msg.type === "pageFind"')
+    # the pageFind branch itself: only a real content-script sender is
+    # remembered (the message always carries its tab)
+    i = src.index('if (msg && msg.type === "pageFind") {')
     window = src[i:i + 700]
     assert "_sender && _sender.tab" in window
     assert "remember(tabId" in window
+    # v0.46.10 audit B/F2: every PRIVILEGED branch refuses a tab sender —
+    # a content script may only ever report a sighting
+    assert ('if (_sender && _sender.tab && !(msg && msg.type === "pageFind"))'
+            in src)

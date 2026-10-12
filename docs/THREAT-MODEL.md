@@ -13,6 +13,7 @@ desktop/extension side is noted where it differs.
 | job history | `~/.suravidl/jobs.db` (SQLite) | cookie values are **never** written; rows that carried a `Cookie` header store `<redacted>`; the job URL is stored as pasted — signed query strings included, because retry/resume must replay it exactly — and error text is scrubbed of query credentials | — |
 | settings | `~/.suravidl/settings.json` | never contains cookie *values* (only a path, or `<redacted>`) | — |
 | engine token | `~/.suravidl/token` | `0600`, directory `0700` | in memory; the Android app keeps it in its private `SharedPreferences` |
+| page key | `~/.suravidl/page_key` | `0600`, directory `0700` | in memory; the Android app keeps it in its private `SharedPreferences` |
 | downloads | `filesDir/…` | as downloaded | — |
 
 The Keystore key is created on first import (`suravidl-cookies-v1`) with
@@ -80,6 +81,24 @@ user's own LAN NAS, which is a supported target — and the API is
 token-gated, so only the user's own tools can ask the engine to fetch
 anything at all. The line is drawn at the neighborhood, not at remote
 servers; remote URLs are the product.
+
+## The loopback surface (the page, its key, and the extension's origins)
+
+`GET /` serves the web UI **with the API token embedded** — anything that
+can read that page can drive the engine. Loopback is shared, and the CORS
+rule admits every browser-extension origin *by design* (the extension is a
+first-class client, and its origin differs per install), so since v0.46.10
+the page itself is gated: the Android shell has always opened it with a key
+(`?k=`, kept in private `SharedPreferences`), and the desktop does the same
+now (`~/.suravidl/page_key`, `0600`). A request without the key gets a 401
+that says how to get in — never the token. The key gates *reading the
+page*; API calls stay bearer-token-gated exactly as before.
+
+The in-app browser's JS bridge (Android) takes the same posture for its own
+surface: the injected sniff script carries a per-session token the page
+cannot read, and the bridge refuses any report that does not present it
+(v0.46.10) — a remote page can no longer plant fake media "finds" in the
+sniff list.
 
 ## Reporting
 

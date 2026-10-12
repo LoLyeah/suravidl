@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -36,21 +37,21 @@ def _fetch_latest_release(repo: str) -> dict:
 
 
 def _parse(v: str):
-    parts = []
-    for chunk in (v or "").lstrip("v").split("."):
-        digits = ""
-        for ch in chunk:
-            if ch.isdigit():
-                digits += ch
-            else:
-                break
-        parts.append(int(digits) if digits else 0)
-    while len(parts) < 3:
-        parts.append(0)
-    # a "-suffix" marks a prerelease: same numbers, sorted BELOW the
-    # release it leads to, so an rc install gets offered the final build
-    prerelease = 0 if "-" in (v or "") else 1
-    return tuple(parts[:3]) + (prerelease,)
+    """Version → a comparable tuple: (numbers, release?, suffix).
+
+    Every dotted part is kept (a 4-part `0.45.1.1` orders after `0.45.1`;
+    truncation to three used to make them equal), a trailing suffix sorts
+    the version BELOW its own release — an rc install gets offered the
+    final build — and two prereleases of the same numbers order by the
+    suffix itself, so `rc2` follows `rc1` (v0.46.10 audit A/F7).
+    """
+    s = (v or "").strip().lstrip("v")
+    m = re.match(r"^(\d+(?:\.\d+)*)(.*)$", s)
+    if not m:
+        return ((0,), 0, "")
+    nums = tuple(int(x) for x in m.group(1).split("."))
+    suffix = m.group(2)
+    return (nums, 0 if suffix else 1, suffix)
 
 
 def check_update(current: str, repo: str = DEFAULT_REPO, fetch_fn=None,

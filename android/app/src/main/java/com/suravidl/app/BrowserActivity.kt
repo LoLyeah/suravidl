@@ -76,6 +76,10 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var desktopChip: android.widget.Button
     private val ui = Handler(Looper.getMainLooper())
     private var lastVersion = -1
+    /** v0.46.10 audit B/F6: the token the sniff bridge demands — generated
+     *  per browsing session, known only to the injected script (a closure)
+     *  and this activity. A page calling the bridge itself is refused. */
+    private val sniffToken = java.util.UUID.randomUUID().toString()
     private var bg = MainActivity.BG_DARK
 
     /**
@@ -140,7 +144,7 @@ class BrowserActivity : AppCompatActivity() {
         // requests either way.
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             try {
-                WebViewCompat.addDocumentStartJavaScript(webView, SniffScript.js(), setOf("*"))
+                WebViewCompat.addDocumentStartJavaScript(webView, SniffScript.js(sniffToken), setOf("*"))
             } catch (_: Throwable) {
                 // the same-origin walk remains the fallback
             }
@@ -553,8 +557,8 @@ class BrowserActivity : AppCompatActivity() {
     /** Ask again: re-install the hooks, then sweep the resource timeline. */
     private fun scanAgain() {
         status.text = "scanning…"
-        webView.evaluateJavascript(SniffScript.js(), null)
-        webView.evaluateJavascript(SniffScript.scan(), null)
+        webView.evaluateJavascript(SniffScript.js(sniffToken), null)
+        webView.evaluateJavascript(SniffScript.scan(sniffToken), null)
     }
 
     private fun refreshIfChanged() {
@@ -915,7 +919,13 @@ class BrowserActivity : AppCompatActivity() {
      */
     inner class SniffBridge {
         @android.webkit.JavascriptInterface
-        fun report(url: String?, via: String?, frame: String?) {
+        fun report(url: String?, via: String?, frame: String?, token: String?) {
+            // v0.46.10 audit B/F6: only the injected script knows the token
+            // (it lives in a closure the page cannot read), so a page calling
+            // this bridge itself — to plant fake finds in the list — is
+            // refused. Reports from the old-WebView frame walk carry a null
+            // token by design; the network layer covers those frames.
+            if (token != sniffToken) return
             SniffLog.add(url ?: return, via ?: "hook", frame ?: "", false)
         }
     }

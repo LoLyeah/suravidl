@@ -55,8 +55,13 @@ jobs:
         with:
           gradle-version: '8.7'
       - name: Restore signing keystore
+        # v0.46.10 audit B/F7: the secret rides an env var, not the script
+        # text — an expression interpolated into `run` is a shell-injection
+        # sink the runner cannot vet.
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/suravidl-release.keystore"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/suravidl-release.keystore"
           echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/suravidl-release.keystore" >> "$GITHUB_ENV"
       - name: Build signed release APK
         # the password is step-scoped on purpose (v0.43.2 audit): exporting

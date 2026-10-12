@@ -54,8 +54,13 @@ relaunch() {
     return 0
   fi
   # LaunchServices said no; exec the inside directly — a GUI app spawned
-  # from a user-session script still gets the Aqua session.
-  INNER="$1/Contents/MacOS/$EXEC"
+  # from a user-session script still gets the Aqua session. The exec name
+  # is re-read here, not reused from the top: after the swap the bundle is
+  # the NEW one, and a renamed executable would make the fallback exec a
+  # path that no longer exists (v0.46.10 audit A/F11).
+  EXEC_NOW="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' \
+              "$1/Contents/Info.plist" 2>/dev/null || basename "$1" .app)"
+  INNER="$1/Contents/MacOS/$EXEC_NOW"
   if [ -x "$INNER" ]; then
     nohup "$INNER" >/dev/null 2>&1 &
     say "relaunch: open -n failed; inner executable spawned -> $INNER"
@@ -117,9 +122,12 @@ xattr -dr com.apple.quarantine "$NEW" 2>/dev/null
 
 # 3) swap by rename; roll back on any failure
 OLD="$(mktemp -d "$DIR/.suravidl-old.XXXXXX")" || { rm -rf "$STAGE"; relaunch "$APP"; exit 1; }
-rm -rf "$OLD"   # the placeholder goes — the rename below needs the name free
-if ! mv "$APP" "$OLD"; then
-  rm -rf "$STAGE"; relaunch "$APP"; exit 1
+# The old bundle moves INTO the placeholder directory — no rm-then-mv
+# window for a planted path to swallow the rename (v0.46.10 audit A/F11;
+# the placeholder is mktemp's own 0700 directory, so nothing else can be
+# the target).
+if ! mv "$APP" "$OLD/old.app"; then
+  rm -rf "$STAGE" "$OLD"; relaunch "$APP"; exit 1
 fi
 if mv "$NEW" "$APP"; then
   rm -rf "$OLD"
@@ -127,7 +135,7 @@ if mv "$NEW" "$APP"; then
   # gone and the new one runs from where it should — the zip goes too
   rm -f "$ZIP"
 else
-  mv "$OLD" "$APP"    # nothing lost: the version they had comes back
+  mv "$OLD/old.app" "$APP"   # nothing lost: the version they had comes back
 fi
 rm -rf "$STAGE"
 

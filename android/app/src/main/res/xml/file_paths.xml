@@ -4,7 +4,12 @@
      the plaintext cookie-session copy and jobs.db — to any page holding the
      JS bridge (v0.21.1 audit). -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-files-path name="external_files" path="." />
+    <!-- v0.46.10 audit B/F9: scope the shares to the download folder itself —
+         `.` exposed every file under the app's external dir. Downloads live in
+         Movies/suravidl; files/suravidl is the same folder when external
+         storage is unavailable (EngineService falls back to filesDir). -->
+    <external-files-path name="downloads" path="Movies/suravidl" />
+    <files-path name="internal_downloads" path="suravidl" />
     <!-- apk updates live in cache/updates; only this subdirectory is exposed, keeping the rest of cache private -->
     <cache-path name="cache_updates" path="updates" />
 </paths>

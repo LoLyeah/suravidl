@@ -76,9 +76,9 @@ def test_the_ci_dry_runs_the_very_script_the_app_runs():
 def test_the_swap_script_waits_swaps_and_rolls_back():
     s = SWAP.read_text()
     assert "kill -0" in s, "it must wait for the old app to exit"
-    assert 'mv "$APP" "$OLD"' in s, "the swap is a rename, never a copy"
+    assert 'mv "$APP" "$OLD/old.app"' in s, "the swap is a rename, never a copy"
     assert 'mv "$NEW" "$APP"' in s
-    assert 'mv "$OLD" "$APP"' in s, "a failed swap must roll back"
+    assert 'mv "$OLD/old.app" "$APP"' in s, "a failed swap must roll back"
     assert "ditto -x -k" in s, "extract beside the old bundle (same fs)"
     assert "xattr -dr com.apple.quarantine" in s
     assert "SURAVIDL_APPLY_DRYRUN" in s, "the CI hook stops the relaunch"
@@ -93,7 +93,8 @@ def test_the_relaunch_is_hardened_and_leaves_a_trace():
     s = SWAP.read_text()
     assert "open -n" in s, "the reopen must force a FRESH instance"
     assert "suravidl-update.log" in s, "a failed relaunch must leave a trace"
-    assert 'INNER="$1/Contents/MacOS/$EXEC"' in s, "the direct-exec fallback"
+    assert 'INNER="$1/Contents/MacOS/$EXEC_NOW"' in s, \
+        "the direct-exec fallback (the exec name re-read after the swap, v0.46.10)"
     assert 'kill -TERM "$PID"' in s and 'kill -KILL "$PID"' in s, \
         "a lingering old process must be ended, or the reopen lands on it"
     assert 'ps -p "$PID" -o comm=' in s, "never kill a recycled pid"

@@ -121,10 +121,47 @@ function pickHeaders(reqHeaders) {
 // nothing is held for more than a couple of hundred requests.
 const pending = new Map();
 
+// MV3 service workers die after ~30 s idle: a header held only here is gone
+// if the worker goes away between the request and its response, and the
+// guarded stream then downloads without its cookie — silently (v0.46.10
+// audit B/F3). Mirror the map into chrome.storage.session — in-memory,
+// browser-managed, never written to disk — so a fresh worker still finds it.
+// Firefox MV2 has no session area (its background page lives for the whole
+// session); the feature check keeps this a no-op there.
+const pendingSession = (chrome.storage && chrome.storage.session) || null;
+const PENDING_KEY = "svPending";
+
+function _mirrorPending() {
+  if (!pendingSession) return;
+  try {
+    pendingSession.set({ [PENDING_KEY]: Object.fromEntries(pending) });
+  } catch (_) { /* a session area that refuses must never break sniffing */ }
+}
+
 function holdHeaders(url, pick) {
   pending.set(url, pick);
   while (pending.size > PENDING_KEEP) {
     pending.delete(pending.keys().next().value);
+  }
+  _mirrorPending();
+}
+
+function dropHeaders(url) {
+  pending.delete(url);
+  _mirrorPending();
+}
+
+/** The held headers for a URL: memory first, then the session mirror — the
+ *  worker may have restarted since the request went out. */
+async function heldHeaders(url) {
+  const held = pending.get(url);
+  if (held) return held;
+  if (!pendingSession) return null;
+  try {
+    const got = await pendingSession.get(PENDING_KEY);
+    return ((got && got[PENDING_KEY]) || {})[url] || null;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -188,13 +225,14 @@ chrome.webRequest.onHeadersReceived.addListener(
         // The request headers for this URL were held because its name said
         // nothing; now that the response proved it is media, they are worth
         // keeping — a guarded stream needs them to download.
-        const held = pending.get(details.url);
-        if (held) commitHeaders(details.url, held);
-        pending.delete(details.url);
+        heldHeaders(details.url).then((held) => {
+          if (held) commitHeaders(details.url, held);
+          dropHeaders(details.url);
+        });
         return;
       }
     }
-    pending.delete(details.url); // the name did not lie after all
+    dropHeaders(details.url); // the name did not lie after all
   },
   { urls: ["<all_urls>"] },
   ["responseHeaders"]
@@ -229,6 +267,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // v0.46.10 audit B/F2: pagefind.js runs in every frame of every page, so a
+  // message arriving with `_sender.tab` set comes from a content script — and
+  // a content script may only ever report a sighting (pageFind, below). Every
+  // other action here drives the engine or reads stored state and belongs to
+  // the extension's own pages (popup/options), which carry no tab.
+  if (_sender && _sender.tab && !(msg && msg.type === "pageFind")) {
+    sendResponse({ ok: false, error: "refused" });
+    return false;
+  }
   if (msg && msg.type === "getMedia") {
     chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, ({ tabMedia, reqHeaders }) => {
       const items = (tabMedia[msg.tabId] || []).map((m) => ({

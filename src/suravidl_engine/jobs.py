@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     download_dir TEXT,
     live INTEGER DEFAULT 0,
     video_id TEXT,
+    note TEXT,
     follow_id TEXT
 )
 """
@@ -111,6 +112,21 @@ def _stat_size(job: dict) -> int | None:
                 found = True
         except OSError:
             continue
+    # v0.46.10 audit A/F9: a transfer in flight leaves its bytes in a
+    # `.part` (the hook records the name in `partials`; `filepath` does
+    # not exist until the final rename) — disk is the truth for live
+    # recordings too, not just for finished files. Before this, every
+    # active live recording answered size_bytes: null all night.
+    if not found:
+        for p in job.get("partials") or []:
+            for cand in (str(p), str(p) + ".part"):
+                try:
+                    if os.path.isfile(cand):
+                        total += os.path.getsize(cand)
+                        found = True
+                        break
+                except OSError:
+                    continue
     return total if found else None
 
 # A URL longer than this is junk, not a link (the audit found the engine
@@ -434,6 +450,11 @@ class JobManager:
                     # card wears a quiet tag and the panel can count
                     self._con.execute(
                         "ALTER TABLE jobs ADD COLUMN follow_id TEXT")
+                # a caveat note (v0.45.29) — and the cut's own attribution
+                # (v0.46.9) — ride the row now; before this they lived only
+                # in memory and died on reboot (v0.46.10 audit A/F1)
+                if "note" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN note TEXT")
                 if "download_dir" not in cols:
                     # the folder this job downloaded into: a later settings
                     # change must not make its files undeletable (v0.21.2)
@@ -540,6 +561,8 @@ class JobManager:
         job["live"] = bool(job.get("live"))
         job["video_id"] = job.get("video_id") or None
         job["follow_id"] = job.get("follow_id") or None
+        # v0.46.10 audit A/F1: a caveat that rides the row must ride the DB
+        job["note"] = job.get("note") or None
         job["size_bytes"] = _stat_size(job)
         return job
 
@@ -554,8 +577,8 @@ class JobManager:
                 " raw_args, overrides, headers, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at, files, partials, download_dir,"
-                " replaced_by, live, video_id, follow_id)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " replaced_by, live, video_id, follow_id, note)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -566,7 +589,8 @@ class JobManager:
                 " replaced_by=excluded.replaced_by,"
                 " live=excluded.live,"
                 " video_id=excluded.video_id,"
-                " follow_id=excluded.follow_id",
+                " follow_id=excluded.follow_id,"
+                " note=excluded.note",
                 (
                     job["id"], job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
@@ -587,6 +611,7 @@ class JobManager:
                     1 if job.get("live") else 0,
                     job.get("video_id"),
                     job.get("follow_id"),
+                    job.get("note"),
                 ),
             )
 
@@ -728,6 +753,9 @@ class JobManager:
     def get(self, job_id: str) -> dict:
         with self._lock:
             job = dict(self._jobs[job_id])
+        # the requeue claim is engine-internal and transient — never handed
+        # out with a row (v0.46.10 audit A/F2)
+        job.pop("_requeue_claim", None)
         job["size_bytes"] = _stat_size(job)
         return job
 
@@ -749,6 +777,7 @@ class JobManager:
         # learns it, and the worker's in-memory dict never stats anything
         # (v0.38.2 — without this the API answered size_bytes: null)
         for j in jobs:
+            j.pop("_requeue_claim", None)
             j["size_bytes"] = _stat_size(j)
         return jobs
 
@@ -781,6 +810,19 @@ class JobManager:
 
     def resume(self, job_id: str) -> dict:
         """Continue a paused job: a new row that reuses the partial file."""
+        # v0.46.10 audit A/F2: a pause marks the row but the worker unwinds
+        # for a while (yt-dlp stops at its next hook); a resume fired in
+        # that window used to queue a SECOND writer on the same .part.
+        # delete_job already waits this way — resume now does too.
+        deadline = time.monotonic() + 15
+        while True:
+            with self._lock:
+                live = job_id in self._running
+            if not live:
+                break
+            if time.monotonic() > deadline:
+                raise ValueError("cancel this download before resuming it")
+            time.sleep(0.2)
         src = self.get(job_id)
         if src["status"] != "paused":
             raise ValueError(f"cannot resume job in status '{src['status']}'")
@@ -807,9 +849,24 @@ class JobManager:
         handing `create` a contradiction (v0.32.1 audit). A preset that
         expands to no intent (a pure bundle) clears the lane just the same.
         """
-        if src.get("replaced_by"):
-            raise ValueError(
-                "this job already has a newer attempt — open that one")
+        # v0.46.10 audit A/F2: claim the row under the lock BEFORE building
+        # the successor — two concurrent resumes used to both pass this
+        # check (each on its own unlocked snapshot) and queue two writers on
+        # the same .part file (live repro: two successors, replaced_by None)
+        with self._lock:
+            live_src = self._jobs.get(src["id"])
+            if live_src is None:
+                raise ValueError("that job is gone")
+            if live_src.get("replaced_by"):
+                raise ValueError(
+                    "this job already has a newer attempt — open that one")
+            if live_src.get("_requeue_claim"):
+                # another resume/retry is building its successor right now:
+                # a second builder would be a second writer on the same .part
+                raise ValueError(
+                    "this job is already being resumed — open the new attempt")
+            claimed = uuid.uuid4().hex[:12]
+            live_src["_requeue_claim"] = claimed
         patch = dict(patch or {})
         # an edit that names overrides REPLACES them: merging could never
         # clear a failed override ({} merged over the old set is the old
@@ -824,15 +881,25 @@ class JobManager:
             preset = None               # a raw format asked for by name
         if "preset" in patch and "fmt" not in patch:
             fmt = None
-        job = self.create(src["url"],
-                          fmt=fmt,
-                          extra_headers=patch.get("headers", src.get("headers")),
-                          preset=preset,
-                          playlist_items=src.get("playlist_items"),
-                          raw_args=patch.get("raw_args", src.get("raw_args")),
-                          overrides=overrides,
-                          download_dir=src.get("download_dir"),
-                          partials=src.get("partials"))
+        try:
+            job = self.create(src["url"],
+                              fmt=fmt,
+                              extra_headers=patch.get("headers", src.get("headers")),
+                              preset=preset,
+                              playlist_items=src.get("playlist_items"),
+                              raw_args=patch.get("raw_args", src.get("raw_args")),
+                              overrides=overrides,
+                              download_dir=src.get("download_dir"),
+                              partials=src.get("partials"))
+        except BaseException:
+            # a failed build must not leave the claim set: the row would
+            # look "being resumed" forever (queue full, bad patch)
+            with self._lock:
+                live_src2 = self._jobs.get(src["id"])
+                if (live_src2 is not None
+                        and live_src2.get("_requeue_claim") == claimed):
+                    live_src2.pop("_requeue_claim", None)
+            raise
         # The successor owns everything on disk now: the source row keeps its
         # story (error, progress) but loses its claim on files — trashing the
         # stale card later must not take the successor's finished download
@@ -840,7 +907,7 @@ class JobManager:
         live = None
         with self._lock:
             live = self._jobs.get(src["id"])
-            if live is not None:
+            if live is not None and live.get("_requeue_claim") == claimed:
                 live["filepath"] = None
                 live["partials"] = None
                 live["files"] = None
@@ -848,6 +915,11 @@ class JobManager:
                 # paused row used to queue a second writer on the same
                 # .part file (v0.45.17 audit B/F2)
                 live["replaced_by"] = job["id"]
+                live.pop("_requeue_claim", None)
+            elif live is not None:
+                # unreachable with the fail-fast claim above; stay loud
+                raise ValueError(
+                    "this job already has a newer attempt — open that one")
         if live is not None:
             self._save(live)
         return job

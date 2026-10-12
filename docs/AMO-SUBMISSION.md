@@ -1,6 +1,6 @@
 # Publishing the Firefox add-on on addons.mozilla.org
 
-**Status:** `suravidl 0.5.14` (install pointers for a fresh extension —
+**Status:** `suravidl 0.5.15` (install pointers for a fresh extension —
 popup + options) submitted via `workflow_dispatch`, on top of `0.5.13`
 (the page side: the extension reads the player itself), `0.5.12`
 (share-link resolution, the recent-jobs mirror, checkbox rows) — an
@@ -49,11 +49,11 @@ account side, which only you can do.
    - `AMO_JWT_ISSUER`
    - `AMO_JWT_SECRET`
 
-4. **Decide the licence.** AMO refuses a listing without one, and the repo
-   currently has none. `docs/amo-metadata.json` is filled in with **MIT**;
-   change `version.license` (and drop a `LICENSE` file in the repository) if
-   you would rather have `MPL-2.0`, `Apache-2.0`, `GPL-3.0-only` or another
-   slug from AMO's list.
+4. **The licence is settled.** `LICENSE` (MIT) is committed at the
+   repository root and `docs/amo-metadata.json` already declares **MIT** —
+   nothing to do. To ship under another slug instead, change
+   `version.license` (and the `LICENSE` file) to one from AMO's list
+   (`MPL-2.0`, `Apache-2.0`, `GPL-3.0-only`, …).
 
 ## What happens then
 

@@ -6,6 +6,7 @@ import re
 import secrets
 import sys
 import threading
+import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
@@ -516,8 +517,11 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.get("/health")
     def health():
-        return {"ok": True, "version": __version__,
-                "download_dir": str(download_dir)}
+        # v0.46.10 audit A/F10: this route is deliberately unauthenticated
+        # (the extension and the shells use it for engine discovery) — it
+        # must not hand the host's folder layout to every local socket.
+        # The UI learns the folder from /settings, which needs the token.
+        return {"ok": True, "version": __version__}
 
     @app.get("/", response_class=HTMLResponse)
     def index(k: str | None = None):
@@ -527,8 +531,14 @@ def create_app(download_dir, auth_token: str | None = None,
         # the token stops being readable by whoever asks (v0.21.1 audit). The
         # desktop shells keep today's behaviour by not setting one.
         if page_key and k != page_key:
-            raise HTTPException(status_code=401,
-                                detail="this page needs its shell's key")
+            # v0.46.10 audit B/F1: with the desktop setting a key too, a
+            # user can now reach this by opening the bare address — the
+            # sentence has to tell them how to get in.
+            raise HTTPException(
+                status_code=401,
+                detail="open suravidl from its app window — the page "
+                       "carries the API token, so this address needs the "
+                       "key the app opens it with")
         html = (_web_dir() / "index.html").read_text(encoding="utf-8")
         cfg = json.dumps({"token": auth_token or "",
                           "downloadDir": str(manager.download_dir),
@@ -1241,6 +1251,18 @@ def create_app(download_dir, auth_token: str | None = None,
                 status_code=409,
                 detail=f"{len(active)} download(s) still running — "
                        "cancel them before clearing the folder")
+        # v0.46.10 audit A/F12: a paused or cancelled row can still have its
+        # worker mid-unwind — the status already flipped but the thread is
+        # writing its last `.part` bytes. Wait for the pool to go quiet
+        # (the same bounded wait delete_job uses) before unlinking.
+        deadline = time.monotonic() + 15
+        while mgr._running:                       # noqa: SLF001
+            if time.monotonic() > deadline:
+                raise HTTPException(
+                    status_code=409,
+                    detail="a download just stopped and is still winding "
+                           "down — try again in a moment")
+            time.sleep(0.2)
         d = Path(manager.download_dir)
         deleted, freed = _wipe_dir(d)
         pruned = mgr.clear_completed()
@@ -1521,7 +1543,11 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail="this take has no file to cut")
         src = Path(str(raw))
         try:
-            mgr._require_inside(src, None)       # noqa: SLF001
+            # the job's own folder, not just today's: a take downloaded
+            # before a Settings folder change must stay playable, deletable
+            # and cuttable (stream/delete already pass the job — v0.46.10
+            # audit A/F3 caught the cut refusing them with a 403)
+            mgr._require_inside(src, job)        # noqa: SLF001
         except PermissionError:
             raise HTTPException(
                 status_code=403,
@@ -1539,6 +1565,9 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail="the out must come after the in")
         out_dir = Path(job.get("download_dir") or mgr.download_dir)
         try:
+            # the output folder gets the same wall as the source (v0.46.10
+            # audit A/F8): a corrupted row must never aim ffmpeg outside
+            mgr._require_inside(out_dir, job)   # noqa: SLF001
             out = cut_file(src, start, end, out_dir)
         except RuntimeError as e:
             raise HTTPException(status_code=400, detail=str(e)) from None

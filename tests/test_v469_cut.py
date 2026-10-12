@@ -97,7 +97,9 @@ def test_a_local_take_files_like_any_other():
 def test_the_route_cuts_inside_the_folder_only():
     seg = API.split('@app.post("/jobs/{job_id}/cut")')[1]
     seg = seg.split("@app.get(\"/follows\")")[0]
-    assert "mgr._require_inside(src, None)" in seg
+    assert "mgr._require_inside(src, job)" in seg, \
+        "the job's own folder — a take from before a folder change still " \
+        "cuts (v0.46.10 audit A/F3)"
     assert "parse_time(body.start)" in seg and "parse_time(body.end)" in seg
     assert "the out must come after the in" in seg
     assert "mgr.add_take(" in seg

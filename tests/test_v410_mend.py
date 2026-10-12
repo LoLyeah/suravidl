@@ -129,6 +129,11 @@ def test_raw_args_denies_the_print_to_file_family():
         ("--print '%(id)s'", "--print"),
         ("--postprocessor-args 'ffmpeg:-y'", "--postprocessor-args"),
         ("--ppa 'ffmpeg:-y'", "--ppa"),
+        # v0.46.10 audit A/F5: the downloader-args family (live-verified
+        # bypass before this) — same wall, same sentence
+        ("--downloader-args 'ffmpeg:-loglevel quiet'", "--downloader-args"),
+        ("--external-downloader-args 'aria2c:--allow-overwrite'",
+         "--external-downloader-args"),
     ):
         with pytest.raises(ValueError) as err:
             parse_raw_args(raw)

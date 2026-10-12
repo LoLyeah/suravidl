@@ -44,6 +44,14 @@ object SniffScript {
         var RE = new RegExp('\\.(' + EX.join('|') + ')(\\?|${'$'})', 'i');
         var B = window.SuravidlSniff;
         if (!B) return;
+        // v0.46.10 audit B/F6: capture the function itself — a page that
+        // wraps SuravidlSniff.report after this runs cannot intercept the
+        // call — and hand the bridge the session token, which lives only in
+        // this closure (the page can read globals; it can never read this).
+        var __R = B.report;
+        function __rep(u, via) {
+          try { __R.call(B, u, via, location.href, __T); } catch (e) {}
+        }
         function P(u) {
           if (!u || typeof u !== 'string') return false;
           var s = u.split('#')[0].toLowerCase();
@@ -55,7 +63,7 @@ object SniffScript {
           try {
             if (!u) return;
             u = String(u);
-            if (u.indexOf('mse:') === 0) { B.report(u, 'mse', location.href); return; }
+            if (u.indexOf('mse:') === 0) { __rep(u, 'mse'); return; }
             u = new URL(u, location.href).href;
             if (!/^(https?:|blob:)/i.test(u)) return;
             // `direct` = the player itself pointed at this URL (a media
@@ -67,7 +75,7 @@ object SniffScript {
             // it is reported as it is; the engine still classifies every
             // candidate before a row is drawn.
             if (!direct && !P(u) && via !== 'mse') return;
-            B.report(u, via, location.href);
+            __rep(u, via);
           } catch (e) {}
         }
         function srcs() {
@@ -146,6 +154,7 @@ object SniffScript {
         (function () {
           try {
             var B = window.SuravidlSniff; if (!B) return;
+            var __R = B.report;
             var es = performance.getEntriesByType ? performance.getEntriesByType('resource') : [];
             var EX = __EX__, HI = __HI__;
             var RE = new RegExp('\\.(' + EX.join('|') + ')(\\?|${'$'})', 'i');
@@ -154,7 +163,7 @@ object SniffScript {
               var s = u.split('#')[0].toLowerCase();
               var hit = RE.test(s);
               if (!hit) { for (var j = 0; j < HI.length; j++) { if (s.indexOf(HI[j]) >= 0) { hit = true; break; } } }
-              if (hit) B.report(u, 'scan', location.href);
+              if (hit) { try { __R.call(B, u, 'scan', location.href, __T); } catch (e) {} }
             }
           } catch (e) {}
         })();
@@ -169,16 +178,26 @@ object SniffScript {
      * eval that into its same-origin frames. (Such a page could always eval
      * into its own frames; what it must not be able to do is make us do it.)
      */
-    fun js(): String {
-        val wrapped = "(function () {\n" + fill(BODY) + "\n})();"
-        val quoted = JSONObject.quote(wrapped)
+    fun js(token: String): String {
+        val body = fill(BODY)
+        // The source stored for child frames carries a NULL token (v0.46.10
+        // audit B/F6): a page can read `__svSniffSrc` — and can override a
+        // same-origin child's `eval` — so the session token never rides the
+        // walk. On WebViews with DOCUMENT_START_SCRIPT every frame gets its
+        // own token-carrying injection, and the walk's copy is then a no-op
+        // (the `__svSniffDoc` guard). Only a frame the walk reaches on an old
+        // WebView loses its script-layer finds; the network layer still sees
+        // that frame's requests.
+        val walk = "(function (__T) {\n" + body + "\n})(null);"
+        val quoted = JSONObject.quote(walk)
         return "(function () { try { Object.defineProperty(window, '__svSniffSrc', " +
             "{ value: $quoted, writable: false, configurable: false, enumerable: false }); }" +
             " catch (e) { try { window.__svSniffSrc = $quoted; } catch (e2) {} } })();" +
-            wrapped
+            "(function (__T) {\n" + body + "\n})(" + JSONObject.quote(token) + ");"
     }
 
-    fun scan(): String = fill(SCAN)
+    fun scan(token: String): String =
+        "(function (__T) {\n" + fill(SCAN) + "\n})(" + JSONObject.quote(token) + ");"
 
     private fun fill(script: String): String = script
         .replace("__EX__", JSONArray(SniffPatterns.extList()).toString())

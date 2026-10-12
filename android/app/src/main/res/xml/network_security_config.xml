@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v0.46.10 audit B/F5: cleartext was allowed app-wide; only the engine's
+     loopback address needs it. Everything else — the in-app browser's pages
+     included — must be https, so a network attacker cannot read or rewrite
+     what the WebView fetches. The engine itself runs in Python (its own
+     socket stack, outside this policy), so downloads are unaffected. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

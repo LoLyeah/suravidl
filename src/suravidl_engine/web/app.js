@@ -888,8 +888,12 @@ let APP_INFO = null;   // /app/info payload (desktop capabilities)
 function ico(name) {
   const s = document.createElement("span");
   s.className = "ico";
+  // v0.46.10 audit B/F8: every call site passes a literal today, but a
+  // helper that concatenates a name into innerHTML is a sink waiting for
+  // one dynamic call — only sprite ids ever reach the string.
+  const id = /^[a-z0-9-]{1,24}$/.test(name) ? name : "info";
   s.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
-    name + '"/></svg>';
+    id + '"/></svg>';
   return s;
 }
 

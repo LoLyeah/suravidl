@@ -138,9 +138,31 @@ _SECRET_QUERY_RE = re.compile(
     r"|access[_-]?token|hdnts|hdnea|policy|hash)=)([^&\s\"'<>]+)")
 
 
+# user:pass@ inside a URL authority (proxy strings, redirected targets)
+_USERINFO_RE = re.compile(r"://([^:/@\s]+):([^@\s]+)@")
+
+# an Authorization / Cookie header value on a log line — plain
+# (`Authorization: Bearer x`) and dict-repr (`'Authorization': 'x'`)
+# shapes both ride verbose logs (v0.46.10 audit A/F4+A/F6)
+_HEADER_SECRET_RE = re.compile(
+    r"(?i)(['\"]?(?:proxy-)?(?:authorization|set-cookie|cookie)['\"]?\s*:\s*)"
+    r"(?:'[^'\r\n]*'|\"[^\"\r\n]*\"|[^\r\n,}]+)")
+
+
 def scrub_secrets(text: str) -> str:
-    """Redact credential values in URL query strings, keeping the names."""
-    return _SECRET_QUERY_RE.sub(r"\1[redacted]", text)
+    """Redact credentials: URL query values, URL userinfo, header values.
+
+    v0.46.10 audit A/F4+A/F6: the scrubber only knew query strings — a
+    proxy password in `http://user:pass@host` and verbose-log header
+    values (`Authorization: …`, `Cookie: …`) passed through verbatim
+    into diagnostics and GET /logs (both live-verified leaks).
+    """
+    text = _SECRET_QUERY_RE.sub(r"\1[redacted]", text)
+    # URL userinfo: scheme://user:password@host → scheme://user:[redacted]@
+    text = _USERINFO_RE.sub(r"://\1:[redacted]@", text)
+    # header-shaped secrets on log lines (Bearer/Basic tokens, cookie jars)
+    text = _HEADER_SECRET_RE.sub(lambda m: m.group(1) + "[redacted]", text)
+    return text
 
 
 def explain_download_error(text: str) -> str:

@@ -139,6 +139,41 @@ def load_or_create_token() -> str:
     return t
 
 
+def page_key_path() -> Path:
+    return Path.home() / ".suravidl" / "page_key"
+
+
+def load_or_create_page_key() -> str:
+    """The key that gates `GET /` — `SURAVIDL_PAGE_KEY` when set, else the
+    key file, born 0600 like the token.
+
+    v0.46.10 audit B/F1: the page inlines the API token, and loopback is
+    shared — the CORS regex admits every extension origin by design (the
+    extension calls the API from its own origin), so ANY browser extension
+    or local program could fetch `GET /` and read the token. Android gated
+    the page since v0.21.1; the desktop opens it with a key now too, so a
+    bare request gets 401 instead of the token.
+    """
+    env = os.environ.get("SURAVIDL_PAGE_KEY", "").strip()
+    if env:
+        return env
+    p = page_key_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    _harden(p.parent, 0o700)
+    if p.exists():
+        k = p.read_text(encoding="utf-8").strip()
+        if k:
+            _harden(p, 0o600)
+            return k
+    k = secrets.token_hex(16)
+    # born 0600 — the same window the token loader closes (v0.43.2 audit)
+    fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(k)
+    _harden(p, 0o600)
+    return k
+
+
 def _harden(path: Path, mode: int) -> None:
     """Best-effort chmod: the token and its directory are for us only."""
     try:
@@ -1413,9 +1448,16 @@ def main() -> None:
     token = load_or_create_token()
     port = find_free_port(args.port)
     url = f"http://127.0.0.1:{port}/"
+    # v0.46.10 audit B/F1: the page inlines the API token; every window,
+    # tab and tray-open goes through the keyed address so a bare fetch by
+    # any other program (or any browser extension) reads 401, not the
+    # token. The badge poller keeps the bare `url` — it calls /jobs with
+    # the Authorization header and never needs the page.
+    page_key = load_or_create_page_key()
+    browse_url = f"{url}?k={page_key}"   # `k` — the param the shell has always used
 
     webview = None if args.no_window else _load_webview()
-    window = _try_window(webview, url) if webview else None
+    window = _try_window(webview, browse_url) if webview else None
     actions = {}
     if window is not None:
         def _pick_file():
@@ -1487,8 +1529,9 @@ def main() -> None:
 
     server = start_server(download_dir=args.download_dir, token=token, port=port,
                           db_path=args.db, desktop_actions=actions or None,
-                          cache_dir=args.cache_dir)
-    print(f"suravidl running at {url}  (token: {token[:4]}…{token[-4:]})")
+                          page_key=page_key, cache_dir=args.cache_dir)
+    print(f"suravidl running at {browse_url}  "
+          f"(token: {token[:4]}…{token[-4:]})")
 
     if window is not None:
         def _ready():
@@ -1511,9 +1554,9 @@ def main() -> None:
             return
 
     if not args.no_browser:
-        webbrowser.open(url)
+        webbrowser.open(browse_url)
 
-    icon = None if args.no_tray else _try_tray(url, args.download_dir)
+    icon = None if args.no_tray else _try_tray(browse_url, args.download_dir)
     if icon is not None:
         icon.run_detached()
         try:
