@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.11",
+        "title": "The solder",
+        "items": [
+            "The phone build ships again: the in-browser sniffer's second injector was missing the wire the seal added — threaded through, and the APK is back on the release page.",
+        ],
+    },
+    {
         "version": "0.46.10",
         "title": "The seal",
         "items": [
@@ -77,14 +84,6 @@ ENTRIES = [
         "title": "The recorder",
         "items": [
             "Live streams are recorded now, not chased: a LIVE link shows ● REC with time on air and bytes — no fake percentage — and Stop & keep keeps everything recorded so far.",
-        ],
-    },
-    {
-        "version": "0.46.0",
-        "title": "The toolbox",
-        "items": [
-            "Several links at once now get checked before anything queues: each is probed, named, and given its own honest answer — tick what is good, then queue just those.",
-            "Copy diagnostics bundles a bug report in one paste — versions, what this ffmpeg can do, settings (secrets redacted by the engine), and the log tail.",
         ],
     },
 ]

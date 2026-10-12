@@ -389,7 +389,8 @@ class BrowserActivity : AppCompatActivity() {
                 },
                 onAppLinkBlocked = { url -> reportAppLinkBlocked(url) },
                 adsBlocked = { adBlock },
-                onHopBlocked = { url -> reportHopBlocked(url) })
+                onHopBlocked = { url -> reportHopBlocked(url) },
+                sniffToken = sniffToken)
         }
         ua = try {
             webView.settings.userAgentString.orEmpty()

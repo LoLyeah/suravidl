@@ -33,6 +33,10 @@ class SnifferWebViewClient(
     /** The truce switch (v0.39.8): read per request, so flipping it applies
      *  from the next one without a new WebView. */
     private val adsBlocked: () -> Boolean,
+    /** v0.46.10 audit B/F6: the sniff bridge demands the session token —
+     *  this client injects the same scripts as the activity, so it carries
+     *  the same token. */
+    private val sniffToken: String,
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -42,7 +46,7 @@ class SnifferWebViewClient(
 
     override fun onPageFinished(view: WebView?, url: String?) {
         inject(view)
-        view?.evaluateJavascript(SniffScript.scan(), null)
+        view?.evaluateJavascript(SniffScript.scan(sniffToken), null)
     }
 
     /**
@@ -99,7 +103,7 @@ class SnifferWebViewClient(
     }
 
     private fun inject(view: WebView?) {
-        view?.evaluateJavascript(SniffScript.js(), null)
+        view?.evaluateJavascript(SniffScript.js(sniffToken), null)
     }
 }
 

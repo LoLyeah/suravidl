@@ -279,6 +279,20 @@ def test_the_sniff_bridge_demands_the_session_token():
     assert "if (token != sniffToken) return" in browser
 
 
+def test_the_second_injector_carries_the_same_token():
+    """v0.46.11: the WebView client injects the same scripts — the B/F6
+    token threading missed it and :app:compileDebugKotlin failed with
+    "No value passed for parameter 'token'"."""
+    wc = (AND / "java" / "com" / "suravidl" / "app" /
+          "SnifferWebViewClient.kt").read_text(encoding="utf-8")
+    assert "private val sniffToken: String," in wc
+    assert "SniffScript.js(sniffToken)" in wc
+    assert "SniffScript.scan(sniffToken)" in wc
+    browser = (AND / "java" / "com" / "suravidl" / "app" /
+               "BrowserActivity.kt").read_text(encoding="utf-8")
+    assert "sniffToken = sniffToken)" in browser
+
+
 def test_shares_stay_inside_the_download_folder():
     paths = (AND / "res" / "xml" / "file_paths.xml").read_text(encoding="utf-8")
     assert 'path="Movies/suravidl"' in paths
