@@ -50,9 +50,17 @@ class SnifferTest {
             val deadline = System.currentTimeMillis() + 120_000
             while (System.currentTimeMillis() < deadline) {
                 val seen = SniffLog.snapshot()
+                // Wait for the ATTRIBUTION the assertions below read, not just
+                // the URL: the network layer records inner.mp4 first (attributed
+                // to the top page), and the child frame's 'player' sighting
+                // upgrades the row a beat later (SniffLog: strongest signal
+                // wins). Breaking on the URL alone made this a race — the 16k
+                // emulator lost it (2026-10-12 flake; the row was still
+                // @page.html at the first complete snapshot).
+                val inner = bySuffix(seen, "/inner.mp4")
                 if (bySuffix(seen, "/fixture.m3u8") != null &&
                     bySuffix(seen, "/bare.mp4") != null &&
-                    bySuffix(seen, "/inner.mp4") != null &&
+                    inner?.frame?.contains("/inner.html") == true &&
                     seen.any { it.via == "mse" }) break
                 Thread.sleep(1000)
             }
