@@ -1312,6 +1312,79 @@ class JobManager:
                 self._workers.append(t)
             self._cap_cv.notify_all()
 
+    def _path_belongs_to(self, path, video_id) -> bool:
+        """Is the file at *path* demonstrably *video_id*'s? (v0.46.17)
+
+        The namesake round's owner oracle, shared by the skip escape and
+        the remux guard: a pre-existing file counts as this video's only
+        when its own name wears the id, or a queue row that names it
+        carries the same id. Anything else — another video's file, or a
+        file no row claims — must never be silently skipped or replaced.
+        """
+        try:
+            path = str(path or "")
+            vid = str(video_id or "")
+            if not path or not vid:
+                return False
+            if f"[{vid}]" in os.path.basename(path):
+                return True
+            key = os.path.normcase(path)
+            for other in list(self._jobs.values()):
+                owned = list(other.get("files") or [])
+                if other.get("filepath"):
+                    owned.append(other["filepath"])
+                if any(os.path.normcase(str(f)) == key for f in owned):
+                    return (other.get("video_id") or "") == vid
+        except Exception:  # noqa: BLE001 — bookkeeping must never kill a job
+            return False
+        return False
+
+    def _escape_namesake(self, opts: dict, existing: str, info: dict,
+                         job: dict) -> dict | None:
+        """A name owned by a DIFFERENT video is not "already downloaded".
+
+        yt-dlp skips any existing output and reports the skip honestly —
+        but when the file at that name belongs to another video (two
+        videos, one title, one filename), the asked-for download silently
+        never happens. v0.46.17 "the namesake": the download is re-run
+        ONCE under a template that wears the site's id, so the older file
+        is left exactly as it is and the new video lands beside it.
+        Returns the re-run's info dict on success, None when the skip
+        should stand (the file is this video's, or nothing can change).
+        """
+        vid = str(info.get("id") or "")
+        if not existing or not vid:
+            return None
+        if self._path_belongs_to(existing, vid):
+            return None                 # this video's own file — the skip stands
+        from .download_opts import disambiguating_template
+
+        outtmpl = opts.get("outtmpl")
+        if isinstance(outtmpl, dict):
+            variant = disambiguating_template(outtmpl.get("default") or "")
+            if not variant:
+                return None
+            outtmpl = {**outtmpl, "default": variant}
+        else:
+            variant = disambiguating_template(outtmpl or "")
+            if not variant:
+                return None
+            outtmpl = variant
+        print(f"[namesake] “{Path(existing).name}” belongs to a different "
+              "video — re-running with the id in the name", flush=True)
+        info2 = extract_info({**opts, "outtmpl": outtmpl}, job["url"],
+                             download=True, retry_refresh=True) or {}
+        if info2.get("_type") == "playlist" or not info2.get("requested_downloads"):
+            return None
+        req2 = (info2.get("requested_downloads") or [{}])[0]
+        if req2.get("__real_download") is False:
+            return None                 # the variant is taken too — skip stands
+        landed = Path(str(req2.get("filepath") or info2.get("filepath") or ""))
+        job["note"] = (f"the name “{Path(existing).name}” already belonged "
+                       f"to a different video — saved beside it as "
+                       f"“{landed.name}”")
+        return info2
+
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued
             return
@@ -1389,7 +1462,7 @@ class JobManager:
         opts = {
             "quiet": True,
             "no_warnings": True,
-            "outtmpl": str(target_dir / "%(title).100B.%(ext)s"),
+            "outtmpl": str(target_dir / "%(title).100B [%(id)s].%(ext)s"),
             "progress_hooks": [hook],
             "postprocessor_hooks": [hook],
         }
@@ -1444,6 +1517,14 @@ class JobManager:
                 opts["format"] = strip_audio_pairing(opts["format"])
         if extra_headers:
             opts["http_headers"] = extra_headers
+        # the remux guard's owner oracle (v0.46.17 "the namesake"): a
+        # container conversion must never land on another video's file
+        opts["__sv_path_owner"] = self._path_belongs_to
+        # the caveat channel PP-side notes ride in (v0.46.17): yt-dlp
+        # copies the opts dict, but this list OBJECT is shared with every
+        # copy — it is how a fixed/caveat note reaches the card when the
+        # returned info dict cannot carry it (see extract._deliver_notice)
+        opts["__sv_notices_out"] = []
         try:
             subs_skipped = None
             with (self._cookie_session() if self._cookie_session
@@ -1517,7 +1598,18 @@ class JobManager:
                             "on disk, so the section was never cut. Use the "
                             "player's Cut this take, or delete the file to "
                             "fetch the section fresh.")
-                    job["note"] = "already on disk — nothing was fetched"
+                    # v0.46.17 "the namesake": the file at that name may belong
+                    # to a DIFFERENT video — a skip is only "already downloaded"
+                    # when the file is really this video's
+                    escaped = self._escape_namesake(
+                        opts, str(req.get("filepath")
+                                  or info.get("filepath") or ""), info, job)
+                    if escaped:
+                        info = escaped
+                        req = (info.get("requested_downloads") or [{}])[0]
+                        job["filepath"] = req.get("filepath") or info.get("filepath")
+                    else:
+                        job["note"] = "already on disk — nothing was fetched"
                 # the finished file (after any conversion) is what the row
                 # owns; the hook may also have recorded the pre-conversion
                 # name, which is fine — a missing target is skipped on delete
@@ -1536,7 +1628,10 @@ class JobManager:
                     return
                 if info and not job.get("video_id"):
                     job["video_id"] = str(info.get("id") or "") or None
-                extra = notices + list((info or {}).get("__sv_notices") or [])
+                extra = list(dict.fromkeys(
+                    notices
+                    + list((info or {}).get("__sv_notices") or [])
+                    + list(opts.get("__sv_notices_out") or [])))
                 if extra:
                     # a finished job with a caveat says so on its card
                     job["note"] = "; ".join(

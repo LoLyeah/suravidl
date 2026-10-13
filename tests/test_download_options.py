@@ -48,7 +48,7 @@ def test_parse_langs():
 
 def test_defaults_only_set_outtmpl():
     o = opts()
-    assert o["outtmpl"] == str(Path("/dl") / "%(title).100B.%(ext)s")
+    assert o["outtmpl"] == str(Path("/dl") / "%(title).100B [%(id)s].%(ext)s")
     assert "postprocessors" not in o
     assert "writesubtitles" not in o
     assert "ratelimit" not in o
@@ -99,7 +99,7 @@ def test_embed_thumbnail_implies_writethumbnail():
     assert pp_keys(o) == ["EmbedThumbnail"]
     # playlist thumbnail output must be disabled, like the CLI does
     assert o["outtmpl"]["pl_thumbnail"] == ""
-    assert o["outtmpl"]["default"].endswith("%(title).100B.%(ext)s")
+    assert o["outtmpl"]["default"].endswith("%(title).100B [%(id)s].%(ext)s")
 
 
 # -- sponsorblock -----------------------------------------------------------

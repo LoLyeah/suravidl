@@ -12,7 +12,7 @@ def s(tmp_path):
 
 def test_defaults_present(s):
     d = s.get()
-    assert d["filename_template"] == "%(title).100B.%(ext)s"
+    assert d["filename_template"] == "%(title).100B [%(id)s].%(ext)s"
     assert d["subtitles_mode"] == "off"
     assert d["subtitles_langs"] == "en"
     assert d["embed_metadata"] is False and d["embed_thumbnail"] is False

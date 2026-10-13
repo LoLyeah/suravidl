@@ -3,6 +3,12 @@ import json
 import os
 from pathlib import Path
 
+# The filename template that shipped before v0.46.17 "the namesake". Kept
+# ONLY so a stored value still equal to it is recognized as "never
+# customized" and upgraded to the new default (see the load loop in
+# Settings.__init__) — do not use it for anything else.
+_LEGACY_TEMPLATE = "%(title).100B.%(ext)s"
+
 DEFAULTS = {
     "download_dir": None,
     "max_concurrent": 2,
@@ -21,7 +27,7 @@ DEFAULTS = {
     "default_preset": "",        # a preset name that rides every NEW download
                                  # (Settings → Presets): permanence lives in a
                                  # setting, not in session state (v0.36.0)
-    "filename_template": "%(title).100B.%(ext)s",
+    "filename_template": "%(title).100B [%(id)s].%(ext)s",
     "subtitles_mode": "off",     # off | sidecar | embed
     "subtitles_langs": "en",     # comma list, e.g. "en, id" or "all"
     "subtitles_auto": False,     # include auto-generated captions
@@ -164,6 +170,14 @@ class Settings:
                 loaded = {}
             for k in DEFAULTS:
                 if k not in loaded or loaded[k] is None:
+                    continue
+                if k == "filename_template" and loaded[k] == _LEGACY_TEMPLATE:
+                    # v0.46.17 "the namesake": the stored old default never
+                    # said which video a file was — two videos with one title
+                    # fought over one filename (a silent skip, or a silent
+                    # replacement on container conversion). A value still
+                    # equal to the old default was never customized, so it
+                    # upgrades in place; anything hand-made is left alone.
                     continue
                 # Validate what we load: a hand-edited or half-written file
                 # used to reach the engine unchecked, and one bad value

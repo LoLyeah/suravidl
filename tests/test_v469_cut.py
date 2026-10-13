@@ -82,8 +82,12 @@ def test_the_cut_trims_for_real(tmp_path):
 
 def test_the_skip_is_detected_and_answered_honestly():
     # the P0: the skip signal, verified live against yt-dlp
-    assert 'req.get("__real_download") is False' in JOBS
-    assert 'if opts.get("download_ranges"):' in JOBS.split(
+    # (v0.46.17: the namesake escape reads the same signal inside
+    # _escape_namesake — scope the pin to the _execute body, or it lands
+    # on the helper's text instead of the check it means)
+    exe = JOBS.split("def _execute(")[1]
+    assert 'req.get("__real_download") is False' in exe
+    assert 'if opts.get("download_ranges"):' in exe.split(
         '__real_download") is False')[1][:400]
     assert "nothing was fetched" in JOBS
     assert "already on disk — nothing was fetched" in JOBS

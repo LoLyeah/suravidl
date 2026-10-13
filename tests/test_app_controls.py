@@ -105,7 +105,7 @@ def test_reveal_desktop_only_and_calls_action(tmp_path):
             time.sleep(0.2)
         r = c.post(f"/jobs/{job['id']}/reveal", headers=AUTH)
         assert r.status_code == 200
-        assert calls and calls[0].endswith("tiny.mp4")
+        assert calls and calls[0].endswith("tiny [tiny].mp4")
     finally:
         srv.shutdown()
 
@@ -130,6 +130,6 @@ def test_reveal_on_complete(tmp_path):
         deadline = time.time() + 5
         while not revealed and time.time() < deadline:
             time.sleep(0.05)
-        assert revealed and revealed[0].endswith("tiny.mp4")
+        assert revealed and revealed[0].endswith("tiny [tiny].mp4")
     finally:
         srv.shutdown()

@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.17",
+        "title": "The namesake",
+        "items": [
+            "Two different videos could end up under one filename: one was silently skipped, or replaced the other outright. Every download now wears the site's own id — takes never fight over a name.",
+            "A custom template without the id gets its own guards: an incoming file that finds its name taken by another video lands beside it and says so — never a quiet skip, never a quiet replacement.",
+            "Caveats attached after a download (a removed stream, a skipped thumbnail) now actually reach the card — they used to be written where nothing read them.",
+        ],
+    },
+    {
         "version": "0.46.16",
         "title": "The pickup",
         "items": [
@@ -77,13 +86,6 @@ ENTRIES = [
         "title": "The guide",
         "items": [
             "The watch list teaches itself: paste a link and Follow works from zero, with a three-step how-to until the first follow — and the audio-only picks light up.",
-        ],
-    },
-    {
-        "version": "0.46.7",
-        "title": "The brief",
-        "items": [
-            "The queue gives you the brief: counts on the filters, one state line (nothing running · 2 filed · 3 failed), failures gathered below the finished takes, and each failure one red sentence.",
         ],
     },
 ]

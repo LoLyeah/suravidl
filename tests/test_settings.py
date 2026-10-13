@@ -109,7 +109,7 @@ def test_download_dir_change_applies_to_new_jobs(tmp_path, fixture_server):
         time.sleep(0.2)
     assert j["status"] == "completed", j
     assert str(new_dir) in j["filepath"]
-    assert (new_dir / "tiny.mp4").exists()
+    assert (new_dir / "tiny [tiny].mp4").exists()
 
 
 def test_max_concurrent_change_applies_live(tmp_path):

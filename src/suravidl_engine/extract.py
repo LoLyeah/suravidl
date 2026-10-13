@@ -43,7 +43,9 @@ import time
 from urllib.parse import urlparse
 
 import yt_dlp
-from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+from yt_dlp.postprocessor.ffmpeg import (
+    FFmpegPostProcessor, FFmpegVideoRemuxerPP, resolve_mapping)
+from yt_dlp.utils import replace_extension
 
 from .download_opts import tiktok_safe_format
 
@@ -450,6 +452,92 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             return [], info
 
 
+def _deliver_notice(owner, info, note: str) -> None:
+    """The road a PP-side caveat travels to the card (v0.46.17).
+
+    Downloads run process_info on a COPY of the video dict — yt-dlp's
+    process_video_result builds `new_info = self._copy_infodict(info_dict)`
+    and returns the ORIGINAL (YoutubeDL.py:3118) — so a note appended to a
+    postprocessor's info dict never reaches the caller; the namesake
+    round found the v0.45.29 channel's PP-side writers (thumbnail embed,
+    stream fix) had been writing into a dict nobody reads for downloads.
+    The shared list on the opts dict is reachable from every copy
+    (jobs.py plants it and reads it back); the info-dict append stays for
+    the flows where the note does arrive (unit callers, skip paths).
+    `owner` is the PP instance or the YoutubeDL itself.
+    """
+    owner = getattr(owner, "_downloader", owner)
+    params = getattr(owner, "params", None)
+    out = params.get("__sv_notices_out") if isinstance(params, dict) else None
+    if isinstance(out, list):
+        out.append(note)
+    if isinstance(info, dict):
+        try:
+            info.setdefault("__sv_notices", []).append(note)
+        except Exception:  # noqa: BLE001 — a caveat is never fatal
+            pass
+
+
+class SafeRemuxPP(FFmpegVideoRemuxerPP):
+    """A remux that must never land on another video's file (v0.46.17).
+
+    FFmpegVideoConvertorPP converts straight onto the target name — the
+    ffmpeg invocation under it overwrites whatever is already there, and
+    nothing in the chain checks for one. With two same-title videos and a
+    container setting, that silently replaced the older file: an mkv
+    remuxed to mp4 landed on the existing mp4 and the old video was gone
+    (reproduced against the engine's own opts, 2026-10-14). When the
+    target is occupied and the owner oracle does NOT name it as this
+    video's, the conversion lands beside it under an id-suffixed name and
+    the card says so — the older file is never touched. Without the
+    oracle (other callers), the parent's behaviour is kept exactly.
+    """
+
+    def run(self, info):
+        try:
+            owner = (getattr(self._downloader, "params", None) or {}).get(
+                "__sv_path_owner")
+            if owner:
+                escaped = self._escape_namesake(info, owner)
+                if escaped is not None:
+                    return escaped
+        except Exception:  # noqa: BLE001 — guarded; the parent stays the fallback
+            pass
+        return super().run(info)
+
+    def _escape_namesake(self, info, owner):
+        """Remux to an id-suffixed neighbour — or None to use the parent."""
+        filename = str(info.get("filepath") or "")
+        if not filename or not os.path.isfile(filename):
+            return None
+        source_ext = str(info.get("ext") or "").lower()
+        target_ext, skip_msg = resolve_mapping(source_ext, self.mapping)
+        if skip_msg or not target_ext:
+            return None
+        target = replace_extension(filename, target_ext, source_ext)
+        vid = str(info.get("id") or "")
+        if not os.path.exists(target) or owner(target, vid):
+            return None
+        stem, ext = os.path.splitext(target)
+        base = f"{stem} [{vid}]" if vid else stem
+        landed = f"{base}{ext}"
+        n = 2
+        while os.path.exists(landed) and not owner(landed, vid):
+            landed = f"{base} ({n}){ext}"
+            n += 1
+        self.to_screen(f'{self._ACTION.title()} video from {source_ext} '
+                       f'to {target_ext}; Destination: {landed}')
+        self.run_ffmpeg(filename, landed, self._options(target_ext))
+        info["filepath"] = landed
+        info["format"] = info["ext"] = target_ext
+        if os.path.normcase(landed) != os.path.normcase(target):
+            _deliver_notice(self, info,
+                            f"the name “{os.path.basename(target)}” already "
+                            f"belonged to a different video — saved as "
+                            f"“{os.path.basename(landed)}”")
+        return [filename], info
+
+
 def _install_safe_thumbnail_embed(ydl) -> None:
     """The thumbnail embed must never kill a finished job.
 
@@ -471,7 +559,8 @@ def _install_safe_thumbnail_embed(ydl) -> None:
                 except Exception as e:  # noqa: BLE001 - a cover is not the job
                     self.report_warning(f"thumbnail embed skipped: {e}")
                     try:
-                        info.setdefault("__sv_notices", []).append(
+                        _deliver_notice(
+                            self, info,
                             "the thumbnail could not be embedded (this phone's "
                             "ffmpeg cannot read its image format) — the video "
                             "itself is complete")
@@ -515,9 +604,7 @@ def _attach_stream_copy_fix(ydl) -> None:
                     if note:
                         # the job still succeeds; the card must say what
                         # was removed (owner's request, 2026-10-10)
-                        info = d.get("info_dict")
-                        if isinstance(info, dict):
-                            info.setdefault("__sv_notices", []).append(note)
+                        _deliver_notice(ydl, d.get("info_dict"), note)
             except Exception:  # noqa: BLE001 — never break a download
                 pass
 
@@ -542,6 +629,22 @@ def _attach_thumbnail_ext_fix(ydl) -> None:
             chain.remove(pp)
             chain.insert(0, pp)
     except Exception:  # noqa: BLE001 - best-effort ordering, never fatal
+        pass
+
+
+def _guard_remux_overwrites(ydl) -> None:
+    """Swap the container remuxer for the one that never lands on another
+    video's file (v0.46.17 "the namesake"). Instances are built by
+    YoutubeDL from the settings' postprocessors list — the swap happens
+    right after construction, like the other fixers; `preferedformat`
+    rides over. Guarded, so a future yt-dlp can only cost the guard,
+    never the job."""
+    try:
+        chain = ydl._pps.get("post_process") or []
+        for idx, pp in enumerate(list(chain)):
+            if type(pp) is FFmpegVideoRemuxerPP:
+                chain[idx] = SafeRemuxPP(ydl, preferedformat=pp.mapping)
+    except Exception:  # noqa: BLE001 - best-effort, never fatal
         pass
 
 
@@ -579,6 +682,7 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
                     _attach_thumbnail_ext_fix(ydl)
                     _attach_stream_copy_fix(ydl)
                     _install_safe_thumbnail_embed(ydl)
+                    _guard_remux_overwrites(ydl)
                 return ydl.sanitize_info(ydl.extract_info(url, download=download))
         except yt_dlp.utils.YoutubeDLError as exc:
             if (refresh_left and seen["bytes"] and is_expired_link(exc)

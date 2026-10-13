@@ -400,7 +400,13 @@ DENIED_RAW_KEYS: dict[str, str] = {
     "external_downloader_args": "--external-downloader-args",
 }
 
-DEFAULT_TEMPLATE = "%(title).100B.%(ext)s"
+# The default output name (v0.46.17 "the namesake"): the title alone let two
+# different videos share one filename — the second was silently skipped as
+# "already on disk", or (with a container conversion) replaced the older
+# file outright. The site's own id rides along, so a name is unique per
+# video by construction; re-downloads of the same video still land on the
+# same name (the dedupe the skip message relies on).
+DEFAULT_TEMPLATE = "%(title).100B [%(id)s].%(ext)s"
 
 _RATE_RE = re.compile(r"^\d+(?:\.\d+)?[kKmMgG]?$")
 _SUFFIX = {"k": 1024, "m": 1024 ** 2, "g": 1024 ** 3}
@@ -507,6 +513,26 @@ def validate_template(value: str) -> str:
     if "%(ext)s" not in v:
         raise ValueError("filename_template must contain %(ext)s")
     return v
+
+
+def disambiguating_template(template: str) -> str | None:
+    """The same template with the site's id worn before the extension.
+
+    The escape hatch for a name collision with a DIFFERENT video (v0.46.17):
+    when a download lands on a file that belongs to another video, it is
+    re-run under this variant, so the user's chosen template stays
+    recognizable and the name is escaped by the one string every site makes
+    unique. None when the template already carries %(id)s (a collision then
+    means the file IS this video's) or has no final %(ext)s to sit before.
+    """
+    if "%(id)s" in template:
+        return None
+    head, token, tail = template.rpartition("%(ext)s")
+    if not token or tail.strip():
+        return None
+    base = head.rstrip("._- ")
+    sep = head[len(base):]
+    return f"{base} [%(id)s]{sep}{token}"
 
 
 def validate_proxy(value: str) -> str:
