@@ -46,7 +46,7 @@ class AudioPresetTest {
         }
         assertEquals("engine error: $error", "completed", status)
 
-        val f = File(dir, "tone.mp3")
+        val f = File(dir, "tone [tone].mp3")
         assertTrue("converted mp3 missing: $f", f.exists())
         assertTrue("converted mp3 too small: ${f.length()}", f.length() > 1000)
         val head = f.readBytes().take(3)
