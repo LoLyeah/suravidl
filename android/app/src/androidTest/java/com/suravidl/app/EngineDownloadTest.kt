@@ -40,7 +40,7 @@ class EngineDownloadTest {
         }
         assertEquals("completed", status)
 
-        val f = File(dir, "tiny.mp4")
+        val f = File(dir, "tiny [tiny].mp4")
         assertTrue("downloaded file missing or empty: $f", f.exists() && f.length() > 1000)
     }
 }
