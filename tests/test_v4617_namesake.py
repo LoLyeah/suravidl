@@ -262,8 +262,8 @@ def test_a_same_name_pair_no_longer_fights_over_one_filename(
     assert jb["status"] == "completed", jb.get("error")
     b_path = Path(jb["filepath"])
     assert b_path.is_file() and b_path != a_path
-    assert "[t" in b_path.name and "BBB" in b_path.name, \
-        "the escaped download wears the site's id"
+    assert f"[{download_opts.short_id(B_STEM)}]" in b_path.name, \
+        "the escaped download wears the site's id (short form since v0.46.18)"
     assert "already belonged to a different video" in (jb.get("note") or "")
     assert hashlib.sha256(a_path.read_bytes()).hexdigest() == a_sha, \
         "the older file is byte-identical — it was never the price"
@@ -298,8 +298,12 @@ def test_the_guards_are_wired():
 def test_whatsnew_opens_with_this_release():
     from suravidl_engine import __version__
 
-    assert __version__ == "0.46.17"
     top = whatsnew.ENTRIES[0]
-    assert top["version"] == "0.46.17"
-    assert top["title"].lower() == "the namesake"
+    assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
+    # v0.46.18 "the nickname" shortened long ids — this round's entry
+    # stays among the living ten (the strict current-version pin moved
+    # to that release's test file, per the retirement policy)
+    assert any(e["version"] == "0.46.17"
+               and e["title"].lower() == "the namesake"
+               for e in whatsnew.ENTRIES)

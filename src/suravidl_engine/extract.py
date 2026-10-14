@@ -47,7 +47,7 @@ from yt_dlp.postprocessor.ffmpeg import (
     FFmpegPostProcessor, FFmpegVideoRemuxerPP, resolve_mapping)
 from yt_dlp.utils import replace_extension
 
-from .download_opts import tiktok_safe_format
+from .download_opts import short_id, tiktok_safe_format
 
 TIKTOK_FLAKE_PHRASES = (
     # the webpage came back with neither challenge nor hydration data
@@ -478,6 +478,28 @@ def _deliver_notice(owner, info, note: str) -> None:
             pass
 
 
+class ShortIdPP(yt_dlp.postprocessor.PostProcessor):
+    """A filename id must be a tag, not a paragraph (v0.46.18).
+
+    Some extractors hand the whole signed URL back as the id — HLS
+    "master" playlists are the field case (`master.m3u8?token=…`, which
+    made a 70+ character name). `pre_process` runs BEFORE the output name
+    is computed (process_info calls it at YoutubeDL.py:3359, right above
+    `prepare_filename`), so the id is normalized here and every naming
+    path downstream — the template, the skip escape, the remux guard —
+    sees the short form. Compact ids pass verbatim; the rewrite is
+    deterministic, so the same video always wears the same tag.
+    """
+
+    def run(self, info):
+        try:
+            if isinstance(info, dict) and info.get("id"):
+                info["id"] = short_id(info["id"])
+        except Exception:  # noqa: BLE001 — a naming nicety is never fatal
+            pass
+        return [], info
+
+
 class SafeRemuxPP(FFmpegVideoRemuxerPP):
     """A remux that must never land on another video's file (v0.46.17).
 
@@ -519,7 +541,7 @@ class SafeRemuxPP(FFmpegVideoRemuxerPP):
         if not os.path.exists(target) or owner(target, vid):
             return None
         stem, ext = os.path.splitext(target)
-        base = f"{stem} [{vid}]" if vid else stem
+        base = f"{stem} [{short_id(vid)}]" if vid else stem
         landed = f"{base}{ext}"
         n = 2
         while os.path.exists(landed) and not owner(landed, vid):
@@ -632,6 +654,15 @@ def _attach_thumbnail_ext_fix(ydl) -> None:
         pass
 
 
+def _attach_short_id(ydl) -> None:
+    """Attach the id normalizer at pre_process (download path only):
+    the name every later step sees wears the short form (v0.46.18)."""
+    try:
+        ydl.add_post_processor(ShortIdPP(ydl), when="pre_process")
+    except Exception:  # noqa: BLE001 - best-effort, never fatal
+        pass
+
+
 def _guard_remux_overwrites(ydl) -> None:
     """Swap the container remuxer for the one that never lands on another
     video's file (v0.46.17 "the namesake"). Instances are built by
@@ -683,6 +714,7 @@ def extract_info(opts: dict, url: str, *, download: bool, sleep=time.sleep,
                     _attach_stream_copy_fix(ydl)
                     _install_safe_thumbnail_embed(ydl)
                     _guard_remux_overwrites(ydl)
+                    _attach_short_id(ydl)
                 return ydl.sanitize_info(ydl.extract_info(url, download=download))
         except yt_dlp.utils.YoutubeDLError as exc:
             if (refresh_left and seen["bytes"] and is_expired_link(exc)

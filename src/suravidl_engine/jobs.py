@@ -1326,7 +1326,9 @@ class JobManager:
             vid = str(video_id or "")
             if not path or not vid:
                 return False
-            if f"[{vid}]" in os.path.basename(path):
+            from .download_opts import short_id
+
+            if f"[{short_id(vid)}]" in os.path.basename(path):
                 return True
             key = os.path.normcase(path)
             for other in list(self._jobs.values()):

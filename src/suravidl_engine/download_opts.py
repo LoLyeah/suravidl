@@ -12,6 +12,7 @@ exposes, including its ordering rules:
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import shutil
@@ -407,6 +408,25 @@ DENIED_RAW_KEYS: dict[str, str] = {
 # video by construction; re-downloads of the same video still land on the
 # same name (the dedupe the skip message relies on).
 DEFAULT_TEMPLATE = "%(title).100B [%(id)s].%(ext)s"
+
+# A filename id must stay a TAG, not a paragraph (v0.46.18 "the nickname"):
+# some extractors hand back whole signed URLs as the id — HLS "master"
+# playlists carry `master.m3u8?token=…` (field report 2026-10-14: a name
+# 70+ characters long). Long or URL-sludge ids collapse to a stable
+# 12-hex digest; compact ids pass verbatim (YouTube's 11 chars, TikTok's
+# digits). Deterministic, so the same video always wears the same tag —
+# the skip/dedupe and the owner checks rely on that.
+SHORT_ID_MAX = 30
+_SHORT_ID_JUNK = frozenset("?&=%#:/\\ \t\n\r")
+_SHORT_ID_HEX = 12
+
+
+def short_id(value) -> str:
+    """The id as a filename wears it — verbatim when compact, else a digest."""
+    v = str(value or "")
+    if len(v) <= SHORT_ID_MAX and not (set(v) & _SHORT_ID_JUNK):
+        return v
+    return hashlib.sha256(v.encode("utf-8")).hexdigest()[:_SHORT_ID_HEX]
 
 _RATE_RE = re.compile(r"^\d+(?:\.\d+)?[kKmMgG]?$")
 _SUFFIX = {"k": 1024, "m": 1024 ** 2, "g": 1024 ** 3}
