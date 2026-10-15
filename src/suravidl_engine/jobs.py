@@ -18,6 +18,7 @@ import yt_dlp
 from .auth import explain_download_error
 from .classify import blocked_reason
 from .extract import extract_info
+from .obfuscated import maybe_materialize
 
 # How many worker threads serve the queue. It equals the settings ceiling for
 # `max_concurrent` (1..4, settings.py), so a raised capacity always has a
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     raw_args TEXT,
     overrides TEXT,
     headers TEXT,
+    xor_key TEXT,
     status TEXT NOT NULL,
     title TEXT,
     filepath TEXT,
@@ -404,11 +406,14 @@ class JobManager:
                 # again. Columns gained over time:
                 # headers/preset/playlist_items/raw_args/overrides
                 # (v0.22.0), files (v0.21.1), partials (v0.26.0),
-                # download_dir (v0.21.2), replaced_by (v0.45.17).
+                # download_dir (v0.21.2), replaced_by (v0.45.17),
+                # xor_key (v0.47.0).
                 version = self._con.execute("PRAGMA user_version").fetchone()[0]
                 cols = {r[1] for r in self._con.execute("PRAGMA table_info(jobs)")}
                 if "headers" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN headers TEXT")
+                if "xor_key" not in cols:
+                    self._con.execute("ALTER TABLE jobs ADD COLUMN xor_key TEXT")
                 if "preset" not in cols:
                     self._con.execute("ALTER TABLE jobs ADD COLUMN preset TEXT")
                 if "playlist_items" not in cols:
@@ -574,11 +579,11 @@ class JobManager:
                 return
             self._con.execute(
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
-                " raw_args, overrides, headers, status, title,"
+                " raw_args, overrides, headers, xor_key, status, title,"
                 " filepath, error, downloaded_bytes, total_bytes, speed, eta,"
                 " created_at, completed_at, files, partials, download_dir,"
                 " replaced_by, live, video_id, follow_id, note)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(id) DO UPDATE SET status=excluded.status,"
                 " title=excluded.title, filepath=excluded.filepath,"
                 " error=excluded.error, downloaded_bytes=excluded.downloaded_bytes,"
@@ -598,6 +603,7 @@ class JobManager:
                     json.dumps(job["overrides"]) if job.get("overrides") else None,
                     json.dumps(_redacted_headers(job["headers"]))
                     if job.get("headers") else None,
+                    job.get("xor_key"),
                     job["status"], job.get("title"), job.get("filepath"),
                     job.get("error"),
                     job["progress"]["downloaded_bytes"],
@@ -618,6 +624,7 @@ class JobManager:
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
                extra_headers: dict | None = None,
+               xor_key: str | None = None,
                preset: str | None = None,
                playlist_items: str | None = None,
                raw_args: str | None = None,
@@ -668,6 +675,14 @@ class JobManager:
 
                 parse_raw_args(raw_args)  # raises ValueError on junk
         extra_headers = _safe_headers(extra_headers)
+        if xor_key is not None:
+            # a scrambled-playlist decode key (v0.47.0): validated before a
+            # row exists — a junk key must fail at the door, not mid-run
+            from .obfuscated import decode_key
+
+            xor_key = str(xor_key).strip() or None
+            if xor_key:
+                decode_key(xor_key)
         job_id = uuid.uuid4().hex[:12]
         job = {
             "id": job_id,
@@ -678,6 +693,7 @@ class JobManager:
             "raw_args": raw_args,
             "overrides": overrides,
             "headers": extra_headers,
+            "xor_key": xor_key or None,
             "status": "queued",
             "title": None,
             "filepath": None,
@@ -885,6 +901,7 @@ class JobManager:
             job = self.create(src["url"],
                               fmt=fmt,
                               extra_headers=patch.get("headers", src.get("headers")),
+                              xor_key=src.get("xor_key"),
                               preset=preset,
                               playlist_items=src.get("playlist_items"),
                               raw_args=patch.get("raw_args", src.get("raw_args")),
@@ -1342,7 +1359,7 @@ class JobManager:
         return False
 
     def _escape_namesake(self, opts: dict, existing: str, info: dict,
-                         job: dict) -> dict | None:
+                         job: dict, run_url: str | None = None) -> dict | None:
         """A name owned by a DIFFERENT video is not "already downloaded".
 
         yt-dlp skips any existing output and reports the skip honestly —
@@ -1374,7 +1391,8 @@ class JobManager:
             outtmpl = variant
         print(f"[namesake] “{Path(existing).name}” belongs to a different "
               "video — re-running with the id in the name", flush=True)
-        info2 = extract_info({**opts, "outtmpl": outtmpl}, job["url"],
+        info2 = extract_info({**opts, "outtmpl": outtmpl},
+                             run_url or job["url"],
                              download=True, retry_refresh=True) or {}
         if info2.get("_type") == "playlist" or not info2.get("requested_downloads"):
             return None
@@ -1527,14 +1545,25 @@ class JobManager:
         # copy — it is how a fixed/caveat note reaches the card when the
         # returned info dict cannot carry it (see extract._deliver_notice)
         opts["__sv_notices_out"] = []
+        # scrambled playlists (v0.47.0 "the veil"): decode the tree behind a
+        # loopback server and hand yt-dlp a URL it can actually eat — the
+        # server and its files live exactly as long as this run (a bad or
+        # stale key raises, and explain_download_error turns that into
+        # "sniff it again from the page")
+        hls = None
+        run_url = job["url"]
         try:
+            hls = maybe_materialize(job["url"], headers=extra_headers,
+                                    xor_key=job.get("xor_key"))
+            if hls is not None:
+                run_url = hls.url
             subs_skipped = None
             with (self._cookie_session() if self._cookie_session
                   else nullcontext()) as cookie_opts:
                 if cookie_opts:
                     opts.update(cookie_opts)
                 try:
-                    info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
+                    info = extract_info(opts, run_url, download=True, retry_refresh=True) or {}
                 except Exception as e:  # noqa: BLE001 — classified below
                     # a subtitle sidecar is not the download: when the site
                     # refuses to serve captions (YouTube throttles them hard),
@@ -1543,7 +1572,7 @@ class JobManager:
                         raise
                     subs_skipped = _subtitle_reason(e)
                     _drop_subtitles(opts)
-                    info = extract_info(opts, job["url"], download=True, retry_refresh=True) or {}
+                    info = extract_info(opts, run_url, download=True, retry_refresh=True) or {}
             if subs_skipped:
                 job["note"] = (f"subtitles could not be fetched ({subs_skipped})"
                                " — downloaded without them")
@@ -1605,7 +1634,8 @@ class JobManager:
                     # when the file is really this video's
                     escaped = self._escape_namesake(
                         opts, str(req.get("filepath")
-                                  or info.get("filepath") or ""), info, job)
+                                  or info.get("filepath") or ""), info, job,
+                        run_url=run_url)
                     if escaped:
                         info = escaped
                         req = (info.get("requested_downloads") or [{}])[0]
@@ -1653,6 +1683,8 @@ class JobManager:
                 job["status"] = "error"
                 job["error"] = explain_download_error(str(e))
         finally:
+            if hls is not None:
+                hls.stop()
             self._save(job)
         if job["status"] == "completed" and self.on_complete:
             try:

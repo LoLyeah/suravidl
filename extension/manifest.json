@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "suravidl",
-  "version": "0.5.15",
+  "version": "0.5.16",
   "description": "Detect videos on any page and send them to your local suravidl engine.",
   "permissions": ["webRequest", "storage", "contextMenus"],
   "host_permissions": ["<all_urls>"],
@@ -12,6 +12,13 @@
       "js": ["pagefind.js"],
       "run_at": "document_start",
       "all_frames": true
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["pk.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
     }
   ],
   "action": {

@@ -139,13 +139,14 @@ async function send(url, mode) {
   try {
     res = await api.runtime.sendMessage(quick
       ? (single
-          ? { type: "sendToEngine", url: picks[0] || url }
-          : { type: "sendBatch", urls: picks })
+          ? { type: "sendToEngine", url: picks[0] || url, tabId: TAB && TAB.id }
+          : { type: "sendBatch", urls: picks, tabId: TAB && TAB.id })
       : {
           type: "sendHandoff",
           url,
           urls: visibleItems().map((m) => m.url),
           tabUrl: (TAB && TAB.url) || "",
+          tabId: TAB && TAB.id,
         });
   } catch (e) {
     res = { ok: false, error: String(e) };

@@ -22,7 +22,7 @@ def client(tmp_path):
 
     seen = {"calls": []}
 
-    def stub_probe(url, headers):
+    def stub_probe(url, headers, xor_key=None):
         seen["calls"].append({"url": url, "headers": dict(headers or {})})
         if "bad-one" in url:
             raise RuntimeError("yt-dlp says no")
@@ -90,7 +90,7 @@ def test_a_probe_payload_never_carries_the_captured_secrets(tmp_path):
     can see them."""
     from suravidl_engine.api import create_app
 
-    def stub_probe(url, headers):
+    def stub_probe(url, headers, xor_key=None):
         return {"title": "t", "http_headers": {"Cookie": "sid=42"},
                 "formats": [{"format_id": "f1", "cookies": "sid=42; Domain=x",
                              "ext": "mp4"}]}
@@ -201,7 +201,7 @@ def test_headers_reach_the_manager(tmp_path, monkeypatch):
 
     monkeypatch.setattr(api_mod, "JobManager", Manager)
     app = api_mod.create_app(download_dir=tmp_path / "dl", auth_token="t",
-                             handoff_probe_fn=lambda u, h: {"formats": []})
+                             handoff_probe_fn=lambda u, h, k=None: {"formats": []})
     with TestClient(app) as c:
         hid = c.post("/handoff", headers=AUTH, json={
             "url": "https://cdn.example/x.mp4",
@@ -228,13 +228,13 @@ def test_focus_action(client):
     tmp = pathlib.Path(tempfile.mkdtemp())
     app = create_app(download_dir=tmp / "dl", auth_token="t",
                      desktop_actions={"focus": lambda: called.append(1)},
-                     handoff_probe_fn=lambda u, h: {})
+                     handoff_probe_fn=lambda u, h, k=None: {})
     with TestClient(app) as c:
         assert c.post("/app/focus", headers=AUTH).status_code == 200
     assert called == [1]
 
     app2 = create_app(download_dir=tmp / "dl2", auth_token="t",
-                      handoff_probe_fn=lambda u, h: {})
+                      handoff_probe_fn=lambda u, h, k=None: {})
     with TestClient(app2) as c:
         assert c.post("/app/focus", headers=AUTH).status_code == 501  # no shell
 
@@ -243,7 +243,7 @@ def test_store_expiry_and_dedupe():
     from suravidl_engine.handoff import HandoffStore
 
     clock = {"t": 1000.0}
-    store = HandoffStore(probe_fn=lambda u, h: {"ok": True},
+    store = HandoffStore(probe_fn=lambda u, h, k=None: {"ok": True},
                          now=lambda: clock["t"])
     a = store.add("https://x/1.m3u8")
     b = store.add("https://x/1.m3u8")          # same click, same handoff

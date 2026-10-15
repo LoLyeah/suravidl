@@ -23,8 +23,8 @@ def test_every_extension_version_string_agrees():
     m3 = json.loads((ROOT / "extension/manifest.json").read_text())
     m2 = json.loads((ROOT / "extension/firefox/manifest.json").read_text())
     html = (ROOT / "extension/popup.html").read_text()
-    assert m3["version"] == m2["version"] == "0.5.15"
-    assert "v0.5.15" in html
+    assert m3["version"] == m2["version"] == "0.5.16"
+    assert "v0.5.16" in html
 
 
 def test_each_manifest_gets_the_permission_its_browser_has():

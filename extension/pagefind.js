@@ -33,6 +33,43 @@
     } catch (_) { /* a sniffer must never break the page */ }
   }
 
+  // The decode key of a scrambled-playlist player (v0.5.16): Chrome reads
+  // it in the MAIN world (pk.js posts it here); Firefox's MV2 content
+  // scripts read page globals directly via wrappedJSObject — one door per
+  // engine, the same forwarding. The engine validates the key against the
+  // stream itself, so a forged one fails the decode and nothing else.
+  let pkLast = null;
+  function reportPk(pk) {
+    if (typeof pk !== "string" || pk.length < 16 || pk.length > 512
+        || pk === pkLast) return;
+    pkLast = pk;
+    try { api.runtime.sendMessage({ type: "pkFind", pk }); } catch (_) {}
+  }
+  try {
+    addEventListener("message", (e) => {
+      if (e.source !== window || !e.data || typeof e.data !== "object") return;
+      reportPk(e.data.__svPk);
+    });
+  } catch (_) {}
+  function readWrapped() {
+    try {
+      const w = window.wrappedJSObject;
+      if (w && typeof w.__pk === "string") reportPk(w.__pk);
+    } catch (_) {}
+  }
+  readWrapped();
+  try {
+    // Firefox's door; a no-op elsewhere. Bounded and unref'd so a Node
+    // harness that evaluates this file can still exit (browsers have no
+    // unref — the guard keeps it honest there too).
+    let pkTicks = 0;
+    const pkTimer = setInterval(() => {
+      readWrapped();
+      if (++pkTicks > 150) clearInterval(pkTimer);   // ~5 minutes of looking
+    }, 2000);
+    if (pkTimer && pkTimer.unref) pkTimer.unref();
+  } catch (_) {}
+
   // The player's own sources. `currentSrc` first — the source actually
   // chosen — then the attribute. No pattern prefilter: this is evidence.
   function sweep() {

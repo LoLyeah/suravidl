@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.0",
+        "title": "The veil",
+        "items": [
+            "Sites that scramble their playlists (reanime.to and friends) now download like any other: the extension lifts the player's decode key while sniffing, and the engine unscrambles the tree before the normal path.",
+        ],
+    },
+    {
         "version": "0.46.19",
         "title": "The knock",
         "items": [
@@ -77,15 +84,6 @@ ENTRIES = [
         "title": "The solder",
         "items": [
             "The phone build ships again: the in-browser sniffer's second injector was missing the wire the seal added — threaded through, and the APK is back on the release page.",
-        ],
-    },
-    {
-        "version": "0.46.10",
-        "title": "The seal",
-        "items": [
-            "Holes closed, quietly: the engine's page no longer hands out its token to anything that asks — the app opens it with a key, and a bare address is refused with a sentence.",
-            "A second resume of a paused download is refused instead of writing the file twice; proxy passwords and login headers never reach the log card or a diagnostics bundle.",
-            "Small truths: live recordings show their real size on disk, cuts work for takes from before a folder change, and the Firefox extension stopped asking for a permission it never used.",
         ],
     },
 ]

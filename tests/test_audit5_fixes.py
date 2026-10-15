@@ -226,7 +226,8 @@ def test_get_without_the_key_answers_401_not_the_token(tmp_path):
 
 def test_a_content_script_cannot_reach_the_privileged_actions():
     bg = (EXT / "background.js").read_text(encoding="utf-8")
-    assert 'if (_sender && _sender.tab && !(msg && msg.type === "pageFind"))' in bg
+    assert ('&& !(msg && (msg.type === "pageFind" || msg.type === "pkFind")))'
+            in bg), "a content script may only ever report a find or a key"
     assert 'sendResponse({ ok: false, error: "refused" })' in bg
 
 
@@ -244,9 +245,12 @@ def test_the_firefox_manifest_asks_for_nothing_it_does_not_use():
     ff = (EXT / "firefox" / "manifest.json").read_text(encoding="utf-8")
     assert "webRequestBlocking" not in ff
     assert '"webRequest"' in ff
-    assert '"version": "0.5.15"' in ff
+    # the twin's version tracks the chrome manifest (bump them together)
+    import json as _json
+    ver = _json.loads((EXT / "manifest.json").read_text())["version"]
+    assert f'"version": "{ver}"' in ff
     ch = (EXT / "manifest.json").read_text(encoding="utf-8")
-    assert '"version": "0.5.15"' in ch
+    assert f'"version": "{ver}"' in ch
     amo = (ROOT / "docs" / "amo-metadata.json").read_text(encoding="utf-8")
     assert "webRequestBlocking" not in amo
 

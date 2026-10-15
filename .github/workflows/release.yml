@@ -210,6 +210,9 @@ jobs:
           # other browser's manifest stay out of both submitted packages
           rm -rf /tmp/ffext/firefox /tmp/ffext/test_harness.mjs
           cp extension/firefox/manifest.json /tmp/ffext/manifest.json
+          # Chrome's MAIN-world reader: Firefox reads page globals via
+          # wrappedJSObject instead, so the file has no business here
+          rm -f /tmp/ffext/pk.js
           # unsigned xpi (stable Firefox needs an AMO-signed build to install)
           (cd /tmp/ffext && zip -qr "$OLDPWD/suravidl-extension-firefox.xpi" .)
           # load-unpacked convenience zips (Chrome blocks off-store .crx since

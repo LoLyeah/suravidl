@@ -173,6 +173,34 @@ it queues a best-quality job through that same one-shot route (`POST
 /jobs` with the captured headers), for people who just want the file and
 no window.
 
+## Scrambled playlists (v0.47.0, "the veil")
+
+Some players do not serve an m3u8 at all: every playlist body is base64 of
+the plaintext XORed with a repeating 32-byte key, and the key sits in page
+memory — the flixcloud embeds behind reanime.to export it to `window.__pk`
+from the player's own WASM. A downloader that fetches such a playlist
+straight gets a blob yt-dlp calls "Response data has no m3u header".
+
+The sniffer lifts that key while it is already standing in the frame:
+Chrome reads it in a MAIN-world content script (`pk.js`), Firefox reads
+page globals through `wrappedJSObject` (its MV2 scripts can — no reader
+file needed), and both forward it through the content script. The
+background stores it per tab (half-hour TTL, like the captured headers)
+and rides it on every door — `/handoff`, `/jobs`, `/jobs/batch` as
+`xor_key`. A page could postMessage a forged key, which is exactly why
+the engine validates it against the stream itself: a key that does not
+decode the playlist fails honestly ("sniff it again from the page") and
+nothing else happens.
+
+Engine-side, `obfuscated.py` fetches and decodes the whole tree behind a
+loopback HTTP server (variants and audio renditions become local decoded
+copies; segments and `#EXT-X-KEY` URIs stay remote and absolute), and
+yt-dlp then downloads it like any other stream — AES-128 segment
+decryption included. The server binds 127.0.0.1 and dies with the job.
+Nothing to lift (no key, a plain body, an error page) leaves the URL
+untouched; the field's "no key" paste gets the honest pointer to sniff
+from the page instead.
+
 ## Manual checklist (only a real device can show these)
 
 1. The case this whole feature was

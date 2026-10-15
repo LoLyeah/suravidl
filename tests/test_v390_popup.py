@@ -124,7 +124,7 @@ def test_the_background_grew_the_handoff_and_the_health_check():
     assert '"/handoff"' in BG_JS and "sendHandoff" in BG_JS
     assert '"/health"' in BG_JS and "engineState" in BG_JS
     # an engine that predates /handoff still gets the old one-shot job
-    assert "sendToEngine(url)" in BG_JS
+    assert "sendToEngine(url, tabId)" in BG_JS
     assert "res.status === 404 || res.status === 405" in BG_JS
 
 

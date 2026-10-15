@@ -20,7 +20,13 @@ def test_both_manifests_carry_the_page_script():
     for rel in ("extension/manifest.json", "extension/firefox/manifest.json"):
         m = json.loads((ROOT / rel).read_text())
         cs = m.get("content_scripts") or []
-        assert len(cs) == 1, rel
+        if "firefox" in rel:
+            assert len(cs) == 1, rel
+            assert cs[0]["js"] == ["pagefind.js"], rel
+        else:
+            # v0.5.16: the page reader plus the MAIN-world key reader
+            assert [s["js"][0] for s in cs] == ["pagefind.js", "pk.js"], rel
+            assert cs[1].get("world") == "MAIN", rel
         block = cs[0]
         assert block["js"] == ["pagefind.js"], rel
         assert block["run_at"] == "document_start", rel
@@ -47,6 +53,7 @@ def test_the_background_only_accepts_reports_with_a_sender_tab():
     assert "_sender && _sender.tab" in window
     assert "remember(tabId" in window
     # v0.46.10 audit B/F2: every PRIVILEGED branch refuses a tab sender —
-    # a content script may only ever report a sighting
-    assert ('if (_sender && _sender.tab && !(msg && msg.type === "pageFind"))'
+    # a content script may only ever report a sighting (or, since
+    # v0.5.16, the page's decode key: pkFind)
+    assert ('&& !(msg && (msg.type === "pageFind" || msg.type === "pkFind")))'
             in src)

@@ -48,5 +48,6 @@ def test_the_popup_hides_fragments_only_on_the_engines_word():
 
 def test_the_handoff_still_carries_the_captured_headers():
     assert "reqHeaders[url]" in BG
-    assert "JSON.stringify({ url, headers: captured })" in BG
+    assert "JSON.stringify({ url, headers: captured," in BG
+    assert "xor_key:" in BG, "the decode key rides every door (v0.5.16)"
     assert "Authorization" in BG

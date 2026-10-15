@@ -130,6 +130,11 @@ TIKTOK_FLAKE_HINT = (
     "browser instead."
 )
 
+# Scrambled playlists (v0.47.0 "the veil"): yt-dlp fetched the playlist and
+# got a base64 blob instead of #EXTM3U — the site obfuscates its playlists
+# and this attempt carried no decode key (a paste), or a stale one.
+_OBFUSCATED_BODY = re.compile(r"no m3u header|does not decode", re.IGNORECASE)
+
 # Query credentials that must never ride out inside an error message the
 # user reads or the row the engine persists: signed links commonly carry
 # these in the URL itself.
@@ -175,6 +180,11 @@ def explain_download_error(text: str) -> str:
                 "add cookies in Settings → Authentication (if some are "
                 "already added, they may have expired — Instagram sessions "
                 "last only hours).")
+    if _OBFUSCATED_BODY.search(text):
+        return (f"{text} — this site scrambles its playlists (a plain "
+                "downloader only ever gets the scrambled blob); sniff the "
+                "stream from the page with the suravidl extension so the "
+                "decode key rides along, then download again.")
     if is_tiktok_flake(text):
         return f"{text} — {TIKTOK_FLAKE_HINT}"
     return text

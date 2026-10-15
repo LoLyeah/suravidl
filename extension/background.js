@@ -37,6 +37,19 @@ function prune(reqHeaders) {
   return Object.fromEntries(entries);
 }
 
+// The page's decode key for scrambled playlists (v0.5.16): like the header
+// store, it is session material — a key older than half an hour belongs to a
+// stream that already expired with it.
+const PK_TTL_MS = 30 * 60 * 1000;
+
+function prunePk(tabPk) {
+  const now = Date.now();
+  const entries = Object.entries(tabPk || {})
+    .filter(([, v]) => v && now - (v.at || 0) < PK_TTL_MS)
+    .slice(-30);
+  return Object.fromEntries(entries);
+}
+
 // Storage is read-modify-write, and three media requests can land in the same
 // tick — a player asks for its manifest and its first fragments together. So
 // every write is chained: without it the last writer wins and finds disappear
@@ -45,7 +58,7 @@ let storageChain = Promise.resolve();
 function update(mutate) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {} }, (data) => {
+      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {} }, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -165,6 +178,19 @@ async function heldHeaders(url) {
   }
 }
 
+/** The tab's captured decode key (v0.5.16), or "" — a fresh one only.
+ *  The engine validates it against the stream, so a stale or foreign key
+ *  fails the decode honestly instead of doing anything. */
+async function pkFor(tabId) {
+  if (typeof tabId !== "number" || tabId < 0) return "";
+  try {
+    const stored = await api.storage.local.get({ tabPk: {} });
+    const hit = (stored.tabPk || {})[tabId];
+    if (hit && Date.now() - (hit.at || 0) < PK_TTL_MS) return hit.pk || "";
+  } catch (_) { /* no key is a normal state, not an error */ }
+  return "";
+}
+
 function commitHeaders(url, pick) {
   update(({ reqHeaders: store }) => {
     store[url] = { headers: pick, at: Date.now() };
@@ -269,10 +295,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // v0.46.10 audit B/F2: pagefind.js runs in every frame of every page, so a
   // message arriving with `_sender.tab` set comes from a content script — and
-  // a content script may only ever report a sighting (pageFind, below). Every
-  // other action here drives the engine or reads stored state and belongs to
-  // the extension's own pages (popup/options), which carry no tab.
-  if (_sender && _sender.tab && !(msg && msg.type === "pageFind")) {
+  // a content script may only ever report a sighting (pageFind) or the page's
+  // decode key (pkFind, v0.5.16). Every other action here drives the engine
+  // or reads stored state and belongs to the extension's own pages
+  // (popup/options), which carry no tab.
+  if (_sender && _sender.tab
+      && !(msg && (msg.type === "pageFind" || msg.type === "pkFind"))) {
     sendResponse({ ok: false, error: "refused" });
     return false;
   }
@@ -296,15 +324,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg && msg.type === "sendHandoff") {
-    sendHandoff(msg.url, msg.urls, msg.tabUrl).then(sendResponse);
+    sendHandoff(msg.url, msg.urls, msg.tabUrl, msg.tabId).then(sendResponse);
     return true;
   }
   if (msg && msg.type === "sendToEngine") {
-    sendToEngine(msg.url).then(sendResponse);
+    sendToEngine(msg.url, msg.tabId).then(sendResponse);
     return true;
   }
   if (msg && msg.type === "sendBatch") {
-    sendBatchToEngine(msg.urls).then(sendResponse);
+    sendBatchToEngine(msg.urls, msg.tabId).then(sendResponse);
     return true;
   }
   if (msg && msg.type === "recentJobs") {
@@ -319,6 +347,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const tabId = _sender && _sender.tab ? _sender.tab.id : undefined;
     if (typeof tabId === "number" && tabId >= 0 && msg.url) {
       remember(tabId, String(msg.url), msg.via === "player" ? "player" : "page");
+      sendResponse({ ok: true });
+      return false;
+    }
+    sendResponse({ ok: false });
+    return false;
+  }
+  if (msg && msg.type === "pkFind") {
+    // the decode key of a scrambled-playlist player (v0.5.16): Chrome reads
+    // it in the MAIN world (pk.js) and posts it through the content script;
+    // Firefox reads it via wrappedJSObject in pagefind.js. Stored per tab
+    // like the captured headers — and, like them, only ever handed to the
+    // engine, which validates the key against the stream itself (a forged
+    // key fails the decode, it never grants anything).
+    const tabId = _sender && _sender.tab ? _sender.tab.id : undefined;
+    if (typeof tabId === "number" && tabId >= 0
+        && typeof msg.pk === "string" && msg.pk.length >= 16 && msg.pk.length <= 512) {
+      update(({ tabPk }) => {
+        tabPk[tabId] = { pk: msg.pk, at: Date.now() };
+        return { tabPk: prunePk(tabPk) };
+      });
       sendResponse({ ok: true });
       return false;
     }
@@ -350,7 +398,7 @@ async function rankWithEngine(items) {
   return null;
 }
 
-async function sendToEngine(url) {
+async function sendToEngine(url, tabId) {
   url = await resolveShareUrl(url);
   const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
@@ -367,7 +415,8 @@ async function sendToEngine(url) {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + stored.engineToken,
       },
-      body: JSON.stringify({ url, headers: captured }),
+      body: JSON.stringify({ url, headers: captured,
+                             xor_key: (await pkFor(tabId)) || undefined }),
     });
   } catch (e) {
     RESOLVED = "";
@@ -387,7 +436,7 @@ async function sendToEngine(url) {
 // answers per link (`skipped`) instead of failing the lot — one bad row in
 // a handful must not cost the rest. The engine has had /jobs/batch since
 // long before /handoff; an even older one falls back to sending one by one.
-async function sendBatchToEngine(urls) {
+async function sendBatchToEngine(urls, tabId) {
   const list = (urls || []).filter(Boolean).slice(0, 20);
   if (!list.length) return { ok: false, error: "nothing to send" };
   const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
@@ -418,8 +467,10 @@ async function sendBatchToEngine(urls) {
         "Authorization": "Bearer " + stored.engineToken,
       },
       body: JSON.stringify(Object.keys(headersByUrl).length
-        ? { urls: resolvedList, headers_by_url: headersByUrl }
-        : { urls: resolvedList }),
+        ? { urls: resolvedList, headers_by_url: headersByUrl,
+            xor_key: (await pkFor(tabId)) || undefined }
+        : { urls: resolvedList,
+            xor_key: (await pkFor(tabId)) || undefined }),
     });
   } catch (e) {
     RESOLVED = "";   // it moved: look again next time
@@ -624,7 +675,7 @@ async function engineState() {
 // the captured headers — and the app's window opens on the format list, so
 // the quality choice happens where the formats are real. An older engine
 // (no /handoff) falls back to the one-shot job this extension used to send.
-async function sendHandoff(url, urls, tabUrl) {
+async function sendHandoff(url, urls, tabUrl, tabId) {
   url = await resolveShareUrl(url);
   tabUrl = await resolveShareUrl(tabUrl);
   urls = await Promise.all((urls || []).map(resolveShareUrl));
@@ -644,7 +695,8 @@ async function sendHandoff(url, urls, tabUrl) {
         Authorization: "Bearer " + stored.engineToken,
       },
       body: JSON.stringify({ url, urls: urls || [], headers: captured,
-                             tab_url: tabUrl || "" }),
+                             tab_url: tabUrl || "",
+                             xor_key: (await pkFor(tabId)) || undefined }),
     });
   } catch (e) {
     RESOLVED = "";   // it moved: look again next time
@@ -653,7 +705,7 @@ async function sendHandoff(url, urls, tabUrl) {
   }
   if (res.status === 404 || res.status === 405) {
     // an older engine has no /handoff: the old one-shot job is still honest
-    const old = await sendToEngine(url);
+    const old = await sendToEngine(url, tabId);
     return old.ok ? { ok: true, mode: "job", job: old.job } : old;
   }
   if (res.status === 401 || res.status === 403) {
@@ -695,7 +747,8 @@ function installMenus() {
   menus.onClicked.addListener(async (info, tab) => {
     const url = menuUrl(info);
     if (!url) return;
-    const res = await sendHandoff(url, [], (tab && tab.url) || (info && info.pageUrl) || "");
+    const res = await sendHandoff(url, [], (tab && tab.url) || (info && info.pageUrl) || "",
+                                  tab && tab.id);
     // no popup to say it in: a quiet "!" on the toolbar until the next send
     try {
       if (chrome.action && chrome.action.setBadgeText) {

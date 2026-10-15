@@ -139,7 +139,7 @@ def test_the_transplant_is_opt_in(monkeypatch):
 
 def test_downloads_enable_the_transplant_and_probes_never_do():
     jobs_src = (ROOT / "src/suravidl_engine/jobs.py").read_text()
-    assert ('extract_info(opts, job["url"], download=True, retry_refresh=True)'
+    assert ('extract_info(opts, run_url, download=True, retry_refresh=True)'
             in jobs_src), "the engine's downloads opt into the refresh"
     probe_src = (ROOT / "src/suravidl_engine/probe.py").read_text()
     assert "retry_refresh" not in probe_src, "a probe has nothing to resume"

@@ -33,7 +33,8 @@ class HandoffStore:
         self._probes = threading.BoundedSemaphore(MAX_PROBING)
 
     # -- writes ----------------------------------------------------------
-    def add(self, url, urls=None, headers=None, tab_url=None) -> dict:
+    def add(self, url, urls=None, headers=None, tab_url=None,
+            xor_key=None) -> dict:
         now = self._now()
         with self._lock:
             self._expire(now)
@@ -46,6 +47,9 @@ class HandoffStore:
                 "urls": [u for u in (urls or []) if u][:20],
                 "headers": dict(headers or {}),
                 "tab_url": tab_url or "",
+                # the sniffer's decode key for scrambled playlists (v0.47.0):
+                # held like the headers — a capture, never a reader's field
+                "xor_key": str(xor_key or "").strip(),
                 "at": now,
                 "status": "probing",
                 "probe": None,
@@ -69,6 +73,12 @@ class HandoffStore:
             it = self._items.get(hid)
             return dict(it["headers"]) if it else None
 
+    def xor_key_for(self, hid: str) -> str | None:
+        """The handoff's captured decode key, for the job that follows it."""
+        with self._lock:
+            it = self._items.get(hid)
+            return (it.get("xor_key") or None) if it else None
+
     # -- reads -----------------------------------------------------------
     def list(self) -> list:
         now = self._now()
@@ -79,9 +89,10 @@ class HandoffStore:
 
     @staticmethod
     def _public(item: dict) -> dict:
-        """Everything but the headers — cookies never travel to a reader."""
-        out = {k: v for k, v in item.items() if k != "headers"}
+        """Everything but the captures — cookies and keys never travel out."""
+        out = {k: v for k, v in item.items() if k not in ("headers", "xor_key")}
         out["has_headers"] = bool(item["headers"])
+        out["has_key"] = bool(item.get("xor_key"))
         return out
 
     # -- internals -------------------------------------------------------
@@ -101,11 +112,12 @@ class HandoffStore:
             if not item:
                 return
             headers = dict(item["headers"])
+            xor_key = item.get("xor_key") or None
             candidates = list(dict.fromkeys([item["url"]] + item["urls"]))[:CANDIDATES_TRIED]
         probe, resolved, error = None, candidates[0], None
         for cand in candidates:
             try:
-                probe = self._probe_fn(cand, headers)
+                probe = self._probe_fn(cand, headers, xor_key)
                 resolved, error = cand, None
                 break
             except Exception as e:  # noqa: BLE001 - becomes the handoff's state

@@ -24,6 +24,7 @@ from .classify import blocked_reason, classify, patterns, rank
 from .download_opts import probe_extra_opts
 from .handoff import HandoffStore
 from .jobs import ACTIVE_STATUSES, JobManager, redact_job
+from .obfuscated import maybe_materialize
 from .probe import probe, scrub_secrets
 from . import site_memory
 
@@ -41,6 +42,8 @@ class JobRequest(BaseModel):
     overrides: dict | None = None
     # a browser handoff's captured headers ride on the job (v0.39.0)
     handoff_id: str | None = None
+    # the sniffer's captured decode key for scrambled playlists (v0.47.0)
+    xor_key: str | None = None
 
 
 class OpenUrlRequest(BaseModel):
@@ -50,6 +53,8 @@ class OpenUrlRequest(BaseModel):
 class ProbeRequest(BaseModel):
     url: str
     headers: dict[str, str] | None = None
+    # scrambled playlists: the extension's captured decode key (v0.47.0)
+    xor_key: str | None = None
 
 
 class ClassifyRequest(BaseModel):
@@ -66,11 +71,14 @@ class HandoffRequest(BaseModel):
 
     `url` is the stream the popup chose; `urls` are its siblings, tried in
     order when a probe fails; `tab_url` is only a label for the reader.
+    `xor_key` (v0.47.0) is the decode key the sniffer lifted from the
+    page — present only when the site scrambles its playlists.
     """
     url: str
     urls: list[str] = []
     headers: dict[str, str] | None = None
     tab_url: str | None = None
+    xor_key: str | None = None
 
 
 class HandoffAckRequest(BaseModel):
@@ -102,6 +110,9 @@ class BatchJobRequest(BaseModel):
     playlist_items: str | None = None
     raw_args: str | None = None
     overrides: dict | None = None
+    # one tab, one key: the sniffer's decode key applies to every link
+    # in the batch (v0.47.0)
+    xor_key: str | None = None
 
 
 class ArchiveForgetRequest(BaseModel):
@@ -823,7 +834,8 @@ def create_app(download_dir, auth_token: str | None = None,
                                 detail=f"could not open the browser: {e}") from e
         return {"opened": url}
 
-    def _probe_with(url: str, headers: dict | None) -> dict:
+    def _probe_with(url: str, headers: dict | None,
+                    xor_key: str | None = None) -> dict:
         """ONE probe path for the UI and for browser handoffs (v0.39.0).
 
         Same option builder either way; the site's remembered quality rides
@@ -833,14 +845,25 @@ def create_app(download_dir, auth_token: str | None = None,
         The link-local gate rides here too (v0.43.2): classify judged the
         URL, but /probe and the handoff probe went straight to yt-dlp —
         this is the one seam both of them share.
+
+        Scrambled playlists (v0.47.0 "the veil"): with a captured key the
+        tree is decoded behind a loopback server first and the probe reads
+        that; None back from maybe_materialize means there was nothing to
+        lift, and the URL probes as-is.
         """
         why = blocked_reason(url)
         if why:
             raise ValueError(why)
-        with cookie_session(settings.get()) as cookie_opts:
-            info = probe(url, extra_headers=headers,
-                         cookie_opts=cookie_opts,
-                         extra_opts=probe_extra_opts(settings.get()))
+        hls = maybe_materialize(url, headers=headers, xor_key=xor_key)
+        try:
+            probe_url = hls.url if hls is not None else url
+            with cookie_session(settings.get()) as cookie_opts:
+                info = probe(probe_url, extra_headers=headers,
+                             cookie_opts=cookie_opts,
+                             extra_opts=probe_extra_opts(settings.get()))
+        finally:
+            if hls is not None:
+                hls.stop()
         site = site_memory.host_of(url)
         if site:
             info["site"] = site
@@ -860,7 +883,7 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.post("/probe")
     def probe_endpoint(body: ProbeRequest, mgr: JobManager = Depends(require_auth)):
         try:
-            return _probe_with(body.url, body.headers)
+            return _probe_with(body.url, body.headers, body.xor_key)
         except Exception as e:  # noqa: BLE001 - error goes to the client
             # one explanation for every shell: the engine owns the "this looks
             # like a sign-in wall" judgement, the UI does not guess
@@ -905,7 +928,8 @@ def create_app(download_dir, auth_token: str | None = None,
         if why:
             raise HTTPException(status_code=400, detail=why)
         item = handoffs.add(url, urls=body.urls,
-                            headers=body.headers, tab_url=body.tab_url)
+                            headers=body.headers, tab_url=body.tab_url,
+                            xor_key=body.xor_key)
         return {"ok": True, "id": item["id"], "status": item["status"]}
 
     @app.get("/handoff")
@@ -984,14 +1008,19 @@ def create_app(download_dir, auth_token: str | None = None,
         elif d_intent and not body.fmt:
             preset = d_intent
         headers = body.headers
+        xor_key = body.xor_key
         if body.handoff_id:
             # a browser handoff's captured headers (cookies included) ride on
-            # the job without ever passing through the UI (v0.39.0)
+            # the job without ever passing through the UI (v0.39.0) — and so
+            # does its decode key, when the sniffer captured one (v0.47.0)
             held = handoffs.headers_for(body.handoff_id)
             if held:
                 headers = {**held, **(headers or {})}
+            if not xor_key:
+                xor_key = handoffs.xor_key_for(body.handoff_id)
         job = mgr.create(body.url, fmt=body.fmt,
                          extra_headers=headers,
+                         xor_key=xor_key,
                          preset=preset,
                          playlist_items=body.playlist_items,
                          raw_args=raw,
@@ -1049,7 +1078,8 @@ def create_app(download_dir, auth_token: str | None = None,
                     JobRequest(url=url, fmt=body.fmt, headers=hdrs,
                                preset=body.preset,
                                playlist_items=body.playlist_items,
-                               raw_args=body.raw_args, overrides=body.overrides),
+                               raw_args=body.raw_args, overrides=body.overrides,
+                               xor_key=body.xor_key),
                     mgr))
             except (ValueError, HTTPException) as e:
                 detail = e.detail if isinstance(e, HTTPException) else str(e)
