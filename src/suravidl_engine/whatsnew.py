@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.46.19",
+        "title": "The knock",
+        "items": [
+            "The app lands front when an update restarts it, and takes clicks immediately. A script-relaunched window used to open in the background — the update looked like it never came back, clicks dead until an app switch.",
+        ],
+    },
+    {
         "version": "0.46.18",
         "title": "The nickname",
         "items": [
@@ -79,13 +86,6 @@ ENTRIES = [
             "Holes closed, quietly: the engine's page no longer hands out its token to anything that asks — the app opens it with a key, and a bare address is refused with a sentence.",
             "A second resume of a paused download is refused instead of writing the file twice; proxy passwords and login headers never reach the log card or a diagnostics bundle.",
             "Small truths: live recordings show their real size on disk, cuts work for takes from before a folder change, and the Firefox extension stopped asking for a permission it never used.",
-        ],
-    },
-    {
-        "version": "0.46.9",
-        "title": "The cut",
-        "items": [
-            "The marks keep their promise: Cut this take trims the file you are playing — local, lossless, filed as its own take. A section re-download of an existing file now says nothing was fetched.",
         ],
     },
 ]

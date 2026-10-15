@@ -632,6 +632,8 @@ def _dress(window) -> None:
     mac probe caught. The `loaded` event is the moment the view exists;
     it can fire again (reload), so every step is idempotent."""
     try:
+        _ensure_activated(window)   # v0.46.19 "the knock" — belt: the
+        # window is definitely real by the time the page has landed
         _calm_page_visibility(window)
         if _apply_native_material(window):
             # the body steps aside so the native material shows through
@@ -641,8 +643,69 @@ def _dress(window) -> None:
         pass
 
 
+_KNOCKED: dict = {}       # the startup activation ran (v0.46.19, one-shot)
+
+
+def _ensure_activated(window) -> None:
+    """macOS: come to the front and hand the page its clicks (v0.46.19).
+
+    A window used to open dead whenever something else launched the app:
+    an update relaunch is spawned by the swap script — no LaunchServices
+    activation — and since macOS 14 an app cannot always activate itself,
+    so the window sat behind everything and clicks landed nowhere until
+    the user switched away and back (field reports 2026-10-14: "I have
+    to click the app again", "can't click anything until I alt-tab").
+    The sanctioned NSRunningApplication activation goes first (the
+    deprecated NSApplication call stays for older systems),
+    `orderFrontRegardless` shows the window even if macOS denies the
+    activation, and the web view takes first responder — the classic
+    cure for a WKWebView that ignores input until it owns the keyboard.
+    One-shot (a later reload must not steal focus); every step guarded.
+    """
+    if sys.platform != "darwin" or _KNOCKED.get("done"):
+        return
+    AppKit, _Foundation = _import_appkit()
+    if AppKit is None:
+        return
+    native = getattr(window, "native", None)
+    if native is None:
+        return
+    _KNOCKED["done"] = True
+
+    def _act():
+        try:
+            opts = getattr(AppKit, "NSApplicationActivateAllWindows", 1) | \
+                getattr(AppKit, "NSApplicationActivateIgnoringOtherApps", 2)
+            AppKit.NSRunningApplication.currentApplication() \
+                .activateWithOptions_(opts)
+        except Exception:  # noqa: BLE001 - fall through to the classic call
+            pass
+        try:
+            AppKit.NSApplication.sharedApplication() \
+                .activateIgnoringOtherApps_(True)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            native.makeKeyAndOrderFront_(None)
+            native.orderFrontRegardless()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            view = _find_webview_view(native.contentView())
+            if view is not None:
+                view.window().makeFirstResponder_(view)
+        except Exception:  # noqa: BLE001
+            pass
+
+    _on_main(_act)
+
+
 def _native_glass_ready(window) -> None:
     """webview.start callback: window.native exists only after the GUI is up."""
+    try:
+        _ensure_activated(window)   # v0.46.19 "the knock"
+    except Exception:  # noqa: BLE001 - a dead window beats a dead shell
+        pass
     try:
         # the webview is parented at first-load, not at GUI-start (v0.39.10);
         # some shells (and the test fixtures) carry no events object at all

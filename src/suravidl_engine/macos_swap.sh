@@ -20,6 +20,12 @@
 # Now every attempt is logged (~/Library/Logs/suravidl-update.log), the
 # reopen forces a FRESH instance (`open -n`), and a direct-exec fallback
 # covers LaunchServices saying no. Silence was the real bug.
+#
+# v0.46.19 "the knock": coming back up is not enough — the window must
+# land in FRONT. Since macOS 14 an app launched by a background script
+# cannot always activate itself, so the relaunch asks LaunchServices to
+# raise the fresh instance (a plain open after the open -n), and the app
+# knocks from inside (activation + first responder) at startup.
 set -u
 APP="$2"
 ZIP="$3"
@@ -44,6 +50,32 @@ alive() {
   case "$st" in Z*) return 1 ;; *) return 0 ;; esac
 }
 
+# v0.46.19 "the knock": the relaunched app must come to the FRONT. Since
+# macOS 14 an app launched by a background script cannot always activate
+# itself — the window opens behind everything and, until the user
+# switches back, every click lands dead (field report 2026-10-14: "it
+# installed the update but I have to click the app again", "can't click
+# anything until I alt-tab"). LaunchServices activation from the user
+# session is the sanctioned path, so after a fresh instance is up we ask
+# it to the front with a plain open. Skipped when a stale registration
+# was left alive above: open could land on THAT one instead.
+LEFT_BEHIND=""
+
+knock() {
+  # the window is up; ask LaunchServices to raise it (v0.46.19 "the
+  # knock"). A fresh instance needs a breath to register first.
+  if [ -n "$LEFT_BEHIND" ]; then
+    say "relaunch: activation skipped — a stale registration was left alive"
+    return 0
+  fi
+  sleep 1
+  if open "$1" 2>>"$LOG"; then
+    say "relaunch: activation requested -> $1"
+  else
+    say "relaunch: activation via open failed — the window is up; clicking it brings it forward"
+  fi
+}
+
 relaunch() {
   # the CI dry-run stops before the app comes back up
   [ -n "${SURAVIDL_APPLY_DRYRUN:-}" ] && return 0
@@ -51,19 +83,32 @@ relaunch() {
   # window-less registration — the user sees nothing come back.
   if open -n "$1" 2>>"$LOG"; then
     say "relaunch: open -n ok -> $1"
+    knock "$1"
     return 0
   fi
-  # LaunchServices said no; exec the inside directly — a GUI app spawned
+  # LaunchServices refused a forced instance. A plain open is still one
+  # rung up — it launches through LaunchServices, which also owns the
+  # activation — but only when no stale registration was left alive
+  # (open would raise THAT instead of launching fresh).
+  if [ -z "$LEFT_BEHIND" ] && open "$1" 2>>"$LOG"; then
+    say "relaunch: open -n refused; plain open ok -> $1"
+    knock "$1"
+    return 0
+  fi
+  # Both opens said no; exec the inside directly — a GUI app spawned
   # from a user-session script still gets the Aqua session. The exec name
   # is re-read here, not reused from the top: after the swap the bundle is
   # the NEW one, and a renamed executable would make the fallback exec a
-  # path that no longer exists (v0.46.10 audit A/F11).
+  # path that no longer exists (v0.46.10 audit A/F11). No knock on this
+  # path: a directly-spawned process never registered with LaunchServices,
+  # so an open here would LAUNCH A SECOND instance instead of raising
+  # this one.
   EXEC_NOW="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' \
               "$1/Contents/Info.plist" 2>/dev/null || basename "$1" .app)"
   INNER="$1/Contents/MacOS/$EXEC_NOW"
   if [ -x "$INNER" ]; then
     nohup "$INNER" >/dev/null 2>&1 &
-    say "relaunch: open -n failed; inner executable spawned -> $INNER"
+    say "relaunch: open refused both ways; inner executable spawned -> $INNER (no activation — clicking it brings it forward)"
     return 0
   fi
   say "relaunch: FAILED both ways — the app is at $1"
@@ -94,7 +139,9 @@ if alive "$PID"; then
       done
       kill -KILL "$PID" 2>/dev/null
       ;;
-    *) say "pid $PID lingers but reads as '${COMM:-nothing}' — not the app; leaving it" ;;
+    *) say "pid $PID lingers but reads as '${COMM:-nothing}' — not the app; leaving it"
+       # v0.46.19: a live stale registration — open could land on it
+       LEFT_BEHIND=1 ;;
   esac
 fi
 sleep 1
