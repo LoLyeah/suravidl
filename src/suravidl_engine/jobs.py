@@ -624,7 +624,6 @@ class JobManager:
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
                extra_headers: dict | None = None,
-               xor_key: str | None = None,
                preset: str | None = None,
                playlist_items: str | None = None,
                raw_args: str | None = None,
@@ -633,7 +632,13 @@ class JobManager:
                partials: list | None = None,
                live: bool = False,
                video_id: str | None = None,
-               follow_id: str | None = None) -> dict:
+               follow_id: str | None = None,
+               # v0.47.0: LAST on purpose — the Android harness and older
+               # callers pass the earlier parameters POSITIONALLY (the
+               # mid-signature insertion broke them: a headers dict landed
+               # on the key and the door refused it, caught by the 16k
+               # emulator board)
+               xor_key: str | None = None) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the

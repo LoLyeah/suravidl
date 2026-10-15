@@ -249,6 +249,20 @@ def test_whatsnew_opens_with_this_release():
     assert len(whatsnew.ENTRIES) == 10
 
 
+def test_create_keeps_its_positional_contract():
+    """The Android harness calls create() positionally (url, fmt,
+    extra_headers, preset) — a new parameter must go LAST or a headers
+    dict lands on it. The v0.47.0 mid-signature insertion did exactly
+    that and the 16k emulator board caught it before any tag existed."""
+    import inspect
+
+    from suravidl_engine.jobs import JobManager
+
+    params = list(inspect.signature(JobManager.create).parameters)
+    assert params[:5] == ["self", "url", "fmt", "extra_headers", "preset"]
+    assert params[-1] == "xor_key", "new parameters go last"
+
+
 # --- the extension side: the key's travel ------------------------------------
 
 
