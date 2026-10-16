@@ -242,11 +242,15 @@ def test_the_probe_reads_the_decoded_tree(tmp_path, veil_rig):
 def test_whatsnew_opens_with_this_release():
     from suravidl_engine import __version__
 
-    assert __version__ == "0.47.0"
     top = whatsnew.ENTRIES[0]
-    assert top["version"] == "0.47.0"
-    assert top["title"].lower() == "the veil"
+    assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
+    # v0.47.1 "the pocket" — this round's entry stays among the living
+    # ten (the strict current-version pin moved to that release's test
+    # file, per the retirement policy)
+    assert any(e["version"] == "0.47.0"
+               and e["title"].lower() == "the veil"
+               for e in whatsnew.ENTRIES)
 
 
 def test_create_keeps_its_positional_contract():

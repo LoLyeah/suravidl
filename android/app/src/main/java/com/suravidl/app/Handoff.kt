@@ -48,11 +48,19 @@ object Handoff {
     ): JSONObject? = post(base, token, "/classify",
                           JSONObject().put("url", url).put("headers", JSONObject(headers)))
 
+    /** The /jobs body both doors share; the decode key rides when captured
+     *  (v0.47.1 "the pocket" — scrambled playlists). */
+    private fun jobBody(
+        url: String, headers: Map<String, String>, xorKey: String
+    ): JSONObject =
+        JSONObject().put("url", url).put("headers", JSONObject(headers))
+            .apply { if (xorKey.isNotEmpty()) put("xor_key", xorKey) }
+
     /** Queue the download. Returns the job id the engine assigned, or null. */
     fun download(
-        base: String, token: String, url: String, headers: Map<String, String>
-    ): String? = post(base, token, "/jobs",
-                      JSONObject().put("url", url).put("headers", JSONObject(headers)))
+        base: String, token: String, url: String, headers: Map<String, String>,
+        xorKey: String = ""
+    ): String? = post(base, token, "/jobs", jobBody(url, headers, xorKey))
         ?.optString("id")?.ifEmpty { null }
 
     /**
@@ -83,12 +91,11 @@ object Handoff {
      */
     fun downloadWhenReady(
         base: String, token: String, url: String, headers: Map<String, String>,
-        attempts: Int = 24, delayMs: Long = 1500
+        xorKey: String = "", attempts: Int = 24, delayMs: Long = 1500
     ): String? {
         repeat(attempts) { i ->
             val (resp, retryable) = postOutcome(
-                base, token, "/jobs",
-                JSONObject().put("url", url).put("headers", JSONObject(headers)))
+                base, token, "/jobs", jobBody(url, headers, xorKey))
             if (resp != null) return resp.optString("id").ifEmpty { null }
             if (!retryable) return null
             if (i < attempts - 1) {

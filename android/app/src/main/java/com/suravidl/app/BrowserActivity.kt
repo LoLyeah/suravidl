@@ -110,6 +110,16 @@ class BrowserActivity : AppCompatActivity() {
     /** What the engine says each find *is* — kind, size, drm. Filled off the UI
      *  thread, one URL at a time, by [classifyOne]. */
     private val info = HashMap<String, JSONObject>()
+
+    /**
+     * The page's captured decode key for scrambled playlists (v0.47.1 "the
+     * pocket"), set from the injected script through [SniffBridge.pk]. One
+     * WebView, one page at a time — the last value wins, like the
+     * extension's per-tab store. It rides the handoff; the engine
+     * validates it against the stream.
+     */
+    @Volatile
+    private var sniffPk: String = ""
     private val queued = HashSet<String>()
     private val classifyQueue = LinkedHashSet<String>()
     private val worker = Executors.newSingleThreadExecutor()
@@ -796,7 +806,7 @@ class BrowserActivity : AppCompatActivity() {
         worker.execute {
             // patient: the engine may still be booting when the first
             // tap lands moments after the sniff (see downloadWhenReady)
-            val id = Handoff.downloadWhenReady(engineOrigin(), token, c.url, headers)
+            val id = Handoff.downloadWhenReady(engineOrigin(), token, c.url, headers, sniffPk)
             ui.post {
                 if (id == null) {
                     toast("the engine refused it — is it still running?")
@@ -939,6 +949,22 @@ class BrowserActivity : AppCompatActivity() {
             // working, not an attack: same-origin frames belong to the page.
             if (sniffEnforced && token != sniffToken) return
             SniffLog.add(url ?: return, via ?: "hook", frame ?: "", false)
+        }
+
+        /**
+         * The page's decode key for scrambled playlists (v0.47.1 "the
+         * pocket"): the injected script reads `window.__pk` and posts it
+         * here, the same token rule as [report]. Session material — it only
+         * ever rides to the engine with the handoff, and the engine
+         * validates it against the stream itself, so a forged key fails
+         * that page's own download and nothing else.
+         */
+        @android.webkit.JavascriptInterface
+        fun pk(value: String?, frame: String?, token: String?) {
+            if (sniffEnforced && token != sniffToken) return
+            val v = value ?: return
+            if (v.length < 16 || v.length > 512) return
+            sniffPk = v
         }
     }
 

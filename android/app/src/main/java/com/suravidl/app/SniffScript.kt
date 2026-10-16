@@ -138,6 +138,24 @@ object SniffScript {
         } catch (e) {}
         srcs();
         injectFrames();
+        // v0.47.1 "the pocket": scrambled playlists keep their decode key on
+        // window.__pk (the player's own WASM exports it). Read it — bounded —
+        // and hand it to the bridge; the engine validates it against the
+        // stream, so a page posting a fake one only fails its own download.
+        var __pkTicks = 0;
+        function pk() {
+          try {
+            var v = window.__pk;
+            if (typeof v === 'string' && v.length >= 16 && v.length <= 512 && v !== window.__svPkSent) {
+              window.__svPkSent = v;
+              try { if (B.pk) B.pk(v, location.href, __T); } catch (e) {}
+            }
+          } catch (e) {}
+        }
+        pk();
+        try {
+          var __pkT = setInterval(function () { pk(); if (++__pkTicks > 200) clearInterval(__pkT); }, 1500);
+        } catch (e) {}
         var __svSoon = 0;
         try {
           new MutationObserver(function () {

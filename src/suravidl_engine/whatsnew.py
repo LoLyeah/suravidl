@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.1",
+        "title": "The pocket",
+        "items": [
+            "Scrambled playlists now work on the phone too: the in-app browser's sniffer lifts the player's decode key while you watch, and the download rides it to the engine — reanime.to and friends download like any other site.",
+        ],
+    },
+    {
         "version": "0.47.0",
         "title": "The veil",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The walk",
         "items": [
             "The seal's bridge check now applies only where it can protect every frame: older WebViews keep the frame walk's pre-seal model, so media inside players' iframes is found again.",
-        ],
-    },
-    {
-        "version": "0.46.11",
-        "title": "The solder",
-        "items": [
-            "The phone build ships again: the in-browser sniffer's second injector was missing the wire the seal added — threaded through, and the APK is back on the release page.",
         ],
     },
 ]
