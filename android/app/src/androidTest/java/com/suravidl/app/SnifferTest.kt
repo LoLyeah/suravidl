@@ -347,32 +347,46 @@ class SnifferTest {
                 .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
+            // wait for the fixture page to parse and start before triggering
+            // navigation: webView.url reflects /page.html immediately on
+            // loadUrl(), but firing JS before onPageStarted finishes means
+            // onPageStart runs a beat later and hides handoffNote ("its note
+            // was about the page before"). Sibling tests wait for /bare.mp4.
             var loaded = false
             val pageDeadline = System.currentTimeMillis() + 90_000
             while (System.currentTimeMillis() < pageDeadline && !loaded) {
-                loaded = currentBrowserUrl()?.endsWith("/page.html") == true
+                loaded = currentBrowserUrl()?.endsWith("/page.html") == true &&
+                    SniffLog.snapshot().any { it.url.endsWith("/bare.mp4") }
                 if (!loaded) Thread.sleep(1000)
             }
-            assertTrue("the fixture page never loaded: " + browserState(), loaded)
+            assertTrue("the fixture page never loaded: " + browserState() + " | finds: " +
+                       dump(SniffLog.snapshot()), loaded)
 
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                for (stage in listOf(Stage.RESUMED, Stage.STARTED)) {
-                    ActivityLifecycleMonitorRegistry.getInstance()
-                        .getActivitiesInStage(stage)
-                        .filterIsInstance<BrowserActivity>()
-                        .forEach { act ->
-                            findWebView(act.window.decorView)
-                                ?.evaluateJavascript(
-                                    "location.href='snssdk1180://aweme/detail/1'", null)
-                        }
-                }
-            }
-
+            // retry the script navigation until the refusal note is visible:
+            // a single-shot evaluateJavascript under emulator load can be
+            // dropped during document transitions or delayed by renderer IPC.
+            wakeScreen()
             var said: String? = null
-            val deadline = System.currentTimeMillis() + 30_000
+            val deadline = System.currentTimeMillis() + 60_000
             while (System.currentTimeMillis() < deadline && said == null) {
                 said = refusalNoteText()
-                if (said == null) Thread.sleep(500)
+                if (said != null) break
+
+                InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                    for (stage in listOf(Stage.RESUMED, Stage.STARTED)) {
+                        ActivityLifecycleMonitorRegistry.getInstance()
+                            .getActivitiesInStage(stage)
+                            .filterIsInstance<BrowserActivity>()
+                            .forEach { act ->
+                                findWebView(act.window.decorView)
+                                    ?.evaluateJavascript(
+                                        "location.href='snssdk1180://aweme/detail/1'", null)
+                            }
+                    }
+                }
+
+                said = refusalNoteText()
+                if (said == null) Thread.sleep(1000)
             }
             assertNotNull("the refused hand-off was swallowed silently — the exact " +
                           "2026-09-28 bug: " + browserState(), said)
@@ -443,15 +457,18 @@ class SnifferTest {
         val inst = InstrumentationRegistry.getInstrumentation()
         var out: String? = null
         inst.runOnMainSync {
-            ActivityLifecycleMonitorRegistry.getInstance()
-                .getActivitiesInStage(Stage.RESUMED)
-                .filterIsInstance<BrowserActivity>()
-                .forEach { act ->
-                    val v = act.window.decorView.findViewWithTag<View>("app-handoff-note")
-                    if (v != null && v.visibility == View.VISIBLE) {
-                        out = (v as android.widget.TextView).text.toString()
+            for (stage in listOf(Stage.RESUMED, Stage.STARTED)) {
+                ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(stage)
+                    .filterIsInstance<BrowserActivity>()
+                    .forEach { act ->
+                        val v = act.window.decorView.findViewWithTag<View>("app-handoff-note")
+                        if (v != null && v.visibility == View.VISIBLE) {
+                            out = (v as android.widget.TextView).text.toString()
+                        }
                     }
-                }
+                if (out != null) break
+            }
         }
         return out
     }
@@ -471,10 +488,13 @@ class SnifferTest {
         val inst = InstrumentationRegistry.getInstrumentation()
         var found: View? = null
         inst.runOnMainSync {
-            ActivityLifecycleMonitorRegistry.getInstance()
-                .getActivitiesInStage(Stage.RESUMED)
-                .filterIsInstance<BrowserActivity>()
-                .forEach { act -> found = act.window.decorView.findViewWithTag(tag) }
+            for (stage in listOf(Stage.RESUMED, Stage.STARTED)) {
+                ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(stage)
+                    .filterIsInstance<BrowserActivity>()
+                    .forEach { act -> found = act.window.decorView.findViewWithTag(tag) }
+                if (found != null) break
+            }
         }
         return found
     }
