@@ -319,6 +319,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     rankWithEngine(msg.items || []).then(sendResponse);
     return true;
   }
+  if (msg && msg.type === "shape") {
+    shapeWithEngine(msg.items || [], msg.tabId).then(sendResponse);
+    return true;
+  }
   if (msg && msg.type === "engineState") {
     engineState().then(sendResponse);
     return true;
@@ -394,6 +398,38 @@ async function rankWithEngine(items) {
     if (res.ok) return await res.json();
   } catch (e) {
     /* fall through: show everything */
+  }
+  return null;
+}
+
+// The stream's own shape: a master manifest says each variant's resolution
+// and each audio rendition's name. The popup labels rows with this — a row
+// called "video" by its URL becomes "Video · 1080p" (v0.47.3).
+async function shapeWithEngine(items, tabId) {
+  const eng = await resolveEngine();
+  if (!eng.ok) return null;
+  const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
+  let headers = {};
+  for (const m of items) {
+    const hit = stored.reqHeaders[m.url];
+    if (hit && hit.headers) { headers = hit.headers; break; }
+  }
+  try {
+    const res = await fetch(eng.base + "/sniff/shape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + stored.engineToken,
+      },
+      body: JSON.stringify({
+        urls: items.map((m) => m.url),
+        headers,
+        xor_key: (await pkFor(tabId)) || undefined,
+      }),
+    });
+    if (res.ok) return await res.json();
+  } catch (e) {
+    /* fall through: labels fall back to the URL */
   }
   return null;
 }

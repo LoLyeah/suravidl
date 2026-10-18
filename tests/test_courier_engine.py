@@ -358,11 +358,15 @@ def test_the_silent_upgrade_command_keeps_its_flags():
 
 
 def test_the_applier_honestly_refuses_outside_windows(tmp_path):
+    """v0.47.3: a refusal is never a silent False — it is a sentence the
+    toast can show verbatim."""
     from suravidl_engine.__main__ import _make_apply_update_action
 
     act = _make_apply_update_action(None)
-    assert act(str(tmp_path / "whatever.exe")) is False
-    assert act(None) is False
+    missing = tmp_path / "whatever.exe"
+    assert act(str(missing)) == ("the staged installer is gone — download "
+                                 "the update again")
+    assert act(None) == "the engine has no staged installer to apply"
 
 
 def test_the_desktop_actions_carry_the_applier():

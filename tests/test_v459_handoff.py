@@ -59,8 +59,8 @@ def test_the_fallback_wait_when_no_pid_was_handed_over():
 
 
 def test_the_applier_hands_over_its_own_pid():
-    assert "_windows_apply_command(staged, _installed_exe()," in MAIN
-    assert "os.getpid()" in MAIN
+    assert "relaunch = _installed_exe()" in MAIN
+    assert "_windows_apply_command(staged, relaunch, os.getpid())" in MAIN
 
 
 def test_the_chain_spawn_is_not_detached():

@@ -1390,6 +1390,23 @@ def _installed_exe() -> str | None:
     return str(Path(local) / "Programs" / "suravidl" / "suravidl.exe")
 
 
+def _update_log_trail(lines: list[str]) -> None:
+    """The applier's own trail, in the file the PowerShell chain writes.
+
+    v0.45.9 promised a hiccup is never invisible; the refusal path broke
+    that promise by returning a bare False. Every refusal now leaves its
+    reason on disk (v0.47.3).
+    """
+    try:
+        p = Path.home() / ".suravidl" / "update.log"
+        p.parent.mkdir(mode=0o700, exist_ok=True)
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open(p, "a", encoding="utf-8", errors="replace") as fh:
+            fh.write(f"=== {stamp} ===\n" + "\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
 def _make_apply_update_action(window):
     """The desktop_actions["apply_update"] the courier's /update/apply calls.
 
@@ -1401,15 +1418,17 @@ def _make_apply_update_action(window):
     """
     def _apply_update(installer_path=None):
         if not installer_path:
-            return False
+            return "the engine has no staged installer to apply"
         staged = str(installer_path)
         if not Path(staged).is_file():
-            return False
+            _update_log_trail([f"staged file missing: {staged}"])
+            return ("the staged installer is gone — download the update "
+                    "again")
         import subprocess
 
         if os.name == "nt":
-            cmd = _windows_apply_command(staged, _installed_exe(),
-                                           os.getpid())
+            relaunch = _installed_exe()
+            cmd = _windows_apply_command(staged, relaunch, os.getpid())
             try:
                 subprocess.Popen(
                     cmd, close_fds=True,
@@ -1422,8 +1441,17 @@ def _make_apply_update_action(window):
                     # keeps the chain genuinely running and still outlives
                     # us: it holds no tie to our console or our exit.
                     creationflags=_CREATE_NO_WINDOW)
-            except Exception:  # noqa: BLE001 - the UI reports nothing staged ran
-                return False
+            except Exception as e:  # noqa: BLE001 - the UI reports why
+                # never a silent refusal (v0.47.3): the reason reaches the
+                # toast verbatim and the trail on disk
+                _update_log_trail([
+                    f"applier refused: {type(e).__name__}: {e}",
+                    f"staged: {staged} (exists={Path(staged).is_file()})",
+                    f"pid: {os.getpid()} relaunch: {relaunch!r}",
+                ])
+                return (f"the updater could not start "
+                        f"({type(e).__name__}): {e}")
+            _update_log_trail([f"applier spawned for {staged}"])
             window.destroy()   # hand the locks back; the chain does the rest
             return True
 
@@ -1603,7 +1631,8 @@ def main() -> None:
             _start_badge_poller(window, url, token)   # v0.40.6: the tally
 
         try:
-            webview.start(_ready)
+            webview.start(_ready, private_mode=False,
+                          storage_path=str(Path.home() / ".suravidl" / "webview"))
         except Exception:  # noqa: BLE001 - fall back to the browser
             window = None
             # the window never came up (headless host, missing Qt/GTK, …):

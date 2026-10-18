@@ -192,11 +192,15 @@ def test_the_served_tree_has_no_disguised_names(disguise_rig):
 def test_whatsnew_opens_with_this_release():
     from suravidl_engine import __version__, whatsnew
 
-    assert __version__ == "0.47.2"
     top = whatsnew.ENTRIES[0]
-    assert top["version"] == "0.47.2"
-    assert top["title"].lower() == "the masquerade"
+    assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
+    # v0.47.3 "the legend" — this round's entry stays among the living
+    # ten (the strict current-version pin moved to that release's test
+    # file, per the retirement policy)
+    assert any(e["version"] == "0.47.2"
+               and e["title"].lower() == "the masquerade"
+               for e in whatsnew.ENTRIES)
 
 
 def test_the_popup_names_the_tree():
@@ -207,6 +211,7 @@ def test_the_popup_names_the_tree():
     assert "All qualities" in popup
     assert "Show the {n} separate streams" in popup
     assert 'if (role.role === "audio")' in popup
-    assert "v0.5.17" in (ROOT / "extension/popup.html").read_text()
+    man = json.loads((ROOT / "extension/manifest.json").read_text())["version"]
+    assert "v" + man in (ROOT / "extension/popup.html").read_text()
     for rel in ("extension/manifest.json", "extension/firefox/manifest.json"):
-        assert json.loads((ROOT / rel).read_text())["version"] == "0.5.17"
+        assert json.loads((ROOT / rel).read_text())["version"] == man

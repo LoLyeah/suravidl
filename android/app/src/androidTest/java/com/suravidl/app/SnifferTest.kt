@@ -43,11 +43,19 @@ class SnifferTest {
         val server = FixtureServer().start()
         SniffLog.clear()
         try {
-            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val target = server.url("/page.html")
+            fun launch() {
+                wakeScreen()
+                ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                    .putExtra(BrowserActivity.EXTRA_URL, target)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                              Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                              Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            launch()
 
             val deadline = System.currentTimeMillis() + 120_000
+            var ticks = 0
             while (System.currentTimeMillis() < deadline) {
                 val seen = SniffLog.snapshot()
                 // Wait for the ATTRIBUTION the assertions below read, not just
@@ -62,13 +70,17 @@ class SnifferTest {
                     bySuffix(seen, "/bare.mp4") != null &&
                     inner?.frame?.contains("/inner.html") == true &&
                     seen.any { it.via == "mse" }) break
+                ticks++
+                if (ticks % 10 == 0 || (ticks == 3 && currentBrowserUrl()?.endsWith("/page.html") != true)) {
+                    launch()
+                }
                 Thread.sleep(1000)
             }
 
             val items = SniffLog.snapshot()
             val manifest = bySuffix(items, "/fixture.m3u8")
-            assertNotNull("the manifest the page fetched by script was missed: " + dump(items),
-                          manifest)
+            assertNotNull("the manifest the page fetched by script was missed. Browser: " +
+                          browserState() + " | finds: " + dump(items), manifest)
             assertEquals("the fetch hook never fired — only the network layer saw it: " +
                          dump(items), "fetch", manifest!!.via)
             assertNotNull("the video element in the page was missed: " + dump(items),
@@ -154,25 +166,37 @@ class SnifferTest {
         val server = FixtureServer().start()
         SniffLog.clear()
         try {
-            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val target = server.url("/page.html")
+            fun launch() {
+                wakeScreen()
+                ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                    .putExtra(BrowserActivity.EXTRA_URL, target)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                              Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                              Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            launch()
 
             // The static tests prove the chip *code* exists; this proves the row
             // for a find actually carries one, tagged with that find's URL —
             // which is the half a mutation can delete without anyone noticing.
             var tagged: String? = null
             val deadline = System.currentTimeMillis() + 120_000
+            var ticks = 0
             while (System.currentTimeMillis() < deadline && tagged == null) {
                 val found = SniffLog.snapshot().firstOrNull { it.url.endsWith("/fixture.m3u8") }
                 if (found != null && viewWithTag("download:" + found.url) != null) {
                     tagged = found.url
                 } else {
+                    ticks++
+                    if (ticks % 10 == 0 || (ticks == 3 && currentBrowserUrl()?.endsWith("/page.html") != true)) {
+                        launch()
+                    }
                     Thread.sleep(1000)
                 }
             }
-            assertNotNull("no live row offered a Download button for the find: " +
-                          dump(SniffLog.snapshot()), tagged)
+            assertNotNull("no live row offered a Download button for the find. Browser: " +
+                          browserState() + " | finds: " + dump(SniffLog.snapshot()), tagged)
         } finally {
             server.stop()
         }
@@ -184,20 +208,43 @@ class SnifferTest {
         val server = FixtureServer().start()
         SniffLog.clear()
         try {
-            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL, server.url("/noext.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val target = server.url("/noext.html")
+            fun launch() {
+                wakeScreen()
+                ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                    .putExtra(BrowserActivity.EXTRA_URL, target)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                              Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                              Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            launch()
 
+            // wait for the player sighting with full attribution: under
+            // emulator load an existing singleTask activity can drop a
+            // single-shot launch or pause behind a sleeping screen, so wake
+            // and re-dispatch if the URL hasn't landed or finds stay empty.
             var found: Sniffed? = null
             val deadline = System.currentTimeMillis() + 120_000
+            var ticks = 0
             while (System.currentTimeMillis() < deadline) {
-                found = SniffLog.snapshot().firstOrNull { it.url.endsWith("/media/plainid1234") }
+                val seen = SniffLog.snapshot()
+                found = seen.firstOrNull {
+                    it.url.endsWith("/media/plainid1234") &&
+                        it.via == "player" &&
+                        it.frame.contains("/noext-inner.html")
+                }
                 if (found != null) break
+
+                ticks++
+                if (ticks % 10 == 0 || (ticks == 3 && currentBrowserUrl()?.endsWith("/noext.html") != true)) {
+                    launch()
+                }
                 Thread.sleep(1000)
             }
             assertNotNull("an extension-less stream the player itself points at was missed " +
                           "— the real site served /1Vvp1Q5ixT-GxZcW4IToe with no extension " +
-                          "at all: " + dump(SniffLog.snapshot()), found)
+                          "at all. Browser: " + browserState() + " | finds: " +
+                          dump(SniffLog.snapshot()), found)
             assertEquals("the player's own source is a 'player' find", "player", found!!.via)
             assertTrue("the frame the stream lives in must be recorded — it becomes the " +
                        "referer: " + found!!.frame, found!!.frame.contains("/noext-inner.html"))
@@ -232,28 +279,53 @@ class SnifferTest {
         val server = FixtureServer().start()
         SniffLog.clear()
         try {
-            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL, server.url("/xframe.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val target = server.url("/xframe.html")
+            fun launch() {
+                wakeScreen()
+                ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                    .putExtra(BrowserActivity.EXTRA_URL, target)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                              Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                              Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            launch()
 
+            // wait for both the element source and the script fetch with full
+            // cross-origin attribution: mirror the launch retry and screen wake
+            // so an existing singleTask activity doesn't drop the intent.
             var player: Sniffed? = null
             var fetched: Sniffed? = null
             val deadline = System.currentTimeMillis() + 120_000
+            var ticks = 0
             while (System.currentTimeMillis() < deadline) {
                 val seen = SniffLog.snapshot()
-                player = seen.firstOrNull { it.url.endsWith("/xinner.mp4") }
-                fetched = seen.firstOrNull { it.url.endsWith("/xinner2.m3u8") }
-                if (player?.via == "player" && fetched?.via == "fetch") break
+                player = seen.firstOrNull {
+                    it.url.endsWith("/xinner.mp4") &&
+                        it.via == "player" &&
+                        it.frame.contains("localhost")
+                }
+                fetched = seen.firstOrNull {
+                    it.url.endsWith("/xinner2.m3u8") &&
+                        it.via == "fetch"
+                }
+                if (player != null && fetched != null) break
+
+                ticks++
+                if (ticks % 10 == 0 || (ticks == 3 && currentBrowserUrl()?.endsWith("/xframe.html") != true)) {
+                    launch()
+                }
                 Thread.sleep(1000)
             }
-            assertEquals("the cross-origin frame's player never reached the script layers — " +
-                         "only its network request was seen: " + dump(SniffLog.snapshot()),
-                         "player", player?.via)
+            assertNotNull("the cross-origin frame's player never reached the script layers — " +
+                          "only its network request was seen. Browser: " + browserState() +
+                          " | finds: " + dump(SniffLog.snapshot()), player)
+            assertEquals("player", player!!.via)
             assertTrue("the frame the stream lives in must be recorded as the cross-origin " +
                        "one: " + dump(SniffLog.snapshot()),
-                       player!!.frame.contains("localhost"))
-            assertEquals("the cross-origin frame's script fetch never fired: " +
-                         dump(SniffLog.snapshot()), "fetch", fetched?.via)
+                       player.frame.contains("localhost"))
+            assertNotNull("the cross-origin frame's script fetch never fired. Browser: " +
+                          browserState() + " | finds: " + dump(SniffLog.snapshot()), fetched)
+            assertEquals("fetch", fetched!!.via)
         } finally {
             server.stop()
         }
@@ -308,18 +380,31 @@ class SnifferTest {
         val ctx = InstrumentationRegistry.getInstrumentation().targetContext
         val server = FixtureServer().start()
         try {
-            wakeScreen()
-            ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
-                .putExtra(BrowserActivity.EXTRA_URL, server.url("/page.html"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val target = server.url("/page.html")
+            fun launch() {
+                wakeScreen()
+                ctx.startActivity(Intent(ctx, BrowserActivity::class.java)
+                    .putExtra(BrowserActivity.EXTRA_URL, target)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+                              Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                              Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }
+            launch()
             var hint: View? = null
             val deadline = System.currentTimeMillis() + 60_000
+            var ticks = 0
             while (System.currentTimeMillis() < deadline && hint == null) {
                 hint = viewWithTag("signin-hint")
-                if (hint == null) Thread.sleep(1000)
+                if (hint == null) {
+                    ticks++
+                    if (ticks % 10 == 0 || (ticks == 3 && currentBrowserUrl()?.endsWith("/page.html") != true)) {
+                        launch()
+                    }
+                    Thread.sleep(1000)
+                }
             }
-            assertNotNull("the browser no longer offers the sign-in route on screen",
-                          hint)
+            assertNotNull("the browser no longer offers the sign-in route on screen. Browser: " +
+                          browserState(), hint)
             val text = (hint as android.widget.TextView).text.toString()
             assertTrue("the hint must say the session travels with the download: $text",
                        text.contains("session goes with the download"))

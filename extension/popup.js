@@ -26,6 +26,7 @@ applyI18n();   // the static strings; dynamic ones go through t() at paint
 let TAB = null;
 let ITEMS = [];      // every find on the tab
 let RANK = null;     // the engine's shape for them (hides fragments)
+let SHAPE = null;    // the manifests' own shape: variants + audio tracks
 let SENT = false;
 let INPUTS = [];     // the live row checkboxes, in list order
 let SHOW_PARTS = false;  // a stream's variants/audio unfold on demand
@@ -115,7 +116,36 @@ function roleOf(url) {
   return { role: "playlist", name: last };
 }
 
+// The engine read the manifests themselves: a variant's resolution, an audio
+// rendition's name. That beats anything the URL can say (v0.47.3).
+function resFromResolution(r) {
+  const m = /^\d+x(\d+)$/.exec(String(r || ""));
+  return m ? m[1] + "p" : "";
+}
+
+function shapeChild(url) {
+  const out = { role: "", res: "", name: "" };
+  for (const it of (SHAPE && SHAPE.items) || []) {
+    for (const v of it.variants || []) {
+      if (v.url === url) { out.role = "variant"; out.res = resFromResolution(v.res); }
+    }
+    for (const a of it.audio || []) {
+      if (a.url === url) { out.role = "audio"; out.name = a.name || a.lang || ""; }
+    }
+    if (out.role) break;
+  }
+  return out;
+}
+
+function shapeMaster(url) {
+  return ((SHAPE && SHAPE.items) || [])
+    .find((it) => it.url === url && it.master) || null;
+}
+
 function streamLabel(m) {
+  const child = shapeChild(m.url);
+  if (child.role === "variant" && child.res) return t("Video") + " · " + child.res;
+  if (child.role === "audio") return t("Audio") + (child.name ? " · " + child.name : "");
   const role = roleOf(m.url);
   if (role.role === "master") return t("All qualities");
   if (role.role === "audio") return role.name ? t("Audio") + " · " + role.name : t("Audio");
@@ -304,8 +334,12 @@ function render() {
     const grouped = groupRows(vis);
     const rows = [];
     if (grouped && !SHOW_PARTS) {
-      const quals = [...new Set(grouped.parts.filter((p) => p.role.res).map((p) => p.role.res))];
-      const audio = grouped.parts.filter((p) => p.role.role === "audio").length;
+      const sm = shapeMaster(grouped.master.url);
+      const quals = sm
+        ? [...new Set((sm.variants || []).map((v) => resFromResolution(v.res)).filter(Boolean))]
+        : [...new Set(grouped.parts.filter((p) => p.role.res).map((p) => p.role.res))];
+      const audio = (sm ? (sm.audio || []).length : 0) ||
+        grouped.parts.filter((p) => p.role.role === "audio").length;
       let label = streamLabel(grouped.master);
       if (quals.length) label += " · " + quals.join(" ");
       if (audio) label += " · " + t("{n} audio", { n: audio });
@@ -493,6 +527,9 @@ $("rescan").onclick = () => location.reload();
   ITEMS = (res && res.items) || [];
   try {
     RANK = await api.runtime.sendMessage({ type: "rank", items: ITEMS });
+    SHAPE = await api.runtime.sendMessage({
+      type: "shape", items: ITEMS, tabId: (TAB || {}).id,
+    });
   } catch (_) { /* engine not answering: show everything */ }
   render();
 })();

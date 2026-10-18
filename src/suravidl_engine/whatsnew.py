@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.3",
+        "title": "The legend",
+        "items": [
+            "The stream list names each row from the manifest itself — a real resolution, the audio track's name, one 'All qualities' row — the what's-new card now survives a restart, and a refused update says why.",
+        ],
+    },
+    {
         "version": "0.47.2",
         "title": "The masquerade",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The round",
         "items": [
             "The ETA reads like a time, not a calculator tape: 19s of estimate used to print as 19.126124260462905s — it now wears the same clock as every other duration (0:19, 2:05, 1:02:03).",
-        ],
-    },
-    {
-        "version": "0.46.13",
-        "title": "The still",
-        "items": [
-            "The queue stops blinking: a failed card next to finished takes was re-inserted on every poll — its fade replaying every second. The failure caption now keeps its place above the failures, and the cards hold still.",
         ],
     },
 ]

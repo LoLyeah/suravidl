@@ -575,3 +575,78 @@ def rank(urls: list) -> dict:
         else:
             items.append({"url": u, "kind": "media", "hidden": False, "reason": ""})
     return {"items": items, "hidden": sum(1 for i in items if i["hidden"])}
+
+
+# -- the stream's own shape: what the manifest says about its parts ----------
+
+# A master can list many renditions; the pack of them is still small. One
+# ranged read, capped like the size estimator, and silence on any failure:
+# labels are a courtesy, never a gate.
+MANIFEST_BYTES = 256 * 1024
+
+_ATTR = re.compile(r'([A-Z0-9-]+)=("([^"]*)"|([^,]*))')
+
+
+def _x_decode(body: str, xor_key: str | None) -> str:
+    """The playlist text, lifting the veil when a key rode along."""
+    if "#EXTM3U" in body[:64] or not xor_key:
+        return body
+    try:  # late import: obfuscated imports this module's header defaults
+        from .obfuscated import decode_key, xor_decode
+        key = decode_key(xor_key)
+        return (xor_decode(body, key) if key else None) or body
+    except Exception:  # noqa: BLE001 - a stale key is not a label emergency
+        return body
+
+
+def _attrs(line: str) -> dict:
+    head = line.split(":", 1)[1] if ":" in line else line
+    return {m.group(1): m.group(3) if m.group(3) is not None else m.group(4)
+            for m in _ATTR.finditer(head)}
+
+
+def manifest_shape(urls: list, headers: dict | None = None,
+                   xor_key: str | None = None, fetch=None) -> dict:
+    """Map a manifest's parts: variant resolutions/bandwidths and audio
+    renditions (name, language), as absolute urls.
+
+    The extension draws "Video · 1080p" and "Audio · Japanese" from this
+    answer instead of from the URL, whose last path token ("video", "native",
+    a bare id) says nothing a person can use. One read per manifest, eight at
+    most, and every failure is silent — the shell falls back to URL names.
+    """
+    fetch = fetch or _http_fetch
+    items = []
+    for u in [x for x in urls if _is_manifest(x)][:8]:
+        ent = {"url": u, "master": False, "variants": [], "audio": []}
+        try:
+            got = fetch(u, headers, "GET", MANIFEST_BYTES)
+            body = (got.body or b"").decode("utf-8", "replace") if got.ok() else ""
+        except Exception:  # noqa: BLE001 - labels are a courtesy
+            body = ""
+        text = _x_decode(body, xor_key)
+        if "#EXTM3U" in text[:64]:
+            want = None
+            for line in text.splitlines():
+                line = line.strip()
+                if line.startswith("#EXT-X-STREAM-INF:"):
+                    ent["master"] = True
+                    want = _attrs(line)
+                    continue
+                if want is not None and line and not line.startswith("#"):
+                    ent["variants"].append({
+                        "url": urljoin(u, line),
+                        "res": want.get("RESOLUTION") or "",
+                        "bandwidth": want.get("BANDWIDTH") or "",
+                    })
+                    want = None
+                elif line.startswith("#EXT-X-MEDIA:"):
+                    a = _attrs(line)
+                    if a.get("TYPE") == "AUDIO" and a.get("URI"):
+                        ent["audio"].append({
+                            "url": urljoin(u, a["URI"]),
+                            "name": a.get("NAME") or "",
+                            "lang": a.get("LANGUAGE") or "",
+                        })
+        items.append(ent)
+    return {"items": items}

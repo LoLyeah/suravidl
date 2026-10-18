@@ -66,6 +66,12 @@ class RankRequest(BaseModel):
     urls: list[str] = []
 
 
+class ShapeRequest(BaseModel):
+    urls: list[str] = []
+    headers: dict[str, str] = {}
+    xor_key: str | None = None
+
+
 class HandoffRequest(BaseModel):
     """What the browser extension hands over (v0.39.0).
 
@@ -915,6 +921,12 @@ def create_app(download_dir, auth_token: str | None = None,
         nothing else is touched.
         """
         return rank(body.urls[:200])
+
+    @app.post("/sniff/shape")
+    def sniff_shape(body: ShapeRequest, mgr: JobManager = Depends(require_auth)):
+        from .classify import manifest_shape
+        return manifest_shape(body.urls[:50], headers=body.headers or None,
+                              xor_key=body.xor_key)
 
     @app.post("/handoff")
     def create_handoff(body: HandoffRequest,
