@@ -135,6 +135,14 @@ TIKTOK_FLAKE_HINT = (
 # and this attempt carried no decode key (a paste), or a stale one.
 _OBFUSCATED_BODY = re.compile(r"no m3u header|does not decode", re.IGNORECASE)
 
+# ffmpeg could not OPEN the output file while finishing a download
+# (v0.47.4 "the minutes"): on Windows this is a name the filesystem
+# refuses, a full disk (reported as this same error), or antivirus/OneDrive
+# holding the file — never a broken download.
+_OUTPUT_OPEN = re.compile(
+    r"opening output files|error opening output file"
+    r"|unable to choose an output format", re.IGNORECASE)
+
 # Query credentials that must never ride out inside an error message the
 # user reads or the row the engine persists: signed links commonly carry
 # these in the URL itself.
@@ -185,6 +193,12 @@ def explain_download_error(text: str) -> str:
                 "downloader only ever gets the scrambled blob); sniff the "
                 "stream from the page with the suravidl extension so the "
                 "decode key rides along, then download again.")
+    if _OUTPUT_OPEN.search(text):
+        return (f"{text} — the download itself finished; finishing it "
+                "(joining video and audio) could not open the output file. "
+                "On Windows that is usually a filename the filesystem "
+                "refuses, a full disk, or antivirus holding the file. "
+                "View log has the exact ffmpeg line.")
     if is_tiktok_flake(text):
         return f"{text} — {TIKTOK_FLAKE_HINT}"
     return text

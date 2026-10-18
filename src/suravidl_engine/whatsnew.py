@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.4",
+        "title": "The minutes",
+        "items": [
+            "A failed finish now explains itself: the log keeps what yt-dlp and ffmpeg actually said, and an output file that cannot be opened says what that usually means (name, disk, antivirus).",
+        ],
+    },
+    {
         "version": "0.47.3",
         "title": "The legend",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The settle",
         "items": [
             "The Windows app installs as a folder now instead of one self-unpacking file: the unpack could lose a file to antivirus (the \"Failed to load Python DLL\" error) — a folder cannot, and the app starts faster.",
-        ],
-    },
-    {
-        "version": "0.46.14",
-        "title": "The round",
-        "items": [
-            "The ETA reads like a time, not a calculator tape: 19s of estimate used to print as 19.126124260462905s — it now wears the same clock as every other duration (0:19, 2:05, 1:02:03).",
         ],
     },
 ]

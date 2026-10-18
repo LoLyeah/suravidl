@@ -1492,6 +1492,13 @@ class JobManager:
             "postprocessor_hooks": [hook],
         }
         opts.update(ffmpeg_opts())
+        # every job keeps yt-dlp's own trail (v0.47.4 "the minutes"): the
+        # log card must be able to explain a postprocessing death — the
+        # ffmpeg command and its stderr are exactly what a field report
+        # cannot reproduce. Bounded, scrubbed, in memory only.
+        from . import logcap
+        opts["verbose"] = True
+        opts["logger"] = logcap.logger()
         # settings-derived options (template, subtitles, embed, network, ...)
         user_pps: list[dict] = []
         notices: list[str] = []
