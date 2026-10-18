@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.8",
+        "title": "The path",
+        "items": [
+            "Restart & Install starts PowerShell by its exact system path now — on one machine the bare name could not be found (WinError 2), so a verified update never began. The update log records the path it tried.",
+        ],
+    },
+    {
         "version": "0.47.7",
         "title": "The drawer",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The knock",
         "items": [
             "The app lands front when an update restarts it, and takes clicks immediately. A script-relaunched window used to open in the background — the update looked like it never came back, clicks dead until an app switch.",
-        ],
-    },
-    {
-        "version": "0.46.18",
-        "title": "The nickname",
-        "items": [
-            "A stream's whole signed address used to become its name — “master [master.m3u8?token=…]”. Long or messy ids now wear a short stable tag (“master [4f8a2b9c3d1e].mp4”); compact ids stay as they are.",
         ],
     },
 ]

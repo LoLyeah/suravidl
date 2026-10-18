@@ -1304,6 +1304,28 @@ def _try_tray(url: str, open_downloads: Path):
     return pystray.Icon("suravidl", Image.open(icon_file), "suravidl", menu)
 
 
+def _powershell_exe() -> str:
+    """PowerShell by its ABSOLUTE path, the bare name as a last resort.
+
+    v0.47.8 "the path": the applier spawned a bare "powershell.exe", which
+    Windows resolves through PATH — and the windowed build's PATH is not
+    always the shell's. A field report (2026-10-18) had Restart & Install
+    fail three times with `[WinError 2] The system cannot find the file
+    specified`: the installer was staged and verified, the hand-off program
+    simply was not findable. The system's own path cannot be missing.
+    """
+    root = (os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+            or r"C:\Windows")
+    cand = (Path(root) / "System32" / "WindowsPowerShell" / "v1.0"
+            / "powershell.exe")
+    try:
+        if cand.is_file():
+            return str(cand)
+    except OSError:
+        pass
+    return "powershell.exe"
+
+
 def _windows_apply_command(installer: str, relaunch: str | None,
                            pid: int | None = None,
                            log_path: str | None = None) -> list[str]:
@@ -1378,7 +1400,7 @@ def _windows_apply_command(installer: str, relaunch: str | None,
         ]
     script = "\r\n".join(lines)
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
-    return ["powershell.exe", "-NoProfile", "-NonInteractive",
+    return [_powershell_exe(), "-NoProfile", "-NonInteractive",
             "-EncodedCommand", encoded]
 
 
@@ -1447,6 +1469,9 @@ def _make_apply_update_action(window):
                 _update_log_trail([
                     f"applier refused: {type(e).__name__}: {e}",
                     f"staged: {staged} (exists={Path(staged).is_file()})",
+                    f"powershell: {cmd[0]!r} "
+                    f"(exists={Path(cmd[0]).is_file()})",
+                    f"PATH: {os.environ.get('PATH', '')}",
                     f"pid: {os.getpid()} relaunch: {relaunch!r}",
                 ])
                 return (f"the updater could not start "
