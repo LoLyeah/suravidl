@@ -85,7 +85,7 @@ MAIN = (ROOT / "src" / "suravidl_engine" / "__main__.py").read_text(encoding="ut
 
 def test_no_bare_json_in_the_sidecar_list():
     # deleting a job must not take a user's document named like the media
-    i = JOBS.index("SIDECAR_SUFFIXES")
+    i = JOBS.index("SIDECAR_SUFFIXES = (")
     seg = JOBS[i:i + 400]
     assert '".info.json"' in seg and '".live_chat.json"' in seg
     assert '", ".json"' not in seg and '(".json"' not in seg

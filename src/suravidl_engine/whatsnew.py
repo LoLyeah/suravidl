@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.7",
+        "title": "The drawer",
+        "items": [
+            "A finished download can be renamed from its card — the file and its subtitles/thumbnail follow the new name together, and names Windows would refuse are refused before anything moves.",
+            "Clear history forgets the finished rows and keeps the files in your downloads folder (desktop only — on the phone the files live in app storage).",
+        ],
+    },
+    {
         "version": "0.47.6",
         "title": "The clock",
         "items": [
@@ -75,15 +83,6 @@ ENTRIES = [
         "title": "The nickname",
         "items": [
             "A stream's whole signed address used to become its name — “master [master.m3u8?token=…]”. Long or messy ids now wear a short stable tag (“master [4f8a2b9c3d1e].mp4”); compact ids stay as they are.",
-        ],
-    },
-    {
-        "version": "0.46.17",
-        "title": "The namesake",
-        "items": [
-            "Two different videos could end up under one filename: one was silently skipped, or replaced the other outright. Every download now wears the site's own id — takes never fight over a name.",
-            "A custom template without the id gets its own guards: an incoming file that finds its name taken by another video lands beside it and says so — never a quiet skip, never a quiet replacement.",
-            "Caveats attached after a download (a removed stream, a skipped thumbnail) now actually reach the card — they used to be written where nothing read them.",
         ],
     },
 ]

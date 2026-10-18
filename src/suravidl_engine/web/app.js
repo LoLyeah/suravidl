@@ -785,6 +785,18 @@ const STRINGS = { en: {}, id: {
     "menghapus berkas selesai dari folder unduhan Anda",
   "Delete the {n} filed files?": "Hapus {n} berkas selesai?",
   "They leave your downloads folder.": "Berkas-berkas itu keluar dari folder unduhan Anda.",
+  "Clear history ({n})": "Bersihkan riwayat ({n})",
+  "clear the history — the files stay in your downloads folder":
+    "bersihkan riwayat — berkasnya tetap di folder unduhan Anda",
+  "Clear the history of {n} filed downloads?": "Bersihkan riwayat {n} unduhan selesai?",
+  "The files stay in your downloads folder.": "Berkasnya tetap di folder unduhan Anda.",
+  "history cleared": "riwayat dibersihkan",
+  "Rename": "Ganti nama",
+  "New name": "Nama baru",
+  "rename the file and its subtitles together":
+    "ganti nama berkas beserta subtitle-nya sekaligus",
+  "renamed to {name}": "diganti nama menjadi {name}",
+  "could not rename: {msg}": "gagal mengganti nama: {msg}",
   "The file on disk goes too.": "Berkas di disk ikut terhapus.",
   "{n} running": "{n} berjalan",
   "nothing running": "tidak ada yang berjalan",
@@ -2914,11 +2926,20 @@ function renderQueueActions(jobs) {
   const box = $("queueActions");
   if (!box) return;
   const rb = $("queueRetryFailed"), cb = $("queueClearFiled");
+  const ch = $("queueClearHistory");
   rb.textContent = t("Retry failed ({n})", { n: failed });
   cb.textContent = t("Delete filed files ({n})", { n: filed });
   cb.title = t("deletes the filed files from your downloads folder");
   rb.classList.toggle("hidden", !failed);
   cb.classList.toggle("hidden", !filed);
+  if (ch) {
+    // v0.47.7: forget the rows, keep the files. Desktop only — on the phone
+    // the downloads live in app storage, so a cleared row would leave a file
+    // the user cannot reach (owner's call, 2026-10-18).
+    ch.textContent = t("Clear history ({n})", { n: filed });
+    ch.title = t("clear the history — the files stay in your downloads folder");
+    ch.classList.toggle("hidden", !filed || ANDROID());
+  }
   box.classList.toggle("hidden", !failed && !filed);
 }
 
@@ -2969,6 +2990,64 @@ async function clearFiledJobs() {
 }
 $("queueRetryFailed").onclick = retryFailedJobs;
 $("queueClearFiled").onclick = clearFiledJobs;
+
+async function clearHistory() {
+  const { jobs } = await api("/jobs").catch(() => ({ jobs: [] }));
+  const filed = (jobs || []).filter((j) => QUEUE_BUCKETS.filed.includes(j.status));
+  if (!filed.length) return;
+  const msg = t("Clear the history of {n} filed downloads?", { n: filed.length })
+    + " " + t("The files stay in your downloads folder.")
+    + " " + t("This cannot be undone.");
+  if (!(await askConfirm(msg, { okText: t("Clear history"), danger: false }))) return;
+  try {
+    await api("/jobs/forget", {
+      method: "POST", body: JSON.stringify({ confirm: "forget" }),
+    });
+    toast(t("history cleared"));
+  } catch (e) {
+    toast(t("could not clear: {msg}", { msg: e.message }), "bad");
+  }
+  refreshJobs();
+}
+if ($("queueClearHistory")) $("queueClearHistory").onclick = clearHistory;
+
+/* ---------- rename (v0.47.7) ----------
+   The stem changes; `Movie.mp4`, `Movie.en.srt` and `Movie.jpg` all follow
+   the new name, so a renamed video never orphans its subtitles. */
+function startRename(row, j) {
+  if (row.querySelector(".renamebar")) return;
+  const current = baseName(j.filepath || "").replace(/\.[^.]+$/, "");
+  const bar = el("div", "renamebar");
+  const input = el("input", "renameinput");
+  input.type = "text";
+  input.value = current;
+  input.maxLength = 150;
+  input.setAttribute("aria-label", t("New name"));
+  const ok = el("button", "btn sm", t("Save"));
+  const no = el("button", "btn sm ghost", t("Cancel"));
+  bar.append(input, ok, no);
+  row.append(bar);
+  input.focus();
+  input.select();
+  const close = () => bar.remove();
+  no.onclick = close;
+  input.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+    if (e.key === "Enter") { e.preventDefault(); ok.click(); }
+  };
+  ok.onclick = async () => {
+    try {
+      await api(`/jobs/${j.id}/rename`, {
+        method: "POST", body: JSON.stringify({ name: input.value }),
+      });
+      toast(t("renamed to {name}", { name: input.value.trim() }));
+      close();
+      refreshJobs();
+    } catch (e) {
+      toast(t("could not rename: {msg}", { msg: e.message }), "bad");
+    }
+  };
+}
 
 /* ---------- the yt-dlp log card (v0.44.x audit) ----------
    The verbose switch asked people to turn on a log they could never read.
@@ -3319,6 +3398,13 @@ function jobRow(j) {
         const play = el("button", "ghost-sm", t("Play"));
         play.onclick = () => openPlayer(j);
         r.append(play);
+        // v0.47.7: rename the stem — the file and its sidecars follow
+        if (!playlistRow) {
+          const ren = el("button", "ghost-sm", t("Rename"));
+          ren.title = t("rename the file and its subtitles together");
+          ren.onclick = () => startRename(row, j);
+          r.append(ren);
+        }
       }
     }
     trashHost = r;

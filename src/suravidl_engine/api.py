@@ -104,6 +104,16 @@ class FilesClearRequest(BaseModel):
     confirm: str = ""
 
 
+class JobsForgetRequest(BaseModel):
+    """Clearing history is one-way: it takes the word too (v0.47.7)."""
+    confirm: str = ""
+
+
+class JobRenameRequest(BaseModel):
+    """The pencil on a finished card (v0.47.7)."""
+    name: str = ""
+
+
 class BatchJobRequest(BaseModel):
     """Several links in one go — the "paste 10 links, queue them all" flow."""
     urls: list[str]
@@ -1338,6 +1348,39 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):
         return {"jobs": [redact_job(j) for j in mgr.list()]}
+
+    @app.post("/jobs/forget")
+    def forget_completed(body: JobsForgetRequest | None = None,
+                         mgr: JobManager = Depends(require_auth)):
+        """Clear the history and keep the files (v0.47.7).
+
+        The bulk wipe (/files/clear) takes the rows AND the downloads; this
+        one takes the rows only — the files stay where they are, which on
+        the desktop is a folder the user can open and on the phone is not
+        (hence the button lives in the desktop UI). History is not
+        recoverable, so it still asks for the word.
+        """
+        if (body.confirm if body else "") != "forget":
+            raise HTTPException(
+                status_code=400,
+                detail='this clears the download history — send '
+                       '{"confirm": "forget"} to proceed')
+        return {"cleared_jobs": mgr.clear_completed()}
+
+    @app.post("/jobs/{job_id}/rename")
+    def rename_job_endpoint(job_id: str, body: JobRenameRequest,
+                            mgr: JobManager = Depends(require_auth)):
+        """The pencil: rename a finished download and its sidecars."""
+        try:
+            return mgr.rename_job(job_id, body.name)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="job not found") from None
+        except (ValueError, PermissionError) as e:
+            raise HTTPException(status_code=409, detail=str(e)) from None
+        except OSError as e:
+            raise HTTPException(
+                status_code=409,
+                detail=f"could not rename: {e}") from None
 
     @app.get("/jobs/{job_id}")
     def get_job(job_id: str, mgr: JobManager = Depends(require_auth)):

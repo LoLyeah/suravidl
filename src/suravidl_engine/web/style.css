@@ -916,6 +916,11 @@ details.card { padding: 0 18px 6px; }
 /* v0.47.6 "the clock" — the finishing step + its elapsed time */
 .job .jphase { margin-top: 6px; color: var(--muted); font-size: 12px;
   font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+/* v0.47.7 — the rename bar under a finished card */
+.renamebar { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.renameinput { flex: 1 1 auto; min-width: 0; padding: 7px 10px;
+  border: 1px solid var(--line, #333); border-radius: 8px;
+  background: var(--field, #1a1a1a); color: inherit; font: inherit; }
 /* v0.46.7 "the brief": the queue's own summary — state line, counts, the
    failures gathered under a quiet caption, and the fold's drawn caret */
 .qstate { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;

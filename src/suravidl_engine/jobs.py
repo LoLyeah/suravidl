@@ -1,6 +1,7 @@
 """Job manager: background downloads, live progress, SQLite persistence."""
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -1005,6 +1006,98 @@ class JobManager:
                 self._con.execute(
                     "DELETE FROM jobs WHERE status = 'completed'")
         return len(gone)
+
+    # -- renaming a finished download (v0.47.7) ---------------------------
+    _WIN_BAD = '<>:"/\\|?*'
+    _WIN_RESERVED = frozenset({"con", "prn", "aux", "nul",
+                               *(f"com{i}" for i in range(1, 10)),
+                               *(f"lpt{i}" for i in range(1, 10))})
+
+    @classmethod
+    def check_name(cls, name: str) -> str:
+        """A name Windows accepts and the card can show (v0.47.7)."""
+        clean = (name or "").strip()
+        if not clean:
+            raise ValueError("the name cannot be empty")
+        if len(clean) > 150:
+            raise ValueError("the name is too long — keep it under 150 characters")
+        if any(c in cls._WIN_BAD for c in clean) or any(ord(c) < 32 for c in clean):
+            raise ValueError('the name cannot contain \\ / : * ? " < > |')
+        if clean != clean.rstrip(". "):
+            raise ValueError("the name cannot end with a dot or a space")
+        if clean.split(".")[0].lower() in cls._WIN_RESERVED:
+            raise ValueError("that name is reserved by Windows — pick another")
+        return clean
+
+    def rename_job(self, job_id: str, name: str) -> dict:
+        """Rename a finished download — the file and its sidecars together.
+
+        The STEM is what changes: `Movie.mp4`, `Movie.en.srt` and `Movie.jpg`
+        all follow, keeping their suffix (and the language tag) — renaming
+        the video alone would orphan its subtitles. Only a completed row may
+        be renamed, a collision is a refusal (never an overwrite), and a
+        half-done move is rolled back.
+        """
+        try:
+            job = self.get(job_id)
+        except KeyError:
+            raise KeyError(job_id) from None
+        if job.get("status") != "completed":
+            raise ValueError("only a finished download can be renamed")
+        clean = self.check_name(name)
+        files = [Path(str(p)) for p in (job.get("files") or []) if p]
+        primary = Path(str(job["filepath"])) if job.get("filepath") else None
+        if primary is not None and primary.suffix and primary not in files:
+            files.insert(0, primary)
+        if not files:
+            raise ValueError("this row has no file on disk to rename")
+        if primary is None or not primary.suffix:
+            primary = next((p for p in files
+                            if p.suffix.lower() not in self.SIDECAR_SUFFIXES),
+                           files[0])
+        stem = primary.stem
+        if stem == clean:
+            return job
+        moves: list[tuple[Path, Path]] = []
+        for p in files:
+            if not p.exists():
+                continue
+            if p.name != stem + p.suffix and not p.name.startswith(stem + "."):
+                continue                      # not this download's stem
+            target = p.with_name(clean + p.name[len(stem):])
+            if target.exists():
+                raise ValueError(
+                    f'a file named "{target.name}" is already there — '
+                    "pick another name")
+            moves.append((p, target))
+        if not moves:
+            raise ValueError("this download's files are no longer on disk")
+        done: list[tuple[Path, Path]] = []
+        try:
+            for src, dst in moves:
+                src.rename(dst)
+                done.append((src, dst))
+        except OSError as e:
+            for src, dst in reversed(done):
+                try:
+                    dst.rename(src)
+                except OSError:
+                    pass
+            if (getattr(e, "winerror", None) in (32, 33)
+                    or e.errno in (errno.EACCES, errno.EBUSY)):
+                raise ValueError(
+                    "another app has this file open — close it and try "
+                    "again") from None
+            raise ValueError(f"could not rename: {e}") from None
+        moved = dict(done)
+        job["files"] = [str(moved.get(Path(str(p)), Path(str(p))))
+                        for p in (job.get("files") or [])]
+        if job.get("filepath"):
+            job["filepath"] = str(moved.get(Path(str(job["filepath"])),
+                                            Path(str(job["filepath"]))))
+        job["title"] = clean
+        self._save(job)
+        return job
 
     # -- deleting one download (the trash button) -------------------------
     SIDECAR_SUFFIXES = (".info.json", ".description", ".annotations.xml",

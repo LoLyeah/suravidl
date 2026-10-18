@@ -101,7 +101,7 @@ if sys.platform == "darwin":
         icon=str(ROOT / "assets/icon.icns"),
         bundle_identifier="com.suravidl.app",
         info_plist={
-            "CFBundleShortVersionString": "0.47.6",
+            "CFBundleShortVersionString": "0.47.7",
             "CFBundleName": "suravidl",
             "NSHighResolutionCapable": True,
         },
