@@ -11,9 +11,15 @@ The extension lifts the key from the page while sniffing (it already
 stands in every frame) and rides it on the handoff; this module turns
 URL + key into an ordinary HLS tree the engine's own download path can
 eat: fetch, decode, rewrite every child reference — variants and audio
-renditions — to a local decoded copy, and keep segments and #EXT-X-KEY
-URIs absolute so yt-dlp fetches and AES-128-decrypts them exactly as on
-any other site.
+renditions — to a local decoded copy, and keep #EXT-X-KEY URIs absolute
+so yt-dlp fetches and AES-128-decrypts them exactly as on any other site.
+
+Segments are proxied through the same loopback face under ordinary .ts
+names (v0.47.2 "the disguise"): this CDN names segments .png/.webp, and
+ffmpeg's HLS demuxer refuses to open a segment whose extension is not in
+its media list — the download died on "Invalid data found" with the
+bytes sitting right there. The proxy passes the ciphertext through
+untouched; only the name changes.
 
 The decoded tree is served over a loopback HTTP server, not as local
 files: yt-dlp must resolve the relative child references like any other
@@ -92,19 +98,28 @@ def xor_decode(body: str, key: bytes) -> str | None:
     return text if text.lstrip().startswith("#EXTM3U") else None
 
 
-def _fetch(url: str, headers: dict | None = None, timeout: int = 40) -> str:
-    """GET as a browser: the engine's TLS story, case-insensitive headers.
-
-    urllib happily sends `User-Agent` *and* `user-agent` when both are in
-    the dict, and the captured headers are lowercase — so the defaults are
-    merged case-insensitively before the request is built.
-    """
+def _request(url: str, headers: dict | None = None) -> urllib.request.Request:
+    """A Request built the way the browser sends it: the engine's TLS story,
+    case-insensitive headers. urllib happily sends `User-Agent` *and*
+    `user-agent` when both are in the dict, and the captured headers are
+    lowercase — so the defaults are merged case-insensitively first."""
     merged: dict[str, str] = {}
     for k, v in {**HEADER_DEFAULTS, **(headers or {})}.items():
         merged[k.lower()] = str(v)
-    req = urllib.request.Request(url, headers={k.title(): v for k, v in merged.items()})
-    with urllib.request.urlopen(req, timeout=timeout, context=ssl_context()) as r:
+    return urllib.request.Request(url, headers={k.title(): v for k, v in merged.items()})
+
+
+def _fetch(url: str, headers: dict | None = None, timeout: int = 40) -> str:
+    with urllib.request.urlopen(_request(url, headers), timeout=timeout,
+                                context=ssl_context()) as r:
         return r.read().decode("utf-8", "replace")
+
+
+def _fetch_bytes(url: str, headers: dict | None = None, timeout: int = 60) -> tuple[int, bytes]:
+    """The proxy's fetch: raw bytes for a segment, headers and all."""
+    with urllib.request.urlopen(_request(url, headers), timeout=timeout,
+                                context=ssl_context()) as r:
+        return r.status, r.read()
 
 
 class _QuietHandler(SimpleHTTPRequestHandler):
@@ -124,15 +139,56 @@ class DecodedHls:
 
     Use as a context manager (or call stop()): both the server and the
     files die together, and neither outlives the probe/job that made it.
+
+    `routes` is the segment proxy: disguised segment URLs (v0.47.2 "the
+    disguise" — this CDN names segments .png/.webp, and ffmpeg's HLS
+    demuxer refuses extensions outside its media list) are re-served from
+    here as ordinary .ts paths, fetched with the job's own headers. The
+    bytes stay AES-128 ciphertext: the key URI stays remote, so the
+    downloader decrypts exactly as on any other site.
     """
 
-    def __init__(self, workdir: Path):
+    def __init__(self, workdir: Path, headers: dict | None = None):
         self.dir = Path(workdir)
+        self.headers = dict(headers or {})
+        self.routes: dict[str, str] = {}
         self.url = ""
         self._server: ThreadingHTTPServer | None = None
 
+    def add_route(self, local: str, remote: str) -> None:
+        self.routes["/" + local.lstrip("/")] = remote
+
     def start(self, master: Path) -> None:
-        handler = functools.partial(_QuietHandler, directory=str(self.dir))
+        routes, headers = self.routes, self.headers
+
+        class _Handler(_QuietHandler):
+            def _maybe_proxy(self, head: bool) -> bool:
+                path = self.path.split("?", 1)[0]
+                remote = routes.get(path)
+                if remote is None:
+                    return False
+                try:
+                    status, data = _fetch_bytes(remote, headers)
+                except Exception:  # noqa: BLE001 - a segment fetch must not kill the server
+                    self.send_error(502)
+                    return True
+                self.send_response(200 if status == 200 else status)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                if not head:
+                    self.wfile.write(data)
+                return True
+
+            def do_GET(self):  # noqa: N802 - the stdlib spelling
+                if not self._maybe_proxy(head=False):
+                    super().do_GET()
+
+            def do_HEAD(self):  # noqa: N802 - the stdlib spelling
+                if not self._maybe_proxy(head=True):
+                    super().do_HEAD()
+
+        handler = functools.partial(_Handler, directory=str(self.dir))
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         threading.Thread(target=self._server.serve_forever, daemon=True).start()
         port = self._server.server_address[1]
@@ -175,8 +231,9 @@ def maybe_materialize(url: str, *, headers: dict | None = None,
         return None
 
     workdir = Path(tempfile.mkdtemp(prefix="sv-hls-"))
-    hls = DecodedHls(workdir)
+    hls = DecodedHls(workdir, headers=headers)
     counter = {"n": 0}
+    seg = {"n": 0}
 
     def _decode(text: str, where: str) -> str:
         got = xor_decode(text, key)
@@ -187,21 +244,46 @@ def maybe_materialize(url: str, *, headers: dict | None = None,
                 f"so a fresh key rides along ({where})")
         return got
 
+    def _proxy(ref: str, ext: str = "ts") -> str:
+        """A disguised segment, re-served from our loopback face under a
+        name ffmpeg's HLS demuxer accepts (v0.47.2 "the disguise")."""
+        seg["n"] += 1
+        local = f"s{seg['n']}.{ext}"
+        hls.add_route(local, ref)
+        return local
+
     def _materialize(purl: str, depth: int) -> str:
         text = _decode(fetch(purl, headers), purl)
         is_master = "#EXT-X-STREAM-INF" in text
         out: list[str] = []
         for line in text.splitlines():
-            if line.startswith(("#EXT-X-MEDIA:", "#EXT-X-KEY:", "#EXT-X-MAP:")):
+            if line.startswith("#EXT-X-MEDIA:"):
+                # audio renditions live in the master and are scrambled too:
+                # materialize them like variants, or the downloader fetches
+                # the raw blob and the mux comes out broken (v0.47.2)
+                if is_master and depth < 3:
+                    out.append(_URI_ATTRS.sub(
+                        lambda m: f'URI="{_materialize(urljoin(purl, m.group(1)), depth + 1)}"',
+                        line))
+                else:
+                    out.append(_URI_ATTRS.sub(
+                        lambda m: f'URI="{urljoin(purl, m.group(1))}"', line))
+                continue
+            if line.startswith("#EXT-X-KEY:"):
+                # the key stays remote: the downloader decrypts, we do not
                 out.append(_URI_ATTRS.sub(
                     lambda m: f'URI="{urljoin(purl, m.group(1))}"', line))
+                continue
+            if line.startswith("#EXT-X-MAP:"):
+                out.append(_URI_ATTRS.sub(
+                    lambda m: f'URI="{_proxy(urljoin(purl, m.group(1)), "mp4")}"', line))
                 continue
             if line and not line.startswith("#"):
                 ref = urljoin(purl, line.strip())
                 if is_master and depth < 3:
                     out.append(_materialize(ref, depth + 1))
                 else:
-                    out.append(ref)        # segments stay remote, absolute
+                    out.append(_proxy(ref))
                 continue
             out.append(line)
         counter["n"] += 1

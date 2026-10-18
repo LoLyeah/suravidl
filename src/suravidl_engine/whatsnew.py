@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.2",
+        "title": "The masquerade",
+        "items": [
+            "Streams that disguise their segments as images (.png/.webp) now download the whole episode, audio tracks included — and the extension's list names what each row is: all qualities, a resolution, or an audio track.",
+        ],
+    },
+    {
         "version": "0.47.1",
         "title": "The pocket",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The still",
         "items": [
             "The queue stops blinking: a failed card next to finished takes was re-inserted on every poll — its fade replaying every second. The failure caption now keeps its place above the failures, and the cards hold still.",
-        ],
-    },
-    {
-        "version": "0.46.12",
-        "title": "The walk",
-        "items": [
-            "The seal's bridge check now applies only where it can protect every frame: older WebViews keep the frame walk's pre-seal model, so media inside players' iframes is found again.",
         ],
     },
 ]

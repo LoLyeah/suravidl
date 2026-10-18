@@ -149,6 +149,20 @@ h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 }
 .more:hover { color: var(--text); border-color: var(--line); }
 .more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+
+/* a stream's parts hang under its master; the toggle line stays quiet */
+.stream.part { margin-left: 22px; }
+.partsline { margin: 2px 0 8px 22px; }
+.partstoggle {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.partstoggle:hover { text-decoration: underline; }
 .raw {
   grid-column: 1 / -1; margin: 7px 0 3px; padding: 8px 10px;
   font: 10.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;

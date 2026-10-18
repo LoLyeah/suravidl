@@ -844,8 +844,8 @@ ok(batched && batched.ok && batched.queued === 2,
        "firefox: the first stream is pre-asked for");
     ok(labelOf(rows[0]) === "Stream 1" && labelOf(rows[1]) === "Stream 2",
        "firefox: identical rows still get ordinals");
-    ok(labelOf(rows[2]) === "Stream · 1080p",
-       "firefox: a resolution in the URL names the row");
+    ok(labelOf(rows[2]) === "All qualities",
+       "firefox: a master names the whole stream");
     ok(labelOf(rows[3]) === "Big Buck Bunny 2019 · 720p",
        "firefox: a real filename names the row, resolution kept");
     // the URL door: folded by default, unfolds the raw link, folds back

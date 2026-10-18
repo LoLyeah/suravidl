@@ -28,6 +28,7 @@ let ITEMS = [];      // every find on the tab
 let RANK = null;     // the engine's shape for them (hides fragments)
 let SENT = false;
 let INPUTS = [];     // the live row checkboxes, in list order
+let SHOW_PARTS = false;  // a stream's variants/audio unfold on demand
 
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
@@ -89,10 +90,71 @@ function streamName(url) {
   return { name, res };
 }
 
+// What a row IS, read from the URL alone — rank is a pure URL answer and
+// the popup has to stay instant. A master names the whole stream; an
+// audio path is one track; a resolution token is one variant. "Playlist 1,
+// Playlist 2…" told nobody which row to pick (2026-10-16).
+const AUDIO_SEG = /^(audio|audios|native|jpn|japanese|eng|english|ind|indo|indonesian|commentary)$/i;
+const MASTER_SEG = /^(master|index|playlist|manifest|main|hls|stream)$/i;
+
+function roleOf(url) {
+  let u;
+  try { u = new URL(url); } catch (_) { return { role: "other" }; }
+  const path = u.pathname;
+  if (!/\.(m3u8|mpd)$/i.test(path) && !/(master|manifest|playlist)/i.test(path)) {
+    return { role: "other" };
+  }
+  const last = (path.split("/").filter(Boolean).pop() || "")
+    .replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[._-]+/g, " ");
+  if (/\/audio?s?\//i.test(path) || AUDIO_SEG.test(last)) {
+    return { role: "audio", name: last };
+  }
+  if (MASTER_SEG.test(last)) return { role: "master" };
+  const res = resToken(last);
+  if (res) return { role: "variant", res };
+  return { role: "playlist", name: last };
+}
+
 function streamLabel(m) {
+  const role = roleOf(m.url);
+  if (role.role === "master") return t("All qualities");
+  if (role.role === "audio") return role.name ? t("Audio") + " · " + role.name : t("Audio");
+  if (role.role === "variant") {
+    const info = streamName(m.url);
+    return (info.name || t("Video")) + " · " + role.res;
+  }
   const info = streamName(m.url);
   const base = info.name || kindWord(m);
   return info.res ? base + " · " + info.res : base;
+}
+
+// When the list has exactly one master, the other playlists on its origin
+// are that stream's parts: variants and audio tracks. They fold under the
+// master row — picking the master is picking the whole stream (best video
+// plus its audio), which is what "download this video" means.
+function groupRows(vis) {
+  const roles = vis.map((m) => roleOf(m.url));
+  const masters = [];
+  roles.forEach((r, i) => { if (r.role === "master") masters.push(i); });
+  if (masters.length !== 1) return null;
+  const mi = masters[0];
+  let origin = "";
+  try { origin = new URL(vis[mi].url).origin; } catch (_) { return null; }
+  const parts = [];
+  const rest = [];
+  vis.forEach((m, i) => {
+    if (i === mi) return;
+    const r = roles[i];
+    let same = false;
+    try { same = new URL(m.url).origin === origin; } catch (_) { /* keep apart */ }
+    if (same && (r.role === "variant" || r.role === "audio" || r.role === "playlist")) {
+      parts.push({ m, role: r });
+    } else {
+      rest.push({ m, role: r });
+    }
+  });
+  if (!parts.length) return null;
+  return { master: vis[mi], role: roles[mi], parts, rest };
 }
 
 function checkedUrls() {
@@ -236,15 +298,50 @@ function render() {
     // filename when the URL offers one, the kind word when it doesn't), and
     // an ordinal only when two names still read the same. The URL door on
     // the right unfolds the raw link for anyone who wants it.
-    const labels = vis.map(streamLabel);
+    // Rows say what they are; a master's parts fold beneath it and unfold
+    // on demand (SHOW_PARTS). The master row carries the summary, so one
+    // glance answers "which one do I pick?" — the top, checked row.
+    const grouped = groupRows(vis);
+    const rows = [];
+    if (grouped && !SHOW_PARTS) {
+      const quals = [...new Set(grouped.parts.filter((p) => p.role.res).map((p) => p.role.res))];
+      const audio = grouped.parts.filter((p) => p.role.role === "audio").length;
+      let label = streamLabel(grouped.master);
+      if (quals.length) label += " · " + quals.join(" ");
+      if (audio) label += " · " + t("{n} audio", { n: audio });
+      rows.push({ m: grouped.master, label, parts: grouped.parts.length });
+      for (const x of grouped.rest) rows.push({ m: x.m, label: streamLabel(x.m) });
+    } else if (grouped) {
+      rows.push({ m: grouped.master, label: streamLabel(grouped.master) });
+      for (const p of grouped.parts) {
+        rows.push({ m: p.m, label: streamLabel(p.m), part: true });
+      }
+      for (const x of grouped.rest) rows.push({ m: x.m, label: streamLabel(x.m) });
+      rows.push({ toggle: "hide" });
+    } else {
+      vis.forEach((m) => rows.push({ m, label: streamLabel(m) }));
+    }
     const counts = {};
-    for (const l of labels) counts[l] = (counts[l] || 0) + 1;
+    for (const r of rows) if (r.label) counts[r.label] = (counts[r.label] || 0) + 1;
     const seen = {};
-    vis.forEach((m, i) => {
-      seen[labels[i]] = (seen[labels[i]] || 0) + 1;
-      const suffix = counts[labels[i]] > 1 ? " " + seen[labels[i]] : "";
+    for (const r of rows) {
+      if (r.toggle) {
+        const line = document.createElement("div");
+        line.className = "partsline";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "partstoggle";
+        btn.textContent = t("Hide the separate streams");
+        btn.onclick = () => { SHOW_PARTS = false; render(); };
+        line.append(btn);
+        box.append(line);
+        continue;
+      }
+      const m = r.m;
+      seen[r.label] = (seen[r.label] || 0) + 1;
+      const suffix = counts[r.label] > 1 ? " " + seen[r.label] : "";
       const row = document.createElement("div");
-      row.className = "stream";
+      row.className = "stream" + (r.part ? " part" : "");
       const pick = document.createElement("label");
       pick.className = "pickline";
       const input = document.createElement("input");
@@ -255,7 +352,7 @@ function render() {
       INPUTS.push(input);
       const say = document.createElement("span");
       say.className = "ssay";
-      say.textContent = labels[i] + suffix;
+      say.textContent = r.label + suffix;
       pick.append(input, say);
       const raw = document.createElement("pre");
       raw.className = "raw";
@@ -277,7 +374,18 @@ function render() {
       };
       row.append(pick, more, raw);
       box.append(row);
-    });
+      if (r.parts) {
+        const line = document.createElement("div");
+        line.className = "partsline";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "partstoggle";
+        btn.textContent = t("Show the {n} separate streams", { n: r.parts });
+        btn.onclick = () => { SHOW_PARTS = true; render(); };
+        line.append(btn);
+        box.append(line);
+      }
+    }
     const first = box.querySelector("input");
     if (first) first.checked = true;
     const all = $("allbtn");
