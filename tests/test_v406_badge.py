@@ -9,6 +9,7 @@ import http.server
 import json
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -96,13 +97,26 @@ def test_reads_the_engines_own_count(jobs_server):
     assert shell.read_active("http://127.0.0.1:1", "testtoken") is None
 
 
+def _paint(window, base, token="testtoken", attempts=40):
+    """One step until it paints: a read may answer "unknown" on a loaded
+    runner, and an unknown count is silence by design (v0.47.5 CI flake on
+    3.12 — the first read timed out, the step correctly painted nothing,
+    and the test asserted too early). The assertion stays strict; only the
+    step is retried."""
+    for _ in range(attempts):
+        shell._badge_once(window, base, token)
+        if window.writes:
+            return
+        time.sleep(0.05)
+
+
 def test_one_step_reads_then_repaints_only_on_change(jobs_server, monkeypatch):
     base, state = jobs_server
     window = FakeWindow()
     shell._BADGE["last"] = None
     monkeypatch.setattr(sys, "platform", "win32")  # the title floor, determinstic
 
-    shell._badge_once(window, base, "testtoken")
+    _paint(window, base)
     assert window.title == "suravidl — 2 jobs"
     n = len(window.writes)
     shell._badge_once(window, base, "testtoken")   # same count: no repaint
