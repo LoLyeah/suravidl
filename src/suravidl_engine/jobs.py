@@ -67,6 +67,45 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 ACTIVE_STATUSES = ("queued", "downloading", "merging")
 
+# v0.47.6 "the clock": every postprocessor step names itself. The merge of a
+# big episode is minutes of ffmpeg copy-mux with no numbers anywhere — the
+# card sat on a dead "MERGING" bar (2026-10-18 field screenshot) while the
+# disk was working the whole time.
+_PP_LABELS = {
+    "FFmpegMerger": "joining video and audio",
+    "FFmpegVideoRemuxer": "repacking the file",
+    "FFmpegVideoConvertor": "repacking the file",
+    "FFmpegEmbedSubtitle": "embedding subtitles",
+    "FFmpegMetadata": "writing the details",
+    "EmbedThumbnail": "attaching the thumbnail",
+    "FFmpegFixupStretched": "tidying the audio",
+    "FFmpegFixupM4a": "tidying the audio",
+    "FFmpegFixupM3u8": "tidying the audio",
+    "MoveFiles": "filing the result",
+}
+
+
+def _pp_note(job: dict, d: dict) -> bool:
+    """Fold a postprocessor event onto the job; True when `d` was one.
+
+    Both kinds of hook event say "finished", so the download branches must
+    never read a postprocessor event — the caller returns on True.
+    """
+    pp = d.get("postprocessor")
+    if not pp:
+        return False
+    status = d.get("status")
+    if status == "started":
+        job["phase"] = {
+            "label": _PP_LABELS.get(pp, "finishing the file"),
+            "postprocessor": pp,
+            "started": time.time(),
+        }
+    elif status == "finished":
+        job["phase"] = None
+    job["status"] = "merging"
+    return True
+
 # A download that produces no event for STALL_LIMIT seconds is failed as
 # stalled: yt-dlp only bounds socket reads, and Android's resolver (netd)
 # has no bound at all, so a source that answers nothing could hold a
@@ -1440,6 +1479,9 @@ class JobManager:
             if _stop_requested(job):  # stop requested mid-run
                 raise _Cancelled()
             d_info = d.get("info_dict") or {}
+            if _pp_note(job, d):     # a postprocessor step, not a download
+                self._save(job)
+                return
             # Record the target as soon as yt-dlp names it. A cancelled or
             # failed download used to keep `filepath = None`, so deleting the
             # row left its `.part` (and every playlist entry already written)

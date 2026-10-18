@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.6",
+        "title": "The clock",
+        "items": [
+            "The finishing phase now names its step and counts up — 'joining video and audio · 2:14' instead of a dead bar while a big file is copied.",
+        ],
+    },
+    {
         "version": "0.47.5",
         "title": "The carrier",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
             "Two different videos could end up under one filename: one was silently skipped, or replaced the other outright. Every download now wears the site's own id — takes never fight over a name.",
             "A custom template without the id gets its own guards: an incoming file that finds its name taken by another video lands beside it and says so — never a quiet skip, never a quiet replacement.",
             "Caveats attached after a download (a removed stream, a skipped thumbnail) now actually reach the card — they used to be written where nothing read them.",
-        ],
-    },
-    {
-        "version": "0.46.16",
-        "title": "The pickup",
-        "items": [
-            "When a page hides its player, the desktop now points the way through: the companion extension hands the stream over, probed — a short guide opens right there, linked from the FAQ. The phone keeps browser + Scan.",
         ],
     },
 ]

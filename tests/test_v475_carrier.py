@@ -122,8 +122,10 @@ def test_plain_auto_is_untouched():
 def test_whatsnew_opens_with_this_release():
     from suravidl_engine import __version__, whatsnew
 
-    assert __version__ == "0.47.5"
     top = whatsnew.ENTRIES[0]
-    assert top["version"] == "0.47.5"
-    assert top["title"].lower() == "the carrier"
+    assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
+    # v0.47.5 "the carrier" — this round's entry stays among the living ten
+    assert any(e["version"] == "0.47.5"
+               and e["title"].lower() == "the carrier"
+               for e in whatsnew.ENTRIES)

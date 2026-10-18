@@ -39,6 +39,11 @@ const el = (tag, cls, text) => {
   return e;
 };
 
+function mmss(s) {
+  const m = Math.floor(s / 60);
+  return m + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+}
+
 function humanBytes(n) {
   if (n == null) return "?";
   const u = ["B", "KB", "MB", "GB", "TB"];
@@ -542,6 +547,14 @@ const STRINGS = { en: {}, id: {
   "mark as chapters": "tandai sebagai bab",
   "matte · cheapest": "matte · paling ringan",
   "merging": "menggabungkan",
+  "joining video and audio": "menggabungkan video dan audio",
+  "repacking the file": "mengemas ulang berkas",
+  "embedding subtitles": "menanamkan subtitle",
+  "writing the details": "menulis detail",
+  "attaching the thumbnail": "memasang thumbnail",
+  "tidying the audio": "merapikan audio",
+  "filing the result": "menyimpan hasil",
+  "finishing the file": "menyelesaikan berkas",
   "mm:ss or hh:mm:ss — for a 30-second highlight out of a 3-hour stream": "mm:ss atau hh:mm:ss — untuk sorotan 30 detik dari stream 3 jam",
   "more audio formats": "format audio lainnya",
   "more formats…": "format lainnya…",
@@ -3180,6 +3193,15 @@ function jobRow(j) {
     fill.style.width = sized ? progressPct(j).toFixed(1) + "%" : "100%";
     bar.append(fill);
     row.append(bar);
+    // v0.47.6 "the clock": the finishing phase names its step and counts up —
+    // a 600 MB copy-mux is minutes of silence otherwise (owner's screenshot,
+    // 2026-10-18: a dead bar said nothing while the disk was working).
+    if (j.phase && j.phase.label) {
+      const secs = Math.max(0, Math.round(Date.now() / 1000 - (j.phase.started || 0)));
+      const ph = el("div", "jphase", t(j.phase.label) + " · " + mmss(secs));
+      bar.setAttribute("aria-label", ph.textContent);
+      row.append(ph);
+    }
     const meta = el("div", "jmeta");
     meta.append(...metaParts(j).map((s) => el("span", "", s)));
     row.append(meta);
