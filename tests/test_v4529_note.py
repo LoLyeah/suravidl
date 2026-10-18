@@ -28,7 +28,10 @@ def test_the_skipped_embed_leaves_a_notice(tmp_path, monkeypatch):
 
     monkeypatch.setattr(do, "ffmpeg_can_encode", lambda name: False)
     s = Settings(path=tmp_path / "settings.json").get()
-    s.update({"subtitles_mode": "embed", "subtitles_langs": "en"})
+    # explicit mp4 is the skip case now — auto would pick mkv (v0.47.5),
+    # where embedding is a copy and there is nothing to warn about
+    s.update({"subtitles_mode": "embed", "subtitles_langs": "en",
+              "video_container": "mp4"})
     opts = build_download_opts(s, str(tmp_path / "dl"))
     got = opts.get("__sv_notices") or []
     assert any("subtitles are kept as files" in n for n in got), got

@@ -122,6 +122,26 @@ def _fetch_bytes(url: str, headers: dict | None = None, timeout: int = 60) -> tu
         return r.status, r.read()
 
 
+def _peek(url: str, headers: dict | None = None, n: int = 32) -> bytes:
+    """The first n bytes of a resource — a Range read, cheap on a CDN."""
+    req = _request(url, headers)
+    req.add_header("Range", f"bytes=0-{n - 1}")
+    with urllib.request.urlopen(req, timeout=20, context=ssl_context()) as r:
+        return r.read(n)
+
+
+def looks_wrapped(head: bytes) -> bool:
+    """A segment wearing an image container (v0.47.5 "the carrier").
+
+    One CDN wave serves every segment as RIFF/WEBP (or PNG/JPEG) with an
+    opaque payload inside — the site's own player unwraps it in wasm and
+    nothing else can. The magic is unmistakable in the first 32 bytes.
+    """
+    return (head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+            or head[:8] == b"\x89PNG\r\n\x1a\n"
+            or head[:3] == b"\xff\xd8\xff")
+
+
 class _QuietHandler(SimpleHTTPRequestHandler):
     """The tree is for yt-dlp, not the log."""
 
@@ -256,6 +276,7 @@ def maybe_materialize(url: str, *, headers: dict | None = None,
         text = _decode(fetch(purl, headers), purl)
         is_master = "#EXT-X-STREAM-INF" in text
         out: list[str] = []
+        segs: list[str] = []
         for line in text.splitlines():
             if line.startswith("#EXT-X-MEDIA:"):
                 # audio renditions live in the master and are scrambled too:
@@ -283,11 +304,27 @@ def maybe_materialize(url: str, *, headers: dict | None = None,
                 if is_master and depth < 3:
                     out.append(_materialize(ref, depth + 1))
                 else:
+                    segs.append(ref)
                     out.append(_proxy(ref))
                 continue
             out.append(line)
         counter["n"] += 1
         name = f"p{counter['n']}.m3u8"
+        if not is_master and segs:
+            # v0.47.5 "the carrier": one CDN wave wraps every segment in a
+            # fake image the player alone can unwrap. ffmpeg would merge the
+            # carriers and call the result broken — refuse before the
+            # download starts, with the way out.
+            try:
+                head = _peek(segs[0], headers)
+            except Exception:  # noqa: BLE001 - a failed peek is not a verdict
+                head = b""
+            if looks_wrapped(head):
+                raise ValueError(
+                    "this server wraps its video segments in fake images "
+                    "(a carrier only the site's own player can unwrap) — "
+                    "the engine cannot read it. Pick another server on the "
+                    "page (e.g. HD-1 instead of HD-2) and sniff again.")
         (workdir / name).write_text("\n".join(out) + "\n", encoding="utf-8")
         return name
 

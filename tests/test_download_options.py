@@ -76,7 +76,10 @@ def test_subtitles_auto_sidecar():
 
 def test_subtitles_embed_adds_postprocessor():
     o = opts(subtitles_mode="embed")
-    assert pp_keys(o) == ["FFmpegEmbedSubtitle"]
+    # v0.47.5: "auto" + embed picks MKV — text subs COPY there instead of
+    # being converted (mov_text needs an encoder some builds lack)
+    assert o["merge_output_format"] == "mkv"
+    assert pp_keys(o) == ["FFmpegEmbedSubtitle", "FFmpegVideoRemuxer"]
     assert o["postprocessors"][0]["already_have_subtitle"] is True
 
 
@@ -148,7 +151,7 @@ def test_combined_order_matches_cli_phases():
              embed_thumbnail=True, sponsorblock_mode="remove")
     assert pp_keys(o) == [
         "FFmpegEmbedSubtitle", "SponsorBlock", "ModifyChapters",
-        "FFmpegMetadata", "EmbedThumbnail",
+        "FFmpegMetadata", "EmbedThumbnail", "FFmpegVideoRemuxer",
     ]
 
 

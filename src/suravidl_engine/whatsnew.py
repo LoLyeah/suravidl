@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.5",
+        "title": "The carrier",
+        "items": [
+            "A server that wraps its segments in fake images (only its own player can unwrap them) now says so before downloading, with the way out — and 'auto' picks MKV when subtitles are embedded.",
+        ],
+    },
+    {
         "version": "0.47.4",
         "title": "The minutes",
         "items": [
@@ -77,13 +84,6 @@ ENTRIES = [
         "title": "The pickup",
         "items": [
             "When a page hides its player, the desktop now points the way through: the companion extension hands the stream over, probed — a short guide opens right there, linked from the FAQ. The phone keeps browser + Scan.",
-        ],
-    },
-    {
-        "version": "0.46.15",
-        "title": "The settle",
-        "items": [
-            "The Windows app installs as a folder now instead of one self-unpacking file: the unpack could lose a file to antivirus (the \"Failed to load Python DLL\" error) — a folder cannot, and the app starts faster.",
         ],
     },
 ]

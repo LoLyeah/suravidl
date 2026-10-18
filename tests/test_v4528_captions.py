@@ -35,7 +35,10 @@ def test_embed_is_skipped_when_the_ffmpeg_cannot_encode(tmp_path, monkeypatch):
     from suravidl_engine import download_opts as do
 
     monkeypatch.setattr(do, "ffmpeg_can_encode", lambda name: False)
-    opts = build_download_opts(_settings(tmp_path), str(tmp_path / "dl"))
+    # an EXPLICIT mp4 cannot copy text subs — this is the skip case now
+    # (auto would pick mkv, where embedding is a copy; v0.47.5)
+    opts = build_download_opts(_settings(tmp_path, video_container="mp4"),
+                               str(tmp_path / "dl"))
     keys = [p.get("key") for p in (opts.get("postprocessors") or [])]
     assert "FFmpegEmbedSubtitle" not in keys, \
         "the phone cannot embed into an mp4 — the pass must not die"

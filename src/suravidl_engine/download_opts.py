@@ -684,8 +684,19 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     # still succeeds and the finished card quotes these (owner's request,
     # 2026-10-10 — a caveat must never ride silently)
     notices: list[str] = []
-    # -- subtitles ---------------------------------------------------------
+    # -- the container the job will actually wear (v0.47.5 "the carrier") --
+    # "auto" picks what the requested work needs: embedding text subtitles
+    # is a copy in MKV and a lossy encode (mov_text) in MP4 — and some
+    # builds cannot encode it at all. An explicit choice always wins.
+    container = settings.get("video_container") or "auto"
     sub_mode = settings.get("subtitles_mode", "off")
+    if container == "auto" and sub_mode == "embed":
+        container = "mkv"
+        notices.append(
+            "auto picked MKV so subtitles embed cleanly — MP4 would convert "
+            "them (lossily, and some builds cannot at all)")
+
+    # -- subtitles ---------------------------------------------------------
     if sub_mode != "off":
         opts["writesubtitles"] = True
         if settings.get("subtitles_auto"):
@@ -705,7 +716,7 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
             # made them: sidecar files beside the video, instead of the
             # whole post-process pass dying on "Encoder not found"
             # (2026-10-10 field report).
-            if (settings.get("video_container") or "auto") == "mkv" or \
+            if container == "mkv" or \
                     ffmpeg_can_encode("mov_text"):
                 pps.append({"key": "FFmpegEmbedSubtitle",
                             "already_have_subtitle": True})
@@ -773,7 +784,6 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     # MKV/WebM will not open in QuickTime, iOS Files, many Smart TVs or
     # WhatsApp, so a "successful" download can look corrupt to a casual user.
     # Remux repackages without re-encoding — the streams keep their quality.
-    container = settings.get("video_container") or "auto"
     if container in ("mp4", "mkv"):
         opts["merge_output_format"] = container
         pps.append({"key": "FFmpegVideoRemuxer", "preferedformat": container})

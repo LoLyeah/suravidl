@@ -121,7 +121,9 @@ def test_a_missing_subtitle_language_does_not_block_the_download(tmp_path):
     finally:
         srv.shutdown()
 
-    assert list((tmp_path / "dl").glob("*.mp4")), "the video landed anyway"
+    landed = [p for ext in ("*.mp4", "*.mkv")
+              for p in (tmp_path / "dl").glob(ext)]
+    assert landed, "the video landed anyway"
 
 
 # -- 2. the sound note only speaks when it is on ----------------------------

@@ -33,8 +33,10 @@ def test_the_output_open_failure_speaks_plainly():
 def test_whatsnew_opens_with_this_release():
     from suravidl_engine import __version__, whatsnew
 
-    assert __version__ == "0.47.4"
     top = whatsnew.ENTRIES[0]
-    assert top["version"] == "0.47.4"
-    assert top["title"].lower() == "the minutes"
+    assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
+    # v0.47.5 "the carrier" — this round's entry stays among the living ten
+    assert any(e["version"] == "0.47.4"
+               and e["title"].lower() == "the minutes"
+               for e in whatsnew.ENTRIES)
