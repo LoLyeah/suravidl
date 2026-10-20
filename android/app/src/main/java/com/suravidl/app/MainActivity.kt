@@ -44,6 +44,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Abandoned gallery imports (rows left IS_PENDING when Android killed
+        // the copy) are invisible to every file manager but still counted and
+        // still on disk — sweep this app's own leftovers at every start
+        // (v0.47.9 "the ghost").
+        Thread {
+            try {
+                val swept = MediaLibrary.sweepPending(this)
+                if (swept > 0) Log.i("suravidl", "swept $swept abandoned gallery imports")
+            } catch (_: Throwable) {
+            }
+        }.start()
         // Android 15+ always draws edge-to-edge. Apply the system bar insets
         // ourselves so no UI ever hides behind the status/navigation bars.
         WindowCompat.setDecorFitsSystemWindows(window, false)

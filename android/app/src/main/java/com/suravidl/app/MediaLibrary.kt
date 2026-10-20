@@ -62,6 +62,50 @@ object MediaLibrary {
     }
 
     /**
+     * Abandoned imports: rows this app inserted as IS_PENDING and never
+     * finalized. The copy into the gallery runs in the background service;
+     * when Android kills it mid-copy (screen off, app swiped, low memory) the
+     * row stays pending — and AOSP keeps a pending item's bytes in a hidden
+     * `.pending-<time>-<name>` file inside the target folder. File managers
+     * hide dot-files, MediaStore keeps counting them: an "empty"
+     * Movies/suravidl that properties say holds 18 files / 516 MB
+     * (field report, 2026-10-18). Deleting the row deletes its pending file.
+     */
+    fun sweepPending(context: Context): Int {
+        if (Build.VERSION.SDK_INT < 29) return 0
+        val resolver = context.contentResolver
+        val collections = listOf(
+            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+        )
+        var removed = 0
+        for (collection in collections) {
+            try {
+                resolver.query(
+                    collection,
+                    arrayOf(MediaStore.MediaColumns._ID,
+                            MediaStore.MediaColumns.RELATIVE_PATH),
+                    "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ? AND "
+                        + "${MediaStore.MediaColumns.IS_PENDING} = 1",
+                    arrayOf(context.packageName), null
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val path = cursor.getString(1) ?: ""
+                        if (!path.contains(FOLDER)) continue
+                        val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
+                        try {
+                            if (resolver.delete(uri, null, null) > 0) removed++
+                        } catch (_: Throwable) {
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        return removed
+    }
+
+    /**
      * MediaStore renames collisions when it inserts ("clip.mp4" becomes
      * "clip (1).mp4"), so the copy of a download the user did twice does not
      * carry the engine's exact file name — matching only the exact name found

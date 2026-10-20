@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.9",
+        "title": "The ghost",
+        "items": [
+            "The phone app sweeps its own abandoned gallery imports at every start: a killed copy left an invisible file that managers counted but never showed (an 'empty' folder claiming 18 items, 516 MB).",
+        ],
+    },
+    {
         "version": "0.47.8",
         "title": "The path",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The veil",
         "items": [
             "Sites that scramble their playlists (reanime.to and friends) now download like any other: the extension lifts the player's decode key while sniffing, and the engine unscrambles the tree before the normal path.",
-        ],
-    },
-    {
-        "version": "0.46.19",
-        "title": "The knock",
-        "items": [
-            "The app lands front when an update restarts it, and takes clicks immediately. A script-relaunched window used to open in the background — the update looked like it never came back, clicks dead until an app switch.",
         ],
     },
 ]
