@@ -21,8 +21,12 @@ TEST = (ROOT / "android/app/src/androidTest/java/com/suravidl/app"
 
 def test_the_sweep_takes_only_this_apps_pending_rows():
     seg = LIB[LIB.index("fun sweepPending"):]
-    assert "OWNER_PACKAGE_NAME} = ? AND " in seg, "only our own rows"
-    assert "IS_PENDING} = 1" in seg, "only unfinished copies"
+    assert "OWNER_PACKAGE_NAME} = ?" in seg, "only our own rows"
+    # is_pending is READ from the projection: as a WHERE term some providers
+    # reject it and the sweep silently found nothing (emulator, 2026-10-21)
+    assert "MediaStore.MediaColumns.IS_PENDING)" in seg, "the column is queried"
+    assert "cursor.getInt(2) != 1" in seg, "only unfinished copies"
+    assert "IS_PENDING} = 1" not in seg, "never a selection on is_pending"
     assert "path.contains(FOLDER)" in seg, "only the suravidl folders"
     assert "resolver.delete(uri, null, null)" in seg, "the row (and its file) goes"
 

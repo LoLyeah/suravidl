@@ -80,26 +80,45 @@ object MediaLibrary {
         )
         var removed = 0
         for (collection in collections) {
+            val ids = mutableListOf<Long>()
             try {
+                // The owner selection is the one deleteOwnCopies already
+                // proves on real devices; `is_pending` is read from the
+                // projection, never selected on — as a WHERE term the
+                // provider rejects it on some builds and the sweep found
+                // nothing at all (caught by the emulator board, 2026-10-21).
                 resolver.query(
                     collection,
                     arrayOf(MediaStore.MediaColumns._ID,
-                            MediaStore.MediaColumns.RELATIVE_PATH),
-                    "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ? AND "
-                        + "${MediaStore.MediaColumns.IS_PENDING} = 1",
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            MediaStore.MediaColumns.IS_PENDING),
+                    "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
                     arrayOf(context.packageName), null
                 )?.use { cursor ->
                     while (cursor.moveToNext()) {
+                        if (cursor.getInt(2) != 1) continue      // finished: keep
                         val path = cursor.getString(1) ?: ""
                         if (!path.contains(FOLDER)) continue
-                        val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
-                        try {
-                            if (resolver.delete(uri, null, null) > 0) removed++
-                        } catch (_: Throwable) {
-                        }
+                        ids.add(cursor.getLong(0))
                     }
                 }
             } catch (_: Throwable) {
+            }
+            for (id in ids) {
+                val uri = ContentUris.withAppendedId(collection, id)
+                try {
+                    resolver.delete(uri, null, null)
+                } catch (_: Throwable) {
+                }
+                // delete() reports 0 for some pending rows even when it takes
+                // them: what counts is that the row no longer answers
+                val gone = try {
+                    resolver.query(uri, arrayOf(MediaStore.MediaColumns._ID),
+                        null, null, null)?.use { it.count == 0 } ?: true
+                } catch (_: Throwable) {
+                    true
+                }
+                if (gone) removed++
             }
         }
         return removed
