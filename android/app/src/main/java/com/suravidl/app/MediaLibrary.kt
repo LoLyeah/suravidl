@@ -3,6 +3,7 @@ package com.suravidl.app
 import android.content.ContentUris
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.provider.MediaStore
 
 /**
@@ -16,6 +17,17 @@ import android.provider.MediaStore
  */
 object MediaLibrary {
     private const val FOLDER = "suravidl"
+
+    /** The first failure the last sweep hit — the emulator board reads it. */
+    @Volatile
+    var lastSweepError: String? = null
+
+    private val SWEEP_COLUMNS = arrayOf(
+        MediaStore.MediaColumns._ID,
+        MediaStore.MediaColumns.RELATIVE_PATH,
+        MediaStore.MediaColumns.IS_PENDING,
+        MediaStore.MediaColumns.OWNER_PACKAGE_NAME,
+    )
 
     fun deleteOwnCopies(context: Context): Int = deleteOwnCopiesNamed(context, null)
 
@@ -73,36 +85,46 @@ object MediaLibrary {
      */
     fun sweepPending(context: Context): Int {
         if (Build.VERSION.SDK_INT < 29) return 0
+        lastSweepError = null
         val resolver = context.contentResolver
         val collections = listOf(
             MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
         )
         var removed = 0
+        var seen = 0
+        var pendingSeen = 0
         for (collection in collections) {
             val ids = mutableListOf<Long>()
+            // NO selection at all: WHERE terms on owner_package_name /
+            // is_pending are rejected by some providers and the failure was
+            // silent (the board caught a no-op sweep, 2026-10-21). The
+            // provider must also be told to include pending rows — a plain
+            // query hides them even from their owner.
             try {
-                // The owner selection is the one deleteOwnCopies already
-                // proves on real devices; `is_pending` is read from the
-                // projection, never selected on — as a WHERE term the
-                // provider rejects it on some builds and the sweep found
-                // nothing at all (caught by the emulator board, 2026-10-21).
-                resolver.query(
-                    collection,
-                    arrayOf(MediaStore.MediaColumns._ID,
-                            MediaStore.MediaColumns.RELATIVE_PATH,
-                            MediaStore.MediaColumns.IS_PENDING),
-                    "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
-                    arrayOf(context.packageName), null
-                )?.use { cursor ->
+                if (Build.VERSION.SDK_INT >= 30) {
+                    val args = Bundle().apply {
+                        putInt(MediaStore.QUERY_ARG_MATCH_PENDING,
+                               MediaStore.MATCH_INCLUDE)
+                    }
+                    resolver.query(collection, SWEEP_COLUMNS, args, null)
+                } else {
+                    resolver.query(collection, SWEEP_COLUMNS, null, null, null)
+                }?.use { cursor ->
                     while (cursor.moveToNext()) {
+                        seen++
                         if (cursor.getInt(2) != 1) continue      // finished: keep
-                        val path = cursor.getString(1) ?: ""
-                        if (!path.contains(FOLDER)) continue
+                        val owner = cursor.getString(3)
+                        if (owner != null && owner != context.packageName) continue
+                        // no path filter: this app only ever creates pending
+                        // rows for its own gallery imports, and a pending
+                        // row's RELATIVE_PATH is not reliable to read
+                        pendingSeen++
                         ids.add(cursor.getLong(0))
                     }
                 }
-            } catch (_: Throwable) {
+            } catch (t: Throwable) {
+                if (lastSweepError == null) lastSweepError = "query: $t"
             }
             for (id in ids) {
                 val uri = ContentUris.withAppendedId(collection, id)
@@ -120,6 +142,11 @@ object MediaLibrary {
                 }
                 if (gone) removed++
             }
+        }
+        if (removed == 0 && lastSweepError == null) {
+            // nothing found is not an error, but the board (and a field log)
+            // need to see how far it looked
+            lastSweepError = "nothing swept: seen=$seen pending=$pendingSeen"
         }
         return removed
     }

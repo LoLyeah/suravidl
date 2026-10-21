@@ -48,7 +48,9 @@ class MediaLibraryTest {
         val ghost = pendingUri("ghost-pending-test.mp4")
         try {
             assertTrue("the pending row must exist first", exists(ghost))
-            assertTrue("the sweep must take it", MediaLibrary.sweepPending(ctx) >= 1)
+            val swept = MediaLibrary.sweepPending(ctx)
+            assertTrue("the sweep must take it (${MediaLibrary.lastSweepError ?: "no error"})",
+                swept >= 1)
             assertEquals("the row (and its .pending file) must be gone",
                 false, exists(ghost))
         } finally {
