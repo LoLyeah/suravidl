@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.10",
+        "title": "The trim",
+        "items": [
+            "A finished row says COMPLETED once — the FILED stamp repeated it on exactly the same rows. And the red dot beside YouTube rows is gone: the host is already printed in the line.",
+        ],
+    },
+    {
         "version": "0.47.9",
         "title": "The ghost",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The pocket",
         "items": [
             "Scrambled playlists now work on the phone too: the in-app browser's sniffer lifts the player's decode key while you watch, and the download rides it to the engine — reanime.to and friends download like any other site.",
-        ],
-    },
-    {
-        "version": "0.47.0",
-        "title": "The veil",
-        "items": [
-            "Sites that scramble their playlists (reanime.to and friends) now download like any other: the extension lifts the player's decode key while sniffing, and the engine unscrambles the tree before the normal path.",
         ],
     },
 ]

@@ -122,8 +122,11 @@ def test_a_completed_download_speaks():
 
 
 def test_the_finish_stamps_the_row():
-    assert 'el("span", "stamp", "FILED")' in APP or '"FILED"' in APP
-    assert ".job .stamp" in CSS
+    """v0.47.10 "the trim": the stamp retired — it repeated the COMPLETED
+    pill on exactly the same rows (owner's screenshot, 2026-10-21)."""
+    assert 'el("span", "stamp", "FILED")' not in APP
+    assert ".job .stamp" not in CSS
+    assert 'pill " + j.status' in APP, "the status pill still names completion"
 
 
 def test_the_bins_rail_collects_the_takes():

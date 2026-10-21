@@ -728,17 +728,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .probe-head .title { flex: 1 1 auto; min-width: 0; }
 .probe-head .chip { flex: none; }
 
-/* source livery: each site tints its own take */
-.card[data-livery="youtube"], .job[data-livery="youtube"]   { --livery: #ff5252; }
-.card[data-livery="twitter"], .job[data-livery="twitter"]   { --livery: #8ab4f8; }
-.card[data-livery="vimeo"],   .job[data-livery="vimeo"]     { --livery: #6fd3ff; }
-.card[data-livery="instagram"], .job[data-livery="instagram"] { --livery: #e178c8; }
-.card[data-livery="tiktok"],  .job[data-livery="tiktok"]    { --livery: #7fe3d4; }
-/* the row's LED: 7px, lit by the site's own colour (v0.46.6) */
-.job[data-livery] .jobtop::before {
-  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--livery, transparent); margin-right: 7px;
-}
+/* source livery: the probe card tints its meta line by site. The queue row
+   used to carry a 7px "LED" in the same colour — a red dot before a title
+   reads as "something is wrong", and the host is already printed in the
+   meta line (owner's screenshot, 2026-10-21, v0.47.10 "the trim"). */
+.card[data-livery="youtube"] { --livery: #ff5252; }
+.card[data-livery="twitter"] { --livery: #8ab4f8; }
+.card[data-livery="vimeo"]   { --livery: #6fd3ff; }
+.card[data-livery="instagram"] { --livery: #e178c8; }
+.card[data-livery="tiktok"]  { --livery: #7fe3d4; }
 .card[data-livery] #probeMeta {
   color: var(--livery, var(--dim));
   border-color: color-mix(in srgb, var(--livery, var(--dim)) 40%, transparent);
@@ -1033,15 +1031,7 @@ details.card { padding: 0 18px 6px; }
 .bulk .bulkmeta { margin-left: auto; flex: none; color: var(--dim); font-size: 11.5px; }
 .bulk.bad .bulkname { color: var(--err); }
 #diagBox { min-height: 240px; margin-top: 8px; }
-/* the FILED stamp — a take that landed */
-.job .stamp, .stamp {
-  display: inline-block;
-  padding: 2px 8px; border: 1.5px solid var(--ok-line); border-radius: 8px;
-  color: var(--ok); font-size: 10px; font-weight: 700; letter-spacing: .18em;
-  transform: rotate(-3deg);
-  font-family: "Martian Mono", ui-monospace, Menlo, monospace;
-  pointer-events: none;
-}
+/* the FILED stamp retired in v0.47.10 — the COMPLETED pill says it once */
 .job.pending { opacity: .6; pointer-events: none; }
 
 /* the progress groove */

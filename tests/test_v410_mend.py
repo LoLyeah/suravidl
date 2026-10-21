@@ -364,8 +364,9 @@ def test_reduced_motion_keeps_a_static_light():
 # -- web: nothing sharper than 8px -------------------------------------------
 
 def test_nothing_sharper_than_eight_px():
-    seg = STYLE[STYLE.index(".job .stamp, .stamp {"):][:400]
-    assert "border-radius: 8px" in seg
+    # v0.47.10: the FILED stamp (the original 8px case) retired with its
+    # rule; the popup's .more keeps the floor where it still applies
+    assert ".job .stamp, .stamp {" not in STYLE
     more = POPUP[POPUP.index(".more {"):][:400]
     assert "border-radius: 8px" in more
     assert "font-size: 11px" in more, "the 9.5px label grew to the floor"

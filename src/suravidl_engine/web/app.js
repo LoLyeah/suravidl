@@ -208,7 +208,6 @@ const STRINGS = { en: {}, id: {
   "Errors": "Eror",
   "Extractor arguments": "Argumen extractor",
   "FAQ has the common answers; this tour replays from the same row whenever you like.": "FAQ berisi jawaban umum; tur ini bisa diputar ulang dari baris yang sama kapan saja.",
-  "FILED": "SELESAI",
   "Filed": "Selesai",
   "Filed takes": "Unduhan selesai",
   "Filed — {name}": "Tersimpan — {name}",
@@ -3208,13 +3207,10 @@ function jobRow(j) {
       : j.status === "paused" ? t("recorded (stopped)") : t(j.status))
     : t(j.status);
   top.append(title, el("span", "pill " + j.status, pillWord));
-  // a finished take gets the stamp (v0.37.0: completion used to be a pill
-  // you never saw flip in a tab you were not on)
-  if (j.status === "completed") {
-    const stamp = el("span", "stamp", t("FILED"));
-    stamp.title = t("download finished — the file is in your downloads");
-    top.append(stamp);
-  }
+  // v0.47.10 "the trim": the FILED stamp is gone — it was drawn on exactly
+  // the rows the COMPLETED pill already names, so every row said it twice
+  // (owner's screenshot, 2026-10-21). "Filed" survives where it means the
+  // bulk actions (Delete filed files / Clear history), not as a second state.
   // what this job actually carries (preset / per-download overrides)
   const extra = j.overrides ? Object.keys(j.overrides).length : 0;
   if (j.preset) {
