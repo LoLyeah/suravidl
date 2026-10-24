@@ -16,6 +16,23 @@ from fastapi.testclient import TestClient
 from suravidl_engine import __version__
 from suravidl_engine.api import create_app
 
+
+def _future_version() -> str:
+    """A staged version that always beats the installed yt-dlp.
+
+    A fixed date is a time bomb: when CI's fresh install passed 2026.9.9,
+    activate() correctly discarded the stage as stale and five tests went
+    red (2026-10-24). One major ahead of whatever is installed cannot age.
+    """
+    try:
+        from yt_dlp.version import __version__ as have
+    except Exception:  # noqa: BLE001 - a bare runtime still gets a version
+        have = "2026.1.1"
+    return f"{int(str(have).split('.')[0]) + 1}.1.1"
+
+
+FUTURE = _future_version()
+
 ROOT = Path(__file__).parent.parent
 ENGINE = ROOT / "src" / "suravidl_engine"
 APPJS = (ENGINE / "web" / "app.js").read_text()
@@ -50,10 +67,10 @@ def _client(tmp_path):
 def test_remove_shadow_deletes_the_downloaded_copy(tmp_path):
     from suravidl_engine import ytdlp_update as yu
 
-    sh = _plant_shadow(tmp_path, "2026.9.9")
+    sh = _plant_shadow(tmp_path, FUTURE)
     r = yu.remove_shadow(db_path=tmp_path / "jobs.db")
     assert r["ok"] is True and r["removed"] is True
-    assert r["version"] == "2026.9.9"
+    assert r["version"] == FUTURE
     assert not sh.exists()
 
 
@@ -68,7 +85,7 @@ def test_remove_shadow_with_nothing_downloaded_is_a_quiet_noop(tmp_path):
 def test_remove_shadow_also_cleans_stage_scratch(tmp_path):
     from suravidl_engine import ytdlp_update as yu
 
-    _plant_shadow(tmp_path, "2026.9.9")
+    _plant_shadow(tmp_path, FUTURE)
     (tmp_path / "ytdlp.old").mkdir()
     (tmp_path / "ytdlp.whl.part").write_bytes(b"half")
     (tmp_path / "ytdlp.stage.x").mkdir()
@@ -83,9 +100,9 @@ def test_removing_an_active_copy_schedules_and_keeps_the_path_entry(tmp_path, mo
     # a marker drops it at the next start instead
     from suravidl_engine import ytdlp_update as yu
 
-    sh = _plant_shadow(tmp_path, "2026.9.9")
+    sh = _plant_shadow(tmp_path, FUTURE)
     monkeypatch.setattr(sys, "path", list(sys.path))
-    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
+    assert yu.activate(db_path=tmp_path / "jobs.db") == FUTURE
     body = yu.remove_shadow(db_path=tmp_path / "jobs.db")
     assert body["pending"] is True and body["removed"] is False
     assert (sh / "remove-pending").exists()
@@ -95,9 +112,9 @@ def test_removing_an_active_copy_schedules_and_keeps_the_path_entry(tmp_path, mo
 def test_after_removal_the_bundle_takes_over(tmp_path, monkeypatch):
     from suravidl_engine import ytdlp_update as yu
 
-    sh = _plant_shadow(tmp_path, "2026.9.9")
+    sh = _plant_shadow(tmp_path, FUTURE)
     monkeypatch.setattr(sys, "path", list(sys.path))
-    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
+    assert yu.activate(db_path=tmp_path / "jobs.db") == FUTURE
     yu.remove_shadow(db_path=tmp_path / "jobs.db")
     assert sh.is_dir()                # still serving THIS session
     # what the next start sees: the marker honored, nothing on the path
@@ -112,8 +129,8 @@ def test_active_source_names_the_running_copy(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "path", list(sys.path))
     src = yu.active_source(db_path=tmp_path / "jobs.db")
     assert src in ("environment", "bundled")  # not frozen in the test venv
-    _plant_shadow(tmp_path, "2026.9.9")
-    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
+    _plant_shadow(tmp_path, FUTURE)
+    assert yu.activate(db_path=tmp_path / "jobs.db") == FUTURE
     assert yu.active_source(db_path=tmp_path / "jobs.db") == "downloaded"
 
 
@@ -125,10 +142,10 @@ def test_version_reports_the_source_and_the_stage(tmp_path):
         assert v["source"] in ("environment", "bundled")
         assert v["staged"] is None
         assert v["remove_pending"] is False
-        _plant_shadow(tmp_path, "2026.9.9")
+        _plant_shadow(tmp_path, FUTURE)
         v2 = c.get("/version", headers=AUTH).json()
         # on disk but not yet active: staged, and the source is unchanged
-        assert v2["staged"] == "2026.9.9"
+        assert v2["staged"] == FUTURE
         assert v2["source"] == v["source"]
 
 
@@ -139,13 +156,13 @@ def test_remove_endpoint_requires_auth(tmp_path):
 
 
 def test_remove_endpoint_cancels_a_stage(tmp_path):
-    _plant_shadow(tmp_path, "2026.9.9")
+    _plant_shadow(tmp_path, FUTURE)
     with _client(tmp_path) as c:
         r = c.post("/ytdlp/remove", headers=AUTH)
         assert r.status_code == 200
         body = r.json()
         assert body["ok"] is True and body["removed"] is True
-        assert body["version"] == "2026.9.9"
+        assert body["version"] == FUTURE
         assert body["was_active"] is False
         assert not (tmp_path / "ytdlp").exists()
         assert c.get("/version", headers=AUTH).json()["staged"] is None
@@ -154,9 +171,9 @@ def test_remove_endpoint_cancels_a_stage(tmp_path):
 def test_remove_endpoint_takes_over_from_an_active_copy(tmp_path, monkeypatch):
     from suravidl_engine import ytdlp_update as yu
 
-    _plant_shadow(tmp_path, "2026.9.9")
+    _plant_shadow(tmp_path, FUTURE)
     monkeypatch.setattr(sys, "path", list(sys.path))
-    assert yu.activate(db_path=tmp_path / "jobs.db") == "2026.9.9"
+    assert yu.activate(db_path=tmp_path / "jobs.db") == FUTURE
     with _client(tmp_path) as c:
         v = c.get("/version", headers=AUTH).json()
         assert v["source"] == "downloaded"

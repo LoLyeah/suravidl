@@ -33,6 +33,23 @@ from suravidl_engine.api import create_app
 from suravidl_engine.jobs import JobManager
 
 AUTH = {"Authorization": "Bearer testtoken"}
+
+def _future_version() -> str:
+    """A staged version that always beats the installed yt-dlp.
+
+    A fixed date is a time bomb: when CI's fresh install passed 2026.9.9,
+    activate() correctly discarded the stage as stale and five tests went
+    red (2026-10-24). One major ahead of whatever is installed cannot age.
+    """
+    try:
+        from yt_dlp.version import __version__ as have
+    except Exception:  # noqa: BLE001 - a bare runtime still gets a version
+        have = "2026.1.1"
+    return f"{int(str(have).split('.')[0]) + 1}.1.1"
+
+
+FUTURE = _future_version()
+
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "tests" / "fixtures"
 
@@ -147,13 +164,13 @@ def _plant_shadow(tmp_path):
     pkg = sh / "yt_dlp"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("from .version import __version__\n")
-    (pkg / "version.py").write_text('__version__ = "2026.9.9"\n')
+    (pkg / "version.py").write_text('__version__ = FUTURE\n')
     di = sh / "yt_dlp-2026.9.9.dist-info"
     di.mkdir()
     (di / "METADATA").write_text(
         "Metadata-Version: 2.1\nName: yt-dlp\nVersion: 2026.9.9\n")
     (sh / "staged.json").write_text(json.dumps({
-        "version": "2026.9.9", "baseline": "2026.1.1", "app": __version__}))
+        "version": FUTURE, "baseline": "2026.1.1", "app": __version__}))
     return sh
 
 
