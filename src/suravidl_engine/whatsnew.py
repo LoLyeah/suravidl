@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.11",
+        "title": "The sheet",
+        "items": [
+            "The extension's engine page — where the address and token go — now looks like the app it belongs to, with Show/Hide on the token. The browser extension is 0.5.19.",
+        ],
+    },
+    {
         "version": "0.47.10",
         "title": "The trim",
         "items": [
@@ -76,13 +83,6 @@ ENTRIES = [
         "title": "The masquerade",
         "items": [
             "Streams that disguise their segments as images (.png/.webp) now download the whole episode, audio tracks included — and the extension's list names what each row is: all qualities, a resolution, or an audio track.",
-        ],
-    },
-    {
-        "version": "0.47.1",
-        "title": "The pocket",
-        "items": [
-            "Scrambled playlists now work on the phone too: the in-app browser's sniffer lifts the player's decode key while you watch, and the download rides it to the engine — reanime.to and friends download like any other site.",
         ],
     },
 ]

@@ -127,5 +127,5 @@ def test_the_extension_versions_agree():
     m = json.loads((ROOT / "extension/manifest.json").read_text())
     f = json.loads((ROOT / "extension/firefox/manifest.json").read_text())
     html = (ROOT / "extension/popup.html").read_text()
-    assert m["version"] == f["version"] == "0.5.18"
-    assert "v0.5.18" in html
+    assert m["version"] == f["version"] == "0.5.19"
+    assert "v0.5.19" in html

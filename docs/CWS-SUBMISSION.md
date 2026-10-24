@@ -18,7 +18,7 @@ the first-publish runbook; the listing copy is copy-paste ready.
 1. <https://chrome.google.com/webstore/devconsole> → **Add new item**.
 2. Upload `suravidl-extension-chrome.zip`. The item is created in **Draft**
    (nothing is public yet) and gets its permanent extension ID.
-3. The manifest version becomes the item version (currently **0.5.18**).
+3. The manifest version becomes the item version (currently **0.5.19**).
 
 ## 2. Store listing
 
@@ -113,4 +113,4 @@ pagefind.js detects media players and their sources in the page; pk.js runs in t
   v1.1** (OAuth client + refresh token stored as repo secrets) — the same
   shape as `.github/workflows/amo.yml`.
 - Keep the extension version and the engine version independent (they already
-  are: 0.5.18 vs 0.47.10).
+  are: 0.5.19 vs 0.47.11).
