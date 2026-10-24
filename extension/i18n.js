@@ -8,6 +8,15 @@
 // applyI18n() is what paints the static strings, and the Node test harness
 // (no querySelectorAll) walks past it.
 const I18N = {
+  "Connect the extension to your engine": "Hubungkan ekstensi ke mesinmu",
+  "The extension hands streams to the suravidl app running on this computer. Paste the address and the token the app shows — nothing leaves your machine.":
+    "Ekstensi menyerahkan stream ke aplikasi suravidl yang berjalan di komputer ini. Tempel alamat dan token yang ditampilkan aplikasi — tidak ada yang keluar dari mesinmu.",
+  "Usually http://127.0.0.1:8787 — leave it unless you changed the port.":
+    "Biasanya http://127.0.0.1:8787 — biarkan kecuali kamu mengganti port.",
+  "In the app: Settings → Authentication → Show token.":
+    "Di aplikasi: Pengaturan → Autentikasi → Tampilkan token.",
+  "Show": "Tampilkan",
+  "Hide": "Sembunyikan",
   "checking…": "memeriksa…",
   "which ones": "yang mana saja",
   "Select all": "Pilih semua",
