@@ -214,6 +214,10 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
   token. On Android the page holding that token is gated behind a per-install
   key, because loopback is shared with every other app on the phone.
 - No accounts, no cloud, no telemetry. Downloads stay on your machine.
+- Play Protect warns about sideloaded apps that install their own updates and
+  download code at runtime. `docs/SECURITY.md` says exactly what it sees, what
+  an independent audit found and fixed, what is by design — and how to verify a
+  download yourself (hash + the release signing certificate).
 
 ## API
 
