@@ -102,7 +102,11 @@ file"). That is a product decision, not a bug fix.
    apksigner verify --print-certs app-release.apk
    ```
 
-3. Install. If Play Protect still warns, use **More details → Install anyway**
+3. If you believe the classification is wrong and want it re-reviewed, the
+   appeal path and the text to submit are in
+   [PLAY-PROTECT-APPEAL.md](PLAY-PROTECT-APPEAL.md).
+
+4. Install. If Play Protect still warns, use **More details → Install anyway**
    *after* steps 1 and 2 match. The warning will stay until the app is
    distributed through Play — that is Play Protect's rule for sideloaded apps
    that can install and download code, not something an update can switch off.

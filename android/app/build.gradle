@@ -17,6 +17,15 @@ def stageAndroidEngine = tasks.register('stageAndroidEngine', Sync) {
     into stagedPythonDir
 }
 tasks.named('preBuild').configure { dependsOn(stageAndroidEngine) }
+// Chaquopy's merge<variant>PythonSources reads the staged directory, so Gradle
+// must be told the order explicitly — preBuild alone is not an ancestor of it
+// (that is what failed v0.47.15's first board: "uses this output of task
+// ':app:stageAndroidEngine' without declaring a dependency")
+tasks.configureEach { t ->
+    if (t.name.startsWith('merge') && t.name.endsWith('PythonSources')) {
+        t.dependsOn(stageAndroidEngine)
+    }
+}
 
 android {
     namespace 'com.suravidl.app'
