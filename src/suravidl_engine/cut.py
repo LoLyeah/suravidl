@@ -16,7 +16,15 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+# A macOS app started from Finder never inherits the shell's PATH, so a
+# Homebrew ffmpeg is invisible to shutil.which() even though the user has it
+# (owner's report, 2026-10-24: "the last step needs ffmpeg" on a Mac with
+# ffmpeg installed). These are the places a package manager puts it.
+_MAC_FFMPEG = ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg",
+               "/opt/local/bin/ffmpeg")
 
 # "1:23", "0:12", "1:02:03", or a bare "95" (seconds). A bare number is
 # seconds, never minutes — the fields' placeholders say "start 1:30".
@@ -24,10 +32,35 @@ _TIME_RE = re.compile(r"^(?:(\d{1,2}):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$")
 
 
 def ffmpeg_exe() -> str:
-    """The ffmpeg the engine itself uses — Android passes its jniLib
-    path in via SURAVIDL_FFMPEG; desktop builds take the system one."""
-    return (os.environ.get("SURAVIDL_FFMPEG", "").strip()
-            or shutil.which("ffmpeg") or "")
+    """The ffmpeg the engine itself uses.
+
+    Android passes its jniLib path in via SURAVIDL_FFMPEG; desktop builds
+    take the system one — from PATH, then (on macOS) from the package
+    managers' own prefixes, because a Finder-launched app has no PATH.
+    """
+    env = os.environ.get("SURAVIDL_FFMPEG", "").strip()
+    if env:
+        return env
+    # the copy Settings downloaded (v0.47.13): small installers, one click
+    try:
+        from . import tools
+
+        own = tools.ffmpeg_path()
+        if own.is_file() and os.access(own, os.X_OK):
+            return str(own)
+    except Exception:  # noqa: BLE001 - a missing tools module is not fatal
+        pass
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    if sys.platform == "darwin":
+        for candidate in _MAC_FFMPEG:
+            try:
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    return candidate
+            except OSError:
+                continue
+    return ""
 
 
 def parse_time(s) -> float | None:

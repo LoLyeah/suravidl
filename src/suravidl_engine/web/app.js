@@ -797,6 +797,17 @@ const STRINGS = { en: {}, id: {
   "renamed to {name}": "diganti nama menjadi {name}",
   "could not rename: {msg}": "gagal mengganti nama: {msg}",
   "The file on disk goes too.": "Berkas di disk ikut terhapus.",
+  "installed": "terpasang",
+  "not installed": "belum terpasang",
+  "downloading… {pct}%": "mengunduh… {pct}%",
+  "unpacking…": "membuka paket…",
+  "download failed: {msg}": "unduhan gagal: {msg}",
+  "Download ({size})": "Unduh ({size})",
+  "the best quality needs it to join video and audio":
+    "kualitas terbaik membutuhkannya untuk menggabungkan video dan audio",
+  "a static build from ffmpeg-static, pinned by checksum":
+    "build statis dari ffmpeg-static, dipatok dengan checksum",
+  "no build for this platform ({p})": "tidak ada build untuk platform ini ({p})",
   "{n} running": "{n} berjalan",
   "nothing running": "tidak ada yang berjalan",
   "{n} filed": "{n} selesai",
@@ -3066,6 +3077,69 @@ async function loadLog() {
   }
 }
 initDiagnostics();
+
+/* ---------- ffmpeg, fetched on demand (v0.47.13 "the tool") ----------
+   Not bundled: the installers stay small. The row says whether one is
+   reachable, offers the pinned static build when it is not, and removes
+   only the app's own copy. */
+async function refreshFfmpeg() {
+  const stateEl = $("ffState"), get = $("ffGet"), rem = $("ffRemove"), meta = $("ffMeta");
+  if (!stateEl) return;
+  const st = await api("/tools/ffmpeg").catch(() => null);
+  if (!st) return;
+  const d = st.download || {};
+  if (d.state === "downloading" || d.state === "unpacking") {
+    stateEl.textContent = d.state === "unpacking"
+      ? t("unpacking…")
+      : t("downloading… {pct}%", { pct: d.pct || 0 });
+    get.classList.add("hidden");
+    rem.classList.add("hidden");
+    meta.textContent = t("a static build from ffmpeg-static, pinned by checksum");
+    setTimeout(refreshFfmpeg, 800);
+    return;
+  }
+  if (st.installed) {
+    stateEl.textContent = t("installed") + (st.version ? " · " + st.version : "");
+    meta.textContent = st.path;
+    get.classList.add("hidden");
+    rem.classList.remove("hidden");
+    return;
+  }
+  stateEl.textContent = d.state === "error"
+    ? t("download failed: {msg}", { msg: d.error || "" })
+    : t("not installed");
+  meta.textContent = st.supported
+    ? t("the best quality needs it to join video and audio")
+    : t("no build for this platform ({p})", { p: st.platform });
+  get.classList.toggle("hidden", !st.supported);
+  get.textContent = t("Download ({size})", { size: "~25 MB" });
+  rem.classList.add("hidden");
+}
+
+function initFfmpegRow() {
+  if (!$("ffGet")) return;
+  $("ffGet").onclick = async () => {
+    const b = $("ffGet");
+    b.disabled = true;
+    try {
+      await api("/tools/ffmpeg", { method: "POST" });
+    } catch (e) {
+      toast(t("download failed: {msg}", { msg: e.message }), "bad");
+    } finally {
+      b.disabled = false;
+    }
+    refreshFfmpeg();
+  };
+  $("ffRemove").onclick = async () => {
+    try {
+      await api("/tools/ffmpeg/remove", { method: "POST" });
+    } catch (_) { /* the refresh below says what is true */ }
+    refreshFfmpeg();
+  };
+  refreshFfmpeg();
+}
+
+initFfmpegRow();
 initFollows();
 
 $("logOpen").onclick = async () => {

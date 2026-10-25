@@ -208,6 +208,21 @@ def _safe_headers(h: dict | None) -> dict | None:
     return {k: v for k, v in h.items() if str(k).lower() in ALLOWED_HEADER_KEYS}
 
 
+NO_FFMPEG_PICK = ("no ffmpeg here — the best single-file stream was chosen; "
+                  "a separate video+audio pick needs it")
+
+
+def _default_format(ffmpeg: bool) -> str | None:
+    """The format expression when the user picked nothing.
+
+    None means "leave yt-dlp's own default alone" — `bestvideo*+bestaudio/best`
+    with the best quality the site has. Without ffmpeg that default can only
+    end at a failed merge, so it becomes the best stream that is already
+    whole (progressive mp4 first: it plays everywhere).
+    """
+    return None if ffmpeg else "best[ext=mp4]/best"
+
+
 # One-click download intents that don't fit the per-format table.
 # audio-native keeps the source stream untouched (no ffmpeg anywhere);
 # the convert variants run yt-dlp's FFmpegExtractAudio post-processor.
@@ -296,14 +311,19 @@ def preset_opts(preset: str | None) -> dict:
 
 
 def ffmpeg_opts() -> dict:
-    """Point yt-dlp at the bundled ffmpeg when the host provides one.
+    """Point yt-dlp at the ffmpeg this engine resolved.
 
-    Android ships a static ffmpeg as a jniLib (libffmpeg.so) and passes its
-    path in via this env var; desktop builds leave it unset so yt-dlp finds
-    the system ffmpeg on its own.
+    The resolver knows about all of them: Android's jniLib (env), the copy
+    Settings downloaded into ~/.suravidl/tools, PATH, and — because a
+    Finder-launched Mac app has no PATH — Homebrew's prefixes. yt-dlp's own
+    lookup only ever sees PATH, so passing the answer explicitly is what
+    makes the downloaded copy (and the Mac one) actually reachable
+    (v0.47.13).
     """
-    loc = os.environ.get("SURAVIDL_FFMPEG", "").strip()
-    return {"ffmpeg_location": loc} if loc else {}
+    from .cut import ffmpeg_exe
+
+    exe = ffmpeg_exe()
+    return {"ffmpeg_location": exe} if exe else {}
 
 
 # A language tag, BCP-47-shaped: `.en`, `.en-US`, `.zh-Hans`, `.es-419`,
@@ -1671,6 +1691,18 @@ class JobManager:
             opts["playlist_items"] = "1"
         if fmt:
             opts["format"] = fmt
+        # v0.47.12 "the fallback": with no pick at all, yt-dlp's own default
+        # is `bestvideo*+bestaudio/best` — two tracks that only ffmpeg can
+        # join. On a machine without ffmpeg that picks the best streams and
+        # then dies at the last step (owner's macOS report, 2026-10-24), so
+        # the default degrades to the best stream that is already whole.
+        if "format" not in opts and not job.get("preset"):
+            from .cut import ffmpeg_exe as _ffmpeg_exe
+
+            choice = _default_format(bool(_ffmpeg_exe()))
+            if choice:
+                opts["format"] = choice
+                notices.append(NO_FFMPEG_PICK)
         # no_audio (per-download): the shells pair a video-only pick with the
         # site's audio by default; this override keeps it silent. It applies
         # to what the app controls — a stream that carries its own audio is

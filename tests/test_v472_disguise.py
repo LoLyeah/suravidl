@@ -195,12 +195,8 @@ def test_whatsnew_opens_with_this_release():
     top = whatsnew.ENTRIES[0]
     assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
-    # v0.47.3 "the legend" — this round's entry stays among the living
-    # ten (the strict current-version pin moved to that release's test
-    # file, per the retirement policy)
-    assert any(e["version"] == "0.47.2"
-               and e["title"].lower() == "the masquerade"
-               for e in whatsnew.ENTRIES)
+    # 0.47.2 "the masquerade" retired out of the rolling ten in v0.47.12
+    assert "The masquerade" not in [e["title"] for e in whatsnew.ENTRIES]
 
 
 def test_the_popup_names_the_tree():

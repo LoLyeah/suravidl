@@ -669,6 +669,27 @@ def create_app(download_dir, auth_token: str | None = None,
 
         return updater.update_status()
 
+    @app.get("/tools/ffmpeg")
+    def ffmpeg_status(_mgr: JobManager = Depends(require_auth)):
+        """Is there an ffmpeg, where is it, and is one downloading (v0.47.13)."""
+        from . import tools
+
+        return tools.status()
+
+    @app.post("/tools/ffmpeg")
+    def ffmpeg_fetch(_mgr: JobManager = Depends(require_auth)):
+        """Download a static ffmpeg into the app's own folder (pinned by sha256)."""
+        from . import tools
+
+        return tools.start_download()
+
+    @app.post("/tools/ffmpeg/remove")
+    def ffmpeg_remove(_mgr: JobManager = Depends(require_auth)):
+        """Delete the app's own copy — a system ffmpeg is never touched."""
+        from . import tools
+
+        return tools.remove()
+
     @app.post("/update/cancel")
     def update_cancel(_mgr: JobManager = Depends(require_auth)):
         """Abort a staged download in flight (the row's Cancel button)."""

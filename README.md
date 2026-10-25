@@ -80,6 +80,10 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 The engine binds to loopback, keeps its database in `~/.suravidl/`, and prints
 an API token on start (or takes `SURAVIDL_TOKEN`).
 
+ffmpeg is optional: **Settings → ffmpeg** downloads a pinned static build when none is
+reachable (needed to join best video+audio, and to convert audio). Android ships
+its own; on a Mac the app also finds a Homebrew install.
+
 ## Browser extension
 
 Watches media requests on every page and hands the interesting ones to the
@@ -247,7 +251,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 1437 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 1454 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

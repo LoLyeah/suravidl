@@ -20,6 +20,8 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlparse
 
+from .cut import ffmpeg_exe      # one resolver for the whole engine (v0.47.12)
+
 from yt_dlp.utils import download_range_func
 
 SUBTITLE_MODES = ("off", "sidecar", "embed")
@@ -41,7 +43,7 @@ def ffmpeg_can_encode(name: str) -> bool:
     No ffmpeg found or a failed probe answers True: never silently
     degrade a chain when unsure — the failure itself is honest.
     """
-    exe = os.environ.get("SURAVIDL_FFMPEG", "").strip() or shutil.which("ffmpeg")
+    exe = ffmpeg_exe()
     if not exe:
         return True
     key = (exe, name)
@@ -786,7 +788,14 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     # Remux repackages without re-encoding — the streams keep their quality.
     if container in ("mp4", "mkv"):
         opts["merge_output_format"] = container
-        pps.append({"key": "FFmpegVideoRemuxer", "preferedformat": container})
+        if ffmpeg_exe():
+            pps.append({"key": "FFmpegVideoRemuxer", "preferedformat": container})
+        else:
+            # v0.47.12: a remux is an ffmpeg pass. Asking for one on a box
+            # without ffmpeg turns a finished download into a failed job.
+            notices.append(
+                f"the file keeps its original container — repacking it as "
+                f"{container} needs ffmpeg")
 
     opts["outtmpl"] = outtmpl
     if pps:

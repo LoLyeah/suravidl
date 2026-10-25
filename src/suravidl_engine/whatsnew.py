@@ -15,6 +15,20 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.13",
+        "title": "The fetch",
+        "items": [
+            "ffmpeg is no longer something you have to know about: Settings shows whether one is reachable and downloads a pinned static build when it isn't — the join video+audio step and every audio conversion need it.",
+        ],
+    },
+    {
+        "version": "0.47.12",
+        "title": "The whole",
+        "items": [
+            "On a machine without ffmpeg the default pick is now the best stream that is already whole, instead of a video+audio pair it could never join — and a Homebrew ffmpeg is found even when the app was opened from Finder.",
+        ],
+    },
+    {
         "version": "0.47.11",
         "title": "The sheet",
         "items": [
@@ -69,20 +83,6 @@ ENTRIES = [
         "title": "The minutes",
         "items": [
             "A failed finish now explains itself: the log keeps what yt-dlp and ffmpeg actually said, and an output file that cannot be opened says what that usually means (name, disk, antivirus).",
-        ],
-    },
-    {
-        "version": "0.47.3",
-        "title": "The legend",
-        "items": [
-            "The stream list names each row from the manifest itself — a real resolution, the audio track's name, one 'All qualities' row — the what's-new card now survives a restart, and a refused update says why.",
-        ],
-    },
-    {
-        "version": "0.47.2",
-        "title": "The masquerade",
-        "items": [
-            "Streams that disguise their segments as images (.png/.webp) now download the whole episode, audio tracks included — and the extension's list names what each row is: all qualities, a resolution, or an audio track.",
         ],
     },
 ]
