@@ -516,6 +516,18 @@ class MainActivity : AppCompatActivity() {
                     toast("the update file is gone — download it again")
                     return@runOnUiThread
                 }
+                // v0.47.14 "the seal": the sha256 in version.json protects the
+                // download, not the channel. Only an APK carrying THIS app's
+                // signing certificate (and package name) may reach the
+                // installer — a hijacked release feed cannot swap in a
+                // foreign app, and Play Protect sees a check, not a dropper.
+                if (ApkTrust.packageOf(this@MainActivity, apk) != packageName ||
+                    !ApkTrust.signedLikeSelf(this@MainActivity, apk)) {
+                    LogStore.write(this@MainActivity, "update-install.log",
+                                   "refused ${apk.name}: not signed by this app's key")
+                    toast("this update is not signed by the same key — refusing")
+                    return@runOnUiThread
+                }
                 try {
                     val uri = FileProvider.getUriForFile(
                         this@MainActivity, "$packageName.fileprovider", apk)
@@ -537,6 +549,12 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
+    /** Where downloads may live: the engine's folder and the legacy internal one. */
+    private fun downloadRoots(): List<File> = listOf(
+        File(getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES) ?: filesDir, "suravidl"),
+        File(filesDir, "suravidl"),
+    )
+
     /** Hand a file to another app (player / share sheet) via our FileProvider. */
     private fun handOffFile(path: String, share: Boolean) {
         val f = File(path)
@@ -548,6 +566,13 @@ class MainActivity : AppCompatActivity() {
         }
         if (!f.exists()) {
             toast("file is gone")
+            return
+        }
+        // FileProvider's scope also covers cache/updates (the downloaded
+        // APK), so the path alone is not permission to hand a file out:
+        // only the download folders may leave the app (v0.47.14, audit V-06)
+        if (!PathGuard.insideAny(f, downloadRoots())) {
+            toast("that file is outside the downloads folder")
             return
         }
         val mime = when (f.extension.lowercase()) {

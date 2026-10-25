@@ -251,7 +251,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 1454 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 1465 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

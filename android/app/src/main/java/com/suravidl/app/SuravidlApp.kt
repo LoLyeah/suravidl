@@ -151,6 +151,9 @@ class SuravidlApp : Application() {
         } else {
             makeExecutable(f, "ffmpeg")
             try {
+                // tells the engine it is the APK, not a desktop Linux: the
+                // Settings ffmpeg download must refuse here (v0.47.14)
+                Os.setenv("SURAVIDL_ANDROID", "1", true)
                 Os.setenv("SURAVIDL_FFMPEG", f.absolutePath, true)
                 Log.i(TAG, "bundled ffmpeg: ${f.absolutePath}")
             } catch (e: Throwable) {

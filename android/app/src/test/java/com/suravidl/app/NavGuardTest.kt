@@ -57,6 +57,29 @@ class NavGuardTest {
     }
 
     @Test
+    fun twoPartSuffixesDoNotBecomeOneSite() {
+        // v0.47.14 "the seal": `video.co.uk` and `ads.co.uk` are different
+        // sites; the old takeLast(2) collapsed both to `co.uk` and let the
+        // hop through silently (audit V-01)
+        assertEquals("video.co.uk", NavGuard.siteKey("https://video.co.uk/watch"))
+        assertEquals("ads.co.uk", NavGuard.siteKey("https://ads.co.uk/x"))
+        assertFalse(NavGuard.sameSite("https://video.co.uk/watch", "https://ads.co.uk/x"))
+        assertNotNull(
+            NavGuard.blockReason("https://video.co.uk/watch", "https://ads.co.uk/x")
+        )
+        // …while a subdomain of the same site still passes
+        assertTrue(
+            NavGuard.sameSite("https://video.co.uk/watch", "https://www.video.co.uk/x")
+        )
+        // and the private suffixes behave the same way
+        assertFalse(NavGuard.sameSite("https://a.github.io/x", "https://b.github.io/y"))
+        assertTrue(NavGuard.sameSite("https://a.github.io/x", "https://a.github.io/y"))
+        assertFalse(NavGuard.sameSite("https://x.pages.dev/a", "https://y.pages.dev/b"))
+        // ordinary TLDs are untouched
+        assertEquals("example.com", NavGuard.siteKey("https://a.b.example.com/x"))
+    }
+
+    @Test
     fun adsBlockingCanBePardoned() {
         assertTrue(AdHosts.blocked("https://cdn.popads.net/pop.js"))
         assertFalse(AdHosts.blocked("https://cdn.popads.net/pop.js", enabled = false))

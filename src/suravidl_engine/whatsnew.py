@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.14",
+        "title": "The seal",
+        "items": [
+            "An update is now installed only when it is signed by the same key as the app you already have — a hijacked download can no longer hand Android a different app.",
+            "The in-app browser no longer treats two different sites under co.uk, com.au, github.io and friends as one site, and a downloaded file can only be handed to another app from the downloads folder.",
+            "On the phone, Settings no longer offers an ffmpeg download that could never work there — the app already carries its own.",
+        ],
+    },
+    {
         "version": "0.47.13",
         "title": "The fetch",
         "items": [
@@ -76,13 +85,6 @@ ENTRIES = [
         "title": "The carrier",
         "items": [
             "A server that wraps its segments in fake images (only its own player can unwrap them) now says so before downloading, with the way out — and 'auto' picks MKV when subtitles are embedded.",
-        ],
-    },
-    {
-        "version": "0.47.4",
-        "title": "The minutes",
-        "items": [
-            "A failed finish now explains itself: the log keeps what yt-dlp and ffmpeg actually said, and an output file that cannot be opened says what that usually means (name, disk, antivirus).",
         ],
     },
 ]

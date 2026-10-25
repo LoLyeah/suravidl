@@ -48,14 +48,44 @@ object NavGuard {
         return if (rest.isEmpty()) null else rest
     }
 
-    /** The registrable-ish site: the last two labels of the host. Not a
-     *  Public-Suffix-List implementation on purpose — a hop from a video page
-     *  to *.some-ad.net is a hop off the page, and that is all this maps. */
+    /**
+     * Suffixes that own their own subdomain space, so the site is three
+     * labels, not two. Without this, `video.co.uk` and `ads.co.uk` both
+     * collapse to `co.uk` and every hop between them looked like a
+     * same-site hop (v0.47.14 "the seal" — the audit's V-01).
+     *
+     * Deliberately not the whole Public Suffix List: it is a few hundred
+     * kilobytes, and this file only needs the shapes that appear in ad and
+     * pop-under hops. A missing entry does not open a hole — it just keeps
+     * the old, coarser behaviour for that suffix.
+     */
+    private val MULTI_PART = setOf(
+        "co.uk", "org.uk", "me.uk", "ac.uk", "gov.uk", "net.uk", "sch.uk",
+        "com.au", "net.au", "org.au", "edu.au", "gov.au", "id.au",
+        "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp",
+        "com.br", "net.br", "org.br", "gov.br",
+        "co.nz", "net.nz", "org.nz", "govt.nz",
+        "co.za", "org.za", "co.in", "net.in", "org.in",
+        "co.kr", "or.kr", "com.tr", "com.mx", "com.ar", "com.co",
+        "com.cn", "net.cn", "org.cn", "com.hk", "com.tw", "com.sg",
+        "com.my", "co.id", "or.id", "web.id", "co.th", "in.th",
+        "com.ph", "com.vn", "co.il", "com.sa", "com.eg", "com.pk",
+        // private suffixes: two users' spaces are two different sites
+        "github.io", "githubusercontent.com", "pages.dev", "workers.dev",
+        "netlify.app", "vercel.app", "herokuapp.com", "blogspot.com",
+        "wordpress.com", "tumblr.com", "cloudfront.net", "amazonaws.com",
+        "azurewebsites.net", "appspot.com", "firebaseapp.com",
+    )
+
+    /** The registrable-ish site: the last two labels of the host, or three
+     *  where the last two are a suffix that hosts sites beneath itself. */
     fun siteKey(url: String?): String {
         val h = host(url) ?: return ""
         val parts = h.split('.').filter { it.isNotEmpty() }
         if (parts.size <= 2) return parts.joinToString(".")
-        return parts.takeLast(2).joinToString(".")
+        val lastTwo = parts.takeLast(2).joinToString(".")
+        val take = if (lastTwo in MULTI_PART) 3 else 2
+        return parts.takeLast(take).joinToString(".")
     }
 
     fun sameSite(a: String?, b: String?): Boolean {

@@ -681,6 +681,12 @@ def create_app(download_dir, auth_token: str | None = None,
         """Download a static ffmpeg into the app's own folder (pinned by sha256)."""
         from . import tools
 
+        if tools.on_android():
+            # the APK already ships ffmpeg in nativeLibraryDir; "linux-arm64"
+            # here means Android's linux, and a glibc build can never run
+            # under bionic (v0.47.14, audit V-04)
+            raise HTTPException(
+                status_code=501, detail="ffmpeg ships inside the Android app")
         return tools.start_download()
 
     @app.post("/tools/ffmpeg/remove")

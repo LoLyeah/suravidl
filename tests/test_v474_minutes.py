@@ -36,7 +36,7 @@ def test_whatsnew_opens_with_this_release():
     top = whatsnew.ENTRIES[0]
     assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
-    # v0.47.5 "the carrier" — this round's entry stays among the living ten
-    assert any(e["version"] == "0.47.4"
-               and e["title"].lower() == "the minutes"
-               for e in whatsnew.ENTRIES)
+    # retired by v0.47.14 "the seal": ten releases later, the card is
+    # rolling — the behaviour it pinned is covered by its own tests above
+    assert "0.47.4" not in [e["version"] for e in whatsnew.ENTRIES]
+    assert "the minutes" not in [e["title"].lower() for e in whatsnew.ENTRIES]

@@ -62,15 +62,33 @@ def tools_dir() -> Path:
     return Path.home() / ".suravidl" / "tools"
 
 
+def on_android() -> bool:
+    """Is this the Chaquopy APK? There ffmpeg already ships in the APK's
+    nativeLibraryDir and is exported as SURAVIDL_FFMPEG; a downloaded
+    glibc build could never run under bionic + W^X, so the fetch must
+    refuse instead of leaving a dead binary behind (v0.47.14, audit V-04)."""
+    return bool(os.environ.get("SURAVIDL_ANDROID")) or "ANDROID_ROOT" in os.environ
+
+
 def platform_key() -> str:
-    """`darwin-arm64`, `linux-x64`, `win32-x64` … — the manifest's key."""
+    """`darwin-arm64`, `linux-x64`, `win32-x64` … — the manifest's key.
+
+    Android reports `linux`, which is exactly the trap the audit found: it
+    would match the desktop `linux-*` build. It gets its own key so the
+    manifest lookup misses on purpose."""
+    if on_android():
+        return f"android-{arch_name()}"
     plat = sys.platform
     if plat == "win32":
         plat = "win32"
+    return f"{plat}-{arch_name()}"
+
+
+def arch_name() -> str:
+    """`arm64` / `x64` — how the manifest spells the machine."""
     machine = (_platform.machine() or "").lower()
-    arch = {"arm64": "arm64", "aarch64": "arm64",
+    return {"arm64": "arm64", "aarch64": "arm64",
             "x86_64": "x64", "amd64": "x64"}.get(machine, machine or "x64")
-    return f"{plat}-{arch}"
 
 
 def entry() -> tuple[str, str, str] | None:
@@ -98,6 +116,7 @@ def status() -> dict:
     return {
         "platform": platform_key(),
         "supported": entry() is not None,
+        "note": "ffmpeg ships inside the Android app" if on_android() else "",
         "installed": exists,
         "path": str(path),
         "size": size,
@@ -168,6 +187,9 @@ def _download() -> None:
 
 def start_download() -> dict:
     """Kick a download; the UI polls status() for progress."""
+    if on_android():
+        _set("error", 0, "ffmpeg ships inside the Android app")
+        return dict(_STATE)
     with _LOCK:
         if _STATE["state"] in ("downloading", "unpacking"):
             return dict(_STATE)

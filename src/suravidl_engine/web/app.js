@@ -3085,6 +3085,9 @@ initDiagnostics();
 async function refreshFfmpeg() {
   const stateEl = $("ffState"), get = $("ffGet"), rem = $("ffRemove"), meta = $("ffMeta");
   if (!stateEl) return;
+  // the APK ships ffmpeg; showing a download button there would be a lie
+  // (v0.47.14 — the engine also answers 501, this just hides the row)
+  if (ANDROID()) { const f = $("ffmpegField"); if (f) f.classList.add("hidden"); return; }
   const st = await api("/tools/ffmpeg").catch(() => null);
   if (!st) return;
   const d = st.download || {};
