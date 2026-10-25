@@ -22,7 +22,10 @@ tasks.named('preBuild').configure { dependsOn(stageAndroidEngine) }
 // (that is what failed v0.47.15's first board: "uses this output of task
 // ':app:stageAndroidEngine' without declaring a dependency")
 tasks.configureEach { t ->
-    if (t.name.startsWith('merge') && t.name.endsWith('PythonSources')) {
+    // every Chaquopy task that could read the sources: merge*PythonSources,
+    // generate*PythonSources, *PythonAssets — one rule instead of guessing
+    // which one Gradle validates first
+    if (t.name.toLowerCase().contains('python')) {
         t.dependsOn(stageAndroidEngine)
     }
 }
