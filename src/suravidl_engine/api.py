@@ -29,6 +29,21 @@ from .probe import probe, scrub_secrets
 from . import site_memory
 
 
+def _load_tools():
+    """The ffmpeg fetcher, or None where it does not ship.
+
+    The fetcher is desktop-only: the Android build stages the engine without
+    `tools.py` (v0.47.15) because the phone already carries ffmpeg in
+    nativeLibraryDir. Its absence is the platform, not a fault — so the
+    Settings routes answer plainly instead of raising ImportError.
+    """
+    try:
+        from . import tools
+    except ImportError:
+        return None
+    return tools
+
+
 class JobRequest(BaseModel):
     url: str
     fmt: str | None = None
@@ -672,19 +687,28 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.get("/tools/ffmpeg")
     def ffmpeg_status(_mgr: JobManager = Depends(require_auth)):
         """Is there an ffmpeg, where is it, and is one downloading (v0.47.13)."""
-        from . import tools
-
+        tools = _load_tools()
+        if tools is None:
+            # the Android build ships no fetcher at all (v0.47.15): answer the
+            # row's question honestly instead of failing the import
+            return {"platform": "android", "supported": False,
+                    "installed": True, "path": "", "size": 0, "version": "",
+                    "note": "ffmpeg ships inside the Android app",
+                    "download": {"state": "idle", "pct": 0, "error": None}}
         return tools.status()
 
     @app.post("/tools/ffmpeg")
     def ffmpeg_fetch(_mgr: JobManager = Depends(require_auth)):
         """Download a static ffmpeg into the app's own folder (pinned by sha256)."""
-        from . import tools
-
+        tools = _load_tools()
+        if tools is None:
+            raise HTTPException(
+                status_code=501, detail="ffmpeg ships inside the Android app")
         if tools.on_android():
-            # the APK already ships ffmpeg in nativeLibraryDir; "linux-arm64"
-            # here means Android's linux, and a glibc build can never run
-            # under bionic (v0.47.14, audit V-04)
+            # belt and braces for builds that still carry the module: the APK
+            # already ships ffmpeg in nativeLibraryDir; "linux-arm64" here
+            # means Android's linux, and a glibc build can never run under
+            # bionic (v0.47.14, audit V-04)
             raise HTTPException(
                 status_code=501, detail="ffmpeg ships inside the Android app")
         return tools.start_download()
@@ -692,8 +716,10 @@ def create_app(download_dir, auth_token: str | None = None,
     @app.post("/tools/ffmpeg/remove")
     def ffmpeg_remove(_mgr: JobManager = Depends(require_auth)):
         """Delete the app's own copy — a system ffmpeg is never touched."""
-        from . import tools
-
+        tools = _load_tools()
+        if tools is None:
+            raise HTTPException(
+                status_code=501, detail="ffmpeg ships inside the Android app")
         return tools.remove()
 
     @app.post("/update/cancel")

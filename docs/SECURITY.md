@@ -41,6 +41,14 @@ Fixed in **0.47.14 "the seal"**:
 | ffmpeg download reachable on Android | Android reports `linux`, so the fetch would have downloaded a glibc build that can never run under bionic, and left it behind | Android gets its own platform key; `POST /tools/ffmpeg` answers **501** there; the Settings row is hidden on the phone |
 | Hand-off took any path | `FileProvider`'s scope also covers `cache/updates` (the downloaded APK) | `PathGuard` checks the canonical path: only the download folders may leave the app |
 
+**0.47.15 "the spare"** went one step further: the APK no longer carries the
+ffmpeg *fetcher* at all. The phone's ffmpeg already ships inside the app, so
+`tools.py` was desktop-only; the Android build stages the engine without it and
+the release job asserts its absence in the built APK. Be clear about what this
+does and does not buy: Play Protect's scanner reads the manifest, `classes.dex`
+and the ELF headers — not Python assets — so this is removing dead code, not
+silencing the warning. The warning's causes are the four items listed below.
+
 Checked and left as designed (with the reason):
 
 - **`window.__pk` scraping** — the key comes from the page's own player. A page

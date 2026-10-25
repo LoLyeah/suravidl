@@ -4,6 +4,20 @@ plugins {
     id 'com.chaquo.python'
 }
 
+// v0.47.15 "the spare": the phone already carries ffmpeg in nativeLibraryDir,
+// so the on-demand fetcher (src/suravidl_engine/tools.py) is desktop-only and
+// must not ship. Chaquopy 3.11 has no per-file exclude, so the engine is
+// staged into the build directory without it and Chaquopy reads that copy.
+def stagedPythonDir = layout.buildDirectory.dir('staged-python').get().asFile
+def stageAndroidEngine = tasks.register('stageAndroidEngine', Sync) {
+    from('../../src') {
+        include 'suravidl_engine/**'
+        exclude 'suravidl_engine/tools.py'
+    }
+    into stagedPythonDir
+}
+tasks.named('preBuild').configure { dependsOn(stageAndroidEngine) }
+
 android {
     namespace 'com.suravidl.app'
     compileSdk 35
@@ -18,8 +32,8 @@ android {
         applicationId "com.suravidl.app"
         minSdk 24
         targetSdk 35
-        versionCode 167
-        versionName "0.47.14"
+        versionCode 168
+        versionName "0.47.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters "arm64-v8a", "x86_64" }
     }
@@ -51,7 +65,11 @@ android {
 
     sourceSets {
         main {
-            python.srcDir '../../src'   // bundle suravidl_engine as-is
+            // v0.47.15 "the spare": the engine is staged so the APK carries
+            // no ffmpeg *fetcher* — the phone's ffmpeg already ships in
+            // nativeLibraryDir, so tools.py is desktop-only. Chaquopy 3.11
+            // has no per-file exclude, hence the Sync copy.
+            python.srcDir stagedPythonDir
         }
     }
 

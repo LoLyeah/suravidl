@@ -71,6 +71,8 @@ jobs:
         run: gradle -p android assembleRelease --no-daemon
       - name: Verify signature
         run: $ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs android/app/build/outputs/apk/release/app-release.apk
+      - name: The phone carries no ffmpeg fetcher (v0.47.15)
+        run: python3 android/scripts/check_no_fetcher.py android/app/build/outputs/apk/release/app-release.apk
       - name: Verify 16 KB page size compatibility
         run: |
           set -e

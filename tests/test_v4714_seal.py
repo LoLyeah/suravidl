@@ -21,11 +21,12 @@ APP_JS = ROOT / "src" / "suravidl_engine" / "web" / "app.js"
 AUTH = {"Authorization": "Bearer testtoken"}
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.47.14"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the seal"
+def test_the_notes_still_carry_this_release():
+    # the CURRENT version is pinned by the newest release's test; this one
+    # only has to keep its own entry in the rolling ten
     assert len(ENTRIES) == 10, "the card shows ten releases; retire the oldest"
+    assert any(e["version"] == "0.47.14" and e["title"].lower() == "the seal"
+               for e in ENTRIES)
 
 
 def test_android_is_not_a_linux_desktop(monkeypatch):

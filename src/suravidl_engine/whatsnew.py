@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.15",
+        "title": "The spare",
+        "items": [
+            "The phone no longer carries the desktop's ffmpeg downloader at all — its ffmpeg already sits inside the app, so that part was only ever useful on a Mac or a PC.",
+        ],
+    },
+    {
         "version": "0.47.14",
         "title": "The seal",
         "items": [
@@ -78,13 +85,6 @@ ENTRIES = [
         "title": "The clock",
         "items": [
             "The finishing phase now names its step and counts up — 'joining video and audio · 2:14' instead of a dead bar while a big file is copied.",
-        ],
-    },
-    {
-        "version": "0.47.5",
-        "title": "The carrier",
-        "items": [
-            "A server that wraps its segments in fake images (only its own player can unwrap them) now says so before downloading, with the way out — and 'auto' picks MKV when subtitles are embedded.",
         ],
     },
 ]
