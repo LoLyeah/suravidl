@@ -81,13 +81,19 @@ def test_preset_opts_mapping():
         preset_opts("not-a-preset")
 
 
-def test_ffmpeg_location_only_set_when_env_present(monkeypatch):
+def test_ffmpeg_location_follows_the_resolver(monkeypatch):
+    """v0.47.13: not just the env — the downloaded copy and PATH count too,
+    because yt-dlp's own lookup only ever sees PATH."""
+    from suravidl_engine import cut
     from suravidl_engine.jobs import ffmpeg_opts
 
-    monkeypatch.delenv("SURAVIDL_FFMPEG", raising=False)
-    assert ffmpeg_opts() == {}
     monkeypatch.setenv("SURAVIDL_FFMPEG", "/data/app/libffmpeg.so")
     assert ffmpeg_opts() == {"ffmpeg_location": "/data/app/libffmpeg.so"}
+    monkeypatch.delenv("SURAVIDL_FFMPEG", raising=False)
+    monkeypatch.setattr(cut, "ffmpeg_exe", lambda: "")
+    assert ffmpeg_opts() == {}
+    monkeypatch.setattr(cut, "ffmpeg_exe", lambda: "/opt/homebrew/bin/ffmpeg")
+    assert ffmpeg_opts() == {"ffmpeg_location": "/opt/homebrew/bin/ffmpeg"}
 
 
 # -- API validation ---------------------------------------------------------

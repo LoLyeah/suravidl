@@ -115,11 +115,8 @@ def test_whatsnew_opens_with_this_release():
     top = whatsnew.ENTRIES[0]
     assert top["version"] == __version__, "ENTRIES[0] is the current version"
     assert len(whatsnew.ENTRIES) == 10
-    # v0.47.4 "the minutes" — this round's entry stays among the living
-    # ten (the strict current-version pin moved to that release's file)
-    assert any(e["version"] == "0.47.3"
-               and e["title"].lower() == "the legend"
-               for e in whatsnew.ENTRIES)
+    # 0.47.3 "the legend" retired out of the rolling ten in v0.47.13
+    assert "The legend" not in [e["title"] for e in whatsnew.ENTRIES]
     assert "0.46.13" not in [e["version"] for e in whatsnew.ENTRIES]
 
 
