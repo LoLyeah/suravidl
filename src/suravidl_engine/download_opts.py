@@ -92,6 +92,42 @@ def impersonate_available() -> bool:
 
     return importlib.util.find_spec("curl_cffi") is not None
 
+
+def _curl_targets() -> list[str]:
+    """The concrete impersonation targets the installed curl_cffi can serve.
+
+    Read from the package's own Literal, so a version that renames or drops
+    aliases shows up here instead of at download time. 2026-10-26: curl_cffi
+    0.17.0 dropped the bare "chrome" alias, and every impersonated job and
+    probe started failing with "Impersonate target ... is not available".
+    """
+    try:
+        import typing
+
+        from curl_cffi.requests.session import BrowserTypeLiteral
+
+        return [t for t in typing.get_args(BrowserTypeLiteral) if isinstance(t, str)]
+    except Exception:  # noqa: BLE001 - an unknown shape means "ask yt-dlp"
+        return []
+
+
+def resolve_impersonate(client: str) -> str:
+    """The name handed to yt-dlp: the alias if this build knows it, else the
+    newest concrete target for that browser (chrome142, firefox135, …)."""
+    targets = _curl_targets()
+    if not targets or client in targets:
+        return client
+
+    def version(target: str) -> int:
+        head = target[len(client):].split("_")[0]
+        digits = "".join(ch for ch in head if ch.isdigit())
+        return int(digits) if digits else -1
+
+    candidates = [t for t in targets
+                  if t.startswith(client) and version(t) >= 0
+                  and not t.endswith(("_android", "_ios"))]
+    return max(candidates, key=version) if candidates else client
+
 # One-click quality picks, expressed the way yt-dlp recommends: a capped
 # video stream paired with the best audio when the site serves them apart
 # (`bv*` + `ba`), falling back to the best single file (`b`). The engine owns
@@ -309,7 +345,7 @@ def curated_settings_opts(settings: dict) -> dict:
                 "curl_cffi or turn impersonate off in Settings → Authentication")
         from yt_dlp.networking.impersonate import ImpersonateTarget
 
-        opts["impersonate"] = ImpersonateTarget(target)
+        opts["impersonate"] = ImpersonateTarget(resolve_impersonate(target))
     return opts
 
 

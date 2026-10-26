@@ -19,6 +19,7 @@ ENTRIES = [
         "title": "The catch",
         "items": [
             "The phone build's new guard stopped its own release: it looked for a string every build carries. It now looks only for the downloader's own code, so the update installs again.",
+            "Browser impersonation follows the installed curl_cffi: when a release renames a browser profile, the newest matching one is used instead of every impersonated job failing.",
         ],
     },
     {
