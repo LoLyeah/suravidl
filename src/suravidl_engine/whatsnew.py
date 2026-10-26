@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.16",
+        "title": "The catch",
+        "items": [
+            "The phone build's new guard stopped its own release: it looked for a string every build carries. It now looks only for the downloader's own code, so the update installs again.",
+        ],
+    },
+    {
         "version": "0.47.15",
         "title": "The spare",
         "items": [
@@ -78,13 +85,6 @@ ENTRIES = [
         "items": [
             "A finished download can be renamed from its card — the file and its subtitles/thumbnail follow the new name together, and names Windows would refuse are refused before anything moves.",
             "Clear history forgets the finished rows and keeps the files in your downloads folder (desktop only — on the phone the files live in app storage).",
-        ],
-    },
-    {
-        "version": "0.47.6",
-        "title": "The clock",
-        "items": [
-            "The finishing phase now names its step and counts up — 'joining video and audio · 2:14' instead of a dead bar while a big file is copied.",
         ],
     },
 ]

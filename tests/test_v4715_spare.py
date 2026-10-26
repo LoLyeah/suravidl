@@ -23,11 +23,11 @@ CHECKER = ROOT / "android" / "scripts" / "check_no_fetcher.py"
 AUTH = {"Authorization": "Bearer testtoken"}
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.47.15"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the spare"
+def test_the_notes_still_carry_this_release():
+    # the current version is pinned by the newest test file
     assert len(ENTRIES) == 10
+    assert any(e["version"] == "0.47.15" and e["title"].lower() == "the spare"
+               for e in ENTRIES)
 
 
 def test_the_android_build_stages_the_engine_without_the_fetcher():
@@ -122,3 +122,29 @@ def test_the_desktop_still_has_the_fetcher(tmp_path, monkeypatch):
     st = tools.status()
     assert st["supported"] is True
     assert st["note"] == ""
+
+
+def test_the_checker_ignores_the_api_route(tmp_path):
+    """v0.47.16: "/tools/ffmpeg/remove" is an API route, not the fetcher —
+    looking for it failed the phone's own build (v0.47.15 shipped no APK)."""
+    apk = tmp_path / "route.apk"
+    _fake_apk(apk, {"api.py": b'@app.post("/tools/ffmpeg/remove")\n',
+                    "web/app.js": b'await api("/tools/ffmpeg/remove", {method: "POST"})\n'})
+    out = _run_checker(apk)
+    assert out.returncode == 0, out.stdout + out.stderr
+
+
+def test_the_checker_catches_bytecode_left_by_a_test_run(tmp_path):
+    """A stray tools.cpython-*.pyc in the tree would smuggle the module in."""
+    apk = tmp_path / "pyc.apk"
+    _fake_apk(apk, {"api.py": b"from fastapi import FastAPI\n",
+                    "__pycache__/tools.cpython-311.pyc":
+                        b"\x00\x00ffmpeg-static/releases/download\x00"})
+    out = _run_checker(apk)
+    assert out.returncode == 1, out.stdout + out.stderr
+    assert "FETCHER IN APK" in out.stdout
+
+
+def test_the_staging_copy_drops_bytecode():
+    assert "exclude 'suravidl_engine/__pycache__/**'" in GRADLE
+    assert "exclude '**/*.pyc'" in GRADLE

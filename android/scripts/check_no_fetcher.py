@@ -15,12 +15,14 @@ import zipfile
 
 DEFAULT_APK = "android/app/build/outputs/apk/release/app-release.apk"
 
-# strings that only the fetcher carries (a URL constant survives into a .pyc
-# even where sources are compiled)
+# Strings that only the fetcher carries. NOT "/tools/ffmpeg/remove": that is
+# an API route and ships in api.py and app.js on every platform — a guard that
+# looks for it fails the phone's own APK (v0.47.15 shipped without one because
+# of exactly that). A URL constant survives into a .pyc, so bytecode is caught.
 MARKERS = (
     b"def start_download",
     b"ffmpeg-static/releases/download",
-    b"/tools/ffmpeg/remove",
+    b"SURAVIDL_TOOLS_DIR",
 )
 
 

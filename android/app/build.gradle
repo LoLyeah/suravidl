@@ -13,6 +13,10 @@ def stageAndroidEngine = tasks.register('stageAndroidEngine', Sync) {
     from('../../src') {
         include 'suravidl_engine/**'
         exclude 'suravidl_engine/tools.py'
+        // a stray tools.cpython-*.pyc (a local test run leaves one) would
+        // smuggle the module straight back in
+        exclude 'suravidl_engine/__pycache__/**'
+        exclude '**/*.pyc'
     }
     into stagedPythonDir
 }
@@ -44,8 +48,8 @@ android {
         applicationId "com.suravidl.app"
         minSdk 24
         targetSdk 35
-        versionCode 168
-        versionName "0.47.15"
+        versionCode 169
+        versionName "0.47.16"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters "arm64-v8a", "x86_64" }
     }

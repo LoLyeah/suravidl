@@ -44,7 +44,9 @@ Fixed in **0.47.14 "the seal"**:
 **0.47.15 "the spare"** went one step further: the APK no longer carries the
 ffmpeg *fetcher* at all. The phone's ffmpeg already ships inside the app, so
 `tools.py` was desktop-only; the Android build stages the engine without it and
-the release job asserts its absence in the built APK. Be clear about what this
+the release job asserts its absence in the built APK (0.47.16 fixed that
+guard's first version, which searched for an API route every build carries and
+so stopped the phone's own 0.47.15 APK from being published). Be clear about what this
 does and does not buy: Play Protect's scanner reads the manifest, `classes.dex`
 and the ELF headers — not Python assets — so this is removing dead code, not
 silencing the warning. The warning's causes are the four items listed below.
