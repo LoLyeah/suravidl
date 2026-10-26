@@ -1,4 +1,9 @@
 const CFG = window.__SURAVIDL__ || {};
+
+// Module state that early code paths read. Declared HERE, before anything can
+// run: a `let` further down threw "cannot access before initialization" the
+// moment a load-time call touched it (v0.47.17 "the hoist").
+let refreshStorageInfo = null;   // filled in by initStorageSection()
 const H = () => ({
   "Authorization": "Bearer " + CFG.token,
   "Content-Type": "application/json",
@@ -459,6 +464,7 @@ const STRINGS = { en: {}, id: {
   "copy path": "salin path",
   "copy the whole message": "salin seluruh pesan",
   "could not apply: {msg}": "tidak bisa diterapkan: {msg}",
+  "could not check": "tidak bisa memeriksa",
   "could not check for updates": "gagal memeriksa pembaruan",
   "could not clear the cache: {msg}": "gagal membersihkan cache: {msg}",
   "could not delete: {msg}": "gagal menghapus: {msg}",
@@ -3089,7 +3095,11 @@ async function refreshFfmpeg() {
   // (v0.47.14 — the engine also answers 501, this just hides the row)
   if (ANDROID()) { const f = $("ffmpegField"); if (f) f.classList.add("hidden"); return; }
   const st = await api("/tools/ffmpeg").catch(() => null);
-  if (!st) return;
+  if (!st) {
+    // never leave "checking…" as the last word (v0.47.17)
+    stateEl.textContent = t("could not check");
+    return;
+  }
   const d = st.download || {};
   if (d.state === "downloading" || d.state === "unpacking") {
     stateEl.textContent = d.state === "unpacking"
@@ -4615,7 +4625,13 @@ function wireQuitButton() {
 }
 
 /* ---------- host-aware download location ---------- */
-const ANDROID = () => !!window.AndroidHost;
+// a function declaration, not a const arrow: refreshFfmpeg() runs at load
+// and asked "is this Android?" long before a `const` down here had a value,
+// which threw a TDZ ReferenceError inside the async call and left the ffmpeg
+// row spinning on every phone (v0.47.17)
+function ANDROID() {
+  return !!window.AndroidHost;
+}
 
 /** Does this host give finished downloads a Gallery/Music copy?
  *
@@ -4975,7 +4991,8 @@ function initVaultSection() {
 
 /** Android: storage row in Settings → Device — how much is downloaded, and a
  *  way to delete it, because the folder (Android/data/…) is unreachable. */
-let refreshStorageInfo = null;   // set below; re-read on tab open and deletes
+// declared at the top of the module on purpose (see ANDROID above): the
+// checks that call it run before this line executes
 
 async function initStorageSection() {
   const sec = $("storageSection");

@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.17",
+        "title": "The hoist",
+        "items": [
+            "The phone's Settings no longer shows an ffmpeg row that could only ever say \"checking…\" — the code meant to hide it ran before its own helper existed, so it crashed silently.",
+            "If the check really fails on a desktop, the row now says so instead of spinning forever.",
+        ],
+    },
+    {
         "version": "0.47.16",
         "title": "The catch",
         "items": [
@@ -78,14 +86,6 @@ ENTRIES = [
         "title": "The path",
         "items": [
             "Restart & Install starts PowerShell by its exact system path now — on one machine the bare name could not be found (WinError 2), so a verified update never began. The update log records the path it tried.",
-        ],
-    },
-    {
-        "version": "0.47.7",
-        "title": "The drawer",
-        "items": [
-            "A finished download can be renamed from its card — the file and its subtitles/thumbnail follow the new name together, and names Windows would refuse are refused before anything moves.",
-            "Clear history forgets the finished rows and keeps the files in your downloads folder (desktop only — on the phone the files live in app storage).",
         ],
     },
 ]
