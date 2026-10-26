@@ -34,8 +34,15 @@ def _free_port() -> int:
 
 
 def _blocked(p: int):
+    """Hold a rung. A rung somebody else already holds is blocked too — the
+    test asks "is the ladder full", not "who holds it" (flaked 2026-10-26 on
+    a runner where an earlier test's port was still bound)."""
     s = socket.socket()
-    s.bind(("127.0.0.1", p))
+    try:
+        s.bind(("127.0.0.1", p))
+    except OSError:
+        s.close()
+        return None
     s.listen(1)
     return s
 
@@ -61,8 +68,9 @@ def test_the_engine_port_ladder_is_fixed():
         with socket.socket() as s:
             s.bind(("127.0.0.1", chosen))
     finally:
-        b1.close()
-        b2.close()
+        for b in (b1, b2):
+            if b:
+                b.close()
 
 
 def test_a_full_ladder_falls_back_to_any_free_port():
@@ -78,7 +86,8 @@ def test_a_full_ladder_falls_back_to_any_free_port():
             s.bind(("127.0.0.1", chosen))  # and actually free
     finally:
         for b in blockers:
-            b.close()
+            if b:
+                b.close()
 
 
 def test_the_extension_scans_the_same_ladder():

@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install . pyinstaller pystray pillow pywebview "curl_cffi>=0.17.0"
+        run: pip install . pyinstaller pystray pillow pywebview "curl_cffi>=0.16,<0.17"
       - name: Build macOS app icon
         if: matrix.os == 'macos-14'
         run: |

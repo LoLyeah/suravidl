@@ -84,13 +84,23 @@ build (the frozen bundle's own import report lists them as missing optional
 imports of yt-dlp; the APK's Chaquopy archive contains no brotli entries). The
 engine asks for gzip/deflate only and never decodes a Brotli stream itself.
 
-One path does carry a Brotli decoder: **curl_cffi**, which is bundled for the
-impersonation feature and statically links both libcurl and Brotli. The
-decoder before Brotli 1.2.1 carries **CVE-2026-111497** ("Node2Shell", an
-out-of-bounds write when decoding a crafted stream). Since the version inside
-a wheel cannot be read from the outside, the build and the developer setup
-require `curl_cffi>=0.17.0` — the first line released after the fix — and
-impersonation stays opt-in. The Android build has no curl_cffi at all.
+One path does carry a Brotli decoder: **curl_cffi**, bundled for the
+impersonation feature, which statically links libcurl and Brotli into its
+binding. The version is readable from outside, so it was measured with
+`BrotliDecoderVersion()`:
+
+- curl_cffi **0.16.3** → Brotli **1.2.0** → carries CVE-2026-111497
+  ("Node2Shell": out-of-bounds write while decoding a crafted stream);
+- curl_cffi **0.17.0** → Brotli **1.2.1** → fixed — but yt-dlp 2026.10.21
+  refuses that version outright ("Only curl_cffi versions 0.5.10 and 0.10.x
+  through 0.16.x are supported"), which disables impersonation completely.
+
+That is a real either-or, so the build pins the range yt-dlp actually accepts
+(`curl_cffi>=0.16,<0.17`) and states the exposure instead of hiding it: the
+decoder is reachable only when impersonation is enabled **and** a site answers
+with a crafted `Content-Encoding: br` body. The Android build has no curl_cffi
+at all. The watch item is upstream: when yt-dlp accepts 0.17.x, the pin moves
+and this paragraph goes away.
 
 ## Verify your own download
 

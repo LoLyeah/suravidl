@@ -90,7 +90,16 @@ def impersonate_available() -> bool:
     """
     import importlib.util
 
-    return importlib.util.find_spec("curl_cffi") is not None
+    if importlib.util.find_spec("curl_cffi") is None:
+        return False
+    # a module that yt-dlp refuses (it caps supported curl_cffi versions) is
+    # not a working backend: the download would fail at impersonation time
+    # (2026-10-26: curl_cffi 0.17.0 with yt-dlp 2026.10.21)
+    try:
+        import yt_dlp.networking._curlcffi  # noqa: F401
+    except Exception:  # noqa: BLE001 - the import IS the compatibility check
+        return False
+    return True
 
 
 def _curl_targets() -> list[str]:

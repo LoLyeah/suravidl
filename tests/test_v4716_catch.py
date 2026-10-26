@@ -70,5 +70,24 @@ def test_the_brotli_carrying_dependency_is_pinned():
     """curl_cffi statically links a Brotli decoder (CVE-2026-111497)."""
     pyproject = (ROOT / "pyproject.toml").read_text()
     release = (ROOT / ".github" / "workflows" / "release.yml").read_text()
-    assert 'curl_cffi>=0.17.0' in pyproject
-    assert 'curl_cffi' in release and '>=0.17.0' in release
+    # 0.16.x is the newest range yt-dlp 2026.10.21 accepts; 0.17.0 has the
+    # fixed Brotli but yt-dlp refuses it, which kills impersonation
+    assert "curl_cffi>=0.16,<0.17" in pyproject
+    assert "curl_cffi>=0.16,<0.17" in release
+
+
+def test_a_backend_yt_dlp_refuses_is_not_available(monkeypatch):
+    """A module yt-dlp caps out of support must not look usable."""
+    import importlib.util as util
+
+    monkeypatch.setattr(util, "find_spec", lambda name: object()
+                        if name == "curl_cffi" else None)
+    real_import = __import__
+
+    def refuse(name, *a, **k):
+        if name.startswith("yt_dlp.networking._curlcffi"):
+            raise ImportError("Only curl_cffi versions ... are supported")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr("builtins.__import__", refuse)
+    assert download_opts.impersonate_available() is False

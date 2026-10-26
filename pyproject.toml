@@ -14,13 +14,16 @@ dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
 version = {attr = "suravidl_engine.__version__"}
 
 [project.optional-dependencies]
-# curl_cffi bundles its own libcurl AND a static Brotli decoder; the
-# Brotli decoder before 1.2.1 carries CVE-2026-111497 ("Node2Shell"),
-# so the floor is the first release built after that fix
-dev = ["pytest", "pytest-xdist", "httpx", "curl_cffi>=0.17.0"]
+# curl_cffi bundles libcurl AND a static Brotli decoder. 0.16.3 ships
+# Brotli 1.2.0 (CVE-2026-111497, "Node2Shell"); 0.17.0 ships the fixed
+# 1.2.1 — but yt-dlp 2026.10.21 refuses 0.17.x outright ("Only curl_cffi
+# versions 0.5.10 and 0.10.x through 0.16.x are supported"), which kills
+# impersonation entirely. Until yt-dlp accepts 0.17, the cap is 0.16: a
+# working feature with the exposure documented in docs/SECURITY.md.
+dev = ["pytest", "pytest-xdist", "httpx", "curl_cffi>=0.16,<0.17"]
 # browser impersonation for sites with strict bot checks (e.g. Facebook):
 #   pip install -e '.[impersonate]'
-impersonate = ["curl_cffi>=0.17.0"]
+impersonate = ["curl_cffi>=0.16,<0.17"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
