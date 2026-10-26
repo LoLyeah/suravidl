@@ -64,3 +64,11 @@ def test_the_package_metadata_cannot_go_stale():
     assert 'dynamic = ["version"]' in pyproject
     assert 'attr = "suravidl_engine.__version__"' in pyproject
     assert 'version = "0.43.1"' not in pyproject
+
+
+def test_the_brotli_carrying_dependency_is_pinned():
+    """curl_cffi statically links a Brotli decoder (CVE-2026-111497)."""
+    pyproject = (ROOT / "pyproject.toml").read_text()
+    release = (ROOT / ".github" / "workflows" / "release.yml").read_text()
+    assert 'curl_cffi>=0.17.0' in pyproject
+    assert 'curl_cffi' in release and '>=0.17.0' in release

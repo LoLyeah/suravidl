@@ -77,6 +77,21 @@ If the warning matters more than one-tap updates, the updater can be dropped in
 a later release (updates would then be "download from the release page, open the
 file"). That is a product decision, not a bug fix.
 
+## Dependencies that carry a C decoder
+
+`Brotli`/`brotlicffi` are not dependencies of this app and are not in either
+build (the frozen bundle's own import report lists them as missing optional
+imports of yt-dlp; the APK's Chaquopy archive contains no brotli entries). The
+engine asks for gzip/deflate only and never decodes a Brotli stream itself.
+
+One path does carry a Brotli decoder: **curl_cffi**, which is bundled for the
+impersonation feature and statically links both libcurl and Brotli. The
+decoder before Brotli 1.2.1 carries **CVE-2026-111497** ("Node2Shell", an
+out-of-bounds write when decoding a crafted stream). Since the version inside
+a wheel cannot be read from the outside, the build and the developer setup
+require `curl_cffi>=0.17.0` — the first line released after the fix — and
+impersonation stays opt-in. The Android build has no curl_cffi at all.
+
 ## Verify your own download
 
 1. Compare the file with `SHA256SUMS.txt` from the same release:

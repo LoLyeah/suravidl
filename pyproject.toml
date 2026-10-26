@@ -14,10 +14,13 @@ dependencies = ["yt-dlp", "fastapi", "uvicorn[standard]"]
 version = {attr = "suravidl_engine.__version__"}
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-xdist", "httpx", "curl_cffi"]
+# curl_cffi bundles its own libcurl AND a static Brotli decoder; the
+# Brotli decoder before 1.2.1 carries CVE-2026-111497 ("Node2Shell"),
+# so the floor is the first release built after that fix
+dev = ["pytest", "pytest-xdist", "httpx", "curl_cffi>=0.17.0"]
 # browser impersonation for sites with strict bot checks (e.g. Facebook):
 #   pip install -e '.[impersonate]'
-impersonate = ["curl_cffi"]
+impersonate = ["curl_cffi>=0.17.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
