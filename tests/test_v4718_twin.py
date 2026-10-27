@@ -44,6 +44,15 @@ def test_the_import_records_what_it_created():
     assert "MediaLibrary.rememberCopy(this, id, copy)" in ENGINE
 
 
+def test_an_ambiguous_name_is_refused_rather_than_guessed():
+    """Legacy rows have no URI; if a name answers for several, delete none."""
+    assert "matches.size > 1" in LIB
+    test = (ROOT / "android" / "app" / "src" / "androidTest" / "java" /
+            "com" / "suravidl" / "app" / "MediaLibraryTest.kt").read_text()
+    assert "anAmbiguousNameDeletesNothing" in test
+    assert "aSameNamedTwinSurvivesDeletingOneJob" in test
+
+
 def test_the_bridge_offers_job_identity_deletion():
     assert "fun deleteMediaForJob(" in MAIN
     assert "MediaLibrary.deleteOwnCopiesForJob" in MAIN

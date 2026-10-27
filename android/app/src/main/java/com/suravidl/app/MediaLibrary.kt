@@ -79,12 +79,31 @@ object MediaLibrary {
     fun deleteOwnCopiesNamed(context: Context, name: String?): Int {
         if (Build.VERSION.SDK_INT < 29) return 0
         if (name != null && name.isBlank()) return 0
+        // One name may answer for several rows (a twin, or MediaStore's own
+        // "name (2)" numbering). A single-row delete must never guess: if the
+        // name is ambiguous, delete nothing and let the job path handle it
+        // (v0.47.18 "the twin").
+        val matches = mutableListOf<android.net.Uri>()
+        forEachOwnCopy(context, name) { uri -> matches.add(uri) }
+        if (name != null && matches.size > 1) return 0
+        var removed = 0
+        for (uri in matches) {
+            try {
+                if (context.contentResolver.delete(uri, null, null) > 0) removed++
+            } catch (_: Throwable) {
+            }
+        }
+        return removed
+    }
+
+    /** Walk this app's copies in the gallery folder, optionally filtered by a
+     *  display name, and hand each row's URI to [visit]. */
+    private fun forEachOwnCopy(context: Context, name: String?, visit: (android.net.Uri) -> Unit) {
         val resolver = context.contentResolver
         val collections = listOf(
             MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
         )
-        var removed = 0
         for (collection in collections) {
             try {
                 resolver.query(
@@ -99,17 +118,12 @@ object MediaLibrary {
                         val path = cursor.getString(1) ?: ""
                         if (!path.contains(FOLDER)) continue
                         if (name != null && !matchesName(cursor.getString(2), name)) continue
-                        val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
-                        try {
-                            if (resolver.delete(uri, null, null) > 0) removed++
-                        } catch (_: Throwable) {
-                        }
+                        visit(ContentUris.withAppendedId(collection, cursor.getLong(0)))
                     }
                 }
             } catch (_: Throwable) {
             }
         }
-        return removed
     }
 
     /**

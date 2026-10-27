@@ -104,4 +104,28 @@ class MediaLibraryTest {
             b.delete()
         }
     }
+
+    /** A name that answers for two rows must delete neither: a legacy job has
+     *  no stored URI, and guessing is how the twin was lost (v0.47.18). */
+    @Test(timeout = 240_000)
+    fun anAmbiguousNameDeletesNothing() {
+        val dirA = File(ctx.cacheDir, "ambig-a").apply { mkdirs() }
+        val dirB = File(ctx.cacheDir, "ambig-b").apply { mkdirs() }
+        val a = File(dirA, "ambig-test.mp4").apply { writeBytes(ByteArray(2048) { 0x33 }) }
+        val b = File(dirB, "ambig-test.mp4").apply { writeBytes(ByteArray(2048) { 0x44 }) }
+        val uriA = MediaImporter.importToGallery(ctx, a)
+        val uriB = MediaImporter.importToGallery(ctx, b)
+        assertTrue("both copies must land", uriA != null && uriB != null)
+        try {
+            assertEquals("an ambiguous name must delete nothing", 0,
+                MediaLibrary.deleteOwnCopiesNamed(ctx, "ambig-test.mp4"))
+            assertTrue("copy A stays", exists(uriA!!))
+            assertTrue("copy B stays", exists(uriB!!))
+        } finally {
+            runCatching { ctx.contentResolver.delete(uriA!!, null, null) }
+            runCatching { ctx.contentResolver.delete(uriB!!, null, null) }
+            a.delete()
+            b.delete()
+        }
+    }
 }
