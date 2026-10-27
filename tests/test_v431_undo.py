@@ -214,15 +214,17 @@ def test_the_versions_line_shows_where_the_copy_comes_from():
 
 
 def test_the_rolling_card_keeps_ten_and_the_retired_stay_retired():
-    """Ten entries max — v0.47.17's entry pushed out "The drawer"
-    (0.47.7); earlier retirements stay retired. No half-entry
+    """Ten entries max — v0.47.18's entry pushed out "The path"
+    (0.47.8); earlier retirements stay retired. No half-entry
     may remain."""
     from suravidl_engine import whatsnew
 
     versions = [e["version"] for e in whatsnew.ENTRIES]
     titles = [e["title"] for e in whatsnew.ENTRIES]
     assert len(versions) == 10
-    assert versions[0] == "0.47.17"
+    assert versions[0] == "0.47.18"
+    assert "0.47.8" not in versions
+    assert "The path" not in titles
     assert "0.47.7" not in versions
     assert "The drawer" not in titles
     assert "0.47.6" not in versions
@@ -281,7 +283,6 @@ def test_the_rolling_card_keeps_ten_and_the_retired_stay_retired():
     assert "0.45.19" not in versions
     assert "The shadow" not in titles
     assert "0.45.20" not in versions
-    assert "The twin" not in titles
     assert "0.45.21" not in versions
     assert "The start" not in titles
     assert "0.45.22" not in versions

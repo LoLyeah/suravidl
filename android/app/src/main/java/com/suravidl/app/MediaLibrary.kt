@@ -2,6 +2,7 @@ package com.suravidl.app
 
 import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -30,6 +31,44 @@ object MediaLibrary {
     )
 
     fun deleteOwnCopies(context: Context): Int = deleteOwnCopiesNamed(context, null)
+
+    /**
+     * Remember which MediaStore row a job's copy became (v0.47.18).
+     *
+     * Deleting by display name is not safe: two downloads can share a name
+     * (the second gets " (2)" from MediaStore), and matchesName() deliberately
+     * matches the numbered variants too — so trashing one row used to take
+     * every same-named copy with it. The URI is the only exact key.
+     */
+    fun rememberCopy(context: Context, jobId: String, uri: Uri) {
+        val prefs = context.getSharedPreferences("engine", Context.MODE_PRIVATE)
+        val set = prefs.getStringSet(KEY_COPIES, emptySet())!!.toMutableSet()
+        set.add("$jobId\t$uri")
+        prefs.edit().putStringSet(KEY_COPIES, set).apply()
+    }
+
+    /** Delete exactly the copies THIS job made. Returns how many rows went. */
+    fun deleteOwnCopiesForJob(context: Context, jobId: String?): Int {
+        if (Build.VERSION.SDK_INT < 29) return 0
+        if (jobId.isNullOrBlank()) return 0
+        val prefs = context.getSharedPreferences("engine", Context.MODE_PRIVATE)
+        val all = prefs.getStringSet(KEY_COPIES, emptySet())!!.toMutableSet()
+        val mine = all.filter { it.startsWith("$jobId\t") }
+        if (mine.isEmpty()) return 0
+        var removed = 0
+        for (entry in mine) {
+            val uri = Uri.parse(entry.substringAfter('\t'))
+            try {
+                if (context.contentResolver.delete(uri, null, null) > 0) removed++
+            } catch (_: Throwable) {
+            }
+            all.remove(entry)
+        }
+        prefs.edit().putStringSet(KEY_COPIES, all).apply()
+        return removed
+    }
+
+    private const val KEY_COPIES = "imported_uris"
 
     /**
      * Delete the library copies this app made. `name` limits it to one

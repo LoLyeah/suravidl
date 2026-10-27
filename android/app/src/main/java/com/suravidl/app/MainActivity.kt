@@ -348,7 +348,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** JS bridge: window.AndroidHost.{quit,openBatterySettings,pickCookiesFile,openUrl,
-     *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed,
+     *  openFile,shareFile,cookiesStatus,deleteCookies,deleteMediaCopies,deleteMediaNamed,deleteMediaForJob,
      *  galleryExport,canInstallPackages,openInstallPermissionSettings,installApk}. */
     inner class HostBridge {
         /**
@@ -453,6 +453,12 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun deleteMediaNamed(name: String?): Int =
             MediaLibrary.deleteOwnCopiesNamed(this@MainActivity, name)
+
+        /** Trash one row's gallery copies by the job that made them — exact,
+         *  so a same-named twin (or its " (2)" sibling) survives (v0.47.18). */
+        @JavascriptInterface
+        fun deleteMediaForJob(jobId: String?): Int =
+            MediaLibrary.deleteOwnCopiesForJob(this@MainActivity, jobId)
 
         /**
          * Can this app request package installations?

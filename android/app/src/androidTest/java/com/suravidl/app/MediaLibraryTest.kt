@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,6 +72,36 @@ class MediaLibraryTest {
         } finally {
             f.delete()
             uri?.let { ctx.contentResolver.delete(it, null, null) }
+        }
+    }
+
+    /**
+     * v0.47.18 "the twin": two downloads can carry the same display name
+     * (MediaStore numbers the second). Trashing one row must take exactly the
+     * copy that row made — deleting by name took both.
+     */
+    @Test(timeout = 240_000)
+    fun aSameNamedTwinSurvivesDeletingOneJob() {
+        val dirA = File(ctx.cacheDir, "twin-a").apply { mkdirs() }
+        val dirB = File(ctx.cacheDir, "twin-b").apply { mkdirs() }
+        val a = File(dirA, "twin-test.mp4").apply { writeBytes(ByteArray(2048) { 0x11 }) }
+        val b = File(dirB, "twin-test.mp4").apply { writeBytes(ByteArray(2048) { 0x22 }) }
+        val uriA = MediaImporter.importToGallery(ctx, a)
+        val uriB = MediaImporter.importToGallery(ctx, b)
+        assertTrue("both copies must land", uriA != null && uriB != null)
+        try {
+            MediaLibrary.rememberCopy(ctx, "job-a", uriA!!)
+            MediaLibrary.rememberCopy(ctx, "job-b", uriB!!)
+            assertEquals("exactly one row must go", 1,
+                MediaLibrary.deleteOwnCopiesForJob(ctx, "job-a"))
+            assertFalse("the trashed job's copy is gone", exists(uriA))
+            assertTrue("its same-named twin must stay", exists(uriB))
+        } finally {
+            runCatching { ctx.contentResolver.delete(uriA!!, null, null) }
+            runCatching { ctx.contentResolver.delete(uriB!!, null, null) }
+            MediaLibrary.deleteOwnCopiesForJob(ctx, "job-b")
+            a.delete()
+            b.delete()
         }
     }
 }

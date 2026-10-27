@@ -39,16 +39,12 @@ def test_a_failed_ffmpeg_check_does_not_spin_forever():
     assert '"could not check": "tidak bisa memeriksa"' in APP
 
 
-def test_the_notes_name_this_release():
-    from suravidl_engine import __version__
+def test_the_notes_still_carry_this_release():
     from suravidl_engine.whatsnew import ENTRIES
 
-    assert __version__ == "0.47.17"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the hoist"
     assert len(ENTRIES) == 10
-    for item in ENTRIES[0]["items"]:
-        assert 0 < len(item) <= 220
+    assert any(e["version"] == "0.47.17" and e["title"].lower() == "the hoist"
+               for e in ENTRIES)
 
 
 def test_no_other_top_level_helper_is_defined_as_a_late_const():

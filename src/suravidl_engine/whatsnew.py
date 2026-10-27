@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.18",
+        "title": "The twin",
+        "items": [
+            "Deleting one video no longer takes a same-named twin with it: the trash removes exactly the copy that row made, instead of every file sharing its name.",
+        ],
+    },
+    {
         "version": "0.47.17",
         "title": "The hoist",
         "items": [
@@ -79,13 +86,6 @@ ENTRIES = [
         "title": "The ghost",
         "items": [
             "The phone app sweeps its own abandoned gallery imports at every start: a killed copy left an invisible file that managers counted but never showed (an 'empty' folder claiming 18 items, 516 MB).",
-        ],
-    },
-    {
-        "version": "0.47.8",
-        "title": "The path",
-        "items": [
-            "Restart & Install starts PowerShell by its exact system path now — on one machine the bare name could not be found (WinError 2), so a verified update never began. The update log records the path it tried.",
         ],
     },
 ]

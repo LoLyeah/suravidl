@@ -2987,7 +2987,11 @@ async function clearFiledJobs() {
       const r = await settleThenDelete(j);
       deleted += r.deleted || 0;
       freed += r.freed_bytes || 0;
-      if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
+      // by job, not by name: two downloads can share a display name, and the
+      // name route took every same-named copy with it (v0.47.18)
+      if (ANDROID() && window.AndroidHost.deleteMediaForJob) {
+        try { window.AndroidHost.deleteMediaForJob(j.id); } catch (_) { }
+      } else if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
         const names = (j.files && j.files.length ? j.files : [j.filepath || ""])
           .map((p) => baseName(p)).filter(Boolean);
         for (const name of names) {
@@ -3208,10 +3212,12 @@ function deleteButton(j) {
     }
     try {
       const r = await settleThenDelete(j);
-      // Gallery cleanup: one name per file. A playlist row's filepath is the
-      // download *folder*, so the old code asked the gallery to delete a
-      // folder name that matched nothing (v0.21.2 audit).
-      if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
+      // Gallery cleanup: by job, so a same-named twin survives (v0.47.18).
+      // A playlist row names its own files; its filepath is a folder.
+      if (ANDROID() && window.AndroidHost.deleteMediaForJob) {
+        try { window.AndroidHost.deleteMediaForJob(j.id); }
+        catch (_) { /* the row is gone either way */ }
+      } else if (ANDROID() && window.AndroidHost.deleteMediaNamed) {
         const names = (j.files && j.files.length ? j.files : [j.filepath || ""])
           .map((p) => baseName(p)).filter(Boolean);
         for (const name of names) {

@@ -261,7 +261,13 @@ class EngineService : Service() {
                 if (!f.isFile) continue
                 existing++
                 try {
-                    if (MediaImporter.importToGallery(this, f) != null) imported = true
+                    // the row's URI is the only exact way back to it
+                    // (v0.47.18: name-based deletion took same-named twins)
+                    val copy = MediaImporter.importToGallery(this, f)
+                    if (copy != null) {
+                        imported = true
+                        MediaLibrary.rememberCopy(this, id, copy)
+                    }
                 } catch (t: Throwable) {
                     lastError = t
                 }
