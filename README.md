@@ -19,6 +19,21 @@ history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
 next: [docs/PLAN-next-features.md](docs/PLAN-next-features.md) ·
 reviews: [docs/audits/](docs/audits/)
 
+## Screenshots
+
+One window, the same UI on macOS, Windows, Linux and Android. Probe a link and
+the real formats appear — quality, size, what each stream carries:
+
+<img src="docs/img/app-probe.png" width="860" alt="Probing a link: the format list with quality chips, sizes and a TAKE button" />
+
+Finished downloads land in the queue with Play, Rename and Delete on each row:
+
+<img src="docs/img/app-queue.png" width="860" alt="The queue: three completed downloads with Play, Rename and Delete" />
+
+The browser extension hands the streams it found to the engine — no copy-paste:
+
+<img src="docs/cws/1-streams.png" width="860" alt="The extension popup listing a page's streams, with All qualities and folded variants" />
+
 ## What it does
 
 - **Probe first**: paste a link, see the real formats, pick one, download.
