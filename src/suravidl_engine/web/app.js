@@ -67,6 +67,19 @@ function baseName(p) {
   return String(p ?? "").split(/[\\/]/).pop();
 }
 
+/** A URL's readable name: the file stem, else the host. A failed row used to
+ *  show the whole URL as its title (v0.47.19). */
+function prettySource(url) {
+  try {
+    const u = new URL(String(url || ""));
+    const last = decodeURIComponent((u.pathname.split("/").filter(Boolean).pop()) || "");
+    const stem = last.replace(/\.[a-z0-9]{1,5}$/i, "");
+    return stem || u.host || String(url || "");
+  } catch (_) {
+    return String(url || "");
+  }
+}
+
 /* ---------- i18n: zero-build strings (v0.44.0) -----------------------------
    No bundler, no build step — a plain dictionary and one t(), by house rule.
    The English string IS the key: t("Open folder") looks itself up in the
@@ -325,6 +338,7 @@ const STRINGS = { en: {}, id: {
   "Restart & Install": "Mulai ulang & pasang",
   "Resume": "Lanjutkan",
   "Retries": "Percobaan ulang",
+  "Retry without certificate check": "Coba lagi tanpa memeriksa sertifikat",
   "Retry": "Coba lagi",
   "Show queue": "Lihat antrean",
   "Couldn't download \u201c{name}\u201d \u2014 {why}": "Gagal mengunduh \u201c{name}\u201d \u2014 {why}",
@@ -686,7 +700,10 @@ const STRINGS = { en: {}, id: {
   "the folder is empty": "foldernya kosong",
   "the house lamp": "lampu rumah ini",
   "the last step needs ffmpeg — audio “keep original” avoids the conversion": "langkah terakhir butuh ffmpeg — pilih audio “pertahankan asli” untuk menghindari konversi",
+  "the certificate was issued for a different host name — the site's media server is misconfigured": "sertifikatnya diterbitkan untuk nama host lain — server media situs itu salah konfigurasi",
   "the secure connection could not be verified — a TLS-inspecting proxy can cause this": "koneksi aman tidak bisa diverifikasi — proxy yang memeriksa TLS bisa jadi penyebabnya",
+  "the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it": "situs menyajikan sertifikat yang tidak dipercaya perangkat ini (self-signed) — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
+  "the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection": "sertifikat situsnya sudah kedaluwarsa — pemiliknya harus memperbaruinya; browser hanya bisa membukanya kalau jaringamu mencegat koneksinya",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",
   "the site never answered in time — check the connection and retry": "situs tidak menjawab tepat waktu — periksa koneksi lalu coba lagi",
@@ -1011,8 +1028,18 @@ function humanErr(s, detail, url) {
     return t("the engine could not find that address — check the link is spelled whole, then retry");
   if (/connection refused|errno 111|network is unreachable|errno 101|no route to host|connection reset|errno 104/i.test(s))
     return t("the engine could not reach that address — check the connection, then retry");
-  if (/certificate|SSL/i.test(s))
+  if (/certificate|SSL/i.test(s)) {
+    // v0.47.19 "the witness": the old arm guessed "TLS-inspecting proxy" for
+    // every certificate failure. Expired, self-signed and mismatched
+    // certificates are the site's own doing — say which one it is.
+    if (/has expired|expired certificate|certificate expired/i.test(s))
+      return t("the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection");
+    if (/self-signed|local issuer|unknown ca|unable to verify/i.test(s))
+      return t("the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it");
+    if (/hostname|subject name|doesn't match|no alternative certificate/i.test(s))
+      return t("the certificate was issued for a different host name — the site's media server is misconfigured");
     return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
+  }
   if (/unable to embed using|embed thumbnail/i.test(s))
     return "the thumbnail could not be embedded — this phone's ffmpeg cannot read its image format; the video itself is fine";
   if (/ffmpeg/i.test(s))
@@ -3188,7 +3215,7 @@ function deleteButton(j) {
   b.title = t("Delete this download — the file on disk goes with it");
   b.onclick = async () => {
     const name = j.filepath ? baseName(j.filepath)
-      : String(j.title || j.url).slice(0, 60);
+      : String(j.title || prettySource(j.url)).slice(0, 60);
     // v0.46.7: the copy is no longer inverted — a file row says the file
     // dies, a fileless row is just a list removal and stops borrowing the
     // "cannot be undone" gravity (critique round 2)
@@ -3257,7 +3284,7 @@ function jobRow(j) {
   // affordance — cursor:pointer never reaches touch (critique round 2)
   const chev = el("span", "chev");
   chev.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chev"/></svg>';
-  title.append(chev, document.createTextNode(j.title || j.url));
+  title.append(chev, document.createTextNode(j.title || prettySource(j.url)));
   title.title = j.url;
   // the title ellipsises on a phone and nothing hover-reveals it there: a
   // tap unfolds the whole line (2026-10-01 report). v0.38.3: it is a real
@@ -3423,6 +3450,26 @@ function jobRow(j) {
       .then(refreshJobs)
       .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad"));
     r.append(copy, retry);
+    // a certificate failure is the one case where "checks off" can help:
+    // offer it on the row itself (v0.47.19)
+    if (j.error && /certificate|SSL/i.test(j.error)) {
+      const loose = el("button", "ghost-sm", t("Retry without certificate check"));
+      loose.title = t("this job only — the setting stays as it is");
+      loose.onclick = async () => {
+        loose.disabled = true;
+        try {
+          const overrides = { ...(j.overrides || {}), no_check_certificates: true };
+          await api("/jobs", { method: "POST",
+            body: JSON.stringify({ url: j.url, overrides }) });
+          refreshJobs();
+        } catch (e) {
+          toast(t("retry failed: {msg}", { msg: e.message }), "bad");
+        } finally {
+          loose.disabled = false;
+        }
+      };
+      r.append(loose);
+    }
     trashHost = r;
     row.append(r);
     if (j.error && /ffmpeg/i.test(j.error) &&
@@ -3627,8 +3674,20 @@ function updateJobRow(row, j) {
     return fresh;
   }
   const title = row.querySelector(".jobtitle");
-  const text = j.title || j.url;
-  if (title && title.textContent !== text) title.textContent = text;
+  const text = j.title || prettySource(j.url);
+  if (title) {
+    // rewrite the TEXT NODE, never textContent: assigning textContent wiped
+    // the chevron out of every row on the first poll, so the fold lost its
+    // caret and the title fell back to the raw URL (v0.47.19 — found while
+    // chasing a failed row that showed its address)
+    const textNode = [...title.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
+    if (textNode) {
+      if (textNode.nodeValue !== text) textNode.nodeValue = text;
+    } else {
+      title.append(document.createTextNode(text));
+    }
+    title.title = j.url;
+  }
   const fill = row.querySelector(".fill");
   if (fill && !fill.classList.contains("indet")) {
     fill.style.width = progressPct(j).toFixed(1) + "%";

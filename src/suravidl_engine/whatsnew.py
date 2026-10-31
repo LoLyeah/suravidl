@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.19",
+        "title": "The witness",
+        "items": [
+            "A failed download now says what actually went wrong — an expired certificate, a self-signed server, a host that no longer exists — instead of blaming a proxy every time.",
+            "A certificate failure offers \"retry without certificate check\" for that one job, and a failed row shows the file's name rather than the whole address.",
+            "The fold caret no longer disappears from a row after the first progress poll — the title rewrite was deleting it.",
+        ],
+    },
+    {
         "version": "0.47.18",
         "title": "The twin",
         "items": [
@@ -79,13 +88,6 @@ ENTRIES = [
         "title": "The trim",
         "items": [
             "A finished row says COMPLETED once — the FILED stamp repeated it on exactly the same rows. And the red dot beside YouTube rows is gone: the host is already printed in the line.",
-        ],
-    },
-    {
-        "version": "0.47.9",
-        "title": "The ghost",
-        "items": [
-            "The phone app sweeps its own abandoned gallery imports at every start: a killed copy left an invisible file that managers counted but never showed (an 'empty' folder claiming 18 items, 516 MB).",
         ],
     },
 ]
