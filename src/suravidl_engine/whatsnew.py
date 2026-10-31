@@ -21,6 +21,7 @@ ENTRIES = [
             "A failed download now says what actually went wrong — an expired certificate, a self-signed server, a host that no longer exists — instead of blaming a proxy every time.",
             "A certificate failure offers \"retry without certificate check\" for that one job, and a failed row shows the file's name rather than the whole address.",
             "The fold caret no longer disappears from a row after the first progress poll — the title rewrite was deleting it.",
+            "A stream that plays in Chrome but failed in the app now works: the engine trusts the device's own certificate store, not only the list bundled with Python.",
         ],
     },
     {

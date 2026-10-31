@@ -428,6 +428,13 @@ def create_app(download_dir, auth_token: str | None = None,
     from .settings import Settings
     from .presets import PresetStore, split_patch
 
+    # every embedded start (tests, the phone's service) gets the merged store
+    try:
+        from . import trust
+
+        trust.install()
+    except Exception:  # noqa: BLE001
+        pass
     app = FastAPI(title="suravidl engine")
     app.add_middleware(
         CORSMiddleware,

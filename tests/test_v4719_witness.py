@@ -78,3 +78,59 @@ def test_the_poll_does_not_wipe_the_chevron():
     assert "title.textContent = " not in body, "textContent deletes the chevron"
     assert "prettySource(j.url)" in body
     assert "nodeType === Node.TEXT_NODE" in body
+
+
+# --- the other half of the report: Chrome plays it, the app does not --------
+
+def _pem(tag: str) -> str:
+    return f"-----BEGIN CERTIFICATE-----\n{tag}\n-----END CERTIFICATE-----\n"
+
+
+def test_the_merged_bundle_is_certifi_plus_the_platform_store(tmp_path, monkeypatch):
+    from suravidl_engine import trust
+
+    base = tmp_path / "certifi.pem"
+    base.write_text(_pem("BASE1") + _pem("BASE2"), encoding="utf-8")
+    store = tmp_path / "cacerts"
+    store.mkdir()
+    (store / "aaa.0").write_text(_pem("SYSTEM1"), encoding="utf-8")
+    (store / "bbb.0").write_text(_pem("BASE1"), encoding="utf-8")   # a duplicate
+
+    monkeypatch.setattr(trust, "_certifi_path", lambda: base)
+    monkeypatch.setattr(trust, "_SYSTEM_FILES", ())
+    monkeypatch.setattr(trust, "_SYSTEM_DIRS", (str(store),))
+    monkeypatch.setenv("SURAVIDL_CA_BUNDLE", str(tmp_path / "merged.pem"))
+
+    out = trust.merged_bundle()
+    text = out.read_text(encoding="utf-8")
+    assert trust._MARKER in text
+    for tag in ("BASE1", "BASE2", "SYSTEM1"):
+        assert tag in text
+    assert text.count("BEGIN CERTIFICATE") == 3, "duplicates must not pile up"
+
+
+def test_install_points_every_trust_hook_at_the_merge(tmp_path, monkeypatch):
+    from suravidl_engine import trust
+
+    base = tmp_path / "certifi.pem"
+    base.write_text(_pem("BASE1"), encoding="utf-8")
+    monkeypatch.setattr(trust, "_certifi_path", lambda: base)
+    monkeypatch.setattr(trust, "_SYSTEM_FILES", ())
+    monkeypatch.setattr(trust, "_SYSTEM_DIRS", ())
+    monkeypatch.setenv("SURAVIDL_CA_BUNDLE", str(tmp_path / "merged.pem"))
+
+    dest = trust.install()
+    assert dest.is_file()
+    import os
+    for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        assert os.environ[var] == str(dest)
+    import certifi
+    assert certifi.where() == str(dest), "urllib3/yt-dlp ask certifi directly"
+
+
+def test_the_engine_context_is_still_a_verifying_one():
+    from suravidl_engine import net
+
+    ctx = net.ssl_context()
+    assert ctx.verify_mode.name == "CERT_REQUIRED"
+    assert ctx.check_hostname is True

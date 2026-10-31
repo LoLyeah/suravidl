@@ -24,11 +24,6 @@ def ssl_context() -> ssl.SSLContext:
     so builds that ship no discoverable store can still verify real
     certificates.
     """
-    ctx = ssl.create_default_context()
-    try:
-        import certifi
+    from . import trust
 
-        ctx.load_verify_locations(cafile=certifi.where())
-    except Exception:  # noqa: BLE001 - absent certifi must not break TLS
-        pass
-    return ctx
+    return trust.context()

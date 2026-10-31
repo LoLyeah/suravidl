@@ -196,6 +196,16 @@ def start_server(download_dir, token: str, port: int, db_path=None,
     cache home). The Android shell exports the env var before Python starts,
     so it needs no extra argument here.
     """
+    # trust what the device's browser trusts, not only certifi (v0.47.19):
+    # a phone that plays a stream in Chrome was failing here on a CA that
+    # certifi does not ship but the system store does
+    from . import trust
+
+    try:
+        trust.install()
+    except Exception:  # noqa: BLE001 - trust setup must never block the engine
+        pass
+
     # v0.43.0: a staged yt-dlp update (the PyPI wheel copy) must be ahead of
     # the bundled one on sys.path BEFORE anything imports yt_dlp — the sweep
     # right below imports the updater, and the updater imports yt_dlp.

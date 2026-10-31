@@ -473,7 +473,9 @@ def test_the_ytdlp_card_can_show_a_stage_waiting_for_restart():
 
 def test_start_server_activates_the_shadow_before_any_yt_dlp_import():
     i = MAINPY.index("def start_server")
-    seg = MAINPY[i:i + 1600]
+    # a window, not a fixed size: the body grew (trust setup, v0.47.19) and
+    # the assertion is about ORDER, not about how much code sits above it
+    seg = MAINPY[i:i + 3000]
     assert "ytdlp_update" in seg and "activate_safe(" in seg
     # must run before the sweep — importing updater imports yt_dlp
     assert seg.index("activate_safe(") < seg.index("sweep_stale_downloads")
