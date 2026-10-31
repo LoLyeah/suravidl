@@ -134,3 +134,64 @@ def test_the_engine_context_is_still_a_verifying_one():
     ctx = net.ssl_context()
     assert ctx.verify_mode.name == "CERT_REQUIRED"
     assert ctx.check_hostname is True
+
+
+# --- AIA repair: what a browser does with an incomplete chain ---------------
+
+def _leaf_der() -> bytes:
+    import base64
+    import pathlib as _p
+
+    pem = (_p.Path(__file__).resolve().parents[1] / "tests" / "fixtures" /
+           "leaf-incomplete-chain.pem").read_text()
+    body = pem.split("-----BEGIN CERTIFICATE-----")[1].split("-----END CERTIFICATE-----")[0]
+    return base64.b64decode("".join(body.split()))
+
+
+def test_the_aia_extension_names_the_missing_issuer():
+    from suravidl_engine import trust
+
+    urls = trust.aia_issuer_urls(_leaf_der())
+    assert urls == ["http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt"], urls
+
+
+def test_repair_fetches_the_issuer_and_refreshes_the_bundle(tmp_path, monkeypatch):
+    from suravidl_engine import trust
+    import urllib.request
+
+    monkeypatch.setenv("SURAVIDL_CA_BUNDLE", str(tmp_path / "merged.pem"))
+    monkeypatch.setattr(trust, "_peer_leaf", lambda host, port=443: _leaf_der())
+    der = (pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" /
+           "sectigo-intermediate.der").read_bytes()
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, n=-1): return der
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+
+    assert trust.repair_chain("https://cdnserver23.cloudmp4.to/media/x.mp4") is True
+    extra = trust.extra_path().read_text()
+    assert "BEGIN CERTIFICATE" in extra
+    assert "BEGIN CERTIFICATE" in trust.bundle_path().read_text(), "the merge must include it"
+    # a second call adds nothing new (idempotent)
+    assert trust.repair_chain("https://cdnserver23.cloudmp4.to/media/x.mp4") is False
+
+
+def test_a_chain_error_is_told_apart_from_other_failures():
+    from suravidl_engine.jobs import _is_chain_error
+
+    assert _is_chain_error(Exception("SSL: CERTIFICATE_VERIFY_FAILED unable to get local issuer certificate"))
+    assert _is_chain_error(Exception("unable to verify the first certificate"))
+    assert not _is_chain_error(Exception("HTTP Error 403: Forbidden"))
+    assert not _is_chain_error(Exception("certificate has expired"))
+
+
+def test_a_hotlink_redirect_is_explained():
+    """The CDN answers a bare request with /404.html — the stream only exists
+    for requests that carry the page as referer."""
+    assert "hotlink|referer|referrer" in APP
+    assert "refuses requests that do not come from its page" in APP
+    # it must be decided before the generic "unsupported url" arm
+    assert APP.index("hotlink|referer") < APP.index("unsupported url|no (suitable )?extractor")

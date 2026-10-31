@@ -58,6 +58,11 @@ def bundle_path() -> Path:
     return home / "ca-bundle.pem"
 
 
+def extra_path() -> Path:
+    """CAs fetched by the AIA repair — kept apart from the merge's own output."""
+    return bundle_path().with_name("extra-cas.pem")
+
+
 def _pem_blocks(path: Path) -> list[str]:
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -108,6 +113,8 @@ def merged_bundle(target: Path | None = None) -> Path:
     if base is not None:
         sources.append(base)
     sources.extend(system_bundles())
+    if extra_path().is_file():
+        sources.append(extra_path())     # repaired chains survive the re-merge
     for src in sources:
         for block in _pem_blocks(src):
             key = hash(block.strip())
@@ -152,3 +159,159 @@ def context() -> ssl.SSLContext:
                 continue
     return ctx
 
+
+
+# --- AIA repair: what browsers do that OpenSSL does not ---------------------
+#
+# cdnserver23.cloudmp4.to answers with its LEAF certificate only. OpenSSL says
+# "unable to verify the first certificate" (21); Chrome fetches the issuer
+# named in the certificate's Authority Information Access extension and plays.
+# This is that repair, done once per host and cached in the bundle.
+
+_AIA_OID = bytes.fromhex("06082B06010505070101")     # 1.3.6.1.5.5.7.1.1
+_CA_ISSUERS_OID = bytes.fromhex("06082B06010505073002")  # 1.3.6.1.5.5.7.48.2
+
+
+def _tlv(data: bytes, i: int) -> tuple[int, bytes, int]:
+    """One DER element: (tag, value, next index)."""
+    tag = data[i]
+    i += 1
+    ln = data[i]
+    i += 1
+    if ln & 0x80:
+        n = ln & 0x7F
+        ln = int.from_bytes(data[i:i + n], "big")
+        i += n
+    return tag, data[i:i + ln], i + ln
+
+
+def _children(body: bytes) -> list[tuple[int, bytes]]:
+    out, i = [], 0
+    while i < len(body):
+        tag, val, i = _tlv(body, i)
+        out.append((tag, val))
+    return out
+
+
+def aia_issuer_urls(leaf_der: bytes) -> list[str]:
+    """The CA Issuers URLs inside a certificate (empty when it names none)."""
+    try:
+        tag, cert, _ = _tlv(leaf_der, 0)
+        if tag != 0x30:
+            return []
+        tag, tbs, _ = _tlv(cert, 0)
+        if tag != 0x30:
+            return []
+        parts = _children(tbs)
+        # [3] EXPLICIT extensions is the last element of the TBSCertificate
+        ext_wrapper = next((v for t, v in parts if t == 0xA3), None)
+        if ext_wrapper is None:
+            return []
+        tag, ext_seq, _ = _tlv(ext_wrapper, 0)
+        if tag != 0x30:
+            return []
+        urls: list[str] = []
+        for tag, ext in _children(ext_seq):
+            if tag != 0x30:
+                continue
+            fields = _children(ext)
+            if not fields or fields[0][1] != _AIA_OID[2:]:
+                continue
+            value = next((v for t, v in fields if t == 0x04), None)
+            if value is None:
+                continue
+            tag, access_seq, _ = _tlv(value, 0)
+            if tag != 0x30:
+                continue
+            for tag, desc in _children(access_seq):
+                if tag != 0x30:
+                    continue
+                d = _children(desc)
+                if len(d) < 2 or d[0][1] != _CA_ISSUERS_OID[2:]:
+                    continue
+                uri_tag, uri = d[1]
+                if uri_tag == 0x86:
+                    urls.append(uri.decode("ascii", "replace"))
+        return urls
+    except (IndexError, ValueError):
+        return []
+
+
+def _peer_leaf(host: str, port: int = 443) -> bytes | None:
+    """The certificate the server actually sends, without verifying it."""
+    import socket
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((host, port), timeout=15) as raw:
+            with ctx.wrap_socket(raw, server_hostname=host) as tls:
+                return tls.getpeercert(binary_form=True)
+    except OSError:
+        return None
+
+
+def _as_pem(blob: bytes) -> str | None:
+    """DER certificate -> PEM. PEM passes through; PKCS#7 is skipped."""
+    text = blob.decode("latin-1", "ignore")
+    if "-----BEGIN CERTIFICATE-----" in text:
+        return text if text.endswith("\n") else text + "\n"
+    if not blob or blob[0] != 0x30:
+        return None
+    try:
+        return ssl.DER_cert_to_PEM_cert(blob)
+    except (ValueError, ssl.SSLError):
+        return None
+
+
+def repair_chain(url_or_host: str) -> bool:
+    """Fetch the issuer a server forgot to send, add it, refresh the bundle.
+
+    Returns True when at least one new CA was added (callers retry once).
+    """
+    import urllib.request
+
+    host = url_or_host
+    if "://" in host:
+        from urllib.parse import urlsplit
+
+        host = urlsplit(host).hostname or ""
+    if not host:
+        return False
+    leaf = _peer_leaf(host)
+    if not leaf:
+        return False
+    urls = aia_issuer_urls(leaf)
+    if not urls:
+        return False
+    dest = extra_path()
+    existing = ""
+    try:
+        existing = dest.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        existing = ""
+    added = 0
+    for url in urls[:3]:
+        if not url.lower().startswith(("http://", "https://")):
+            continue
+        try:
+            with urllib.request.urlopen(url, timeout=15) as r:
+                blob = r.read(200_000)
+        except Exception:  # noqa: BLE001 - a dead AIA must not break the job
+            continue
+        pem = _as_pem(blob)
+        if not pem or pem.strip() in existing:
+            continue
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest, "a", encoding="utf-8") as fh:
+                fh.write(pem if pem.startswith("\n") else "\n" + pem)
+        except OSError:
+            return False
+        existing += pem
+        added += 1
+    if not added:
+        return False
+    install()
+    return True

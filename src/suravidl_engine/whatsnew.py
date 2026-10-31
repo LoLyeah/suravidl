@@ -22,6 +22,7 @@ ENTRIES = [
             "A certificate failure offers \"retry without certificate check\" for that one job, and a failed row shows the file's name rather than the whole address.",
             "The fold caret no longer disappears from a row after the first progress poll — the title rewrite was deleting it.",
             "A stream that plays in Chrome but failed in the app now works: the engine trusts the device's own certificate store, not only the list bundled with Python.",
+            "A site whose server forgets to send its intermediate certificate now downloads like it plays in a browser: the missing CA is fetched and the job retried.",
         ],
     },
     {

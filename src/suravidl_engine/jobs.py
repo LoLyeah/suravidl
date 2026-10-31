@@ -17,6 +17,7 @@ from pathlib import Path
 import yt_dlp
 
 from .auth import explain_download_error
+from . import trust
 from .classify import blocked_reason
 from .extract import extract_info
 from .obfuscated import maybe_materialize
@@ -358,6 +359,18 @@ def _subtitle_files(info) -> list[str]:
 # say "video data", so the two never collide (v0.34.0: an m4a job died on a
 # subtitles-endpoint 429 before the audio ever started)
 _SUB_ERROR_MARK = ("unable to download", "subtitle")
+
+
+def _is_chain_error(e: BaseException) -> bool:
+    """A server that forgot its intermediate CA (v0.47.19).
+
+    OpenSSL: "unable to get local issuer certificate" / "unable to verify the
+    first certificate". Browsers fetch the issuer from the certificate's AIA
+    and carry on; `trust.repair_chain()` does the same here.
+    """
+    text = str(e).lower()
+    return ("unable to get local issuer" in text
+            or "unable to verify the first certificate" in text)
 
 
 def _is_subtitle_error(e: BaseException) -> bool:
@@ -1744,14 +1757,26 @@ class JobManager:
                 try:
                     info = extract_info(opts, run_url, download=True, retry_refresh=True) or {}
                 except Exception as e:  # noqa: BLE001 — classified below
-                    # a subtitle sidecar is not the download: when the site
-                    # refuses to serve captions (YouTube throttles them hard),
-                    # retry once without them instead of losing the media
-                    if not _is_subtitle_error(e):
+                    if _is_chain_error(e) and trust.repair_chain(run_url):
+                        # an incomplete chain is the site's omission, not a
+                        # reason to fail: fetch the missing issuer once, the
+                        # way a browser does, then retry (v0.47.19)
+                        job["note"] = ("the server's certificate chain was"
+                                       " incomplete — fetched the missing CA"
+                                       " and retried")
+                        info = extract_info(opts, run_url, download=True,
+                                            retry_refresh=True) or {}
+                    elif _is_subtitle_error(e):
+                        # a subtitle sidecar is not the download: when the site
+                        # refuses to serve captions (YouTube throttles them
+                        # hard), retry once without them instead of losing the
+                        # media
+                        subs_skipped = _subtitle_reason(e)
+                        _drop_subtitles(opts)
+                        info = extract_info(opts, run_url, download=True,
+                                            retry_refresh=True) or {}
+                    else:
                         raise
-                    subs_skipped = _subtitle_reason(e)
-                    _drop_subtitles(opts)
-                    info = extract_info(opts, run_url, download=True, retry_refresh=True) or {}
             if subs_skipped:
                 job["note"] = (f"subtitles could not be fetched ({subs_skipped})"
                                " — downloaded without them")

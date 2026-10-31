@@ -704,6 +704,7 @@ const STRINGS = { en: {}, id: {
   "the secure connection could not be verified — a TLS-inspecting proxy can cause this": "koneksi aman tidak bisa diverifikasi — proxy yang memeriksa TLS bisa jadi penyebabnya",
   "the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it": "situs menyajikan sertifikat yang tidak dipercaya perangkat ini (self-signed) — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection": "sertifikat situsnya sudah kedaluwarsa — pemiliknya harus memperbaruinya; browser hanya bisa membukanya kalau jaringamu mencegat koneksinya",
+  "the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension": "server media situs itu menolak permintaan yang bukan dari halamannya — buka videonya di browser lalu pilih stream di sana, atau pakai ekstensi",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",
   "the site never answered in time — check the connection and retry": "situs tidak menjawab tepat waktu — periksa koneksi lalu coba lagi",
@@ -1006,6 +1007,11 @@ function humanErr(s, detail, url) {
     return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
   if (/HTTP Error 429|too many requests/i.test(s))
     return "the site is rate-limiting this address (429) — wait a bit, then try once more";
+  if (/\/404\.html|hotlink|referer|referrer/i.test(s)) {
+    // the CDN answers a bare request with a redirect to its 404 page: the
+    // stream only exists for requests that come from the page (v0.47.19)
+    return t("the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension");
+  }
   if (/unsupported url|no (suitable )?extractor/i.test(s)) {
     if (/photo post|tiktok[^\s"']*\/photo\//i.test(s))
       return phone
