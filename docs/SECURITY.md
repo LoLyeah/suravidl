@@ -102,6 +102,25 @@ with a crafted `Content-Encoding: br` body. The Android build has no curl_cffi
 at all. The watch item is upstream: when yt-dlp accepts 0.17.x, the pin moves
 and this paragraph goes away.
 
+## Certificates: what the engine will and will not trust
+
+Two things changed after a report that a stream played in Chrome but failed in
+the app:
+
+1. **The engine trusts the device's store as well as certifi.** Android, a
+   Linux distro and macOS all keep a CA store of their own; Python historically
+   only had certifi's bundle. `trust.install()` merges the two (never
+   substitutes one for the other) on every start.
+2. **An incomplete chain is repaired, like a browser does.** Some servers send
+   only their leaf certificate; OpenSSL refuses ("unable to verify the first
+   certificate"), while Chrome fetches the issuer named in the certificate's
+   AIA extension. The engine now does the same, once per host, and retries.
+
+The limit on that repair: it only ever caches a certificate that is **itself a
+CA** (`basicConstraints CA:TRUE`), because otherwise a hostile server could
+name its own leaf in an AIA extension and get it trusted. It also only runs
+after verification has already failed, and it is scoped to the URL that failed.
+
 ## Verify your own download
 
 1. Compare the file with `SHA256SUMS.txt` from the same release:

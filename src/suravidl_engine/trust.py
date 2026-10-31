@@ -237,6 +237,53 @@ def aia_issuer_urls(leaf_der: bytes) -> list[str]:
         return []
 
 
+_CA_BASIC_OID = bytes.fromhex("0603551D13")      # 2.5.29.19 basicConstraints
+
+
+def is_ca_certificate(der: bytes) -> bool:
+    """basicConstraints CA:TRUE. Only a CA may become a trust anchor: a
+    server must not be able to get its own end-entity certificate trusted by
+    naming it in an AIA extension."""
+    try:
+        tag, cert, _ = _tlv(der, 0)
+        if tag != 0x30:
+            return False
+        tag, tbs, _ = _tlv(cert, 0)
+        parts = _children(tbs)
+        ext_wrapper = next((v for t, v in parts if t == 0xA3), None)
+        if ext_wrapper is None:
+            return False
+        tag, ext_seq, _ = _tlv(ext_wrapper, 0)
+        for tag, ext in _children(ext_seq):
+            if tag != 0x30:
+                continue
+            fields = _children(ext)
+            if not fields or fields[0][1] != _CA_BASIC_OID[2:]:
+                continue
+            value = next((v for t, v in fields if t == 0x04), None)
+            if value is None:
+                return False
+            tag, seq, _ = _tlv(value, 0)
+            for tag2, val2 in _children(seq):
+                if tag2 == 0x01:               # the cA boolean
+                    return bool(val2 and val2[0])
+            return False
+        return False
+    except (IndexError, ValueError):
+        return False
+
+
+def _pem_to_der(pem: str) -> bytes | None:
+    import base64
+
+    try:
+        body = pem.split("-----BEGIN CERTIFICATE-----")[1]
+        body = body.split("-----END CERTIFICATE-----")[0]
+        return base64.b64decode("".join(body.split()))
+    except (IndexError, ValueError):
+        return None
+
+
 def _peer_leaf(host: str, port: int = 443) -> bytes | None:
     """The certificate the server actually sends, without verifying it."""
     import socket
@@ -303,6 +350,9 @@ def repair_chain(url_or_host: str) -> bool:
         pem = _as_pem(blob)
         if not pem or pem.strip() in existing:
             continue
+        der = _pem_to_der(pem)
+        if der is None or not is_ca_certificate(der):
+            continue        # an end-entity cert may never become a trust anchor
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             with open(dest, "a", encoding="utf-8") as fh:

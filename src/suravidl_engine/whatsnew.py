@@ -15,7 +15,7 @@ from . import __version__
 
 ENTRIES = [
     {
-        "version": "0.47.19",
+        "version": "0.47.20",
         "title": "The witness",
         "items": [
             "A failed download now says what actually went wrong — an expired certificate, a self-signed server, a host that no longer exists — instead of blaming a proxy every time.",

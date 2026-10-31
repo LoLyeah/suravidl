@@ -19,7 +19,7 @@ jobs:
             files: |
               suravidl-windows-x64.exe
               suravidl-windows-x64-setup.exe
-          - os: macos-14
+          - os: macos-15
             binary: suravidl
             files: |
               suravidl-macos-arm64.dmg
@@ -33,7 +33,7 @@ jobs:
       - name: Install deps
         run: pip install . pyinstaller pystray pillow pywebview "curl_cffi>=0.16,<0.17"
       - name: Build macOS app icon
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: |
           mkdir -p app.iconset
           for s in 16 32 64 128 256 512; do
@@ -45,12 +45,12 @@ jobs:
           sips -z 1024 1024 assets/logo.png --out app.iconset/icon_512x512@2x.png
           iconutil -c icns app.iconset -o assets/icon.icns
       - name: Patch spec icon (macOS)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: sed -i '' 's#assets/logo.png#assets/icon.icns#' suravidl.spec
       - name: Build binary
         run: pyinstaller suravidl.spec --noconfirm
       - name: Ad-hoc sign (macOS arm64 needs it to run)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: |
           codesign --force -s - dist/suravidl
           codesign --force -s - --deep dist/suravidl.app
@@ -68,7 +68,7 @@ jobs:
               sudo apt-get update -q && sudo apt-get install -y -q squashfs-tools
               ./scripts/build_appimage.sh dist/suravidl suravidl-linux-x64.AppImage
               ;;
-            macos-14)
+            macos-15)
               cp dist/suravidl suravidl-macos-arm64
               mkdir -p dmg_stage
               cp -R dist/suravidl.app dmg_stage/
@@ -83,7 +83,7 @@ jobs:
               ;;
           esac
       - name: Dry-run the self-update swap (macOS only)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         run: |
           set -euo pipefail
           WORK="$(mktemp -d)"

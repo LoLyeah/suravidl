@@ -24,7 +24,9 @@ APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
 def test_the_notes_name_this_release():
-    assert __version__ == "0.47.19"
+    # 0.47.19 never published (the macOS image was retired mid-cut), so the
+    # notes ship under 0.47.20 — the number that has a release
+    assert __version__ == "0.47.20"
     assert ENTRIES[0]["version"] == __version__
     assert ENTRIES[0]["title"].lower() == "the witness"
     assert len(ENTRIES) == 10
@@ -195,3 +197,42 @@ def test_a_hotlink_redirect_is_explained():
     assert "refuses requests that do not come from its page" in APP
     # it must be decided before the generic "unsupported url" arm
     assert APP.index("hotlink|referer") < APP.index("unsupported url|no (suitable )?extractor")
+
+
+def test_the_release_does_not_ask_for_a_retired_macos_image():
+    """macos-14 was retired on 2026-11-02; brownouts cancelled the job with
+    no runner assigned, twice."""
+    wf = (pathlib.Path(__file__).resolve().parents[1] / ".github" / "workflows" /
+          "release.yml").read_text()
+    assert "macos-14" not in wf
+    assert "macos-15" in wf
+
+
+def test_only_a_ca_may_become_a_trust_anchor():
+    """A hostile server must not get its own leaf trusted via AIA."""
+    from suravidl_engine import trust
+
+    root = pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+    inter = (root / "sectigo-intermediate.der").read_bytes()
+    leaf_pem = (root / "leaf-incomplete-chain.pem").read_text()
+    assert trust.is_ca_certificate(inter) is True
+    assert trust.is_ca_certificate(trust._pem_to_der(leaf_pem) or b"") is False
+
+
+def test_repair_refuses_an_end_entity_certificate(tmp_path, monkeypatch):
+    from suravidl_engine import trust
+    import urllib.request
+
+    monkeypatch.setenv("SURAVIDL_CA_BUNDLE", str(tmp_path / "merged.pem"))
+    monkeypatch.setattr(trust, "_peer_leaf", lambda host, port=443: _leaf_der())
+    leaf_pem = (pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" /
+                "leaf-incomplete-chain.pem").read_bytes()
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, n=-1): return leaf_pem
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+    assert trust.repair_chain("https://cdnserver23.cloudmp4.to/x.mp4") is False
+    assert not trust.extra_path().exists() or "BEGIN CERTIFICATE" not in trust.extra_path().read_text()
