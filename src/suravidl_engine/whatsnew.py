@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.23",
+        "title": "The report",
+        "items": [
+            "The in-app browser now says why a page's video never loaded — the exact network or certificate error — instead of a spinner with no answer. The earlier playback fix was wrong and is gone.",
+        ],
+    },
+    {
         "version": "0.47.22",
         "title": "The redo",
         "items": [
@@ -85,13 +92,6 @@ ENTRIES = [
         "title": "The fetch",
         "items": [
             "ffmpeg is no longer something you have to know about: Settings shows whether one is reachable and downloads a pinned static build when it isn't — the join video+audio step and every audio conversion need it.",
-        ],
-    },
-    {
-        "version": "0.47.12",
-        "title": "The whole",
-        "items": [
-            "On a machine without ffmpeg the default pick is now the best stream that is already whole, instead of a video+audio pair it could never join — and a Homebrew ffmpeg is found even when the app was opened from Finder.",
         ],
     },
 ]

@@ -1,6 +1,8 @@
 package com.suravidl.app
 
 import android.graphics.Bitmap
+import android.net.http.SslErrorHandler
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -37,6 +39,11 @@ class SnifferWebViewClient(
      *  this client injects the same scripts as the activity, so it carries
      *  the same token. */
     private val sniffToken: String,
+    /** Why a resource failed to load: (url, one-line reason). The in-app
+     *  browser used to show a spinner for ever with no explanation — a
+     *  failing <video> is silent by design, so the client has to say it
+     *  (v0.47.23). */
+    private val onLoadError: (String, String) -> Unit = { _, _ -> },
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -77,6 +84,36 @@ class SnifferWebViewClient(
         return false
     }
 
+    /** A resource that failed outright (DNS, refused, timeout, SSL). */
+    override fun onReceivedError(
+        view: WebView?, request: WebResourceRequest?, error: WebResourceError?
+    ) {
+        val u = request?.url?.toString() ?: return
+        if (!request.isForMainFrame && !looksLikeMedia(u)) return
+        val code = if (android.os.Build.VERSION.SDK_INT >= 23) error?.errorCode else null
+        val what = if (android.os.Build.VERSION.SDK_INT >= 23) error?.description?.toString() else null
+        onLoadError(u, "net error ${code ?: "?"}: ${what ?: "load failed"}")
+    }
+
+    /** A resource the server answered with an error status. */
+    override fun onReceivedHttpError(
+        view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?
+    ) {
+        val u = request?.url?.toString() ?: return
+        if (!request.isForMainFrame && !looksLikeMedia(u)) return
+        onLoadError(u, "HTTP ${response?.statusCode ?: "?"} ${response?.reasonPhrase.orEmpty()}".trim())
+    }
+
+    /** A certificate the device will not accept. Logged, never waved through:
+     *  the answer to a bad chain is the downloader's AIA repair, not a
+     *  WebView that trusts everything. */
+    override fun onReceivedSslError(
+        view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?
+    ) {
+        onLoadError(error?.url ?: pageUrl(), "certificate refused: ${error?.primaryError ?: "?"}")
+        handler?.cancel()
+    }
+
     override fun shouldInterceptRequest(
         view: WebView?, request: WebResourceRequest?
     ): WebResourceResponse? {
@@ -105,6 +142,13 @@ class SnifferWebViewClient(
     private fun inject(view: WebView?) {
         view?.evaluateJavascript(SniffScript.js(sniffToken), null)
     }
+}
+
+/** Media-shaped URLs: the ones a silent failure would hide behind a spinner. */
+internal fun looksLikeMedia(url: String): Boolean {
+    val u = url.substringBefore('?').lowercase()
+    return u.endsWith(".mp4") || u.endsWith(".m3u8") || u.endsWith(".ts") ||
+        u.endsWith(".webm") || u.endsWith(".m4a") || u.contains("/media/")
 }
 
 /** What this browser is for. Top-level on purpose: BrowserActivity's load()

@@ -19,11 +19,9 @@ BROWSER = (ROOT / "android" / "app" / "src" / "main" / "java" / "com" /
 AUTH = {"Authorization": "Bearer testtoken"}
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.47.22"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the redo"
+def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
+    assert any(e["title"].lower() == "the redo" for e in ENTRIES)
 
 
 def test_the_button_retries_the_job_not_a_bare_url():
@@ -40,8 +38,10 @@ def test_an_incomplete_chain_is_not_called_self_signed():
     assert "did not send the intermediate certificate" in APP
 
 
-def test_the_webview_allows_script_started_playback():
-    assert "mediaPlaybackRequiresUserGesture = false" in BROWSER
+def test_the_gesture_hypothesis_is_not_shipped():
+    """0.47.22 turned WebView's gesture requirement off to explain a spinner
+    that would not start; it was the wrong cause and 0.47.23 reverted it."""
+    assert "mediaPlaybackRequiresUserGesture" not in BROWSER
 
 
 def test_a_retry_keeps_the_referer_and_takes_the_override(tmp_path):

@@ -349,11 +349,6 @@ class BrowserActivity : AppCompatActivity() {
             settings.setSupportMultipleWindows(true)
             settings.javaScriptCanOpenWindowsAutomatically = false
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            // players call play() from script after you tap their own button —
-            // inside an iframe that gesture is not seen by the video element,
-            // and WebView's default refuses it: the player then spins for ever
-            // (2026-11-01 report: "thumbnail, then loading indefinitely")
-            settings.mediaPlaybackRequiresUserGesture = false
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             // v0.40.3: the desktop switch — a saved "desktop site" opens the
@@ -415,6 +410,7 @@ class BrowserActivity : AppCompatActivity() {
                 onAppLinkBlocked = { url -> reportAppLinkBlocked(url) },
                 adsBlocked = { adBlock },
                 onHopBlocked = { url -> reportHopBlocked(url) },
+                onLoadError = { url, detail -> reportLoadError(url, detail) },
                 sniffToken = sniffToken)
         }
         ua = try {
@@ -517,6 +513,25 @@ class BrowserActivity : AppCompatActivity() {
     /** A refused off-site top-level hop (v0.39.7): the ad redirect that used
      *  to take the page — and the find list — with it. Named, kept, and one
      *  tap from being followed anyway when the hop was the user's idea. */
+    /**
+     * A resource failed and the page cannot say why: a <video> that never
+     * loads is just a spinner (2026-11-01 report: "thumbnail, then loading
+     * indefinitely"). Logged always; shown for media and certificate
+     * failures, which is what a stalled player is made of (v0.47.23).
+     */
+    private fun reportLoadError(url: String, detail: String) {
+        try {
+            LogStore.write(this, "browser.log",
+                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date()) + " " + detail + " — " + url)
+        } catch (_: Throwable) {
+        }
+        if (looksLikeMedia(url) || detail.startsWith("certificate")) {
+            handoffNote.text = detail + " — " + (url.substringAfterLast('/').take(48))
+            handoffNote.visibility = View.VISIBLE
+        }
+    }
+
     private fun reportHopBlocked(url: String) {
         pendingHop = url
         handoffNote.text = "hop refused (" + (NavGuard.host(url) ?: schemeLabel(url)) +
