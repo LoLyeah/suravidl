@@ -162,3 +162,24 @@ after verification has already failed, and it is scoped to the URL that failed.
 Open an issue at <https://github.com/LoLyeah/suravidl/issues> with the version,
 the platform, and what happened. Please do not attach logs containing private or
 tokenised URLs.
+
+## The in-app browser's one certificate exception
+
+The in-app browser refuses every certificate the platform rejects — with a
+single, narrow exception, because Android's WebView verifies through the
+platform TrustManager, which (unlike Chrome) does not fetch a missing
+intermediate certificate from the leaf's AIA extension. A media host that
+serves a leaf-only chain therefore plays in Chrome and fails silently in a
+WebView.
+
+So `onReceivedSslError` calls `proceed()` only when **both** hold:
+
+- the resource is media-shaped (`.mp4`, `.m3u8`, `.ts`, `.webm`, `.m4a`, or a
+  `/media/` path), and
+- the error is `SSL_UNTRUSTED` — an issuer the platform does not know.
+
+Expired, not-yet-valid, hostname-mismatched and malformed certificates are
+still refused, for every request. The allowance is announced on screen and
+written to `browser.log`; it applies to watching in the browser, never to the
+downloader, which verifies against its own merged bundle and repairs the
+chain instead of ignoring it.

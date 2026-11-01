@@ -104,14 +104,35 @@ class SnifferWebViewClient(
         onLoadError(u, "HTTP ${response?.statusCode ?: "?"} ${response?.reasonPhrase.orEmpty()}".trim())
     }
 
-    /** A certificate the device will not accept. Logged, never waved through:
-     *  the answer to a bad chain is the downloader's AIA repair, not a
-     *  WebView that trusts everything. */
+    /**
+     * A certificate the device will not accept.
+     *
+     * Android's WebView verifies through the platform TrustManager, which —
+     * unlike Chrome — does not fetch a missing intermediate certificate from
+     * the leaf's AIA extension. A media host that sends only its leaf
+     * therefore plays in Chrome and fails silently here (2026-11-01 report:
+     * "thumbnail, then loading indefinitely"; the downloader, which repairs
+     * the chain itself, was fine on the same URL).
+     *
+     * So: for MEDIA only, and only when the platform does not trust the
+     * issuer (SSL_UNTRUSTED), load it and say so. Expired, not-yet-valid,
+     * mismatched and malformed certificates are still refused — those are
+     * not the incomplete-chain case, and a browser that waves them through
+     * is a browser that trusts anything.
+     */
     override fun onReceivedSslError(
         view: WebView?, handler: SslErrorHandler?, error: android.net.http.SslError?
     ) {
-        onLoadError(error?.url ?: pageUrl(), "certificate refused: ${error?.primaryError ?: "?"}")
-        handler?.cancel()
+        val url = error?.url ?: pageUrl()
+        val primary = error?.primaryError ?: -1
+        onLoadError(url, "certificate refused: $primary")
+        val incompleteChain = primary == android.net.http.SslError.SSL_UNTRUSTED
+        if (incompleteChain && looksLikeMedia(url)) {
+            onLoadError(url, "loaded despite an untrusted chain (media only)")
+            handler?.proceed()
+        } else {
+            handler?.cancel()
+        }
     }
 
     override fun shouldInterceptRequest(

@@ -18,7 +18,8 @@ ENTRIES = [
         "version": "0.47.23",
         "title": "The report",
         "items": [
-            "The in-app browser now says why a page's video never loaded — the exact network or certificate error — instead of a spinner with no answer. The earlier playback fix was wrong and is gone.",
+            "A video whose server forgets its intermediate certificate now plays in the in-app browser: media only, and only for an untrusted chain — with a note on screen. Expired or mismatched certificates are still refused.",
+            "The browser also says why a resource failed (network, HTTP status or certificate) instead of leaving a spinner with no answer.",
         ],
     },
     {

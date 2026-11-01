@@ -34,9 +34,10 @@ def test_the_client_reports_every_kind_of_load_failure():
     assert "override fun onReceivedError(" in CLIENT
     assert "override fun onReceivedHttpError(" in CLIENT
     assert "override fun onReceivedSslError(" in CLIENT
-    # a certificate failure is logged and cancelled, never waved through
+    # an incomplete chain is the one case that may proceed — for media only
+    assert "primary == android.net.http.SslError.SSL_UNTRUSTED" in CLIENT
+    assert "incompleteChain && looksLikeMedia(url)" in CLIENT
     assert "handler?.cancel()" in CLIENT
-    assert "handler?.proceed()" not in CLIENT
 
 
 def test_only_failures_that_a_player_would_hide_are_reported():
