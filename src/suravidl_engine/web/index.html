@@ -120,6 +120,8 @@
         <input id="url" type="text" spellcheck="false"
                placeholder="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link" data-i18n-ph="Paste a video URL — any yt-dlp site, or a direct mp4/m3u8 link"/>
         <button id="probeBtn" class="btn prime" data-i18n="Probe">Probe</button>
+        <button id="quickBtn" class="btn sm" data-i18n="Download now"
+                title="Queue it with your default quality — no format list">Download now</button>
       </div>
       <div id="probeSay" class="msg hidden" role="status"></div>
       <div id="probeMsg" class="msg muted"></div>
@@ -523,6 +525,13 @@
         <label class="check small" for="setResume">
           <input id="setResume" type="checkbox"/><span data-i18n=" Resume interrupted downloads after a restart ">
           Resume interrupted downloads after a restart
+        </span></label>
+      </div>
+
+      <div class="field">
+        <label class="check small" for="setQuickShare">
+          <input id="setQuickShare" type="checkbox"/><span data-i18n=" A link shared to the app downloads at once (Android) ">
+          A link shared to the app downloads at once (Android)
         </span></label>
       </div>
 

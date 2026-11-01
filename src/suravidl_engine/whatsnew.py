@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.28",
+        "title": "The tap",
+        "items": [
+            "Download now: one tap queues the pasted link at your default quality, no format list — and a link shared to the phone can skip it too (Settings).",
+            "The notification now shows how far along the download is, how fast it runs and how long is left, with a Cancel button.",
+        ],
+    },
+    {
         "version": "0.47.27",
         "title": "The flush",
         "items": [
@@ -82,14 +90,6 @@ ENTRIES = [
         "title": "The twin",
         "items": [
             "Deleting one video no longer takes a same-named twin with it: the trash removes exactly the copy that row made, instead of every file sharing its name.",
-        ],
-    },
-    {
-        "version": "0.47.17",
-        "title": "The hoist",
-        "items": [
-            "The phone's Settings no longer shows an ffmpeg row that could only ever say \"checking…\" — the code meant to hide it ran before its own helper existed, so it crashed silently.",
-            "If the check really fails on a desktop, the row now says so instead of spinning forever.",
         ],
     },
 ]

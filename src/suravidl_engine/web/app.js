@@ -705,6 +705,7 @@ const STRINGS = { en: {}, id: {
   "the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it": "situs menyajikan sertifikat yang tidak dipercaya perangkat ini (self-signed) — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection": "sertifikat situsnya sudah kedaluwarsa — pemiliknya harus memperbaruinya; browser hanya bisa membukanya kalau jaringamu mencegat koneksinya",
   "the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension": "server media situs itu menolak permintaan yang bukan dari halamannya — buka videonya di browser lalu pilih stream di sana, atau pakai ekstensi",
+  "Download now": "Unduh sekarang",
   "the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it": "situs tidak mengirim sertifikat perantara yang membuktikan rantainya, jadi tidak bisa diverifikasi — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",
@@ -2483,6 +2484,24 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
       triggerBtn.classList.remove("busy");
     }
   }
+}
+
+/**
+ * One tap: queue the pasted link with the settings' own quality and go to the
+ * queue. Probe exists so a link can be inspected; this exists for the times
+ * the answer is already known (v0.47.28, the YTDLnis/cobalt shape).
+ */
+async function quickStart() {
+  const url = $("url").value.trim();
+  if (!url) {
+    toast(t("paste a video link first"), "bad");
+    $("url").focus();
+    return false;
+  }
+  const btn = $("quickBtn");
+  const ok = await startJob(url, null, null, null, btn);
+  if (ok) showTab("queue");
+  return ok;
 }
 
 /* --- "This download only": a patch over the saved settings ---------------- */
@@ -5231,6 +5250,7 @@ async function loadSettings() {
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
     $("setResume").checked = !!s.auto_resume;
+    if ($("setQuickShare")) $("setQuickShare").checked = !!s.quick_share;
     $("setCookies").value = s.cookies_file || "";
     $("setCookiesBrowser").value = s.cookies_from_browser || "";
     $("setImpersonate").value = s.impersonate || "";
@@ -5742,6 +5762,7 @@ function settingsFormPayload() {
       max_concurrent: Number($("setConc").value),
       open_dir_on_complete: $("setReveal").checked,
       auto_resume: $("setResume").checked,
+      quick_share: !!($("setQuickShare") && $("setQuickShare").checked),
       cookies_file: $("setCookies").value.trim(),
       cookies_from_browser: $("setCookiesBrowser").value,
       impersonate: $("setImpersonate").value,
@@ -5892,6 +5913,9 @@ window.suravidlShared = (url) => {
   if (!url || typeof url !== "string") return;
   showTab("download");
   $("url").value = url.trim();
+  // Settings → "A link shared to the app downloads at once": the share is the
+  // whole instruction, so do not stop at the format list (v0.47.28)
+  if (SETTINGS_SNAPSHOT && SETTINGS_SNAPSHOT.quick_share) { quickStart(); return; }
   doProbe();
   toast(t("shared link ready — pick a format"));
 };
@@ -5969,6 +5993,11 @@ wireBayDoor($("ovBlock"));
 
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
+if ($("quickBtn")) $("quickBtn").onclick = quickStart;
+// Enter probes; Ctrl/Cmd+Enter is the shortcut for the one-tap path
+$("url").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); quickStart(); }
+});
 $("url").addEventListener("keydown", (e) => { if (e.key === "Enter") doProbe(); });
 // the transport: picks arm a take; the START lamp commits it (v0.37.0)
 $("bestBtn").onclick = () => commitTake($("bestBtn"));

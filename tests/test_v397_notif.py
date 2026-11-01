@@ -36,8 +36,11 @@ def test_a_bad_notification_never_skips_start_foreground():
     and only then does the call to go foreground happen."""
     assert "private fun buildNotification(" in KOTLIN
     assert 'buildNotification("starting engine\u2026", openApp = false)' in KOTLIN
-    assert "buildNotification(text, openApp = true)" in KOTLIN
-    assert KOTLIN.count("setSmallIcon(android.R.drawable.stat_sys_download)") == 2
+    # v0.47.28: updateCount now picks between the plain builder and the
+    # progress one; both must end at the same guaranteed-visible fallback
+    assert "buildProgress(jobs)" in KOTLIN
+    assert "buildNotification(" in KOTLIN
+    assert KOTLIN.count("setSmallIcon(android.R.drawable.stat_sys_download)") >= 2
     assert 'writeLog("notif-fallback", t)' in KOTLIN
     assert "ServiceCompat.startForeground(" in KOTLIN
 

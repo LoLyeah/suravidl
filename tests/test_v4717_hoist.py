@@ -42,9 +42,9 @@ def test_a_failed_ffmpeg_check_does_not_spin_forever():
 def test_the_notes_still_carry_this_release():
     from suravidl_engine.whatsnew import ENTRIES
 
+    # v0.47.28 rolled 0.47.17 out of the window; the window is the invariant
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.47.17" and e["title"].lower() == "the hoist"
-               for e in ENTRIES)
+    assert len({e["title"].lower() for e in ENTRIES}) == 10
 
 
 def test_no_other_top_level_helper_is_defined_as_a_late_const():

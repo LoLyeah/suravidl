@@ -36,6 +36,9 @@ DEFAULTS = {
     "rate_limit": "",            # e.g. "2M" (bytes/s)
     "subfolders": "off",         # off | playlist | site — keep big batches tidy
     "video_container": "auto",   # auto | mp4 | mkv — remux for compatibility
+    "quick_share": False,         # Android: a shared link queues at once, with the
+                                 # default quality, instead of stopping at the
+                                 # format list (v0.47.28)
     "live_from_start": False,    # live streams: record from the start when the
                                  # site still has it (yt-dlp --live-from-start)
     "download_sections": "",     # "" or a clip like "00:01:30-00:02:45"
@@ -103,6 +106,7 @@ PER_JOB_DENIED = {
     "max_concurrent",    # queue policy
     "open_dir_on_complete",
     "auto_resume",
+    "quick_share",       # app-level: a job may not decide how the next share behaves
     "theme",
     "glass",
     "accent",
@@ -232,6 +236,8 @@ class Settings:
         if key == "open_dir_on_complete":
             return bool(value)
         if key == "auto_resume":
+            return bool(value)
+        if key == "quick_share":
             return bool(value)
         if key == "cookies_file":
             # pointing at YOUR cookies file, anywhere, is the feature; the

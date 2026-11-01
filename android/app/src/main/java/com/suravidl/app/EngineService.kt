@@ -22,6 +22,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 import java.util.UUID
 import kotlin.concurrent.thread
 
@@ -83,6 +84,15 @@ class EngineService : Service() {
         // and drive the engine with the token it finds there (v0.21.1 audit).
         val pageKey = prefs.getString("page_key", null) ?: UUID.randomUUID().toString().also {
             prefs.edit().putString("page_key", it).apply()
+        }
+        // The notification's Cancel action re-enters here (v0.47.28). It must
+        // run before the engineStarted guard: a running service still has to
+        // answer it, and it must never restart the engine.
+        if (intent?.action == ACTION_CANCEL) {
+            intent.getStringExtra(EXTRA_JOB_ID)?.takeIf { it.isNotBlank() }?.let { id ->
+                thread(name = "cancel-job") { cancelJob(id) }
+            }
+            return START_STICKY
         }
         if (engineStarted) return START_STICKY       // one engine per process
         engineStarted = true
@@ -299,7 +309,18 @@ class EngineService : Service() {
         }
     }
 
-    private fun activeCount(): Int {
+    /** One row of /jobs, reduced to what the shade can show. */
+    private data class JobBit(
+        val id: String, val title: String, val status: String,
+        val pct: Int, val speed: Double, val eta: Long,
+    )
+
+    /**
+     * Everything the notification needs, from the same endpoint the UI polls.
+     * The old version counted rows and threw the numbers away; `jobs` already
+     * carries downloaded_bytes / total_bytes / speed / eta (v0.47.28).
+     */
+    private fun activeJobs(): List<JobBit> {
         val c = URL("http://127.0.0.1:$ENGINE_PORT/jobs").openConnection()
             as HttpURLConnection
         c.setRequestProperty("Authorization", "Bearer $token")
@@ -310,26 +331,104 @@ class EngineService : Service() {
             c.disconnect()
         }
         val jobs = JSONObject(body).getJSONArray("jobs")
-        var n = 0
+        val out = ArrayList<JobBit>(jobs.length())
         for (i in 0 until jobs.length()) {
-            when (jobs.getJSONObject(i).getString("status")) {
-                "queued", "downloading", "merging" -> n++
-            }
+            val j = jobs.getJSONObject(i)
+            val status = j.optString("status")
+            if (status != "queued" && status != "downloading" && status != "merging") continue
+            val p = j.optJSONObject("progress") ?: JSONObject()
+            val got = p.optLong("downloaded_bytes", 0L)
+            val total = p.optLong("total_bytes", 0L)
+            val pct = if (total > 0) ((got * 100) / total).toInt().coerceIn(0, 100) else 0
+            out.add(JobBit(
+                id = j.optString("id"),
+                title = j.optString("title").ifBlank { j.optString("url") },
+                status = status,
+                pct = pct,
+                speed = p.optDouble("speed", 0.0),
+                eta = p.optLong("eta", 0L),
+            ))
         }
-        return n
+        return out
+    }
+
+    private fun speedText(bps: Double): String = when {
+        bps >= 1048576 -> String.format(Locale.US, "%.1f MB/s", bps / 1048576)
+        bps >= 1024 -> String.format(Locale.US, "%.0f KB/s", bps / 1024)
+        bps > 0 -> String.format(Locale.US, "%.0f B/s", bps)
+        else -> ""
+    }
+
+    private fun etaText(sec: Long): String =
+        if (sec <= 0 || sec > 86400) "" else String.format(Locale.US, "%d:%02d left", sec / 60, sec % 60)
+
+    private fun cancelJob(id: String) {
+        try {
+            val c = URL("http://127.0.0.1:$ENGINE_PORT/jobs/$id/cancel").openConnection()
+                as HttpURLConnection
+            c.requestMethod = "POST"
+            c.setRequestProperty("Authorization", "Bearer $token")
+            c.connectTimeout = 3000
+            c.readTimeout = 3000
+            c.responseCode      // run it; the body does not matter here
+            c.disconnect()
+        } catch (t: Throwable) {
+            Log.w(SuravidlApp.TAG, "cancel from the notification failed", t)
+        }
+        updateCount()
+    }
+
+    private fun cancelIntent(id: String): PendingIntent =
+        PendingIntent.getService(
+            this, 11,
+            Intent(this, EngineService::class.java)
+                .setAction(ACTION_CANCEL)
+                .putExtra(EXTRA_JOB_ID, id),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+    /** A download in progress, in the shade: how far, how fast, how long, and
+     *  a way to stop it without opening the app. */
+    private fun buildProgress(jobs: List<JobBit>): android.app.Notification {
+        val j = jobs.first()
+        val bits = ArrayList<String>(3)
+        if (j.pct > 0) bits.add("${j.pct}%")
+        speedText(j.speed).takeIf { it.isNotEmpty() }?.let { bits.add(it) }
+        etaText(j.eta).takeIf { it.isNotEmpty() }?.let { bits.add(it) }
+        if (j.status == "merging") bits.add("finishing up")
+        val text = if (bits.isEmpty()) "downloading…" else bits.joinToString(" · ")
+        val title = if (jobs.size > 1) "suravidl — ${jobs.size} downloading" else "suravidl — downloading"
+        val builder = NotificationCompat.Builder(this, CHANNEL).apply {
+            setContentTitle(title)
+            setContentText(text)
+            setSubText(j.title.take(80))
+            setOngoing(true)
+            setOnlyAlertOnce(true)
+            if (j.pct > 0 && j.status != "merging") setProgress(100, j.pct, false)
+            else setProgress(0, 0, true)
+            setContentIntent(openAppIntent())
+            addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancelIntent(j.id))
+            notifLogo?.let { setLargeIcon(it) }
+        }
+        return try {
+            builder.setSmallIcon(R.drawable.ic_stat_suravidl).build()
+        } catch (t: Throwable) {
+            Log.w(SuravidlApp.TAG, "the drawn notification glyph failed; using the platform's", t)
+            builder.setSmallIcon(android.R.drawable.stat_sys_download).build()
+        }
     }
 
     private fun updateCount() {
-        val text = engineError?.let { err ->
-            "engine failed — log saved (${err.lineSequence().first()})"
-        } ?: try {
-            val n = activeCount()
-            if (n == 0) "engine running — no active downloads"
-            else "downloading $n…"
-        } catch (_: Exception) {
-            "starting engine…"
+        val notification = if (engineError != null) {
+            buildNotification(
+                "engine failed — log saved (${engineError!!.lineSequence().first()})", openApp = true)
+        } else {
+            val jobs = try { activeJobs() } catch (_: Exception) { null }
+            when {
+                jobs == null -> buildNotification("starting engine…", openApp = true)
+                jobs.isEmpty() -> buildNotification("engine running — no active downloads", openApp = true)
+                else -> buildProgress(jobs)
+            }
         }
-        val notification = buildNotification(text, openApp = true)
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, notification)   // same id as the foreground one:
                                             // onDestroy can take it down again
@@ -432,6 +531,10 @@ class EngineService : Service() {
         const val ENGINE_PORT = 8787
         const val CHANNEL = "downloads"
         const val NOTIF_ID = 1
+
+        /** The notification's Cancel action; handled before the engine guard. */
+        const val ACTION_CANCEL = "com.suravidl.app.CANCEL_JOB"
+        const val EXTRA_JOB_ID = "job_id"
 
         /** How many ticks a failing Gallery/Music copy gets before the app
          *  stops trying (and says so once in the log). */

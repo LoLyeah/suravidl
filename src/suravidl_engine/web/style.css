@@ -658,11 +658,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 .job.pending .pill { color: var(--warn); }
 
 /* ---------- the source dock ---------- */
-.paste { display: flex; gap: 10px; }
+.paste { display: flex; gap: 10px; flex-wrap: wrap; }
 .paste input {
-  flex: 1; min-width: 0; font-size: 14px; padding: 12px 14px;
+  flex: 1 1 220px; min-width: 0; font-size: 14px; padding: 12px 14px;
   border-radius: 10px;
 }
+/* two buttons now: Probe and Download now. On a phone they take the row
+   under the field rather than squeezing it (v0.47.28) */
+@media (max-width: 560px) { .paste .btn { flex: 1 1 auto; } }
 .paste input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 4px var(--accent-soft); }
 .paste .btn { padding: 12px 20px; border-radius: 10px; flex: none; }
 .audioRow {

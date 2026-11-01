@@ -37,6 +37,9 @@ The browser extension hands the streams it found to the engine — no copy-paste
 ## What it does
 
 - **Probe first**: paste a link, see the real formats, pick one, download.
+- **Download now**: when you already know the quality, one tap queues the link
+  at your default — no format list. A link shared to the phone can skip it too
+  (Settings → *A link shared to the app downloads at once*).
 - **Paste a list**: several links at once are each checked and named before
   anything queues — tick the good ones, queue just those.
 - **Live streams**: a live link records while it plays (● REC, time on air,
@@ -148,8 +151,9 @@ GTK/PyGObject isn't practical. Run from source (plus `pywebview`, `python3-gi`,
 ## Android app
 
 Same engine, same UI: Chaquopy embeds Python 3.11 + the engine + yt-dlp in the
-APK. A foreground service runs uvicorn on `127.0.0.1:8787` (notification with
-the active-download count) and the activity is a WebView kiosk of the engine UI.
+APK. A foreground service runs uvicorn on `127.0.0.1:8787` (a notification with
+the download's percentage, speed, time left and a Cancel button) and the
+activity is a WebView kiosk of the engine UI.
 
 - **Installs on Android 7.0 (API 24) and newer — 64-bit devices only**
   (`arm64-v8a`, `x86_64`). API 24 isn't arbitrary: it is Chaquopy's own floor
@@ -270,7 +274,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 1549 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 1557 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```
