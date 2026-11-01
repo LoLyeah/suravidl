@@ -163,7 +163,7 @@ class EngineService : Service() {
 
     private fun syncWakeLock() {
         val active = try {
-            activeCount()
+            activeJobs().size
         } catch (_: Exception) {
             return  // engine not answering; leave the lock as it is
         }
