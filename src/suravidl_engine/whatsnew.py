@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.27",
+        "title": "The flush",
+        "items": [
+            "A job that fails just as the app restarts now comes back as failed, not interrupted: the row is written before the state is shown.",
+        ],
+    },
+    {
         "version": "0.47.26",
         "title": "The once",
         "items": [
@@ -83,14 +90,6 @@ ENTRIES = [
         "items": [
             "The phone's Settings no longer shows an ffmpeg row that could only ever say \"checking…\" — the code meant to hide it ran before its own helper existed, so it crashed silently.",
             "If the check really fails on a desktop, the row now says so instead of spinning forever.",
-        ],
-    },
-    {
-        "version": "0.47.16",
-        "title": "The catch",
-        "items": [
-            "The phone build's new guard stopped its own release: it looked for a string every build carries. It now looks only for the downloader's own code, so the update installs again.",
-            "Impersonation now refuses honestly: if the installed curl_cffi is a version yt-dlp cannot use, Settings says so instead of failing at download time.",
         ],
     },
 ]

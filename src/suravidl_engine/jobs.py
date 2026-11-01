@@ -844,6 +844,20 @@ class JobManager:
         self._save(job)
         return self.get(job_id)
 
+    def _publish_terminal(self, job: dict, **fields) -> None:
+        """Durable first, visible second.
+
+        `get()` reads this dict, so a status assigned here is visible the
+        instant it is written — while the row may still say "downloading".
+        A JobManager starting inside that window (a restart, or a test that
+        opens one straight after seeing the end state) sweeps the row to
+        "interrupted" and the failure is lost (2026-11-01: a job that had
+        errored came back as interrupted). So the row is written from a
+        snapshot BEFORE the shared dict changes.
+        """
+        self._save({**job, **fields})
+        job.update(fields)
+
     def get(self, job_id: str) -> dict:
         with self._lock:
             job = dict(self._jobs[job_id])
@@ -881,8 +895,9 @@ class JobManager:
             job = self._jobs[job_id]
             if job["status"] not in ACTIVE_STATUSES:
                 raise ValueError(f"cannot cancel job in status '{job['status']}'")
-            job["status"] = "cancelled"  # queued jobs never start; running see below
-        self._save(job)
+            # queued jobs never start; running ones see the stop at their next
+            # hook. Durable before visible, like every terminal state.
+            self._publish_terminal(job, status="cancelled")
         return self.get(job_id)
 
     def pause(self, job_id: str) -> dict:
@@ -1466,10 +1481,11 @@ class JobManager:
                     tick = self._last_tick.get(jid)
                     if tick is not None and now - tick <= STALL_LIMIT:
                         continue
-                    job["status"] = "error"
-                    job["error"] = (f"the source stopped sending data — no "
-                                    f"progress for {int(STALL_LIMIT)}s; "
-                                    "the download was stopped")
+                    self._publish_terminal(
+                        job, status="error",
+                        error=(f"the source stopped sending data — no "
+                               f"progress for {int(STALL_LIMIT)}s; "
+                               "the download was stopped"))
                     self._last_tick[jid] = now
                 self._save(job)
                 self._reap_stalled(jid)
@@ -1872,11 +1888,12 @@ class JobManager:
                     # a finished job with a caveat says so on its card
                     job["note"] = "; ".join(
                         ([job["note"]] if job.get("note") else []) + extra)
-                job["status"] = "completed"
-                job["completed_at"] = datetime.now(timezone.utc).isoformat()
+                self._publish_terminal(
+                    job, status="completed",
+                    completed_at=datetime.now(timezone.utc).isoformat())
         except _Cancelled:
             if not _stop_requested(job):   # keep the word the user asked for
-                job["status"] = "cancelled"
+                self._publish_terminal(job, status="cancelled")
             job["error"] = ("paused by user" if job["status"] == "paused"
                             else "cancelled by user")
         except Exception as e:  # noqa: BLE001 - surfaced to the UI
@@ -1884,8 +1901,8 @@ class JobManager:
                 job["error"] = ("paused by user" if job["status"] == "paused"
                                 else "cancelled by user")
             else:
-                job["status"] = "error"
-                job["error"] = explain_download_error(str(e))
+                self._publish_terminal(
+                    job, status="error", error=explain_download_error(str(e)))
                 # name the layer that broke, not just the symptom (v0.47.21)
                 raw = str(e).lower()
                 if any(k in raw for k in ("timed out", "timeout", "connection",

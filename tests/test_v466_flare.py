@@ -92,7 +92,7 @@ def test_the_path_shows_its_tail():
 def test_the_engine_stamps_a_finish_time():
     """completed_at has been written at completion all along — the UI just
     never showed it. No new column: use the one the ledger already keeps."""
-    assert 'job["completed_at"] = datetime.now(timezone.utc).isoformat()' in JOBS
+    assert 'completed_at=datetime.now(timezone.utc).isoformat()' in JOBS
     assert "finished_at" not in JOBS, \
         "a second timestamp for one fact is how a schema rots"
 
