@@ -173,6 +173,7 @@ def test_repair_fetches_the_issuer_and_refreshes_the_bundle(tmp_path, monkeypatc
         def read(self, n=-1): return der
 
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+    monkeypatch.setattr(trust, "_verifies", lambda host, port=443, timeout=10.0: True)
 
     assert trust.repair_chain("https://cdnserver23.cloudmp4.to/media/x.mp4") is True
     extra = trust.extra_path().read_text()
@@ -235,5 +236,27 @@ def test_repair_refuses_an_end_entity_certificate(tmp_path, monkeypatch):
         def read(self, n=-1): return leaf_pem
 
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+    monkeypatch.setattr(trust, "_verifies", lambda host, port=443, timeout=10.0: True)
     assert trust.repair_chain("https://cdnserver23.cloudmp4.to/x.mp4") is False
     assert not trust.extra_path().exists() or "BEGIN CERTIFICATE" not in trust.extra_path().read_text()
+
+
+def test_a_repair_that_does_not_verify_is_reported_as_failed(tmp_path, monkeypatch):
+    """The phone kept failing after a "successful" repair: a repair only
+    counts when the host actually verifies afterwards."""
+    from suravidl_engine import trust
+    import urllib.request
+
+    monkeypatch.setenv("SURAVIDL_CA_BUNDLE", str(tmp_path / "merged.pem"))
+    monkeypatch.setattr(trust, "_peer_leaf", lambda host, port=443: _leaf_der())
+    der = (pathlib.Path(__file__).resolve().parents[1] / "tests" / "fixtures" /
+           "sectigo-intermediate.der").read_bytes()
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self, n=-1): return der
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+    monkeypatch.setattr(trust, "_verifies", lambda host, port=443, timeout=10.0: False)
+    assert trust.repair_chain("https://cdnserver23.cloudmp4.to/x.mp4") is False

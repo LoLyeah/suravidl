@@ -312,6 +312,18 @@ def _as_pem(blob: bytes) -> str | None:
         return None
 
 
+def _verifies(host: str, port: int = 443, timeout: float = 10.0) -> bool:
+    """Would a connection to this host verify with the bundle we just built?"""
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as raw:
+            with context().wrap_socket(raw, server_hostname=host) as tls:
+                return bool(tls.getpeercert())
+    except (OSError, ssl.SSLError):
+        return False
+
+
 def repair_chain(url_or_host: str) -> bool:
     """Fetch the issuer a server forgot to send, add it, refresh the bundle.
 
@@ -364,4 +376,7 @@ def repair_chain(url_or_host: str) -> bool:
     if not added:
         return False
     install()
-    return True
+    # a repair that does not make THIS host verify is not a repair: say so
+    # instead of claiming one (v0.47.22 — a phone kept failing after a
+    # "successful" repair)
+    return _verifies(host)

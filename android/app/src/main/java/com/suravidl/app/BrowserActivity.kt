@@ -349,6 +349,11 @@ class BrowserActivity : AppCompatActivity() {
             settings.setSupportMultipleWindows(true)
             settings.javaScriptCanOpenWindowsAutomatically = false
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            // players call play() from script after you tap their own button —
+            // inside an iframe that gesture is not seen by the video element,
+            // and WebView's default refuses it: the player then spins for ever
+            // (2026-11-01 report: "thumbnail, then loading indefinitely")
+            settings.mediaPlaybackRequiresUserGesture = false
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             // v0.40.3: the desktop switch — a saved "desktop site" opens the

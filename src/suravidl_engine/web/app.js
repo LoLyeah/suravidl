@@ -705,6 +705,7 @@ const STRINGS = { en: {}, id: {
   "the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it": "situs menyajikan sertifikat yang tidak dipercaya perangkat ini (self-signed) — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection": "sertifikat situsnya sudah kedaluwarsa — pemiliknya harus memperbaruinya; browser hanya bisa membukanya kalau jaringamu mencegat koneksinya",
   "the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension": "server media situs itu menolak permintaan yang bukan dari halamannya — buka videonya di browser lalu pilih stream di sana, atau pakai ekstensi",
+  "the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it": "situs tidak mengirim sertifikat perantara yang membuktikan rantainya, jadi tidak bisa diverifikasi — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",
   "the site never answered in time — check the connection and retry": "situs tidak menjawab tepat waktu — periksa koneksi lalu coba lagi",
@@ -1040,8 +1041,10 @@ function humanErr(s, detail, url) {
     // certificates are the site's own doing — say which one it is.
     if (/has expired|expired certificate|certificate expired/i.test(s))
       return t("the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection");
-    if (/self-signed|local issuer|unknown ca|unable to verify/i.test(s))
+    if (/self-signed/i.test(s))
       return t("the site presents a certificate this device does not trust (self-signed) — retry with certificate checks off if you trust it");
+    if (/local issuer|unknown ca|unable to (get|verify)/i.test(s))
+      return t("the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it");
     if (/hostname|subject name|doesn't match|no alternative certificate/i.test(s))
       return t("the certificate was issued for a different host name — the site's media server is misconfigured");
     return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
@@ -3464,9 +3467,12 @@ function jobRow(j) {
       loose.onclick = async () => {
         loose.disabled = true;
         try {
+          // /jobs/{id}/retry clones the row — headers (the referer the site
+          // demands) included. Building a new job from j.url dropped them,
+          // and the CDN answered /404.html (v0.47.22)
           const overrides = { ...(j.overrides || {}), no_check_certificates: true };
-          await api("/jobs", { method: "POST",
-            body: JSON.stringify({ url: j.url, overrides }) });
+          await api(`/jobs/${j.id}/retry`, { method: "POST",
+            body: JSON.stringify({ overrides }) });
           refreshJobs();
         } catch (e) {
           toast(t("retry failed: {msg}", { msg: e.message }), "bad");

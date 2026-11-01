@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.22",
+        "title": "The redo",
+        "items": [
+            "\"Retry without certificate check\" now keeps the page the link came from — without it the site refused the file again and the row looked like it had not changed.",
+            "The in-app browser can start a video after you tap play even when the page's player calls play() from its own script, which Android's WebView blocks by default.",
+            "An incomplete certificate chain is no longer called \"self-signed\": they are different problems with different fixes.",
+        ],
+    },
+    {
         "version": "0.47.21",
         "title": "The layer",
         "items": [
@@ -83,13 +92,6 @@ ENTRIES = [
         "title": "The whole",
         "items": [
             "On a machine without ffmpeg the default pick is now the best stream that is already whole, instead of a video+audio pair it could never join — and a Homebrew ffmpeg is found even when the app was opened from Finder.",
-        ],
-    },
-    {
-        "version": "0.47.11",
-        "title": "The sheet",
-        "items": [
-            "The extension's engine page — where the address and token go — now looks like the app it belongs to, with Show/Hide on the token. The browser extension is 0.5.19.",
         ],
     },
 ]
