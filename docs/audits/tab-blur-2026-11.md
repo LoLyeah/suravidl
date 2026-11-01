@@ -67,3 +67,30 @@ never fade, contents do. `.tab-in > :not(.card):not(.transport):not(.bins)`,
 panel and card are both at opacity 1, the card still reports
 `blur(14px) saturate(1.15)`, its first child is mid-`contentIn`, and no
 ancestor of a glass plate is below opacity 1.
+
+## The blink (v0.47.26 "the once")
+
+Reported the day 0.47.25 shipped: "the button is blinking after switching tabs."
+
+`contentIn` was correct; its LIFETIME was not. `.tab-in` stayed on the panel
+for ever, so it was a standing rule and any node created inside the panel
+later started the fade again from opacity 0. The queue rebuilds its chips and
+action buttons on the 1.2 s poll — measured with a MutationObserver on
+`#panel-queue` over five seconds: `DIV.qstate` 80 mutations, `BUTTON.btn sm`
+50, `BUTTON.btn sm pick` 10. A/B in the running app, rebuilding one direct
+child: with `.tab-in` pinned it comes back as `contentIn` at opacity 0; with
+the class cleared, `none` at opacity 1.
+
+Argon's pass (same skill, "use Argon high") also caught a defect in the
+selector itself: `#subLink` is a `.subpanel` that wraps `.paste-card` and the
+transport, and `.tab-in > :not(.card):not(.transport):not(.bins)` matched it —
+so on the Download tab the arrival faded a GLASS ancestor and re-created the
+backdrop root one level down (measured: wrapper at opacity .847 mid-arrival).
+It refuted the obvious suspects with the child combinator: `#probeBtn` and the
+queue row buttons are grandchildren of a card, not direct children, so they
+never matched.
+
+Fixes: the class lives only for the arrival (`animationend` or `motionMs(180)`,
+whichever first, with a sequence guard); `.subpanel` is excluded and its own
+non-card children animate instead; and `renderBins()` no longer re-creates the
+filed rail's buttons unless the list actually changed.

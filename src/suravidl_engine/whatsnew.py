@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.26",
+        "title": "The once",
+        "items": [
+            "The tab arrival now plays once. A button inside the queue no longer blinks every second — its rebuild, not the fade, was what you were seeing.",
+        ],
+    },
+    {
         "version": "0.47.25",
         "title": "The dissolve",
         "items": [
@@ -84,13 +91,6 @@ ENTRIES = [
         "items": [
             "The phone build's new guard stopped its own release: it looked for a string every build carries. It now looks only for the downloader's own code, so the update installs again.",
             "Impersonation now refuses honestly: if the installed curl_cffi is a version yt-dlp cannot use, Settings says so instead of failing at download time.",
-        ],
-    },
-    {
-        "version": "0.47.15",
-        "title": "The spare",
-        "items": [
-            "The phone no longer carries the desktop's ffmpeg downloader at all — its ffmpeg already sits inside the app, so that part was only ever useful on a Mac or a PC.",
         ],
     },
 ]

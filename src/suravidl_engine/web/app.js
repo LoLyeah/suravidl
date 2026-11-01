@@ -3915,6 +3915,12 @@ function renderBins(list) {
   const filed = (list || []).filter((j) => j.status === "completed");
   const count = $("binsCount");
   if (count) count.textContent = filed.length ? String(filed.length) : "";
+  // v0.47.26: this ran on every 1.2s poll and re-created every .bin button,
+  // whether or not anything had been filed — glass surfaces re-composited
+  // once a second for nothing. Rebuild only when the rail really changed.
+  const sig = filed.slice(0, 8).map((j) => j.id + "|" + (j.title || "")).join("~");
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
   box.replaceChildren();
   if (!filed.length) {
     box.append(el("div", "bins-empty muted small",
@@ -5294,11 +5300,7 @@ function showSettingsTab(name) {
   if (ps) ps.dataset.stab = name;   // the Save strip retires on the Device tab
   // v0.37.1: the swap dresses itself — the sub-tabs were the only navigation
   // in the app with no transition at all (2026-09-30); a re-tap doesn't re-run
-  if (incoming && !wasOn) {
-    incoming.classList.remove("spanel-in");
-    void incoming.offsetWidth;   // restart the fade on a rapid re-switch
-    incoming.classList.add("spanel-in");
-  }
+  if (incoming && !wasOn) markArrival(incoming, "spanel-in");
 }
 /* The sub-tabs follow the same APG pattern as the main deck (v0.44.x audit:
    they carried aria-selected only — one tab stop and arrow moves were
@@ -5334,6 +5336,27 @@ syncStabTabs();
 /* ---------- the shell: four tabs, hash-routed ---------- */
 const TABS = ("download queue settings ytdlp").split(" ");
 
+/* The arrival is a one-shot. It used to be a class that stayed on the panel
+   for ever, and the queue rebuilds its chips and action buttons on every 1.2 s
+   poll — so each new button started `contentIn` again from opacity 0 and the
+   controls blinked for as long as you stayed on the tab (2026-11-01 report:
+   "the button is blinking after switching tabs"). The class now lives only for
+   the length of the arrival: whichever ends first, the last child's animation
+   or a timer, takes it off — and a seq guard keeps a stale timer or a late
+   animationend from stripping a newer arrival. */
+function markArrival(panel, cls) {
+  const seq = (panel._arrivalSeq = (panel._arrivalSeq || 0) + 1);
+  panel.classList.remove(cls);
+  void panel.offsetWidth;            // restart on a rapid re-switch
+  panel.classList.add(cls);
+  clearTimeout(panel._arrivalT);
+  const done = () => { if (panel._arrivalSeq === seq) panel.classList.remove(cls); };
+  panel.addEventListener("animationend", done, { once: true });
+  // motionMs: under reduced motion the CSS duration is .001s, so the timer is
+  // 0 — the class must not sit on the panel for a quarter of a second either
+  panel._arrivalT = setTimeout(done, motionMs(180));
+}
+
 function showTab(name, opts) {
   const target = TABS.includes(name) ? name : "download";
   const current = document.body.dataset.tab;
@@ -5352,11 +5375,7 @@ function showTab(name, opts) {
   const switching = !!(incoming && current && current !== target &&
     !panels.filter((p) => !p.classList.contains("hidden")).includes(incoming));
   panels.forEach((p) => p.classList.toggle("hidden", p !== incoming));
-  if (switching) {
-    incoming.classList.remove("tab-in");
-    void incoming.offsetWidth;   // restart the fade on a rapid re-switch
-    incoming.classList.add("tab-in");
-  }
+  if (switching) markArrival(incoming, "tab-in");
   TABS.forEach((tab) => {
     document.querySelectorAll(`#tabs .tab[data-tab="${tab}"]`).forEach((b) => {
       b.classList.toggle("active", tab === target);

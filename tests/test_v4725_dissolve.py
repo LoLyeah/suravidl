@@ -25,13 +25,9 @@ CSS = re.sub(r"/\*.*?\*/", "", CSS_RAW, flags=re.S)
 JS = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.47.25"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the dissolve"
+def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    for item in ENTRIES[0]["items"]:
-        assert 0 < len(item) <= 220
+    assert any(e["title"].lower() == "the dissolve" for e in ENTRIES)
 
 
 def test_no_plate_is_faded():
@@ -74,5 +70,5 @@ def test_no_retained_animation_fill():
 
 
 def test_the_switch_still_marks_the_arrival():
-    assert 'incoming.classList.add("tab-in")' in JS
+    assert 'markArrival(incoming, "tab-in")' in JS   # one-shot since v0.47.26
     assert "spanel-in" in JS

@@ -150,7 +150,8 @@ def test_settings_subtabs_swap_with_a_transition():
     assert "opacity" in blk and "transform" not in blk
     seg = APP.split("function showSettingsTab(")[1].split("/* ---------- the shell")[0]
     assert '"spanel-in"' in seg
-    assert "offsetWidth" in seg, "rapid re-taps need the fade restarted"
+    assert 'markArrival(incoming, "spanel-in")' in seg, \
+        "the arrival is a one-shot (v0.47.26); it restarts itself on a rapid re-tap"
 
 
 # --- found on the way ------------------------------------------------------

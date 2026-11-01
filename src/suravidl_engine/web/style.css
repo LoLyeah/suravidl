@@ -390,7 +390,13 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
    was spent in two frames at e-out. So: cards, the transport and the panel
    stay at opacity 1 for the whole switch, and only the words and controls
    inside them dissolve in. The frost never has a reason to blink. */
-.tab-in > :not(.card):not(.transport):not(.bins),
+/* v0.47.26: the sub-panels are wrappers — #subLink holds the paste card AND
+   the transport. Animating one faded a GLASS ancestor and re-created the
+   backdrop root we had just removed at the panel level (measured: the wrapper
+   at opacity .847 mid-arrival). So a sub-panel is never animated itself; its
+   own non-card children are. */
+.tab-in > :not(.card):not(.transport):not(.bins):not(.subpanel),
+.tab-in > .subpanel > :not(.card):not(.transport),
 .tab-in .card > *,
 .spanel-in > :not(.card),
 .spanel-in .card > * {
