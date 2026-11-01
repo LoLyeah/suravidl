@@ -36,9 +36,10 @@ def _block(marker, text=CSS):
 def test_ancestor_fades_do_not_retain():
     """fill: none — a finished fade that keeps filling roots the subtree,
     and Chromium then refuses every backdrop-filter beneath it."""
-    for rule in (".tab-in { animation: tabIn var(--t-fast) var(--e-out) none; }",
-                 ".spanel-in { animation: spanelIn var(--t-fast) var(--e-out) none; }"):
-        assert rule in CSS
+    # v0.47.24: the arrival moved to a ::after wash; the no-retained-fill law
+    # is the one this test has always guarded, and it holds on the new rule
+    assert "animation: tabWash var(--t-fast) var(--e-out) none" in CSS
+    assert "animation: spanelWash var(--t-fast) var(--e-out) none" in CSS
     ov = _block(".overlay {")
     assert "fade var(--t-base) var(--e-out) none" in ov
     assert "backdrop-filter" not in ov          # still the frostless stage

@@ -197,10 +197,11 @@ def test_a_tab_change_fades_through_instead_of_switching_abruptly():
     screen only STARTED arriving once the old one had finished leaving.
     v0.37.3 made the arrival opacity-only: a transform on the panel makes it
     a containing block for its `position: fixed` transport (stuck-bar)."""
-    assert ".tab-in { animation: tabIn var(--t-fast) var(--e-out) none; }" in CSS
+    assert ".tab-in { position: relative; }" in CSS
+    assert ".tab-in::after" in CSS and "animation: tabWash" in CSS
     assert ".tab-out" not in CSS and "@keyframes tabOut" not in CSS, \
         "the swap waits on an exit again"
-    into = _block("@keyframes tabIn")
+    into = _block("@keyframes tabWash")
     assert "opacity" in into
     assert "transform" not in into, \
         "a transform arrival re-anchors the panel's fixed transport (v0.37.3)"

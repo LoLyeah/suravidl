@@ -302,7 +302,7 @@ def test_the_receipt_survives_a_poll_rebuild():
 def test_the_subtab_arrival_drops_its_transform():
     """A transform on the panel makes it a containing block for the fixed
     transport — the exact v0.37.3 tabIn law, overlooked for spanelIn."""
-    assert "@keyframes spanelIn { from { opacity: 0; } }" in CSS
+    assert "@keyframes spanelWash { from { opacity: .45; } to { opacity: 0; } }" in CSS
     assert "translateY(3px)" not in CSS
 
 

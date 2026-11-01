@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.24",
+        "title": "The wash",
+        "items": [
+            "Switching tabs no longer blanks the frosted blur for the length of the fade and snaps it back at the end — the arrival is a wash that clears while the glass keeps its blur.",
+        ],
+    },
+    {
         "version": "0.47.23",
         "title": "The report",
         "items": [
@@ -86,13 +93,6 @@ ENTRIES = [
             "An update is now installed only when it is signed by the same key as the app you already have — a hijacked download can no longer hand Android a different app.",
             "The in-app browser no longer treats two different sites under co.uk, com.au, github.io and friends as one site, and a downloaded file can only be handed to another app from the downloads folder.",
             "On the phone, Settings no longer offers an ffmpeg download that could never work there — the app already carries its own.",
-        ],
-    },
-    {
-        "version": "0.47.13",
-        "title": "The fetch",
-        "items": [
-            "ffmpeg is no longer something you have to know about: Settings shows whether one is reachable and downloads a pinned static build when it isn't — the join video+audio step and every audio conversion need it.",
         ],
     },
 ]

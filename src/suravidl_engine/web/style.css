@@ -371,8 +371,28 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
    FAQ cards were all dead frosts; stripe-tile variance rigs caught it —
    9021 -> 1475 the moment this flipped). No-delay fades look identical
    with fill: none; only the lingering root goes away. */
-.tab-in { animation: tabIn var(--t-fast) var(--e-out) none; }
-@keyframes tabIn { from { opacity: 0; } }
+/* v0.47.24: and the SAME rule applies while the animation runs, not just
+   after it. Any ancestor at opacity < 1 is a backdrop root for its whole
+   fade, so every .card beneath the panel went flat for --t-fast and the
+   frost snapped back at the end ("the blur is gone and then abruptly
+   appears"). Measured in Chrome: a glass card over a striped backdrop has
+   edge energy 0.24 while it can blur, and 52.19 the moment an ancestor sits
+   at opacity .5 — will-change, translateZ and isolation do not help, the
+   spec forbids it. So the arrival is a WASH: a pseudo-element painted over
+   the panel (a child, never an ancestor of the cards) clears from 45% to
+   nothing. No transform (v0.37.3: it re-anchors the fixed transport), no
+   retained fill (v0.45.11). */
+.tab-in { position: relative; }
+.tab-in::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--bg); border-radius: inherit; opacity: 0;
+  z-index: 1;                    /* above the cards: a veil, not a underlay */
+  animation: tabWash var(--t-fast) var(--e-out) none;
+}
+/* the `to` is not optional: with only a `from`, the end state is the
+   element's own opacity (1) and the "wash" would settle as an opaque slab
+   over the panel — the exact opposite of a fade */
+@keyframes tabWash { from { opacity: .45; } to { opacity: 0; } }
 
 /* ---------- layout: bins rail + the deck ---------- */
 main { display: block; padding: 18px 20px 110px; }
@@ -1213,9 +1233,17 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 /* sub-tab swaps dress like the big ones — they were the only navigation in
    the app with no transition at all (2026-09-30). v0.39.12: opacity-only,
    the tabIn law — a transform here is a containing block for the panel's
-   fixed transport for the length of the fade (the audit found it) */
-.spanel-in { animation: spanelIn var(--t-fast) var(--e-out) none; }
-@keyframes spanelIn { from { opacity: 0; } }
+   fixed transport for the length of the fade (the audit found it).
+   v0.47.24: and opacity on the ancestor is the very thing that blanks the
+   frost beneath it, so the sub-tabs get the wash as well. */
+.spanel-in { position: relative; }
+.spanel-in::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--bg); border-radius: inherit; opacity: 0;
+  z-index: 1;
+  animation: spanelWash var(--t-fast) var(--e-out) none;
+}
+@keyframes spanelWash { from { opacity: .45; } to { opacity: 0; } }
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
    corners (it used to be an opaque slab that squared them off) */
