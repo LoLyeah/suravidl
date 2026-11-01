@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.25",
+        "title": "The dissolve",
+        "items": [
+            "Tab switches now leave the frosted plates alone and dissolve only what sits on them: the blur never blinks, and the pinned bars no longer stay bright while everything else fades.",
+        ],
+    },
+    {
         "version": "0.47.24",
         "title": "The wash",
         "items": [
@@ -84,15 +91,6 @@ ENTRIES = [
         "title": "The spare",
         "items": [
             "The phone no longer carries the desktop's ffmpeg downloader at all — its ffmpeg already sits inside the app, so that part was only ever useful on a Mac or a PC.",
-        ],
-    },
-    {
-        "version": "0.47.14",
-        "title": "The seal",
-        "items": [
-            "An update is now installed only when it is signed by the same key as the app you already have — a hijacked download can no longer hand Android a different app.",
-            "The in-app browser no longer treats two different sites under co.uk, com.au, github.io and friends as one site, and a downloaded file can only be handed to another app from the downloads folder.",
-            "On the phone, Settings no longer offers an ffmpeg download that could never work there — the app already carries its own.",
         ],
     },
 ]

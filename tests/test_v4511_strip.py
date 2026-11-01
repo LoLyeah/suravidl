@@ -38,8 +38,7 @@ def test_ancestor_fades_do_not_retain():
     and Chromium then refuses every backdrop-filter beneath it."""
     # v0.47.24: the arrival moved to a ::after wash; the no-retained-fill law
     # is the one this test has always guarded, and it holds on the new rule
-    assert "animation: tabWash var(--t-fast) var(--e-out) none" in CSS
-    assert "animation: spanelWash var(--t-fast) var(--e-out) none" in CSS
+    assert "animation: contentIn var(--t-fast) var(--e-out) none" in CSS
     ov = _block(".overlay {")
     assert "fade var(--t-base) var(--e-out) none" in ov
     assert "backdrop-filter" not in ov          # still the frostless stage

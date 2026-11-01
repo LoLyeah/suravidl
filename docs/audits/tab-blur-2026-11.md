@@ -38,3 +38,32 @@ ancestor of the glass.
   brightness 27.9 at 10 ms vs 33.6 at 140 ms (the veil clears).
 - Pinned by `tests/test_v4724_wash.py` (no opacity animation on panels, wash
   shape, no retained fill).
+
+## Second pass: Argon high (rejected v0.47.24's wash)
+
+Run through agy's own `argon-subagent` skill ("use Argon high"), in a clone,
+asked to be adversarial about the wash. Verdict: reject. The objections that
+survived checking against this tree:
+
+- **Punch-through.** The transport is `z-index: 30` (`style.css:836`), the save
+  strip `3` (`:1260`); the veil was `1` — pinned furniture stayed bright while
+  the cards dimmed.
+- **Wrong colour.** The veil was `var(--bg)`; over white cards in the light
+  theme (`--bg: #e7e4de`) that is a beige film, and in Settings `.spanel` sits
+  inside a card, so `spanelWash` painted page background into the card.
+- **Spent in two frames.** With `--t-fast` (.14 s) and e-out the veil measured
+  .45 / .12 / .03 at 0/35/70 ms — a luminance stutter, not an arrival.
+- `border-radius: inherit` on a panel with no radius resolves to 0.
+
+Refuted from the same report: "`.tab-in` is never removed" is harmless — the
+wash rests at `opacity: 0`, and the class is removed and re-added on the next
+switch; and "tests/test_v4724_wash.py does not exist" was true only because
+the clone predated the commit.
+
+**v0.47.25 "the dissolve"** takes its structural advice, not its code: plates
+never fade, contents do. `.tab-in > :not(.card):not(.transport):not(.bins)`,
+`.tab-in .card > *` and the `.spanel-in` equivalents animate `contentIn`
+(from opacity 0) over `--t-fast`. Verified in Chrome: during the switch the
+panel and card are both at opacity 1, the card still reports
+`blur(14px) saturate(1.15)`, its first child is mid-`contentIn`, and no
+ancestor of a glass plate is below opacity 1.

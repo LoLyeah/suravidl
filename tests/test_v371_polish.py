@@ -121,11 +121,10 @@ def test_the_tab_swap_starts_immediately_and_lands_in_a_beat():
     # v0.47.24: the arrival is a wash on the panel's ::after, not an opacity
     # animation on the panel itself (that made it a backdrop root and killed
     # every backdrop-filter beneath it for the length of the fade)
-    assert ".tab-in { position: relative; }" in CSS
-    assert ".tab-in::after" in CSS
-    into = _block("@keyframes tabWash")
+    # v0.47.25: the plates never fade — only their contents dissolve in
+    assert ".tab-in > :not(.card)" in CSS
+    into = _block("@keyframes contentIn")
     assert "opacity" in into
-    assert "to { opacity: 0" in into, "a `from` alone settles as an opaque slab"
     assert "transform" not in into, \
         "a transform arrival re-anchors the panel's fixed transport (v0.37.3)"
     assert "height" not in into and "max-height" not in into
@@ -144,8 +143,8 @@ def test_the_tab_swap_starts_immediately_and_lands_in_a_beat():
 def test_settings_subtabs_swap_with_a_transition():
     """The sub-tabs were the only navigation in the app with no transition;
     the abrupt cut read as a page jump."""
-    assert ".spanel-in::after" in CSS          # the wash (v0.47.24)
-    blk = _block("@keyframes spanelWash")
+    assert ".spanel-in .card > *" in CSS        # contents, not plates
+    blk = _block("@keyframes contentIn")
     # v0.39.12: opacity-only — a transform here re-anchors the panel's fixed
     # transport for the length of the fade (the tabIn law, the audit found it)
     assert "opacity" in blk and "transform" not in blk

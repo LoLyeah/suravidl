@@ -39,7 +39,7 @@ def _block(marker, text=CSS):
 def test_the_tab_arrival_never_transforms_the_panel():
     """A transform on the panel makes it a containing block for fixed
     children — the transport re-anchored to the page and got stuck."""
-    into = _block("@keyframes tabWash")     # v0.47.24: the wash, not the panel
+    into = _block("@keyframes contentIn")   # v0.47.25: the contents, not the panel
     assert "opacity" in into
     assert "transform" not in into
     assert "translateY" not in into

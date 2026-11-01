@@ -24,9 +24,11 @@ AUTH = {"Authorization": "Bearer testtoken"}
 def test_the_notes_still_carry_this_release():
     # the CURRENT version is pinned by the newest release's test; this one
     # only has to keep its own entry in the rolling ten
+    # v0.47.25 rolled 0.47.14 out of the window; the invariant is the window
+    # itself, and that the shipped titles stay unique
     assert len(ENTRIES) == 10, "the card shows ten releases; retire the oldest"
-    assert any(e["version"] == "0.47.14" and e["title"].lower() == "the seal"
-               for e in ENTRIES)
+    titles = [e["title"].lower() for e in ENTRIES]
+    assert len(titles) == len(set(titles))
 
 
 def test_android_is_not_a_linux_desktop(monkeypatch):

@@ -382,17 +382,21 @@ header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .2px; 
    the panel (a child, never an ancestor of the cards) clears from 45% to
    nothing. No transform (v0.37.3: it re-anchors the fixed transport), no
    retained fill (v0.45.11). */
-.tab-in { position: relative; }
-.tab-in::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: var(--bg); border-radius: inherit; opacity: 0;
-  z-index: 1;                    /* above the cards: a veil, not a underlay */
-  animation: tabWash var(--t-fast) var(--e-out) none;
+/* v0.47.25: the plate never fades — its CONTENTS do. Fading the panel put
+   the glass under an opacity < 1 ancestor (a backdrop root: measured 0.24 vs
+   52.19 edge energy), and a veil painted over the panel was worse than the
+   pop it replaced — it punched under the pinned transport (z-index 30) and
+   the save strip (3), flashed beige over white cards in the light theme, and
+   was spent in two frames at e-out. So: cards, the transport and the panel
+   stay at opacity 1 for the whole switch, and only the words and controls
+   inside them dissolve in. The frost never has a reason to blink. */
+.tab-in > :not(.card):not(.transport):not(.bins),
+.tab-in .card > *,
+.spanel-in > :not(.card),
+.spanel-in .card > * {
+  animation: contentIn var(--t-fast) var(--e-out) none;
 }
-/* the `to` is not optional: with only a `from`, the end state is the
-   element's own opacity (1) and the "wash" would settle as an opaque slab
-   over the panel — the exact opposite of a fade */
-@keyframes tabWash { from { opacity: .45; } to { opacity: 0; } }
+@keyframes contentIn { from { opacity: 0; } }
 
 /* ---------- layout: bins rail + the deck ---------- */
 main { display: block; padding: 18px 20px 110px; }
@@ -1236,14 +1240,7 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
    fixed transport for the length of the fade (the audit found it).
    v0.47.24: and opacity on the ancestor is the very thing that blanks the
    frost beneath it, so the sub-tabs get the wash as well. */
-.spanel-in { position: relative; }
-.spanel-in::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: var(--bg); border-radius: inherit; opacity: 0;
-  z-index: 1;
-  animation: spanelWash var(--t-fast) var(--e-out) none;
-}
-@keyframes spanelWash { from { opacity: .45; } to { opacity: 0; } }
+/* the sub-tabs ride the same rule (see the tab-in law above) */
 
 /* the Save strip: sticky, and it keeps the card's glass and its bottom
    corners (it used to be an opaque slab that squared them off) */
