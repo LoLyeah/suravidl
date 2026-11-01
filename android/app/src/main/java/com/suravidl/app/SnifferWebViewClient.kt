@@ -1,7 +1,7 @@
 package com.suravidl.app
 
 import android.graphics.Bitmap
-import android.net.http.SslErrorHandler
+import android.webkit.SslErrorHandler
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
