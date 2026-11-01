@@ -1886,6 +1886,20 @@ class JobManager:
             else:
                 job["status"] = "error"
                 job["error"] = explain_download_error(str(e))
+                # name the layer that broke, not just the symptom (v0.47.21)
+                raw = str(e).lower()
+                if any(k in raw for k in ("timed out", "timeout", "connection",
+                                          "name or service", "resolve", "refused",
+                                          "ssl", "certificate", "network",
+                                          "no route", "unreachable")):
+                    try:
+                        from .diagnose import note_for
+
+                        note = note_for(job["url"], timeout=4.0)
+                        if note:
+                            job["note"] = note
+                    except Exception:  # noqa: BLE001 - a probe must never fail a job
+                        pass
         finally:
             if hls is not None:
                 hls.stop()

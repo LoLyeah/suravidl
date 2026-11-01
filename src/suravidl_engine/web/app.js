@@ -3483,6 +3483,13 @@ function jobRow(j) {
       row.append(el("div", "jobhint",
         t("This step needs ffmpeg. Use “keep original” for audio-only, or install ffmpeg.")));
     }
+    if (j.note) {
+      // the engine's own probe of the failure: which layer broke (v0.47.21)
+      const hint = el("div", "jobhint");
+      hint.append(ico("info"));
+      hint.append(document.createTextNode(j.note));
+      row.append(hint);
+    }
   } else if (j.filepath) {
     const r = el("div", "jrow");
     r.append(el("span", "path", j.filepath));

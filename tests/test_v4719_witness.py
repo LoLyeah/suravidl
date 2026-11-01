@@ -23,12 +23,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
-def test_the_notes_name_this_release():
-    # 0.47.19 never published (the macOS image was retired mid-cut), so the
-    # notes ship under 0.47.20 — the number that has a release
-    assert __version__ == "0.47.20"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the witness"
+def test_the_notes_still_carry_this_release():
+    # 0.47.19 never published (the macOS image was retired mid-cut); its
+    # notes shipped under 0.47.20, and the current version is pinned by the
+    # newest release's test
+    assert len(ENTRIES) == 10
+    assert any(e["version"] == "0.47.20" and e["title"].lower() == "the witness"
+               for e in ENTRIES)
     assert len(ENTRIES) == 10
     for item in ENTRIES[0]["items"]:
         assert 0 < len(item) <= 220

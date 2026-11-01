@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.21",
+        "title": "The layer",
+        "items": [
+            "A failed download now names the layer that broke — the name does not resolve, the port refused, the handshake failed, or the server accepted and stalled — instead of only \"the site never answered in time\".",
+        ],
+    },
+    {
         "version": "0.47.20",
         "title": "The witness",
         "items": [
@@ -83,13 +90,6 @@ ENTRIES = [
         "title": "The sheet",
         "items": [
             "The extension's engine page — where the address and token go — now looks like the app it belongs to, with Show/Hide on the token. The browser extension is 0.5.19.",
-        ],
-    },
-    {
-        "version": "0.47.10",
-        "title": "The trim",
-        "items": [
-            "A finished row says COMPLETED once — the FILED stamp repeated it on exactly the same rows. And the red dot beside YouTube rows is gone: the host is already printed in the line.",
         ],
     },
 ]
