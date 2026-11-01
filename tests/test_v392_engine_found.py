@@ -74,11 +74,24 @@ def test_the_engine_port_ladder_is_fixed():
 
 
 def test_a_full_ladder_falls_back_to_any_free_port():
+    """CI once handed back a port from inside the ladder: `_blocked` had
+    silently failed on one of them (the port was grabbed between `_free_port`
+    and the bind), so the "full" ladder was not full and the assertion was
+    about a port the engine was right to use. Block a whole ladder or move on.
+    """
     from suravidl_engine.__main__ import _port_candidates, find_free_port
 
-    base = _free_port()
-    occupied = [base + i for i in range(len(_port_candidates(base)))]
-    blockers = [_blocked(p) for p in occupied]
+    blockers, occupied = [], []
+    for _ in range(6):
+        base = _free_port()
+        occupied = [base + i for i in range(len(_port_candidates(base)))]
+        blockers = [_blocked(p) for p in occupied]
+        if all(blockers):
+            break
+        for b in blockers:
+            if b:
+                b.close()
+    assert all(blockers), "could not block a whole ladder on this box"
     try:
         chosen = find_free_port(base)
         assert chosen not in occupied, "the ladder is full: anywhere free is honest"
