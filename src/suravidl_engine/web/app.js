@@ -952,6 +952,9 @@ const ACTIVE = new Set(["queued", "downloading", "merging"]);
 const QUEUE_BUCKETS = {
   filed: ["completed"],
   error: ["error", "interrupted"],
+  // stopped, not running: a cancelled or paused row used to fall through to
+  // "active" and claim the amber running lamp (v0.47.31 audit)
+  stopped: ["cancelled", "paused"],
 };
 let QFILTER = "all";   // session-only: a filter that survives a reload is a trap
 let DESKTOP = false;
@@ -1002,13 +1005,13 @@ function humanErr(s, detail, url) {
     // flow a downloader never gets); fetching one returns the 404 that
     // this arm used to misread as "you copied it wrong" (2026-10-10).
     if (/reddit\.com\/[^\s"']*\/s\//i.test(String(url || "") + " " + s))
-      return "Reddit share links (“/s/” shortcuts) only open in a browser — open it once, copy the full address (it becomes /r/…/comments/…), and paste that";
-    return "the site says this link does not exist (404) — check it was copied whole";
+      return t("Reddit share links (“/s/” shortcuts) only open in a browser — open it once, copy the full address (it becomes /r/…/comments/…), and paste that");
+    return t("the site says this link does not exist (404) — check it was copied whole");
   }
   if (/HTTP Error 403|forbidden/i.test(s))
-    return "the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this";
+    return t("the site refused the request (403) — sign-in cookies or the Impersonate setting often fix this");
   if (/HTTP Error 429|too many requests/i.test(s))
-    return "the site is rate-limiting this address (429) — wait a bit, then try once more";
+    return t("the site is rate-limiting this address (429) — wait a bit, then try once more");
   if (/\/404\.html|hotlink|referer|referrer/i.test(s)) {
     // the CDN answers a bare request with a redirect to its 404 page: the
     // stream only exists for requests that come from the page (v0.47.19)
@@ -1024,11 +1027,13 @@ function humanErr(s, detail, url) {
       : t("no extractor knows this page — play it in your browser, then hand the stream over with the extension");
   }
   if (/\bsign[ -]?in\b|\blog[ -]?in\b|login required|private video|\bage\b/i.test(s))
-    return "the site wants a signed-in session — load cookies in Settings → Authentication";
+    return t("the site wants a signed-in session — load cookies in Settings → Authentication");
   if (/encoder not found/i.test(s))
-    return "the phone's ffmpeg can't convert subtitles for this container — set Subtitles to \u201csidecar\u201d in Settings or use the MKV container, then retry";
+    return t("the phone's ffmpeg can't convert subtitles for this container — set Subtitles to \u201csidecar\u201d in Settings or use the MKV container, then retry");
+  if (/no space left|errno 28|disk (is )?full|not enough (free )?space/i.test(s))
+    return t("your device is out of storage — free some space (Settings → Storage shows what is using it), then retry");
   if (/timed? ?out|timeout/i.test(s))
-    return "the site never answered in time — check the connection and retry";
+    return t("the site never answered in time — check the connection and retry");
   // local/network failures had no arm, so the fallback echoed the raw line
   // into the "human" slot — the queue showed the same red sentence twice
   // (queue critique, 2026-10-11)
@@ -1048,12 +1053,12 @@ function humanErr(s, detail, url) {
       return t("the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it");
     if (/hostname|subject name|doesn't match|no alternative certificate/i.test(s))
       return t("the certificate was issued for a different host name — the site's media server is misconfigured");
-    return "the secure connection could not be verified — a TLS-inspecting proxy can cause this";
+    return t("the secure connection could not be verified — a TLS-inspecting proxy can cause this");
   }
   if (/unable to embed using|embed thumbnail/i.test(s))
-    return "the thumbnail could not be embedded — this phone's ffmpeg cannot read its image format; the video itself is fine";
+    return t("the thumbnail could not be embedded — this phone's ffmpeg cannot read its image format; the video itself is fine");
   if (/ffmpeg/i.test(s))
-    return "the last step needs ffmpeg — audio “keep original” avoids the conversion";
+    return t("the last step needs ffmpeg — audio “keep original” avoids the conversion");
   const line = s.split("\n")[0];
   return line.length > 140 ? line.slice(0, 140) + "…" : (line || "the download failed");
 }
@@ -2485,7 +2490,7 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
     PLAYLIST_NONE = false;
     toast((playlist ? t("Playlist added to downloads")
                     : t("Added to downloads")) + note, "info");
-    refreshJobs();
+    pollNow();
     return true;
   } catch (e) {
     toast(t("could not start download: {msg}", { msg: e.message }), "bad");
@@ -3001,7 +3006,7 @@ function renderQueueActions(jobs) {
   const filed = list.filter((j) => QUEUE_BUCKETS.filed.includes(j.status)).length;
   // v0.46.7 "the brief": the queue answers its own question before you
   // scroll — counts on the chips and one mono state line (critique round 2)
-  const counts = { all: list.length, active: 0, filed: 0, error: 0 };
+  const counts = { all: list.length, active: 0, filed: 0, error: 0, stopped: 0 };
   for (const j of list) counts[queueBucket(j.status)] += 1;
   const filters = $("queueFilters");
   if (filters) {
@@ -3019,12 +3024,19 @@ function renderQueueActions(jobs) {
       : [t("nothing running"), "dim"]);
     if (counts.filed) parts.push([t("{n} filed", { n: counts.filed }), "green"]);
     if (counts.error) parts.push([t("{n} failed", { n: counts.error }), "rose"]);
-    st.replaceChildren();
-    parts.forEach(([text, tone], i) => {
-      if (i) st.append(el("span", "qsep", "\u00b7"));
-      st.append(el("span", "sdot " + tone));
-      st.append(el("span", "", text));
-    });
+    if (counts.stopped) parts.push([t("{n} stopped", { n: counts.stopped }), "dim"]);
+    // a poll that found the same numbers must not rebuild these nodes every
+    // 1.2s (the bins rail got the same guard in v0.47.26)
+    const sig = parts.map(([text, tone]) => tone + ":" + text).join("|");
+    if (st.dataset.sig !== sig) {
+      st.dataset.sig = sig;
+      st.replaceChildren();
+      parts.forEach(([text, tone], i) => {
+        if (i) st.append(el("span", "qsep", "\u00b7"));
+        st.append(el("span", "sdot " + tone));
+        st.append(el("span", "", text));
+      });
+    }
   }
   const box = $("queueActions");
   if (!box) return;
@@ -3780,6 +3792,7 @@ function updateJobRow(row, j) {
 function queueBucket(status) {
   if (QUEUE_BUCKETS.filed.includes(status)) return "filed";
   if (QUEUE_BUCKETS.error.includes(status)) return "error";
+  if (QUEUE_BUCKETS.stopped.includes(status)) return "stopped";
   return "active";
 }
 
@@ -4000,6 +4013,8 @@ function renderBins(list) {
   }
 }
 
+let JOBS_ACTIVE_NOW = false;   // did the last poll see work in flight?
+
 async function refreshJobs() {
   if (document.hidden) return;   // a hidden page keeps its last snapshot;
   // the visibilitychange below re-syncs the moment it is looked at again
@@ -4010,6 +4025,7 @@ async function refreshJobs() {
     const { jobs } = await api("/jobs");
     if (seq !== JOBS_SEQ) return;
     JOBS_FAILS = 0;
+    JOBS_ACTIVE_NOW = jobs.some((j) => ACTIVE.has(j.status));
     renderQueueBadge(jobs);
     renderQueueActions(jobs);
     const box = $("jobs");
@@ -4029,7 +4045,7 @@ async function refreshJobs() {
     // first landed three rose rows above the two finished takes)
     const rank = (j) => {
       const b = queueBucket(j.status);
-      return b === "active" ? 0 : b === "filed" ? 1 : 2;
+      return b === "active" ? 0 : b === "filed" ? 1 : b === "stopped" ? 2 : 3;
     };
     const list = jobs.sort((a, b) => {
       const d = rank(a) - rank(b);
@@ -5486,6 +5502,9 @@ syncTabA11y();
 function syncStartState() {
   const empty = !$("url").value.trim();
   $("bestBtn").disabled = empty;
+  // the Forecourt Rule: an empty box means the start controls are not live
+  // (Download now arrived in v0.47.28 without it and scolded instead)
+  if ($("quickBtn")) $("quickBtn").disabled = empty;
 }
 $("url").addEventListener("input", syncStartState);
 syncStartState();
@@ -5744,6 +5763,18 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("confirmModal").classList.contains("hidden")) {
     return;   // the confirm dialog handles its own Escape
+  }
+  // any other dialog answers Escape here, generically: #diagModal used to be
+  // missing from the per-modal list, so Escape opened from Settings closed
+  // Settings and left the dialog trapped on screen (v0.47.31 audit)
+  const openCards = [...document.querySelectorAll(".overlay:not(.hidden)")]
+    // the what's-new card records that it was seen when it leaves; the
+    // generic close would hide it without that and it would be back on the
+    // next load, so it keeps its own branch below
+    .filter((m) => m !== $("confirmModal") && m !== $("whatsNewModal"));
+  if (openCards.length) {
+    closeModal(openCards[openCards.length - 1]);
+    return;
   }
   // the player and the folder sheet close themselves on Escape; without
   // these the same press ALSO ran closeSettings() below and yanked a
@@ -6177,7 +6208,20 @@ wireQueueFilters();
   showTab(TABS.includes(want) ? want : "download", { keepScroll: true });
 })();
 refreshJobs();
-setInterval(refreshJobs, 1200);
+/* 1.2s while something is moving, 10s when the queue is still: fifty
+   loopback requests a minute to a sleeping engine is not free on a phone
+   (v0.47.31 audit — the bins rail got the same treatment as a DOM guard). */
+const JOBS_ACTIVE_MS = 1200, JOBS_IDLE_MS = 10000;
+let JOBS_TIMER = null;
+function scheduleJobsPoll(delay) {
+  clearTimeout(JOBS_TIMER);
+  JOBS_TIMER = setTimeout(async () => {
+    try { await refreshJobs(); } catch (e) { /* refreshJobs reports its own */ }
+    scheduleJobsPoll(JOBS_ACTIVE_NOW ? JOBS_ACTIVE_MS : JOBS_IDLE_MS);
+  }, delay);
+}
+function pollNow() { scheduleJobsPoll(0); }
+scheduleJobsPoll(JOBS_ACTIVE_MS);
 
 /* ---------- browser handoffs (v0.39.0) -----------------------------------
    The extension's popup hands a find to the engine; the engine probes it
@@ -6559,6 +6603,22 @@ function initBatch() {
   // paste from Link into Batch instead of letting the probe eat it
   for (const b of document.querySelectorAll(".subbtn")) {
     b.onclick = () => showSub(b.dataset.sub);
+    // WAI-ARIA tabs, like #tabs and #settingsTabs already do: one tab stop,
+    // arrows move between rooms (v0.47.31 audit)
+    b.tabIndex = b.classList.contains("on") ? 0 : -1;
+    b.addEventListener("keydown", (e) => {
+      const list = [...document.querySelectorAll(".subbtn")];
+      const i = list.indexOf(b);
+      let t = null;
+      if (e.key === "ArrowRight") t = list[(i + 1) % list.length];
+      if (e.key === "ArrowLeft") t = list[(i - 1 + list.length) % list.length];
+      if (e.key === "Home") t = list[0];
+      if (e.key === "End") t = list[list.length - 1];
+      if (!t) return;
+      e.preventDefault();
+      t.focus();
+      showSub(t.dataset.sub);
+    });
   }
   if ($("url")) $("url").addEventListener("input", renderMultiHint);
   if ($("multiGoBatch")) {
@@ -6631,6 +6691,7 @@ function showSub(name, opts) {
     if (btn) {
       btn.classList.toggle("on", on);
       btn.setAttribute("aria-selected", on ? "true" : "false");
+      btn.tabIndex = on ? 0 : -1;
     }
   }
   if (!(opts && opts.keepScroll)) scrollTo({ top: 0, behavior: "instant" });

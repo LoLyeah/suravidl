@@ -46,7 +46,8 @@ def test_whats_new_uses_the_dialog_lifecycle():
 
 def test_escape_closes_the_whats_new_card():
     i = APP.find('e.key !== "Escape"')
-    seg = APP[i:i + 1400]     # grew: v0.40.10 player/sheet guards, v0.46.16 the guide
+    # grew again in v0.47.31: the generic "close the topmost overlay" branch
+    seg = APP[i:i + 2000]
     assert "dismissWhatsNew(wnVersion)" in seg
 
 

@@ -38,8 +38,10 @@ def test_the_chips_carry_counts_and_the_state_line_speaks():
 def test_success_leads_and_failures_gather_under_a_caption():
     seg = APP[APP.index("const rank = (j) =>"):]
     seg = seg[:seg.index("renderBins")]
-    assert 'b === "active" ? 0 : b === "filed" ? 1 : 2' in seg, \
-        "running first, then filed, then failures"
+    # v0.47.31: stopped rows (cancelled/paused) sort below filed and above
+    # failures — they are not running and they are not the site's fault
+    assert 'b === "active" ? 0 : b === "filed" ? 1 : b === "stopped" ? 2 : 3' in seg, \
+        "running first, then filed, then stopped, then failures"
     assert '"jgroup"' in APP
     assert "box.insertBefore(g, firstFailed)" in APP
     # the caption hides under any filter but All

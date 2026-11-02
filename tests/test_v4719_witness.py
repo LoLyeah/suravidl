@@ -39,9 +39,12 @@ def test_a_certificate_failure_names_its_cause():
     assert "the site's certificate has expired" in APP
     assert "does not trust (self-signed)" in APP
     assert "issued for a different host name" in APP
-    # the old guess survives only as the last resort
-    proxy = APP.index("a TLS-inspecting proxy can cause this\";")
-    expired = APP.index("the site's certificate has expired")
+    # the old guess survives only as the last resort — inside humanErr, not
+    # in the dictionary block at the top of the file (which quotes it too)
+    body = APP[APP.index("function humanErr"):]
+    body = body[:body.index("\n}\n")]
+    proxy = body.index("a TLS-inspecting proxy can cause this")
+    expired = body.index("the site's certificate has expired")
     assert expired < proxy, "the specific arms must be tried before the guess"
 
 

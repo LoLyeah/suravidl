@@ -18,8 +18,9 @@ JOBS = (ROOT / "src" / "suravidl_engine" / "jobs.py").read_text()
 
 
 def test_the_notes_still_carry_this_release():
+    # v0.47.31 rolled 0.47.21 out of the window; the window is the invariant
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the layer" for e in ENTRIES)
+    assert len({e["title"].lower() for e in ENTRIES}) == 10
 
 
 def test_a_name_that_does_not_resolve_says_so():

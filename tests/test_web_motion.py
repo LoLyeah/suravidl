@@ -20,7 +20,10 @@ def _grab(pattern, text=CSS):
     return m.group(1)
 
 
-POLL_MS = int(_grab(r"setInterval\(refreshJobs, (\d+)\)", APP))
+# v0.47.31: the loop is a self-scheduling timer now — 1.2s while work is in
+# flight, 10s when the queue is still. The glide follows the ACTIVE cadence
+# (that is the one a moving bar is seen against); the idle one is separate.
+POLL_MS = int(_grab(r"JOBS_ACTIVE_MS = (\d+)", APP))
 
 
 def _block(marker, text=CSS):

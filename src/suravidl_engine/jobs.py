@@ -442,6 +442,11 @@ class JobManager:
             except OSError:
                 pass
         self._jobs: dict[str, dict] = {}
+        # size_bytes for settled rows: the queue card polls every 1.2s and a
+        # finished file does not change size, so stat-ing 500 rows per tick is
+        # pure syscall churn (v0.47.31 audit). The key covers filepath + file
+        # count, so a rename or a split recomputes.
+        self._sizes: dict[str, tuple] = {}
         self._lock = threading.Lock()
         # ids deleted by the user: a worker finishing (or writing progress) a
         # moment later must not write the row back
@@ -903,8 +908,21 @@ class JobManager:
         # (v0.38.2 — without this the API answered size_bytes: null)
         for j in jobs:
             j.pop("_requeue_claim", None)
-            j["size_bytes"] = _stat_size(j)
+            j["size_bytes"] = self._size_of(j)
         return jobs
+
+    def _size_of(self, job: dict) -> int | None:
+        """size_bytes with a memo for rows that will never change again."""
+        if job.get("status") in ("queued", "downloading", "merging", "paused"):
+            return _stat_size(job)
+        key = (job.get("filepath"), len(job.get("files") or []),
+               bool((job.get("overrides") or {}).get("split_chapters")))
+        hit = self._sizes.get(job.get("id"))
+        if hit is not None and hit[0] == key:
+            return hit[1]
+        size = _stat_size(job)
+        self._sizes[job.get("id")] = (key, size)
+        return size
 
     def cancel(self, job_id: str) -> dict:
         """Cancel a queued or running job. Running ones stop at the next hook."""
@@ -1149,7 +1167,10 @@ class JobManager:
                         src_path.unlink()
                 except OSError:
                     pass
-                job["files"] = [str(x) for x in made]
+                keep = [p for p in (job.get("files") or [])
+                        if Path(str(p)).suffix.lower() in self.SIDECAR_SUFFIXES
+                        and Path(str(p)).exists()]
+                job["files"] = [str(x) for x in made] + [str(p) for p in keep]
                 job["filepath"] = str(made[0])
                 job["note"] = "; ".join(filter(None, [
                     job.get("note"), f"split into {len(made)} chapter files"]))
@@ -1294,6 +1315,8 @@ class JobManager:
             proc = __import__("subprocess").run(
                 [exe, "-y", "-v", "error", "-ss", f"{start:.3f}",
                  "-t", f"{max(0.1, end - start):.3f}", "-i", str(src),
+                 "-map", "0",           # a second audio language or subtitle
+                                        # track is not the cut's to drop
                  "-c", "copy", "-avoid_negative_ts", "make_zero", str(dst)],
                 capture_output=True, text=True, timeout=600)
             if proc.returncode != 0 or not dst.exists() or dst.stat().st_size == 0:

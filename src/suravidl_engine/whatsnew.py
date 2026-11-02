@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.31",
+        "title": "The polish",
+        "items": [
+            "The queue stops re-reading a finished file's size on every poll, and idles at one request every ten seconds instead of fifty a minute.",
+            "Cancelled jobs stop claiming the running lamp; a split keeps its subtitles and its second audio track; Download now obeys an empty field; Escape closes any dialog.",
+        ],
+    },
+    {
         "version": "0.47.30",
         "title": "The line",
         "items": [
@@ -80,13 +88,6 @@ ENTRIES = [
             "\"Retry without certificate check\" now keeps the page the link came from — without it the site refused the file again and the row looked like it had not changed.",
             "The in-app browser can start a video after you tap play even when the page's player calls play() from its own script, which Android's WebView blocks by default.",
             "An incomplete certificate chain is no longer called \"self-signed\": they are different problems with different fixes.",
-        ],
-    },
-    {
-        "version": "0.47.21",
-        "title": "The layer",
-        "items": [
-            "A failed download now names the layer that broke — the name does not resolve, the port refused, the handshake failed, or the server accepted and stalled — instead of only \"the site never answered in time\".",
         ],
     },
 ]
