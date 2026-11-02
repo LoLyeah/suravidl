@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.30",
+        "title": "The line",
+        "items": [
+            "The source field is one line again: a flex basis from 0.47.28 became a 220px-tall box on phones, where the row turns into a column.",
+        ],
+    },
+    {
         "version": "0.47.29",
         "title": "The hand",
         "items": [
@@ -80,17 +87,6 @@ ENTRIES = [
         "title": "The layer",
         "items": [
             "A failed download now names the layer that broke — the name does not resolve, the port refused, the handshake failed, or the server accepted and stalled — instead of only \"the site never answered in time\".",
-        ],
-    },
-    {
-        "version": "0.47.20",
-        "title": "The witness",
-        "items": [
-            "A failed download now says what actually went wrong — an expired certificate, a self-signed server, a host that no longer exists — instead of blaming a proxy every time.",
-            "A certificate failure offers \"retry without certificate check\" for that one job, and a failed row shows the file's name rather than the whole address.",
-            "The fold caret no longer disappears from a row after the first progress poll — the title rewrite was deleting it.",
-            "A stream that plays in Chrome but failed in the app now works: the engine trusts the device's own certificate store, not only the list bundled with Python.",
-            "A site whose server forgets to send its intermediate certificate now downloads like it plays in a browser: the missing CA is fetched and the job retried.",
         ],
     },
 ]

@@ -27,9 +27,9 @@ def test_the_notes_still_carry_this_release():
     # 0.47.19 never published (the macOS image was retired mid-cut); its
     # notes shipped under 0.47.20, and the current version is pinned by the
     # newest release's test
+    # v0.47.30 rolled 0.47.20 out of the window; the window is the invariant
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.47.20" and e["title"].lower() == "the witness"
-               for e in ENTRIES)
+    assert len({e["title"].lower() for e in ENTRIES}) == 10
     assert len(ENTRIES) == 10
     for item in ENTRIES[0]["items"]:
         assert 0 < len(item) <= 220

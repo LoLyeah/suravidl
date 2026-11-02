@@ -660,7 +660,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 /* ---------- the source dock ---------- */
 .paste { display: flex; gap: 10px; flex-wrap: wrap; }
 .paste input {
-  flex: 1 1 220px; min-width: 0; font-size: 14px; padding: 12px 14px;
+  /* no flex-basis: on a phone `.paste` turns into a column (style.css:1497),
+     and a 220px basis then sets the field's HEIGHT — a 220px-tall box was the
+     v0.47.28 regression (the owner'"'"'s screenshot). `auto` + a min-width keeps
+     the row layout honest and lets the field stay one line everywhere. */
+  flex: 1 1 auto; min-width: 12ch; font-size: 14px; padding: 12px 14px;
   border-radius: 10px;
 }
 /* two buttons now: Probe and Download now. On a phone they take the row
