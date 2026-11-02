@@ -1077,6 +1077,169 @@ class JobManager:
             raise ValueError("that name is reserved by Windows — pick another")
         return clean
 
+    # -- what "this download only" does after the bytes land (v0.47.29) -----
+    def _apply_finish_meta(self, job: dict) -> None:
+        """Rename, tag and/or split a finished download.
+
+        Everything here is optional and per-job (`overrides.meta_title`,
+        `.meta_artist`, `.split_chapters`, `.chapters`). It runs once, after
+        the files are known, and every step is guarded: a missing ffmpeg or a
+        refused rename must leave a playable file behind, never a broken row.
+        """
+        ov = job.get("overrides") or {}
+        title = str(ov.get("meta_title") or "").strip()
+        artist = str(ov.get("meta_artist") or "").strip()
+        chapters = ov.get("chapters") or []
+        split = bool(ov.get("split_chapters")) and bool(chapters)
+        primary = Path(str(job.get("filepath"))) if job.get("filepath") else None
+        if primary is None or not primary.exists():
+            return
+
+        made: list[Path] = []
+        if split:
+            try:
+                made = self._split_chapters(primary, chapters)
+            except Exception as e:  # noqa: BLE001 - the file is already good
+                job["note"] = "; ".join(filter(None, [job.get("note"),
+                                                      f"could not split by chapters: {e}"]))
+                made = []
+            if made:
+                job["files"] = [str(x) for x in made]
+                job["filepath"] = str(made[0])
+                job["note"] = "; ".join(filter(None, [
+                    job.get("note"), f"split into {len(made)} chapter files"]))
+                primary = made[0]
+
+        if title and not split:
+            try:
+                self._retitle(job, title)
+                primary = Path(str(job["filepath"]))
+            except Exception as e:  # noqa: BLE001
+                job["note"] = "; ".join(filter(None, [job.get("note"),
+                                                      f"could not rename: {e}"]))
+        if title or artist:
+            targets = [Path(str(x)) for x in (job.get("files") or [])] or [primary]
+            for f in targets:
+                try:
+                    if f.exists():
+                        self._write_tags(f, title, artist)
+                except Exception as e:  # noqa: BLE001
+                    job["note"] = "; ".join(filter(None, [
+                        job.get("note"), f"could not write tags on {f.name}: {e}"]))
+                    break
+
+    def _retitle(self, job: dict, title: str) -> None:
+        """Rename the download and its sidecars, keeping the [id] that makes
+        two takes of the same video distinguishable."""
+        primary = Path(str(job["filepath"]))
+        stem = primary.stem
+        tag = ""
+        m = re.search(r"\[([^\]]{1,32})\]\s*$", stem)
+        if m:
+            tag = f" [{m.group(1)}]"
+        clean = self.check_name(title + tag)
+        if clean == primary.stem:
+            return
+        files = [Path(str(p)) for p in (job.get("files") or []) if p] or [primary]
+        if primary not in files:
+            files.insert(0, primary)
+        moves = []
+        for p in files:
+            if not p.exists() or not p.name.startswith(stem):
+                continue
+            dst = p.with_name(clean + p.name[len(stem):])
+            if dst.exists():
+                raise ValueError(f"{dst.name} is already there")
+            moves.append((p, dst))
+        done = []
+        try:
+            for src, dst in moves:
+                src.rename(dst)
+                done.append((src, dst))
+        except OSError:
+            for src, dst in reversed(done):
+                try:
+                    dst.rename(src)
+                except OSError:
+                    pass
+            raise
+        job["filepath"] = str(Path(str(job["filepath"])).with_name(
+            primary.name.replace(stem, clean, 1)))
+        job["files"] = [str(dst) if src == primary else str(dst)
+                        for src, dst in moves] + [
+            str(p) for p in files if p not in dict(moves)]
+        job["title"] = clean
+        self._save(job)
+
+    def _write_tags(self, path: Path, title: str, artist: str) -> None:
+        """Rewrite title/artist in place with a stream copy (one fast pass)."""
+        from .cut import ffmpeg_exe
+
+        exe = ffmpeg_exe()
+        if not exe:
+            raise RuntimeError("no ffmpeg on this machine")
+        tmp = path.with_name(path.stem + ".tagtmp" + path.suffix)
+        cmd = [exe, "-y", "-v", "error", "-i", str(path), "-c", "copy"]
+        if title:
+            cmd += ["-metadata", f"title={title}"]
+        if artist:
+            cmd += ["-metadata", f"artist={artist}",
+                    "-metadata", f"album_artist={artist}"]
+        cmd.append(str(tmp))
+        proc = __import__("subprocess").run(cmd, capture_output=True, text=True,
+                                            timeout=180)
+        if proc.returncode != 0 or not tmp.exists():
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError((proc.stderr or "ffmpeg failed").strip().splitlines()[-1])
+        os.replace(tmp, path)
+
+    def _split_chapters(self, src: Path, chapters: list) -> list[Path]:
+        """Cut the finished file at its chapters, one stream copy per section."""
+        from .cut import ffmpeg_exe
+
+        exe = ffmpeg_exe()
+        if not exe:
+            raise RuntimeError("no ffmpeg on this machine")
+        out: list[Path] = []
+        base = src.stem
+        # what the file actually holds: a chapter that starts past the end is
+        # a note, not an empty file (and an end past it is clamped)
+        duration = 0.0
+        try:
+            probe = __import__("subprocess").run(
+                [exe.replace("ffmpeg", "ffprobe"), "-v", "error", "-show_entries",
+                 "format=duration", "-of", "default=nw=1:nk=1", str(src)],
+                capture_output=True, text=True, timeout=60)
+            duration = float((probe.stdout or "0").strip() or 0)
+        except Exception:  # noqa: BLE001 - unknown length: let ffmpeg decide
+            duration = 0.0
+        for i, row in enumerate(chapters, 1):
+            start, end = float(row[0]), float(row[1])
+            if duration > 0:
+                if start >= duration - 0.05:
+                    continue
+                end = min(end, duration)
+            name = str(row[2] if len(row) > 2 else "").strip() or f"chapter {i:02d}"
+            name = re.sub(r'[\\/:*?"<>|]+', "-", name)[:60].strip() or f"chapter {i:02d}"
+            dst = src.with_name(f"{base} - {i:02d} - {name}{src.suffix}")
+            n = 2
+            while dst.exists():
+                dst = src.with_name(f"{base} - {i:02d} - {name} ({n}){src.suffix}")
+                n += 1
+            proc = __import__("subprocess").run(
+                [exe, "-y", "-v", "error", "-ss", f"{start:.3f}",
+                 "-t", f"{max(0.1, end - start):.3f}", "-i", str(src),
+                 "-c", "copy", "-avoid_negative_ts", "make_zero", str(dst)],
+                capture_output=True, text=True, timeout=600)
+            if proc.returncode != 0 or not dst.exists() or dst.stat().st_size == 0:
+                dst.unlink(missing_ok=True)
+                raise RuntimeError((proc.stderr or "ffmpeg split failed")
+                                   .strip().splitlines()[-1])
+            out.append(dst)
+        if not out:
+            raise ValueError("no chapter fits inside the file")
+        return out
+
     def rename_job(self, job_id: str, name: str) -> dict:
         """Rename a finished download — the file and its sidecars together.
 
@@ -1872,6 +2035,11 @@ class JobManager:
                     if sub_fp not in made:
                         made.append(sub_fp)
                 job["files"] = made
+                # this download only: rename/tag/split it (v0.47.29)
+                try:
+                    self._apply_finish_meta(job)
+                except Exception as e:  # noqa: BLE001 - never fail a good download
+                    self._log(f"finish-meta failed for {job.get('id')}: {e}")
             with self._lock:
                 if _stop_requested(job):
                     # a cancel (or pause) that landed while yt-dlp was finishing

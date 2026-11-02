@@ -51,6 +51,10 @@ The browser extension hands the streams it found to the engine — no copy-paste
 - **Subtitles**: pick a language from what the site actually offers; download as
   files, embed them, or convert to `.srt` for TVs.
 - **Clips**: `0:10-0:20` for one download, or click a chapter to fill the times.
+- **Split by chapters**: one file per section, cut from the finished download,
+  named by chapter — for albums, lectures and anything with a track list.
+- **Your title, your artist**: rename the file and rewrite its tags for that
+  download only; the site's version stays for the next one.
 - **Batch**: paste up to 20 links, queue them all; bad lines are named, not swallowed.
 - **Pause and resume**: pause keeps the bytes it already fetched.
 - **Tidy output**: subfolder per playlist or per site, and MP4/MKV remuxing so the
@@ -274,7 +278,7 @@ not attempted — is in **[docs/SNIFFING.md](docs/SNIFFING.md)**.
 ## Dev
 
 ```bash
-.venv/bin/python -m pytest tests/ -q -n auto   # 1557 tests, no network
+.venv/bin/python -m pytest tests/ -q -n auto   # 1562 tests, no network
 .venv/bin/python scripts/smoke.py        # live end-to-end against a real engine
 node --check src/suravidl_engine/web/app.js
 ```

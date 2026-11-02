@@ -24,9 +24,9 @@ APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
 def test_the_notes_still_carry_this_release():
+    # v0.47.29 rolled 0.47.18 out of the window; the window is the invariant
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.47.18" and e["title"].lower() == "the twin"
-               for e in ENTRIES)
+    assert len({e["title"].lower() for e in ENTRIES}) == 10
 
 
 def test_the_library_remembers_the_uri_of_each_copy():

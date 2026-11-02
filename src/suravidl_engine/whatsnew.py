@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.47.29",
+        "title": "The hand",
+        "items": [
+            "A download can carry its own title and artist: the file is renamed and its tags rewritten, for that job only — no more site junk in your library.",
+            "Split by chapters: one file per section, cut from the finished download in a single pass, named by chapter.",
+        ],
+    },
+    {
         "version": "0.47.28",
         "title": "The tap",
         "items": [
@@ -83,13 +91,6 @@ ENTRIES = [
             "The fold caret no longer disappears from a row after the first progress poll — the title rewrite was deleting it.",
             "A stream that plays in Chrome but failed in the app now works: the engine trusts the device's own certificate store, not only the list bundled with Python.",
             "A site whose server forgets to send its intermediate certificate now downloads like it plays in a browser: the missing CA is fetched and the job retried.",
-        ],
-    },
-    {
-        "version": "0.47.18",
-        "title": "The twin",
-        "items": [
-            "Deleting one video no longer takes a same-named twin with it: the trash removes exactly the copy that row made, instead of every file sharing its name.",
         ],
     },
 ]

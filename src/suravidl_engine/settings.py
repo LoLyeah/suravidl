@@ -36,6 +36,12 @@ DEFAULTS = {
     "rate_limit": "",            # e.g. "2M" (bytes/s)
     "subfolders": "off",         # off | playlist | site — keep big batches tidy
     "video_container": "auto",   # auto | mp4 | mkv — remux for compatibility
+    # --- per-download metadata and chapter splitting (v0.47.29) ------------
+    "meta_title": "",             # "this download only": the title used for the
+                                  # file name and the embedded tag
+    "meta_artist": "",            # ... and the artist/uploader tag
+    "split_chapters": False,      # cut the finished file at its chapters
+    "chapters": [],               # [[start_s, end_s, title], ...] from the probe
     "quick_share": False,         # Android: a shared link queues at once, with the
                                  # default quality, instead of stopping at the
                                  # format list (v0.47.28)
@@ -239,6 +245,29 @@ class Settings:
             return bool(value)
         if key == "quick_share":
             return bool(value)
+        if key in ("meta_title", "meta_artist"):
+            # a tag, not a path: strip control characters, keep it printable
+            text = "".join(ch for ch in str(value or "") if ch >= " ").strip()
+            if len(text) > 120:
+                raise ValueError(f"{key} is too long (max 120 characters)")
+            return text
+        if key == "split_chapters":
+            return bool(value)
+        if key == "chapters":
+            # a bounded list from the probe: [start_s, end_s, title]
+            if not isinstance(value, list) or len(value) > 200:
+                raise ValueError("chapters must be a list of at most 200 entries")
+            out = []
+            for row in value:
+                if not isinstance(row, (list, tuple)) or len(row) not in (2, 3):
+                    raise ValueError("a chapter is [start, end, title]")
+                start, end = float(row[0]), float(row[1])
+                if not (0 <= start < end <= 24 * 3600):
+                    raise ValueError("a chapter's times are out of range")
+                title = "".join(ch for ch in str(row[2] if len(row) == 3 else "")
+                                if ch >= " ").strip()[:80]
+                out.append([start, end, title])
+            return out
         if key == "cookies_file":
             # pointing at YOUR cookies file, anywhere, is the feature; the
             # existence verdict is per-request and token-gated, so it tells

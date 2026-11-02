@@ -2024,11 +2024,20 @@ function syncSubLangsWithProbe(info) {
 
 /** Chapters: one click fills the clip start (and end) so a long video can be
  *  clipped at a chapter boundary instead of typing times from memory. */
+let CHAPTERS = [];   // the probe's chapters, for "split into one file each"
+
 function renderChapterChips(info) {
   const box = $("chapterChips");
   box.replaceChildren();
   const chapters = (info.chapters || []).slice(0, 20);
   $("chapterRow").classList.toggle("hidden", !chapters.length);
+  CHAPTERS = chapters.filter((c) => c.start_time != null && c.end_time != null)
+    .map((c) => [Number(c.start_time), Number(c.end_time), c.title || ""]);
+  const splitField = $("ovSplitField");
+  if (splitField) {
+    splitField.hidden = !CHAPTERS.length;
+    if (!CHAPTERS.length && $("ovSplit")) $("ovSplit").checked = false;
+  }
   for (const ch of chapters) {
     if (ch.start_time == null) continue;
     const start = clock(ch.start_time);
@@ -2529,6 +2538,18 @@ function readOv() {
     delete patch.subtitles_mode;
     delete patch.subtitles_langs;
   }
+  // this download's own title/artist, and chapter splitting
+  const ttl = ($("ovTitle") && $("ovTitle").value.trim()) || "";
+  const art = ($("ovArtist") && $("ovArtist").value.trim()) || "";
+  if (ttl) patch.meta_title = ttl; else delete patch.meta_title;
+  if (art) patch.meta_artist = art; else delete patch.meta_artist;
+  if ($("ovSplit") && $("ovSplit").checked && CHAPTERS.length) {
+    patch.split_chapters = true;
+    patch.chapters = CHAPTERS;
+  } else {
+    delete patch.split_chapters;
+    delete patch.chapters;
+  }
   const sb = $("ovSb").value;
   if (sb) patch.sponsorblock_mode = sb; else delete patch.sponsorblock_mode;
   // three-state: "" = use my settings, "on"/"off" = a claim about this job.
@@ -2569,6 +2590,9 @@ function clearOv() {
   $("ovRaw").value = "";
   $("ovClipStart").value = "";
   $("ovClipEnd").value = "";
+  if ($("ovTitle")) $("ovTitle").value = "";
+  if ($("ovArtist")) $("ovArtist").value = "";
+  if ($("ovSplit")) $("ovSplit").checked = false;
   $("ovContainer").value = "";
   $("ovArchive").value = "";
   $("ovPreset").value = "";

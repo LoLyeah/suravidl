@@ -338,6 +338,20 @@
             out of a 3-hour stream</span>
         </div>
         <div class="field">
+          <label class="lbl" data-i18n="Title and artist — this download only">Title and artist — this download only</label>
+          <div class="jrow">
+            <input id="ovTitle" type="text" spellcheck="false" placeholder="title" data-i18n-ph="title" aria-label="Title" data-i18n-aria="Title"/>
+            <input id="ovArtist" type="text" spellcheck="false" placeholder="artist" data-i18n-ph="artist" aria-label="Artist" data-i18n-aria="Artist"/>
+          </div>
+          <span class="muted small" data-i18n="renames the file and writes the tags — leave blank to keep what the site says">renames the file and writes the tags — leave blank to keep what the site says</span>
+        </div>
+        <div class="field" id="ovSplitField" hidden>
+          <label class="check small" for="ovSplit">
+            <input id="ovSplit" type="checkbox"/><span data-i18n=" Split into one file per chapter ">
+            Split into one file per chapter
+          </span></label>
+        </div>
+        <div class="field">
           <label class="lbl" for="ovContainer" data-i18n="Container">Container</label>
           <select id="ovContainer">
             <option value="" data-i18n="use my settings">use my settings</option>
