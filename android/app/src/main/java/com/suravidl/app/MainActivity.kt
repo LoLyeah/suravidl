@@ -352,6 +352,66 @@ class MainActivity : AppCompatActivity() {
      *  galleryExport,canInstallPackages,openInstallPermissionSettings,installApk}. */
     inner class HostBridge {
         /**
+         * The wallpaper's Material You palette (Android 12+), as the tonal
+         * steps the web UI maps onto its own tokens (v0.48.0). "" everywhere
+         * else — the page hides its "Wallpaper" scheme when it gets no palette,
+         * and desktop never calls this at all.
+         *
+         * `system_*_N` are the Material 3 tonal palettes the system derives from
+         * the wallpaper; using fixed steps (not the raw accent) is what keeps
+         * text legible on every wallpaper.
+         */
+        @JavascriptInterface
+        fun dynamicPalette(): String {
+            if (Build.VERSION.SDK_INT < 31) return ""
+            fun hex(id: Int): String {
+                val c = resources.getColor(id, theme)
+                return String.format("#%06X", 0xFFFFFF and c)
+            }
+            fun rgba(id: Int, alpha: Float): String {
+                val c = resources.getColor(id, theme)
+                return String.format("rgba(%d,%d,%d,%.2f)",
+                    (c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF, alpha)
+            }
+            fun palette(bg: Int, panel: Int, text: Int, muted: Int,
+                        accent: Int, accent2: Int, ink: Int, fg: Int,
+                        lamp: String): String {
+                return "{" +
+                    "\"bg\":\"" + hex(bg) + "\"," +
+                    "\"panel\":\"" + hex(panel) + "\"," +
+                    "\"text\":\"" + hex(text) + "\"," +
+                    "\"muted\":\"" + hex(muted) + "\"," +
+                    "\"accent\":\"" + hex(accent) + "\"," +
+                    "\"accent2\":\"" + hex(accent2) + "\"," +
+                    "\"accent-fg\":\"" + hex(fg) + "\"," +
+                    "\"accent-ink\":\"" + hex(ink) + "\"," +
+                    "\"accent-soft\":\"" + rgba(accent, 0.14f) + "\"," +
+                    "\"accent-line\":\"" + rgba(accent, 0.45f) + "\"," +
+                    "\"glow\":\"" + rgba(accent, 0.40f) + "\"," +
+                    "\"sel\":\"" + rgba(accent, 0.28f) + "\"," +
+                    "\"lamp\":\"" + lamp + "}"
+            }
+            return try {
+                val light = palette(
+                    android.R.color.system_neutral1_50, android.R.color.system_neutral1_10,
+                    android.R.color.system_neutral1_900, android.R.color.system_neutral2_700,
+                    android.R.color.system_accent1_600, android.R.color.system_accent1_700,
+                    android.R.color.system_accent1_700, android.R.color.system_neutral1_10,
+                    rgba(android.R.color.system_accent1_600, 0.07f))
+                val dark = palette(
+                    android.R.color.system_neutral1_900, android.R.color.system_neutral1_800,
+                    android.R.color.system_neutral1_100, android.R.color.system_neutral2_200,
+                    android.R.color.system_accent1_200, android.R.color.system_accent1_100,
+                    android.R.color.system_accent1_200, android.R.color.system_accent1_800,
+                    rgba(android.R.color.system_accent1_200, 0.09f))
+                "{\"light\":$light,\"dark\":$dark}"
+            } catch (t: Throwable) {
+                Log.w(SuravidlApp.TAG, "no wallpaper palette from this device", t)
+                ""
+            }
+        }
+
+        /**
          * Does a finished download also get a Gallery/Music copy?
          *
          * Below API 29 there is no scoped storage, so the app's own folder is

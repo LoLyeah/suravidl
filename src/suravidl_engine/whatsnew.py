@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.48.0",
+        "title": "The palette",
+        "items": [
+            "Three more schemes: Cobalt (a grading monitor), Oxide (splicing tape) and Silver (halide mono), each with contrast measured rather than eyeballed.",
+            "On Android 12+, Wallpaper follows your Material You palette. And the bright double ring on a selected swatch is gone.",
+        ],
+    },
+    {
         "version": "0.47.31",
         "title": "The polish",
         "items": [
@@ -79,15 +87,6 @@ ENTRIES = [
         "items": [
             "A video whose server forgets its intermediate certificate now plays in the in-app browser: media only, and only for an untrusted chain — with a note on screen. Expired or mismatched certificates are still refused.",
             "The browser also says why a resource failed (network, HTTP status or certificate) instead of leaving a spinner with no answer.",
-        ],
-    },
-    {
-        "version": "0.47.22",
-        "title": "The redo",
-        "items": [
-            "\"Retry without certificate check\" now keeps the page the link came from — without it the site refused the file again and the row looked like it had not changed.",
-            "The in-app browser can start a video after you tap play even when the page's player calls play() from its own script, which Android's WebView blocks by default.",
-            "An incomplete certificate chain is no longer called \"self-signed\": they are different problems with different fixes.",
         ],
     },
 ]

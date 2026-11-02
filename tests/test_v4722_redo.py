@@ -21,7 +21,7 @@ AUTH = {"Authorization": "Bearer testtoken"}
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the redo" for e in ENTRIES)
+    assert any(e["title"].lower() == "the polish" for e in ENTRIES)
 
 
 def test_the_button_retries_the_job_not_a_bare_url():

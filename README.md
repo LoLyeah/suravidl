@@ -70,7 +70,9 @@ The browser extension hands the streams it found to the engine — no copy-paste
   catches and what it deliberately does not.
 - Also: SponsorBlock, metadata/thumbnail embedding, speed limits, retries,
   per-download overrides and saved presets, auto-resume after a restart,
-  Light/Dark/AMOLED themes, and a storage view with a guarded wipe.
+  Light/Dark/AMOLED themes with five schemes (Amber, Pine & cream, Cobalt,
+  Oxide, Silver) and Material You on Android 12+, and a storage view with a
+  guarded wipe.
 
 ## Install
 

@@ -706,6 +706,14 @@ const STRINGS = { en: {}, id: {
   "the site's certificate has expired — its owner has to renew it; a browser can only open it if your network intercepts the connection": "sertifikat situsnya sudah kedaluwarsa — pemiliknya harus memperbaruinya; browser hanya bisa membukanya kalau jaringamu mencegat koneksinya",
   "the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension": "server media situs itu menolak permintaan yang bukan dari halamannya — buka videonya di browser lalu pilih stream di sana, atau pakai ekstensi",
   "Download now": "Unduh sekarang",
+  "Cobalt": "Cobalt",
+  "Oxide": "Oksida",
+  "Silver": "Perak",
+  "Wallpaper": "Wallpaper",
+  "Material You": "Material You",
+  "a grading monitor": "monitor grading",
+  "splicing tape": "pita sambung",
+  "halide mono": "mono halida",
   "the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it": "situs tidak mengirim sertifikat perantara yang membuktikan rantainya, jadi tidak bisa diverifikasi — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",
@@ -1499,6 +1507,48 @@ function askConfirm(message, { okText = "Confirm", danger = true } = {}) {
 }
 
 /* ---------- theme / glass ---------- */
+/* ---------- Material You (v0.48.0) -------------------------------------
+   The phone's wallpaper palette, read through the Android bridge. The bridge
+   returns tonal steps for the light and dark palettes; everything below maps
+   them onto the --dyn-* tokens the CSS blocks read. Desktop has no bridge and
+   Android below 12 returns "" — the swatch simply never appears there. */
+let DYN = null;
+function readDynamicPalette() {
+  try {
+    const host = window.AndroidHost;
+    if (!host || typeof host.dynamicPalette !== "function") return null;
+    const raw = host.dynamicPalette();
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return p && p.light && p.dark ? p : null;
+  } catch (e) {
+    return null;
+  }
+}
+function paintDynamicPalette(p) {
+  const r = document.documentElement.style;
+  const put = (name, v) => { if (v) r.setProperty(name, v); };
+  for (const [k, v] of Object.entries(p.light || {})) put("--dyn-" + k, v);
+  for (const [k, v] of Object.entries(p.dark || {})) put("--dyn-" + k + "-dark", v);
+}
+function applyDynamicPalette() {
+  const sw = $("swDynamic");
+  const p = readDynamicPalette();
+  if (sw) sw.classList.toggle("hidden", !p);
+  if (!p) return null;
+  DYN = p;
+  paintDynamicPalette(p);
+  return p;
+}
+// the wallpaper changed while the app was open (the host calls this on resume)
+window.onDynamicPaletteChanged = () => {
+  const before = JSON.stringify(DYN);
+  applyDynamicPalette();
+  if (JSON.stringify(DYN) !== before && CURRENT.accent === "dynamic") {
+    applyTheme(null, null, "dynamic");
+  }
+};
+
 function applyTheme(theme, glass, accent) {
   const r = document.documentElement;
   const changed = (theme && r.dataset.theme !== theme)
@@ -1506,7 +1556,10 @@ function applyTheme(theme, glass, accent) {
     || (accent && r.dataset.accent !== accent);
   if (theme) r.dataset.theme = theme;
   if (glass) r.dataset.glass = glass;
-  if (accent) r.dataset.accent = accent;
+  if (accent) {
+    if (accent === "dynamic") applyDynamicPalette();
+    r.dataset.accent = accent;
+  }
   // A theme switch repaints every surface. Without this the big cards eased
   // their colours over 350ms while every button, pill and input inside them
   // snapped instantly — the UI looked torn for a third of a second (motion

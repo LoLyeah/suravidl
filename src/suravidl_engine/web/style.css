@@ -36,6 +36,7 @@
   --input-bg: rgba(4,6,8,.45);            /* recessed wells */
   --accent: #e8a33e;                      /* signal amber */
   --accent2: #f3c169;                     /* the lamp at full */
+  --ring: rgba(232,163,62,.72);           /* v0.48.0: the lamp, dimmed to a ring */
   --accent-soft: rgba(232,163,62,.16);
   --accent-line: rgba(232,163,62,.45);
   --accent-ink: #f0c98a;
@@ -93,6 +94,7 @@ html[data-theme="light"] {
   --lamp: rgba(192,122,22,.08);
 }
 html[data-theme="amoled"] {
+  --lamp: transparent;              /* v0.48.0: no cast light on true black */
   --bg: #000000;                /* the room with the lights off */
   --darwin-wash: rgba(0,0,0,.86);   /* the native shell's page wash — v0.39.13; eased v0.45.1 */
   --text: #eef0f3;
@@ -105,6 +107,7 @@ html[data-theme="amoled"] {
   --input-bg: rgba(255,255,255,.05);
   --accent: #e8a33e;
   --accent2: #f3c169;
+  --ring: rgba(232,163,62,.72);   /* the lamp, dimmed to a ring */
   --accent-soft: rgba(232,163,62,.16);
   --accent-line: rgba(232,163,62,.5);
   --accent-ink: #f0c98a;
@@ -139,6 +142,7 @@ html[data-theme="amoled"] {
    (ok/err/warn) stay their own colours: they are signals, not brand. */
 html[data-accent="pine"][data-theme="light"] {
   --accent: #14493C;  --accent2: #0e352b;
+  --ring: #14493C;                /* visible on the day ground, same family */
   --accent-fg: #F2E9D8;  --accent-ink: #14493C;
   --accent-soft: rgba(20,73,60,.12);  --accent-line: rgba(20,73,60,.35);
   --accent-glow: rgba(20,73,60,.35);
@@ -147,10 +151,126 @@ html[data-accent="pine"][data-theme="light"] {
 html[data-accent="pine"][data-theme="dark"],
 html[data-accent="pine"][data-theme="amoled"] {
   --accent: #F2E9D8;  --accent2: #ffffff;
+  --ring: rgba(242,233,216,.62);  /* a ring, not a headlight: cream at 62% */
   --accent-fg: #14493C;  --accent-ink: #F2E9D8;
   --accent-soft: rgba(242,233,216,.14);  --accent-line: rgba(242,233,216,.45);
   --accent-glow: rgba(242,233,216,.30);
   --sel: rgba(242,233,216,.30);  --lamp: rgba(242,233,216,.08);
+}
+
+
+/* ---------- v0.48.0: three more schemes ----------------------------------
+   Same contract as amber/pine: neutrals stay neutral, the accent family
+   carries --accent/--accent2/--accent-ink/--accent-fg/--ring/soft/line/
+   glow/sel/lamp, and the state lights (--ok/--err/--warn) never move — they
+   are signals, not brand. Contrast pairs are pinned by tests/test_v480_themes.py. */
+
+/* cobalt — a reference monitor in a grading suite: cyanotype blue, cold and
+   legible, unmistakable against the green/rose state LEDs. */
+html[data-accent="cobalt"][data-theme="light"] {
+  --accent: #1858b8;  --accent2: #12438e;
+  --accent-fg: #f4f7fc;  --accent-ink: #12438e;
+  --ring: #12438e;
+  --accent-soft: rgba(24,88,184,.13);  --accent-line: rgba(24,88,184,.36);
+  --accent-glow: rgba(24,88,184,.38);
+  --sel: rgba(24,88,184,.22);  --lamp: rgba(24,88,184,.07);
+}
+html[data-accent="cobalt"][data-theme="dark"],
+html[data-accent="cobalt"][data-theme="amoled"] {
+  --accent: #6eb0ff;  --accent2: #96c7ff;
+  --accent-fg: #07192e;  --accent-ink: #9ccaff;
+  --ring: rgba(110,176,255,.66);
+  --accent-soft: rgba(110,176,255,.15);  --accent-line: rgba(110,176,255,.45);
+  --accent-glow: rgba(110,176,255,.42);
+  --sel: rgba(110,176,255,.28);  --lamp: rgba(110,176,255,.09);
+}
+
+/* oxide — splicing tape and a copper head: warm analog, editorial, and far
+   enough from --err rose that a failure still reads as a failure. */
+html[data-accent="oxide"][data-theme="light"] {
+  --accent: #9e4722;  --accent2: #7c3517;
+  --accent-fg: #fff8f4;  --accent-ink: #7c3517;
+  --ring: #7c3517;
+  --accent-soft: rgba(158,71,34,.13);  --accent-line: rgba(158,71,34,.35);
+  --accent-glow: rgba(158,71,34,.38);
+  --sel: rgba(158,71,34,.22);  --lamp: rgba(158,71,34,.07);
+}
+html[data-accent="oxide"][data-theme="dark"],
+html[data-accent="oxide"][data-theme="amoled"] {
+  --accent: #f09a72;  --accent2: #f7b594;
+  --accent-fg: #260f05;  --accent-ink: #f6b899;
+  --ring: rgba(240,154,114,.66);
+  --accent-soft: rgba(240,154,114,.15);  --accent-line: rgba(240,154,114,.45);
+  --accent-glow: rgba(240,154,114,.42);
+  --sel: rgba(240,154,114,.28);  --lamp: rgba(240,154,114,.09);
+}
+
+/* silver — a halide deck in monochrome: titanium greys, only the state lights
+   carry chroma. The quietest of the set. */
+html[data-accent="silver"][data-theme="light"] {
+  --accent: #2c3138;  --accent2: #181b20;
+  --accent-fg: #f2f0ec;  --accent-ink: #181b20;
+  --ring: #181b20;
+  --accent-soft: rgba(44,49,56,.12);  --accent-line: rgba(44,49,56,.36);
+  --accent-glow: rgba(44,49,56,.28);
+  --sel: rgba(44,49,56,.20);  --lamp: rgba(44,49,56,.05);
+}
+html[data-accent="silver"][data-theme="dark"],
+html[data-accent="silver"][data-theme="amoled"] {
+  --accent: #d8dee6;  --accent2: #eef2f6;
+  --accent-fg: #11151a;  --accent-ink: #e2e7ee;
+  --ring: rgba(216,222,230,.62);
+  --accent-soft: rgba(216,222,230,.14);  --accent-line: rgba(216,222,230,.42);
+  --accent-glow: rgba(216,222,230,.28);
+  --sel: rgba(216,222,230,.26);  --lamp: rgba(216,222,230,.07);
+}
+
+/* dynamic — Android's own wallpaper palette (Material You). app.js writes the
+   tonal steps as --dyn-* inline tokens; the blocks below only say where each
+   one goes, so the mapping is testable and the fallback ladder stays obvious. */
+html[data-accent="dynamic"][data-theme="light"] {
+  --bg: var(--dyn-bg, #e7e4de);
+  --panel-solid: var(--dyn-panel, #efece6);
+  --text: var(--dyn-text, #201d18);
+  --muted: var(--dyn-muted, #5b564e);
+  --accent: var(--dyn-accent, #1858b8);  --accent2: var(--dyn-accent2, #12438e);
+  --accent-fg: var(--dyn-accent-fg, #f4f7fc);  --accent-ink: var(--dyn-accent-ink, #12438e);
+  --ring: var(--dyn-accent-ink, #12438e);
+  --accent-soft: var(--dyn-accent-soft, rgba(24,88,184,.13));
+  --accent-line: var(--dyn-accent-line, rgba(24,88,184,.36));
+  --accent-glow: var(--dyn-glow, rgba(24,88,184,.38));
+  --sel: var(--dyn-sel, rgba(24,88,184,.22));
+  --lamp: var(--dyn-lamp, rgba(24,88,184,.07));
+}
+html[data-accent="dynamic"][data-theme="dark"] {
+  --bg: var(--dyn-bg-dark, #0f1216);
+  --panel-solid: var(--dyn-panel-dark, #141a22);
+  --text: var(--dyn-text-dark, #e8eaed);
+  --muted: var(--dyn-muted-dark, #a8b1bd);
+  --accent: var(--dyn-accent-dark, #6eb0ff);  --accent2: var(--dyn-accent2-dark, #96c7ff);
+  --accent-fg: var(--dyn-accent-fg-dark, #07192e);
+  --accent-ink: var(--dyn-accent-ink-dark, #9ccaff);
+  --ring: var(--dyn-accent-ink-dark, #9ccaff);
+  --accent-soft: var(--dyn-accent-soft-dark, rgba(110,176,255,.15));
+  --accent-line: var(--dyn-accent-line-dark, rgba(110,176,255,.45));
+  --accent-glow: var(--dyn-glow-dark, rgba(110,176,255,.42));
+  --sel: var(--dyn-sel-dark, rgba(110,176,255,.28));
+  --lamp: var(--dyn-lamp-dark, rgba(110,176,255,.09));
+}
+html[data-accent="dynamic"][data-theme="amoled"] {
+  --bg: #000000;                       /* the lights are off, on purpose */
+  --panel-solid: var(--dyn-panel-dark, #0b0b0c);
+  --text: var(--dyn-text-dark, #eef0f3);
+  --muted: var(--dyn-muted-dark, #a6aeb8);
+  --accent: var(--dyn-accent-dark, #6eb0ff);  --accent2: var(--dyn-accent2-dark, #96c7ff);
+  --accent-fg: var(--dyn-accent-fg-dark, #07192e);
+  --accent-ink: var(--dyn-accent-ink-dark, #9ccaff);
+  --ring: var(--dyn-accent-ink-dark, #9ccaff);
+  --accent-soft: var(--dyn-accent-soft-dark, rgba(110,176,255,.15));
+  --accent-line: var(--dyn-accent-line-dark, rgba(110,176,255,.45));
+  --accent-glow: var(--dyn-glow-dark, rgba(110,176,255,.42));
+  --sel: var(--dyn-sel-dark, rgba(110,176,255,.28));
+  --lamp: transparent;                 /* AMOLED has no room lamp */
 }
 
 /* ---------- glass styles: smoked (matte) | polished (specular) ---------- */
@@ -1289,6 +1409,10 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 #panel-settings .card {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  /* no frost, so no glass border either: on AMOLED the accent-line border
+     plus the gloss read as a pale slab behind the tab strip (v0.48.0) */
+  border-color: var(--line);
+  background-image: none;
 }
 /* the yt-dlp tab's Save floats like Settings' (v0.45.12): its options
    list runs long and Save used to scroll away */
@@ -1312,7 +1436,16 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
   transition: border-color var(--t-fast) ease;
 }
 @media (hover: hover) { .swatch:hover { border-color: var(--accent-line); } }
-.swatch.on { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--accent-soft); }
+.swatch.on {
+  /* v0.48.0: an INSET ring at the swatch's own radius. The old pair (1px
+     `--accent` border + a 3px outer `--accent-soft` halo) read as a bright
+     double outline on AMOLED, and collided with the focus outline. */
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent2, var(--accent));
+  color: var(--text);
+}
+.swatch.on:focus-visible { box-shadow: inset 0 0 0 1px var(--accent2, var(--accent)); }
 /* selected outlines must clear 3:1 on the day ground too — #c07a16 reads
    2.74:1 there, so the light theme leans on the darker voice (v0.44.x audit;
    pine's own accent is dark enough by itself but shares the rule) */
@@ -1334,6 +1467,13 @@ html[data-theme="light"] .get.picked { border-color: var(--accent2); }
 .sw-amber  { background: linear-gradient(135deg, #14181d 45%, #e8a33e 46%, #f3c169 78%, #e7e4de); }
 .sw-pine   { background: linear-gradient(135deg, #14493C 45%, #F2E9D8 46%, #0e352b 78%, #e7e4de); }
 /* under pine, the theme previews wear the pine lamp, not amber */
+
+/* the new schemes' swatch previews (v0.48.0) */
+.sw-cobalt { background: linear-gradient(135deg, #14181d 45%, #6eb0ff 46%, #96c7ff 78%, #e7e4de); }
+.sw-oxide  { background: linear-gradient(135deg, #14181d 45%, #f09a72 46%, #f7b594 78%, #e7e4de); }
+.sw-silver { background: linear-gradient(135deg, #14181d 45%, #d8dee6 46%, #eef2f6 78%, #e7e4de); }
+.sw-dynamic { background: linear-gradient(135deg, #1b1b1f 45%, #a8c7fa 46%, #d3e3fd 78%, #e7e4de); }
+
 [data-accent="pine"] .sw-light  { background: linear-gradient(135deg, #f0ede8 45%, #14493C 46%, #0e352b 78%, #e7e4de); }
 [data-accent="pine"] .sw-dark   { background: linear-gradient(135deg, #14181d 45%, #F2E9D8 46%, #ffffff 78%, #0f1216); }
 [data-accent="pine"] .sw-amoled { background: linear-gradient(135deg, #000 60%, #F2E9D8 61%, #7e8794); }

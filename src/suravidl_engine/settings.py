@@ -77,7 +77,10 @@ DEFAULTS = {
 
 THEMES = ("light", "dark", "amoled")
 GLASS_STYLES = ("frosted", "liquid")
-ACCENTS = ("amber", "pine")   # the scheme: signal amber, or the pine & cream voice
+ACCENTS = ("amber", "pine", "cobalt", "oxide", "silver", "dynamic")
+# the schemes: signal amber, the pine & cream voice, a grading monitor (cobalt),
+# splicing tape (oxide), halide mono (silver) — and "dynamic", which follows
+# the phone's wallpaper palette on Android 12+ (v0.48.0)
 LANGUAGES = ("en", "id")        # the UI dictionary: English, Bahasa Indonesia
 
 

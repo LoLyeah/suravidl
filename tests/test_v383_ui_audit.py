@@ -176,7 +176,7 @@ def test_queue_opens_with_a_honest_loading_line():
 
 # ---------- the pine & cream scheme option ----------
 def test_the_engine_persists_and_validates_the_scheme():
-    assert 'ACCENTS = ("amber", "pine")' in SETTINGS
+    assert 'ACCENTS = ("amber", "pine", "cobalt", "oxide", "silver", "dynamic")' in SETTINGS
     assert '"accent": "amber"' in SETTINGS
     assert '"accent",' in SETTINGS            # an appearance key, not per-job
     assert 'value not in ACCENTS' in SETTINGS
