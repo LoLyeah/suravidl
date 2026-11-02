@@ -76,9 +76,10 @@ def test_a_playlist_row_is_recognised_by_its_files_not_its_path():
     fragments (…f200.mp4, …f64.mp4, final) in `files`, and the final file is
     one of them — treating that as a playlist took Play/Open/Share off the
     most common YouTube-style download (caught live, 2026-09-27)."""
-    assert ("const playlistRow = !!(j.files && j.files.length\n"
-            "    && j.files[0] !== j.filepath && !j.files.includes(j.filepath));"
-            ) in APP
+    # v0.47.29: a chapter-split row's filepath IS its first section, so the
+    # engine marks it `split` and the row lists its files like a playlist
+    assert "const playlistRow = !!(j.files && j.files.length" in APP
+    assert "(j.split || (j.files[0] !== j.filepath && !j.files.includes(j.filepath)))" in APP
 
 
 def test_playlist_rows_get_an_openable_file_list():

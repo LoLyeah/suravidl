@@ -130,6 +130,15 @@ def _stop_requested(job: dict) -> bool:
     return job["status"] in ("cancelled", "paused")
 
 
+def _same_file(a, b) -> bool:
+    """True when two paths are the same file (a case-only rename on a
+    case-insensitive filesystem is not a collision)."""
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
 def _stat_size(job: dict) -> int | None:
     """Bytes on disk for a job's files — what the expanded queue card shows.
 
@@ -140,14 +149,18 @@ def _stat_size(job: dict) -> int | None:
     is on disk (v0.38.2 report: "show us the file size and the location").
     """
     path = job.get("filepath")
+    split = bool((job.get("overrides") or {}).get("split_chapters"))
     try:
-        if path and os.path.isfile(path):
+        # a split row's filepath is only its FIRST section: summing is the
+        # only honest answer there (v0.47.29 audit)
+        if path and os.path.isfile(path) and not split:
             return os.path.getsize(path)
     except OSError:
         pass
+
     total, found = 0, False
     for f in job.get("files") or []:
-        if f == path:
+        if f == path and not split:
             continue
         try:
             if os.path.isfile(f):
@@ -200,6 +213,10 @@ def redact_job(job: dict) -> dict:
     out = dict(job)
     if out.get("headers"):
         out["headers"] = _redacted_headers(out["headers"])
+    # the UI needs to know a row is a set of chapter files: its filepath is
+    # the first section, so the "is this a playlist folder?" test alone would
+    # hide chapters 2..N behind a single Play button (v0.47.29 audit)
+    out["split"] = bool((job.get("overrides") or {}).get("split_chapters"))
     return out
 
 
@@ -1095,6 +1112,24 @@ class JobManager:
         if primary is None or not primary.exists():
             return
 
+        if title and not split:
+            try:
+                self._retitle(job, title)
+                primary = Path(str(job["filepath"]))
+            except Exception as e:  # noqa: BLE001
+                job["note"] = "; ".join(filter(None, [job.get("note"),
+                                                      f"could not rename: {e}"]))
+        elif title and split:
+            # the sections are named from the file they are cut out of, so the
+            # rename has to happen BEFORE the cut (the owner asked for this
+            # title on every chapter)
+            try:
+                self._retitle(job, title)
+                primary = Path(str(job["filepath"]))
+            except Exception as e:  # noqa: BLE001
+                job["note"] = "; ".join(filter(None, [job.get("note"),
+                                                      f"could not rename: {e}"]))
+
         made: list[Path] = []
         if split:
             try:
@@ -1104,19 +1139,22 @@ class JobManager:
                                                       f"could not split by chapters: {e}"]))
                 made = []
             if made:
+                # the source is what the sections were cut from: leaving it
+                # would orphan a file the row no longer owns (delete missed
+                # it, and the next download of the same URL saw "already on
+                # disk") — so it goes once every section exists
+                try:
+                    src_path = Path(str(job.get("filepath")))
+                    if src_path.exists() and src_path not in made:
+                        src_path.unlink()
+                except OSError:
+                    pass
                 job["files"] = [str(x) for x in made]
                 job["filepath"] = str(made[0])
                 job["note"] = "; ".join(filter(None, [
                     job.get("note"), f"split into {len(made)} chapter files"]))
                 primary = made[0]
 
-        if title and not split:
-            try:
-                self._retitle(job, title)
-                primary = Path(str(job["filepath"]))
-            except Exception as e:  # noqa: BLE001
-                job["note"] = "; ".join(filter(None, [job.get("note"),
-                                                      f"could not rename: {e}"]))
         if title or artist:
             targets = [Path(str(x)) for x in (job.get("files") or [])] or [primary]
             for f in targets:
@@ -1137,18 +1175,25 @@ class JobManager:
         m = re.search(r"\[([^\]]{1,32})\]\s*$", stem)
         if m:
             tag = f" [{m.group(1)}]"
+        if tag and title.rstrip().endswith(tag):
+            title = title.rstrip()[: -len(tag)].rstrip()
         clean = self.check_name(title + tag)
         if clean == primary.stem:
             return
         files = [Path(str(p)) for p in (job.get("files") or []) if p] or [primary]
         if primary not in files:
             files.insert(0, primary)
+        for side in self._sidecars_for(primary):
+            if side not in files:
+                files.append(side)
         moves = []
         for p in files:
-            if not p.exists() or not p.name.startswith(stem):
+            if not p.exists():
                 continue
+            if not (p.name == stem + p.suffix or p.name.startswith(stem + ".")):
+                continue                      # not this download's stem
             dst = p.with_name(clean + p.name[len(stem):])
-            if dst.exists():
+            if dst.exists() and not _same_file(p, dst):
                 raise ValueError(f"{dst.name} is already there")
             moves.append((p, dst))
         done = []
@@ -1165,10 +1210,13 @@ class JobManager:
             raise
         job["filepath"] = str(Path(str(job["filepath"])).with_name(
             primary.name.replace(stem, clean, 1)))
-        job["files"] = [str(dst) if src == primary else str(dst)
-                        for src, dst in moves] + [
-            str(p) for p in files if p not in dict(moves)]
-        job["title"] = clean
+        moved = {src for src, _ in moves}
+        # new paths for what moved, untouched paths for what did not (a
+        # sidecar that was not ours to rename must survive in the list, or a
+        # later delete leaves it behind)
+        job["files"] = [str(dst) for _, dst in moves] + [
+            str(p) for p in files if p not in moved]
+        job["title"] = title          # the row shows the name, not the [id]
         self._save(job)
 
     def _write_tags(self, path: Path, title: str, artist: str) -> None:
@@ -1179,19 +1227,32 @@ class JobManager:
         if not exe:
             raise RuntimeError("no ffmpeg on this machine")
         tmp = path.with_name(path.stem + ".tagtmp" + path.suffix)
-        cmd = [exe, "-y", "-v", "error", "-i", str(path), "-c", "copy"]
+        # -map 0 keeps secondary audio and subtitle tracks: ffmpeg's default
+        # selection takes one stream per type and would drop them
+        cmd = [exe, "-y", "-v", "error", "-i", str(path), "-map", "0",
+               "-c", "copy"]
         if title:
             cmd += ["-metadata", f"title={title}"]
         if artist:
             cmd += ["-metadata", f"artist={artist}",
                     "-metadata", f"album_artist={artist}"]
         cmd.append(str(tmp))
-        proc = __import__("subprocess").run(cmd, capture_output=True, text=True,
-                                            timeout=180)
-        if proc.returncode != 0 or not tmp.exists():
+        try:
+            proc = __import__("subprocess").run(cmd, capture_output=True, text=True,
+                                                timeout=180)
+        except Exception:
             tmp.unlink(missing_ok=True)
-            raise RuntimeError((proc.stderr or "ffmpeg failed").strip().splitlines()[-1])
-        os.replace(tmp, path)
+            raise
+        if (proc.returncode != 0 or not tmp.exists()
+                or tmp.stat().st_size == 0):
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError((proc.stderr or "ffmpeg failed").strip().splitlines()[-1]
+                               if proc.stderr else "ffmpeg wrote nothing")
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def _split_chapters(self, src: Path, chapters: list) -> list[Path]:
         """Cut the finished file at its chapters, one stream copy per section."""
@@ -1220,7 +1281,11 @@ class JobManager:
                     continue
                 end = min(end, duration)
             name = str(row[2] if len(row) > 2 else "").strip() or f"chapter {i:02d}"
-            name = re.sub(r'[\\/:*?"<>|]+', "-", name)[:60].strip() or f"chapter {i:02d}"
+            name = re.sub(r'[\\/:*?"<>|]+', "-", name).strip(" .") or f"chapter {i:02d}"
+            # the whole stem must stay inside check_name's 150 characters:
+            # a base plus a long chapter title used to walk past it
+            room = max(12, 150 - len(base) - 12)
+            name = name[:room].strip(" .") or f"chapter {i:02d}"
             dst = src.with_name(f"{base} - {i:02d} - {name}{src.suffix}")
             n = 2
             while dst.exists():
@@ -1233,6 +1298,8 @@ class JobManager:
                 capture_output=True, text=True, timeout=600)
             if proc.returncode != 0 or not dst.exists() or dst.stat().st_size == 0:
                 dst.unlink(missing_ok=True)
+                for kept in out:            # do not leave half a set behind
+                    kept.unlink(missing_ok=True)
                 raise RuntimeError((proc.stderr or "ffmpeg split failed")
                                    .strip().splitlines()[-1])
             out.append(dst)

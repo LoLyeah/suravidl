@@ -2031,7 +2031,10 @@ function renderChapterChips(info) {
   box.replaceChildren();
   const chapters = (info.chapters || []).slice(0, 20);
   $("chapterRow").classList.toggle("hidden", !chapters.length);
-  CHAPTERS = chapters.filter((c) => c.start_time != null && c.end_time != null)
+  // every chapter the probe returned, not just the twenty drawn as chips:
+  // splitting the whole file must not stop at chapter 20 (v0.47.29 audit)
+  CHAPTERS = (info.chapters || [])
+    .filter((c) => c.start_time != null && c.end_time != null)
     .map((c) => [Number(c.start_time), Number(c.end_time), c.title || ""]);
   const splitField = $("ovSplitField");
   if (splitField) {
@@ -2593,6 +2596,10 @@ function clearOv() {
   if ($("ovTitle")) $("ovTitle").value = "";
   if ($("ovArtist")) $("ovArtist").value = "";
   if ($("ovSplit")) $("ovSplit").checked = false;
+  // the chapters belong to a link, not to the session: a cleared form must
+  // not hand the next link the previous video's cut points (v0.47.29 audit)
+  CHAPTERS = [];
+  if ($("ovSplitField")) $("ovSplitField").hidden = true;
   $("ovContainer").value = "";
   $("ovArchive").value = "";
   $("ovPreset").value = "";
@@ -2915,7 +2922,8 @@ function initOverrides() {
     $("ovBlock").scrollIntoView({ block: "start" });
   };
   for (const id of ["ovSubs", "ovSubLangs", "ovSb", "ovMeta", "ovThumb", "ovRaw",
-                    "ovClipStart", "ovClipEnd", "ovContainer", "ovArchive"]) {
+                    "ovClipStart", "ovClipEnd", "ovContainer", "ovArchive",
+                    "ovTitle", "ovArtist", "ovSplit"]) {
     $(id).addEventListener("input", renderOvCount);
     $(id).addEventListener("change", renderOvCount);
   }
@@ -3558,8 +3566,11 @@ function jobRow(j) {
     // lists the video/audio fragments it muxed (master.f200.mp4, …), but
     // its own filepath is among them — a folder is never (2026-09-27,
     // caught live: a merged row offered "Files (3)" instead of Play).
+    // v0.47.29: a split row's filepath is its FIRST section, so the old
+    // "filepath is not among the files" test hid chapters 2..N behind one
+    // Play button. `j.split` comes from the engine.
     const playlistRow = !!(j.files && j.files.length
-    && j.files[0] !== j.filepath && !j.files.includes(j.filepath));
+      && (j.split || (j.files[0] !== j.filepath && !j.files.includes(j.filepath))));
     if (playlistRow) {
       const count = j.files.length;
       const toggle = el("button", "ghost-sm", t("Files ({n})", { n: count }));
@@ -6018,6 +6029,14 @@ wireBayDoor($("ovBlock"));
 /* ---------- boot ---------- */
 $("probeBtn").onclick = doProbe;
 if ($("quickBtn")) $("quickBtn").onclick = quickStart;
+// A different link invalidates the chapters the last probe found: sending
+// them with a new URL would cut the wrong file at the wrong times (v0.47.29)
+$("url").addEventListener("input", () => {
+  if (!CHAPTERS.length) return;
+  CHAPTERS = [];
+  if ($("ovSplit")) $("ovSplit").checked = false;
+  if ($("ovSplitField")) $("ovSplitField").hidden = true;
+});
 // Enter probes; Ctrl/Cmd+Enter is the shortcut for the one-tap path
 $("url").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); quickStart(); }
@@ -6818,6 +6837,15 @@ function editAndRetry(j) {
       .replace(/^\*/, "").split("-");
     $("ovClipStart").value = (start || "").trim();
     $("ovClipEnd").value = (end || "").trim();
+  }
+  // v0.47.29: a failed job's own title/artist and its chapter cut come back
+  // with it, or "edit & retry" would silently drop them
+  if (ov.meta_title && $("ovTitle")) $("ovTitle").value = ov.meta_title;
+  if (ov.meta_artist && $("ovArtist")) $("ovArtist").value = ov.meta_artist;
+  if (ov.split_chapters && Array.isArray(ov.chapters) && ov.chapters.length) {
+    CHAPTERS = ov.chapters.map((c) => [Number(c[0]), Number(c[1]), c[2] || ""]);
+    if ($("ovSplit")) $("ovSplit").checked = true;
+    if ($("ovSplitField")) $("ovSplitField").hidden = false;
   }
   renderOvCount();
   showTab("download");

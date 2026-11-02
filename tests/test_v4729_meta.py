@@ -120,3 +120,96 @@ def test_the_form_sends_them_as_this_download_only():
     chips = app[app.index("function renderChapterChips"):]
     chips = chips[:chips.index("\n}\n") + 3]
     assert "CHAPTERS =" in chips and "ovSplitField" in chips
+
+
+def test_rename_moves_the_sidecar_too_and_keeps_it_in_files(tmp_path):
+    """The bug this pins: the files list was rebuilt with the OLD path for
+    anything that did not move, so a sidecar kept a name that no longer
+    existed and a later delete would leave it on disk."""
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=tmp_path / "jobs.db")
+    (tmp_path / "dl").mkdir(parents=True, exist_ok=True)
+    video = tmp_path / "dl" / "Old Title [abc123].mp4"
+    subs = tmp_path / "dl" / "Old Title [abc123].en.srt"
+    video.write_bytes(b"x")
+    subs.write_text("1\n")
+    job = {"id": "j1", "url": "http://example.invalid/x", "status": "completed",
+           "progress": {"downloaded_bytes": 1, "total_bytes": 1, "speed": 0,
+                        "eta": 0},
+           "filepath": str(video), "files": [str(video), str(subs)],
+           "video_id": "abc123", "title": "Old Title", "overrides": {},
+           "headers": None}
+    mgr._jobs["j1"] = job
+    mgr._retitle(job, "New Title")
+
+    files = [pathlib.Path(p) for p in job["files"]]
+    assert len(files) == 2
+    assert all(p.exists() for p in files), [p.name for p in files]
+    assert {p.suffix for p in files} == {".mp4", ".srt"}
+    assert all("New Title" in p.name for p in files)
+    assert all("[abc123]" in p.name for p in files)
+    assert pathlib.Path(job["filepath"]).exists()
+
+
+def test_the_uncut_source_is_gone_after_a_split(tmp_path, server):
+    """Blocker from the audit: the source stayed on disk while the row owned
+    only the sections — delete missed it and the next download saw it as
+    "already on disk"."""
+    mgr = JobManager(download_dir=tmp_path / "dl", db_path=tmp_path / "jobs.db")
+    job = mgr.create(f"{server}/tiny.mp4", overrides={
+        "split_chapters": True,
+        "chapters": [[0.0, 0.4, "A"], [0.4, 0.9, "B"]]})
+    j = _wait(mgr, job["id"])
+    assert j["status"] == "completed"
+    on_disk = sorted(p.name for p in (tmp_path / "dl").iterdir() if p.is_file())
+    assert len(on_disk) == 2, on_disk          # the two sections, nothing else
+    assert all(pathlib.Path(p).exists() for p in j["files"])
+
+
+def test_tags_keep_every_stream(tmp_path):
+    """Blocker from the audit: a bare `-c copy` takes one stream per type, so
+    a second audio track or subtitle track was dropped by a tag rewrite."""
+    from suravidl_engine.jobs import JobManager
+    exe = ffmpeg_exe()
+    src = tmp_path / "multi.mkv"
+    subprocess.run([exe, "-y", "-v", "error",
+                    "-f", "lavfi", "-i", "color=c=black:s=64x64:d=1",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
+                    "-f", "lavfi", "-i", "sine=frequency=880:duration=1",
+                    "-map", "0:v", "-map", "1:a", "-map", "2:a",
+                    "-c:v", "libx264", "-c:a", "aac", "-shortest", str(src)],
+                   check=True, timeout=120)
+    mgr = JobManager(download_dir=tmp_path, db_path=tmp_path / "jobs.db")
+    mgr._write_tags(src, "T", "A")
+    probe = subprocess.run([exe.replace("ffmpeg", "ffprobe"), "-v", "error",
+                            "-show_entries", "stream=codec_type", "-of", "json",
+                            str(src)], capture_output=True, text=True, timeout=60)
+    types = [s["codec_type"] for s in json.loads(probe.stdout)["streams"]]
+    assert types.count("audio") == 2, types
+
+
+def test_the_queue_row_shows_every_chapter_file():
+    app = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
+    assert "j.split ||" in app, "a split row must list its files, not only the first"
+    from suravidl_engine.jobs import redact_job
+    assert redact_job({"overrides": {"split_chapters": True}})["split"] is True
+    assert redact_job({"overrides": {}})["split"] is False
+
+
+def test_the_chapter_state_cannot_leak_to_another_link():
+    app = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
+    body = app[app.index("function clearOv()"):]
+    body = body[:body.index("\n}\n") + 3]
+    assert "CHAPTERS = []" in body
+    assert "ovSplitField" in body
+    # every chapter the probe returned, not only the twenty chips
+    chips = app[app.index("function renderChapterChips"):]
+    chips = chips[:chips.index("\n}\n") + 3]
+    assert "CHAPTERS = (info.chapters || [])" in chips
+
+
+def test_retry_keeps_the_title_and_the_cut():
+    app = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
+    body = app[app.index("function editAndRetry"):]
+    body = body[:body.index("\n}\n") + 3]
+    assert "ov.meta_title" in body and "ov.meta_artist" in body
+    assert "ov.split_chapters" in body
