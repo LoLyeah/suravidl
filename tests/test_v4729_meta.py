@@ -55,7 +55,8 @@ def server():
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the hand" for e in ENTRIES)
+    # retired by v0.49.2 "the cue"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the hand" for e in ENTRIES)
 
 
 def test_a_title_and_artist_rename_the_file_and_tag_it(tmp_path, server):

@@ -714,6 +714,7 @@ const STRINGS = { en: {}, id: {
   "a grading monitor": "monitor grading",
   "splicing tape": "pita sambung",
   "halide mono": "mono halida",
+  "this phone did not return a wallpaper palette": "ponsel ini tidak memberi palet wallpaper",
   "the site did not send the intermediate certificate that proves its chain, so it cannot be verified — retry with certificate checks off if you trust it": "situs tidak mengirim sertifikat perantara yang membuktikan rantainya, jadi tidak bisa diverifikasi — coba lagi tanpa memeriksa sertifikat kalau kamu memercayainya",
   "the site does not advertise a size for this stream — the real size shows once the download starts": "situs tidak mencantumkan ukuran untuk stream ini — ukuran asli muncul saat unduhan dimulai",
   "the site is rate-limiting this address (429) — wait a bit, then try once more": "situs sedang membatasi permintaan dari alamat ini (429) — tunggu sebentar, lalu coba sekali lagi",

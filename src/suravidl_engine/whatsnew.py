@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.2",
+        "title": "The cue",
+        "items": [
+            "The URL field wears one focus cue instead of a ring stacked on a halo, and its hint ends in an ellipsis on a phone instead of cutting a word.",
+        ],
+    },
+    {
         "version": "0.49.1",
         "title": "The thumb",
         "items": [
@@ -80,14 +87,6 @@ ENTRIES = [
         "title": "The line",
         "items": [
             "The source field is one line again: a flex basis from 0.47.28 became a 220px-tall box on phones, where the row turns into a column.",
-        ],
-    },
-    {
-        "version": "0.47.29",
-        "title": "The hand",
-        "items": [
-            "A download can carry its own title and artist: the file is renamed and its tags rewritten, for that job only — no more site junk in your library.",
-            "Split by chapters: one file per section, cut from the finished download in a single pass, named by chapter.",
         ],
     },
 ]

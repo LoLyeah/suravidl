@@ -804,6 +804,14 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
    under the field rather than squeezing it (v0.47.28) */
 @media (max-width: 560px) { .paste .btn { flex: 1 1 auto; } }
 .paste input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 4px var(--accent-soft); }
+/* v0.49.2: the halo is the MOUSE cue. A keyboard focus already draws the 2px
+   ring, and both at once read as a double outline on the field the whole
+   paste-first path starts from. */
+.paste input:focus-visible { box-shadow: none; }
+/* v0.49.2: a 412px field cut the placeholder mid-word ("…or a direct"), which
+   reads as a broken string. Ellipsis it instead — the full sentence is in the
+   FAQ right below. */
+#url { text-overflow: ellipsis; }
 .paste .btn { padding: 12px 20px; border-radius: 10px; flex: none; }
 .audioRow {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
