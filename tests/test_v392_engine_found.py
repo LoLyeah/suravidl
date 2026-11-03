@@ -52,25 +52,36 @@ def _blocked(p: int):
 def test_the_engine_port_ladder_is_fixed():
     from suravidl_engine.__main__ import _port_candidates, find_free_port
 
-    base = _free_port()
-    assert find_free_port(base) == base
-
-    b1, b2 = _blocked(base), _blocked(base + 1)
-    try:
-        chosen = find_free_port(base)
-        # The exact rung cannot be pinned when `base` comes from the
-        # ephemeral range: the OS may hand base+2 to anything else on the
-        # runner between the probes (this flaked 2026-10-07, CI run
-        # 37696145975). Pin the CONTRACT instead — a busy rung is skipped,
-        # the answer stays on the ladder, and it is actually bindable.
-        assert chosen >= base + 2, "a busy rung moves at least one step"
-        assert chosen in _port_candidates(base), "and never off the ladder"
-        with socket.socket() as s:
-            s.bind(("127.0.0.1", chosen))
-    finally:
-        for b in (b1, b2):
-            if b:
-                b.close()
+    # A busy runner can hand a rung to anything else between our probe and our
+    # bind (this flaked twice on CI). The CONTRACT is what matters, so the whole
+    # probe retries on a lost port instead of pinning a rung the OS may steal.
+    last = None
+    for _ in range(6):
+        base = _free_port()
+        try:
+            assert find_free_port(base) == base
+        except OSError:
+            continue
+        b1, b2 = _blocked(base), _blocked(base + 1)
+        if not b1 or not b2:
+            for b in (b1, b2):
+                if b:
+                    b.close()
+            continue
+        try:
+            chosen = find_free_port(base)
+            assert chosen >= base + 2, "a busy rung moves at least one step"
+            assert chosen in _port_candidates(base), "and never off the ladder"
+            with socket.socket() as s:
+                s.bind(("127.0.0.1", chosen))
+            return
+        except OSError as e:
+            last = e
+        finally:
+            for b in (b1, b2):
+                if b:
+                    b.close()
+    raise AssertionError(f"the ladder never produced a bindable port in 6 tries: {last}")
 
 
 def test_a_full_ladder_falls_back_to_any_free_port():
