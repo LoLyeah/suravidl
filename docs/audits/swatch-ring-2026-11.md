@@ -64,3 +64,15 @@ html[data-theme="light"] .swatch.on { border-color: var(--accent2); } html[data-
   outline: none } }`. A live tap probe showed `:focus-visible` does not match
   after touch at all (the ring was the selected style, not focus), so
   removing the outline would only cost keyboard users on tablets.
+
+## Third pass — the chips, not the card (v0.48.2)
+
+The owner circled the preview chips: the odd thing was never the card outline
+but the two-tone `linear-gradient(135deg, A 45%, B 46%, …)` inside each swatch.
+A hard 45° seam, and on the dark plates the black half disappeared into the
+card, leaving a floating triangle that read as a torn corner.
+
+Each chip is now a plate with one accent bar: the scheme chips wear their own
+colour, the three theme chips wear the current scheme's `--pv-deep` (light
+plate) or `--pv-bright` (dark and AMOLED plates), so switching scheme still
+updates them. The glass chips keep their gradient and grow no bar.

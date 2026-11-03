@@ -33,11 +33,10 @@ def _block(marker: str) -> str:
     return CSS[i:CSS.index("}", i)]
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.48.1"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the tint"
+def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
+    assert any(e["version"] == "0.48.1" and e["title"].lower() == "the tint"
+               for e in ENTRIES)
 
 
 def test_selection_is_a_tint_not_an_outline():

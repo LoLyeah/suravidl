@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.48.2",
+        "title": "The swatch",
+        "items": [
+            "The little scheme previews are clean plates with one accent bar — the diagonal that looked like a torn corner is gone.",
+        ],
+    },
+    {
         "version": "0.48.1",
         "title": "The tint",
         "items": [
@@ -80,13 +87,6 @@ ENTRIES = [
         "title": "The dissolve",
         "items": [
             "Tab switches now leave the frosted plates alone and dissolve only what sits on them: the blur never blinks, and the pinned bars no longer stay bright while everything else fades.",
-        ],
-    },
-    {
-        "version": "0.47.24",
-        "title": "The wash",
-        "items": [
-            "Switching tabs no longer blanks the frosted blur for the length of the fade and snaps it back at the end — the arrival is a wash that clears while the glass keeps its blur.",
         ],
     },
 ]
