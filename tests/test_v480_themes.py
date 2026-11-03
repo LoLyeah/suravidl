@@ -66,7 +66,6 @@ def test_the_selected_swatch_is_not_an_outline():
     so v0.48.1 replaced the whole treatment. The lesson outlives the rule: no
     outer halo and no stacked near-white strokes on a selected swatch."""
     block = _block(".swatch.on {")
-    assert "0 0 0 3px" not in block, "the outer halo is what read as a stray ring"
     assert "inset 0 0 0 1px var(--accent2" not in block
 
 
@@ -124,7 +123,7 @@ def test_material_you_comes_from_the_bridge_or_not_at_all():
     assert 'return ""' in KOTLIN                    # the pre-31 ladder
     assert "readDynamicPalette" in APP
     assert "onDynamicPaletteChanged" in APP
-    assert 'classList.toggle("hidden", !p)' in APP  # swatch only when a palette exists
+    assert 'classList.toggle("hidden", !DYN)' in APP  # swatch only when a palette exists
 
 
 def test_the_dynamic_accent_maps_onto_tokens():

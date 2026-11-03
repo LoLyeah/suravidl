@@ -39,19 +39,18 @@ def test_the_notes_still_carry_this_release():
                for e in ENTRIES)
 
 
-def test_selection_is_a_tint_not_an_outline():
+def test_selection_is_back_to_the_047_treatment():
+    """v0.48.2 rolled the border back verbatim; only the pair of near-white
+    strokes that fused into a headlight must never return."""
     block = _block(".swatch.on {")
-    assert "background: var(--accent-soft)" in block
-    assert "border-color: var(--accent-line)" in block
-    # the two near-white strokes that fused into a headlight
+    assert "box-shadow: 0 0 0 3px var(--accent-soft)" in block
     assert "inset 0 0 0 1px var(--accent2" not in block
-    assert "border-color: var(--accent)" not in block.replace("--accent-line", "")
 
 
-def test_the_selected_swatch_carries_an_led():
-    assert ".swatch.on .sw-label::before" in CSS
-    assert "width: 6px; height: 6px" in CSS
-    # the LED is not a second filled control: no accent-filled badge circle
+def test_the_selected_swatch_carries_no_led():
+    """v0.48.1 added a dot; the owner rejected it (v0.48.2). Selection is the
+    tint alone."""
+    assert ".swatch.on .sw-label::before" not in CSS
     assert ".swatch.on::after" not in CSS
 
 
@@ -90,6 +89,15 @@ def test_the_palette_is_formatted_locale_free():
     assert "String.format(Locale.US" in KOTLIN
     assert "import java.util.Locale" in KOTLIN
     assert 'String.format("rgba(' not in KOTLIN
+
+
+def test_the_palette_is_cached_not_refetched_per_tap():
+    """A single failed bridge call used to null the palette and make the
+    Wallpaper scheme do nothing at all."""
+    fn = APP[APP.index("function applyDynamicPalette("):]
+    fn = fn[:fn.index("return DYN;")]
+    assert "if (refresh || !DYN) DYN = readDynamicPalette() || DYN;" in fn
+    assert 'id="dynNote"' in (ROOT / "src" / "suravidl_engine" / "web" / "index.html").read_text()
 
 
 def test_the_reader_survives_a_broken_bridge():

@@ -37,7 +37,6 @@
   --accent: #e8a33e;                      /* signal amber */
   --accent2: #f3c169;                     /* the lamp at full */
   --ring: rgba(232,163,62,.72);           /* v0.48.0: the lamp, dimmed to a ring */
-  --pv-deep: #a8670f;  --pv-bright: #e8a33e;   /* swatch previews, v0.48.2 */
   --accent-soft: rgba(232,163,62,.16);
   --accent-line: rgba(232,163,62,.45);
   --accent-ink: #f0c98a;
@@ -143,7 +142,6 @@ html[data-theme="amoled"] {
    (ok/err/warn) stay their own colours: they are signals, not brand. */
 html[data-accent="pine"][data-theme="light"] {
   --accent: #14493C;  --accent2: #0e352b;
-  --pv-deep: #14493C;  --pv-bright: #F2E9D8;
   --ring: #14493C;                /* visible on the day ground, same family */
   --accent-fg: #F2E9D8;  --accent-ink: #14493C;
   --accent-soft: rgba(20,73,60,.12);  --accent-line: rgba(20,73,60,.35);
@@ -153,7 +151,6 @@ html[data-accent="pine"][data-theme="light"] {
 html[data-accent="pine"][data-theme="dark"],
 html[data-accent="pine"][data-theme="amoled"] {
   --accent: #F2E9D8;  --accent2: #ffffff;
-  --pv-deep: #14493C;  --pv-bright: #F2E9D8;
   --ring: rgba(242,233,216,.62);  /* a ring, not a headlight: cream at 62% */
   --accent-fg: #14493C;  --accent-ink: #F2E9D8;
   --accent-soft: rgba(242,233,216,.14);  --accent-line: rgba(242,233,216,.45);
@@ -173,7 +170,6 @@ html[data-accent="pine"][data-theme="amoled"] {
 html[data-accent="cobalt"][data-theme="light"] {
   --accent: #1858b8;  --accent2: #12438e;
   --accent-fg: #f4f7fc;  --accent-ink: #12438e;
-  --pv-deep: #1858b8;  --pv-bright: #6eb0ff;
   --ring: #12438e;
   --accent-soft: rgba(24,88,184,.13);  --accent-line: rgba(24,88,184,.36);
   --accent-glow: rgba(24,88,184,.38);
@@ -183,7 +179,6 @@ html[data-accent="cobalt"][data-theme="dark"],
 html[data-accent="cobalt"][data-theme="amoled"] {
   --accent: #6eb0ff;  --accent2: #96c7ff;
   --accent-fg: #07192e;  --accent-ink: #9ccaff;
-  --pv-deep: #1858b8;  --pv-bright: #6eb0ff;
   --ring: rgba(110,176,255,.66);
   --accent-soft: rgba(110,176,255,.15);  --accent-line: rgba(110,176,255,.45);
   --accent-glow: rgba(110,176,255,.42);
@@ -195,7 +190,6 @@ html[data-accent="cobalt"][data-theme="amoled"] {
 html[data-accent="oxide"][data-theme="light"] {
   --accent: #9e4722;  --accent2: #7c3517;
   --accent-fg: #fff8f4;  --accent-ink: #7c3517;
-  --pv-deep: #9e4722;  --pv-bright: #f09a72;
   --ring: #7c3517;
   --accent-soft: rgba(158,71,34,.13);  --accent-line: rgba(158,71,34,.35);
   --accent-glow: rgba(158,71,34,.38);
@@ -205,7 +199,6 @@ html[data-accent="oxide"][data-theme="dark"],
 html[data-accent="oxide"][data-theme="amoled"] {
   --accent: #f09a72;  --accent2: #f7b594;
   --accent-fg: #260f05;  --accent-ink: #f6b899;
-  --pv-deep: #9e4722;  --pv-bright: #f09a72;
   --ring: rgba(240,154,114,.66);
   --accent-soft: rgba(240,154,114,.15);  --accent-line: rgba(240,154,114,.45);
   --accent-glow: rgba(240,154,114,.42);
@@ -217,7 +210,6 @@ html[data-accent="oxide"][data-theme="amoled"] {
 html[data-accent="silver"][data-theme="light"] {
   --accent: #2c3138;  --accent2: #181b20;
   --accent-fg: #f2f0ec;  --accent-ink: #181b20;
-  --pv-deep: #2c3138;  --pv-bright: #d8dee6;
   --ring: #181b20;
   --accent-soft: rgba(44,49,56,.12);  --accent-line: rgba(44,49,56,.36);
   --accent-glow: rgba(44,49,56,.28);
@@ -227,7 +219,6 @@ html[data-accent="silver"][data-theme="dark"],
 html[data-accent="silver"][data-theme="amoled"] {
   --accent: #d8dee6;  --accent2: #eef2f6;
   --accent-fg: #11151a;  --accent-ink: #e2e7ee;
-  --pv-deep: #2c3138;  --pv-bright: #d8dee6;
   --ring: rgba(216,222,230,.62);
   --accent-soft: rgba(216,222,230,.14);  --accent-line: rgba(216,222,230,.42);
   --accent-glow: rgba(216,222,230,.28);
@@ -244,7 +235,6 @@ html[data-accent="dynamic"][data-theme="light"] {
   --muted: var(--dyn-muted, #5b564e);
   --accent: var(--dyn-accent, #1858b8);  --accent2: var(--dyn-accent2, #12438e);
   --accent-fg: var(--dyn-accent-fg, #f4f7fc);  --accent-ink: var(--dyn-accent-ink, #12438e);
-  --pv-deep: var(--dyn-accent, #415f91);  --pv-bright: var(--dyn-accent-dark, #6eb0ff);
   --ring: var(--dyn-accent-ink, #12438e);
   --accent-soft: var(--dyn-accent-soft, rgba(24,88,184,.13));
   --accent-line: var(--dyn-accent-line, rgba(24,88,184,.36));
@@ -260,7 +250,6 @@ html[data-accent="dynamic"][data-theme="dark"] {
   --accent: var(--dyn-accent-dark, #6eb0ff);  --accent2: var(--dyn-accent2-dark, #96c7ff);
   --accent-fg: var(--dyn-accent-fg-dark, #07192e);
   --accent-ink: var(--dyn-accent-ink-dark, #9ccaff);
-  --pv-deep: var(--dyn-accent, #415f91);  --pv-bright: var(--dyn-accent-dark, #6eb0ff);
   --ring: var(--dyn-accent-ink-dark, #9ccaff);
   --accent-soft: var(--dyn-accent-soft-dark, rgba(110,176,255,.15));
   --accent-line: var(--dyn-accent-line-dark, rgba(110,176,255,.45));
@@ -276,7 +265,6 @@ html[data-accent="dynamic"][data-theme="amoled"] {
   --accent: var(--dyn-accent-dark, #6eb0ff);  --accent2: var(--dyn-accent2-dark, #96c7ff);
   --accent-fg: var(--dyn-accent-fg-dark, #07192e);
   --accent-ink: var(--dyn-accent-ink-dark, #9ccaff);
-  --pv-deep: var(--dyn-accent, #415f91);  --pv-bright: var(--dyn-accent-dark, #6eb0ff);
   --ring: var(--dyn-accent-ink-dark, #9ccaff);
   --accent-soft: var(--dyn-accent-soft-dark, rgba(110,176,255,.15));
   --accent-line: var(--dyn-accent-line-dark, rgba(110,176,255,.45));
@@ -1421,10 +1409,9 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 #panel-settings .card {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  /* no frost, so no glass border either: on AMOLED the accent-line border
-     plus the gloss read as a pale slab behind the tab strip (v0.48.0) */
-  border-color: var(--line);
-  background-image: none;
+  /* v0.48.2 ROLLBACK: v0.48.0 gave this card `border-color: var(--line)` and
+     killed its gloss, which put a visible rectangle around the whole settings
+     panel. The owner asked for the border back off — this is the 0.47 shape. */
 }
 /* the yt-dlp tab's Save floats like Settings' (v0.45.12): its options
    list runs long and Save used to scroll away */
@@ -1449,23 +1436,11 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 }
 @media (hover: hover) { .swatch:hover { border-color: var(--accent-line); } }
 .swatch.on {
-  /* v0.48.1: a tint and an LED, never an outline. v0.48.0 still drew a 1px
-     `--accent` border plus a 1px `--accent2` inset — on AMOLED + Pine those
-     fuse into a 2px near-white headlight (the owner reported it twice). */
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-  box-shadow: inset 0 1px 0 var(--inset-hi);
-  color: var(--text);
+  /* v0.48.2 ROLLBACK: this is the 0.47 treatment, restored verbatim. The
+     tint/hairline/dot detour (0.48.1) is gone — the owner asked for the old
+     border back and the dot removed. */
+  border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.swatch.on .sw-label { color: var(--accent-ink); }
-/* the LED is an indicator, not a second filled control (One Lamp Rule) */
-.swatch.on .sw-label::before {
-  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px;
-  border-radius: 999px; vertical-align: 1px;
-  background: var(--accent); box-shadow: 0 0 6px var(--accent-glow);
-}
-html[data-theme="light"] .swatch.on { border-color: var(--accent2); }
-html[data-theme="light"] .swatch.on .sw-label::before { background: var(--accent2); box-shadow: none; }
 /* selected outlines must clear 3:1 on the day ground too — #c07a16 reads
    2.74:1 there, so the light theme leans on the darker voice (v0.44.x audit;
    pine's own accent is dark enough by itself but shares the rule) */
@@ -1477,33 +1452,28 @@ html[data-theme="light"] .get.picked { border-color: var(--accent2); }
 .sw-preview {
   width: 74px; height: 44px; border-radius: 8px;
   border: 1px solid rgba(127,127,127,.25);
-  /* v0.48.2: a plate with one control on it, not a diagonal bleed. The old
-     two-tone 45%/46% gradient left a hard seam and, on the dark plates, a
-     corner that read as torn or folded (the owner circled exactly those). */
-  position: relative; overflow: hidden;
-  background: var(--pv, #14181d);
 }
-.sw-preview::after {
-  content: ""; position: absolute; left: 9px; right: 9px; bottom: 9px;
-  height: 9px; border-radius: 3px;
-  background: var(--pv-accent, #e8a33e);
-}
-/* the theme plates borrow the CURRENT scheme's accent so switching scheme
-   updates them; the light plate takes the ink — cream on cream vanishes */
-.sw-light  { --pv: #f0ede8; --pv-accent: var(--pv-deep); }
-.sw-dark   { --pv: #14181d; --pv-accent: var(--pv-bright); }
-.sw-amoled { --pv: #000;    --pv-accent: var(--pv-bright); }
+.sw-light  { background: linear-gradient(135deg, #f0ede8 45%, #c07a16 46%, #a8670f 78%, #e7e4de); }
+.sw-dark   { background: linear-gradient(135deg, #14181d 45%, #e8a33e 46%, #f3c169 78%, #0f1216); }
+.sw-amoled { background: linear-gradient(135deg, #000 60%, #e8a33e 61%, #7e8794); }
 .g-frosted { background: linear-gradient(160deg, rgba(255,255,255,.09), rgba(255,255,255,.02) 70%), #343941; }
 .g-liquid  { background: linear-gradient(150deg, rgba(255,255,255,.5), rgba(150,170,210,.16) 42%, rgba(232,163,62,.3) 96%), #3a3f47; }
-.g-frosted::after, .g-liquid::after { display: none; }   /* glass chips keep their own art */
-/* the scheme plates wear their own colour, always */
-.sw-amber  { --pv: #14181d; --pv-accent: #e8a33e; }
-.sw-pine   { --pv: #0e352b; --pv-accent: #F2E9D8; }
-.sw-cobalt { --pv: #14181d; --pv-accent: #6eb0ff; }
-.sw-oxide  { --pv: #14181d; --pv-accent: #f09a72; }
-.sw-silver { --pv: #14181d; --pv-accent: #d8dee6; }
-.sw-dynamic { --pv: #1b1b1f; --pv-accent: var(--dyn-accent-dark, #a8c7fa); }
+/* the scheme swatches: the two voices of the house (v0.38.3) */
+.sw-amber  { background: linear-gradient(135deg, #14181d 45%, #e8a33e 46%, #f3c169 78%, #e7e4de); }
+.sw-pine   { background: linear-gradient(135deg, #14493C 45%, #F2E9D8 46%, #0e352b 78%, #e7e4de); }
+/* under pine, the theme previews wear the pine lamp, not amber */
+
+/* the new schemes' swatch previews (v0.48.0) */
+.sw-cobalt { background: linear-gradient(135deg, #14181d 45%, #6eb0ff 46%, #96c7ff 78%, #e7e4de); }
+.sw-oxide  { background: linear-gradient(135deg, #14181d 45%, #f09a72 46%, #f7b594 78%, #e7e4de); }
+.sw-silver { background: linear-gradient(135deg, #14181d 45%, #d8dee6 46%, #eef2f6 78%, #e7e4de); }
+.sw-dynamic { background: linear-gradient(135deg, #1b1b1f 45%, #a8c7fa 46%, #d3e3fd 78%, #e7e4de); }
+
+[data-accent="pine"] .sw-light  { background: linear-gradient(135deg, #f0ede8 45%, #14493C 46%, #0e352b 78%, #e7e4de); }
+[data-accent="pine"] .sw-dark   { background: linear-gradient(135deg, #14181d 45%, #F2E9D8 46%, #ffffff 78%, #0f1216); }
+[data-accent="pine"] .sw-amoled { background: linear-gradient(135deg, #000 60%, #F2E9D8 61%, #7e8794); }
 [data-accent="pine"] .g-liquid  { background: linear-gradient(150deg, rgba(255,255,255,.5), rgba(150,170,210,.16) 42%, rgba(242,233,216,.3) 96%), #3a3f47; }
+#dynNote { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
 .sw-label { font-weight: 600; }
 .sw-hint { font-size: 10.5px; color: var(--dim); text-align: center; }
 

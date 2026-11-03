@@ -16,9 +16,10 @@ from . import __version__
 ENTRIES = [
     {
         "version": "0.48.2",
-        "title": "The swatch",
+        "title": "The rollback",
         "items": [
-            "The little scheme previews are clean plates with one accent bar — the diagonal that looked like a torn corner is gone.",
+            "The settings panel's outline and the dot beside a selected name are gone — both were mine, both were wrong.",
+            "Wallpaper now sticks: the palette is read once and cached, so a failed bridge call can no longer make it do nothing.",
         ],
     },
     {

@@ -1531,19 +1531,26 @@ function paintDynamicPalette(p) {
   for (const [k, v] of Object.entries(p.light || {})) put("--dyn-" + k, v);
   for (const [k, v] of Object.entries(p.dark || {})) put("--dyn-" + k + "-dark", v);
 }
-function applyDynamicPalette() {
+function applyDynamicPalette(refresh) {
   const sw = $("swDynamic");
-  const p = readDynamicPalette();
-  if (sw) sw.classList.toggle("hidden", !p);
-  if (!p) return null;
-  DYN = p;
-  paintDynamicPalette(p);
-  return p;
+  // v0.48.2: the palette read at boot is CACHED. Re-reading it on every
+  // selection meant a single failed bridge call could null it out and make
+  // "Wallpaper" do nothing at all — exactly the report. Refresh only on resume.
+  if (refresh || !DYN) DYN = readDynamicPalette() || DYN;
+  if (sw) sw.classList.toggle("hidden", !DYN);
+  if (DYN) paintDynamicPalette(DYN);
+  const note = $("dynNote");
+  if (note) {
+    const on = document.documentElement.dataset.accent === "dynamic";
+    note.classList.toggle("hidden", !(on && !DYN));
+    if (on && !DYN) note.textContent = t("this phone did not return a wallpaper palette");
+  }
+  return DYN;
 }
 // the wallpaper changed while the app was open (the host calls this on resume)
 window.onDynamicPaletteChanged = () => {
   const before = JSON.stringify(DYN);
-  applyDynamicPalette();
+  applyDynamicPalette(true);
   if (JSON.stringify(DYN) !== before && CURRENT.accent === "dynamic") {
     applyTheme(null, null, "dynamic");
   }
