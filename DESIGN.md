@@ -136,6 +136,13 @@ before they are written in stack traces, and a finished download says so.
   WKWebView kept a bezel and double-chevron on them; the menu controls were
   the last borrowed chrome).
 - Motion stays under half a second; reduced-motion stops it — never shortens it.
+- The one authored beat is **the landing** (v0.49.0): a finishing job rebuilds
+  its row, so the beat lives on what survives — the COMPLETED pill stamps flat
+  (`.38s`) while a linear 2px scanner pass crosses the row's top edge once
+  (`.5s`). It fires only on a real transition into `completed`, never on a
+  first paint and never twice for the same job; the class is removed after
+  720 ms. The sweep is linear on purpose: an eased opacity fade measured 0.116
+  at the midpoint and the line vanished before it crossed the card.
 - On macOS the room itself is Apple's real glass: the page sits on Liquid
   Glass / vibrancy through a transparent window, behind a near-opaque wash
   of the theme's tone — the desktop reads as a hint, never as the background.

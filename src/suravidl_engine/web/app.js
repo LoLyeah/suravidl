@@ -3797,7 +3797,11 @@ function jobFileItem(j, file) {
 }
 
 /** Patch an existing row in place (smooth progress); rebuild on status change. */
+/* job ids that already played the landing beat (v0.49.0) */
+const LANDED = new Set();
+
 function updateJobRow(row, j) {
+  const was = row.dataset.status;   // the state this row was painted in
   row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   if (row.dataset.sig !== jobSig(j)) {
     const fresh = jobRow(j);
@@ -3815,6 +3819,14 @@ function updateJobRow(row, j) {
       if (fdet) fdet.removeAttribute("aria-hidden");
     }
     fresh.classList.add("swap");
+    // the take lands: only on a real transition into "completed", never on a
+    // first paint and never twice for the same job (a rebuild must not replay)
+    if (j.status === "completed" && was && ACTIVE.has(was) && !LANDED.has(j.id)) {
+      LANDED.add(j.id);
+      if (LANDED.size > 300) LANDED.delete(LANDED.values().next().value);
+      fresh.classList.add("landed");
+      setTimeout(() => fresh.classList.remove("landed"), 720);
+    }
     row.replaceWith(fresh);
     return fresh;
   }

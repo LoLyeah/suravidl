@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.0",
+        "title": "The landing",
+        "items": [
+            "A finishing take lands: the COMPLETED pill stamps flat while a scanner pass runs along the row, once — the machine confirming the file.",
+        ],
+    },
+    {
         "version": "0.48.4",
         "title": "The rim",
         "items": [
@@ -81,13 +88,6 @@ ENTRIES = [
         "items": [
             "Download now: one tap queues the pasted link at your default quality, no format list — and a link shared to the phone can skip it too (Settings).",
             "The notification now shows how far along the download is, how fast it runs and how long is left, with a Cancel button.",
-        ],
-    },
-    {
-        "version": "0.47.27",
-        "title": "The flush",
-        "items": [
-            "A job that fails just as the app restarts now comes back as failed, not interrupted: the row is written before the state is shown.",
         ],
     },
 ]

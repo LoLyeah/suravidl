@@ -23,7 +23,8 @@ JOBS = (ROOT / "src" / "suravidl_engine" / "jobs.py").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the flush" for e in ENTRIES)
+    # retired by v0.49.0 "the landing"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the flush" for e in ENTRIES)
 
 
 def _wait(mgr, job_id, timeout=30):

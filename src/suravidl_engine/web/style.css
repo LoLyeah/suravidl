@@ -1746,6 +1746,33 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after {
 .swap { animation: swapIn var(--t-base) var(--e-out) both; }
 @keyframes swapIn { from { opacity: .55; } }
 
+/* ---------- the take lands (v0.49.0) -------------------------------------
+   A finishing job rebuilds its row, so the progress groove cannot settle —
+   it is simply gone. The beat lives on what survives: the pill stamps flat
+   and a scanner pass confirms the file, once per job. Mechanical, 480 ms,
+   transform and opacity only. */
+.job.landed { overflow: hidden; }
+.job.landed .pill { animation: stampLand .38s var(--e-out) both; }
+.job.landed::before {
+  content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ok-line) 30%,
+              var(--ok) 50%, var(--ok-line) 70%, transparent);
+  box-shadow: 0 0 10px var(--ok-line);
+  transform: translateX(-100%);
+  /* linear, and NO opacity fade: the gradient's own transparent ends soften
+     it, while an eased fade killed the line by 25% of the pass (measured). */
+  animation: scanPass .5s linear both;
+  pointer-events: none;
+}
+@keyframes stampLand {
+  from { transform: scale(1.18); opacity: .45; }
+  to   { transform: scale(1); opacity: 1; }
+}
+@keyframes scanPass {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
 /* wide rooms: give the deck breathing room */
 @media (min-width: 1440px) {
   main { max-width: 1320px; padding-bottom: 150px; }
