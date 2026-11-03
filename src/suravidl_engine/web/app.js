@@ -6176,6 +6176,10 @@ document.addEventListener("focusin", (e) => {
 
 initOptionListKeyboard();
 
+// v0.48.1: the palette decides whether the Wallpaper swatch EXISTS. It used
+// to be read only when that accent was already chosen — a scheme nobody can
+// see cannot be chosen, so Material You never appeared on any phone.
+applyDynamicPalette();
 applyTheme(CURRENT.theme, CURRENT.glass, CURRENT.accent);
 if (ANDROID()) document.documentElement.dataset.host = "android";
 applyStaticI18n();      // v0.44.0: every static string through t()
@@ -6355,6 +6359,7 @@ document.addEventListener("visibilitychange", () => {
     checkHandoff();
     refreshJobs();      // the queue is current the moment it is visible
     checkUpdatePermResume();
+    window.onDynamicPaletteChanged();   // v0.48.1: the wallpaper may have moved
   }
 });
 checkHandoff();

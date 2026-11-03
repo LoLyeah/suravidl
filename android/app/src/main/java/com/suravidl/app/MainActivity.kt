@@ -11,6 +11,7 @@ import android.os.Process
 import android.provider.Settings
 import android.util.Log
 import android.view.ViewGroup
+import java.util.Locale
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -366,11 +367,11 @@ class MainActivity : AppCompatActivity() {
             if (Build.VERSION.SDK_INT < 31) return ""
             fun hex(id: Int): String {
                 val c = resources.getColor(id, theme)
-                return String.format("#%06X", 0xFFFFFF and c)
+                return String.format(Locale.US, "#%06X", 0xFFFFFF and c)
             }
             fun rgba(id: Int, alpha: Float): String {
                 val c = resources.getColor(id, theme)
-                return String.format("rgba(%d,%d,%d,%.2f)",
+                return String.format(Locale.US, "rgba(%d,%d,%d,%.2f)",
                     (c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF, alpha)
             }
             fun palette(bg: Int, panel: Int, text: Int, muted: Int,
@@ -389,7 +390,7 @@ class MainActivity : AppCompatActivity() {
                     "\"accent-line\":\"" + rgba(accent, 0.45f) + "\"," +
                     "\"glow\":\"" + rgba(accent, 0.40f) + "\"," +
                     "\"sel\":\"" + rgba(accent, 0.28f) + "\"," +
-                    "\"lamp\":\"" + lamp + "}"
+                    "\"lamp\":\"" + lamp + "\"}"   // v0.48.1: the quote before } was missing — JSON.parse threw
             }
             return try {
                 val light = palette(

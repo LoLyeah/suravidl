@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.48.1",
+        "title": "The tint",
+        "items": [
+            "A selected swatch is a soft tint with a small LED, never a bright outline — the white edge on AMOLED is gone for good.",
+            "Material You now actually appears on Android 12+: the Wallpaper scheme was hidden behind a state you could not reach, and its palette never parsed.",
+        ],
+    },
+    {
         "version": "0.48.0",
         "title": "The palette",
         "items": [
@@ -79,14 +87,6 @@ ENTRIES = [
         "title": "The wash",
         "items": [
             "Switching tabs no longer blanks the frosted blur for the length of the fade and snaps it back at the end — the arrival is a wash that clears while the glass keeps its blur.",
-        ],
-    },
-    {
-        "version": "0.47.23",
-        "title": "The report",
-        "items": [
-            "A video whose server forgets its intermediate certificate now plays in the in-app browser: media only, and only for an untrusted chain — with a note on screen. Expired or mismatched certificates are still refused.",
-            "The browser also says why a resource failed (network, HTTP status or certificate) instead of leaving a spinner with no answer.",
         ],
     },
 ]

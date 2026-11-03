@@ -19,7 +19,8 @@ BROWSER = (JAVA / "BrowserActivity.kt").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the report" for e in ENTRIES)
+    # retired by v0.48.1 "the tint"; the feature stays covered by its own tests
+    assert not any(e["title"].lower() == "the report" for e in ENTRIES)
 
 
 def test_the_wrong_hypothesis_is_gone():

@@ -1437,15 +1437,23 @@ textarea::-webkit-scrollbar-thumb, .modal::-webkit-scrollbar-thumb {
 }
 @media (hover: hover) { .swatch:hover { border-color: var(--accent-line); } }
 .swatch.on {
-  /* v0.48.0: an INSET ring at the swatch's own radius. The old pair (1px
-     `--accent` border + a 3px outer `--accent-soft` halo) read as a bright
-     double outline on AMOLED, and collided with the focus outline. */
-  border-color: var(--accent);
+  /* v0.48.1: a tint and an LED, never an outline. v0.48.0 still drew a 1px
+     `--accent` border plus a 1px `--accent2` inset — on AMOLED + Pine those
+     fuse into a 2px near-white headlight (the owner reported it twice). */
+  border-color: var(--accent-line);
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent2, var(--accent));
+  box-shadow: inset 0 1px 0 var(--inset-hi);
   color: var(--text);
 }
-.swatch.on:focus-visible { box-shadow: inset 0 0 0 1px var(--accent2, var(--accent)); }
+.swatch.on .sw-label { color: var(--accent-ink); }
+/* the LED is an indicator, not a second filled control (One Lamp Rule) */
+.swatch.on .sw-label::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px;
+  border-radius: 999px; vertical-align: 1px;
+  background: var(--accent); box-shadow: 0 0 6px var(--accent-glow);
+}
+html[data-theme="light"] .swatch.on { border-color: var(--accent2); }
+html[data-theme="light"] .swatch.on .sw-label::before { background: var(--accent2); box-shadow: none; }
 /* selected outlines must clear 3:1 on the day ground too — #c07a16 reads
    2.74:1 there, so the light theme leans on the darker voice (v0.44.x audit;
    pine's own accent is dark enough by itself but shares the rule) */
