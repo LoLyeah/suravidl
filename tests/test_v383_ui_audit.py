@@ -214,4 +214,6 @@ def test_the_hardcoded_button_ink_is_tokenized():
 def test_the_scheme_swatches_preview_both_voices():
     assert ".sw-amber" in CSS and ".sw-pine" in CSS
     # the theme previews follow the scheme too
-    assert '[data-accent="pine"] .sw-dark' in CSS
+    # v0.48.3: the theme chips read the scheme's deep/bright pair, so every
+    # scheme (not just pine) repaints them
+    assert "var(--pv-bright)" in CSS and "var(--pv-deep)" in CSS

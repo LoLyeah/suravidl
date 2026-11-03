@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.48.3",
+        "title": "The follow",
+        "items": [
+            "The Light / Dark / AMOLED previews now take their colour from the scheme you pick — no more amber diagonals under Cobalt.",
+        ],
+    },
+    {
         "version": "0.48.2",
         "title": "The rollback",
         "items": [
@@ -81,13 +88,6 @@ ENTRIES = [
         "title": "The once",
         "items": [
             "The tab arrival now plays once. A button inside the queue no longer blinks every second — its rebuild, not the fade, was what you were seeing.",
-        ],
-    },
-    {
-        "version": "0.47.25",
-        "title": "The dissolve",
-        "items": [
-            "Tab switches now leave the frosted plates alone and dissolve only what sits on them: the blur never blinks, and the pinned bars no longer stay bright while everything else fades.",
         ],
     },
 ]

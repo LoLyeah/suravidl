@@ -27,7 +27,8 @@ JS = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the dissolve" for e in ENTRIES)
+    # retired by v0.48.3 "the follow"; the behaviour keeps its own tests
+    assert not any(e["title"].lower() == "the dissolve" for e in ENTRIES)
 
 
 def test_no_plate_is_faded():

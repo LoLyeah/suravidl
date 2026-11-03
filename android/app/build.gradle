@@ -48,8 +48,8 @@ android {
         applicationId "com.suravidl.app"
         minSdk 24
         targetSdk 35
-        versionCode 187
-        versionName "0.48.2"
+        versionCode 188
+        versionName "0.48.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters "arm64-v8a", "x86_64" }
     }
