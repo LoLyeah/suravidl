@@ -23,7 +23,8 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the once" for e in ENTRIES)
+    # retired by v0.48.4 "the rim"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the once" for e in ENTRIES)
 
 
 def test_the_arrival_marks_and_clears_itself():

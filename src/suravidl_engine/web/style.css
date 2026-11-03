@@ -1464,7 +1464,10 @@ html[data-theme="light"] .get.picked { border-color: var(--accent2); }
 }
 .sw-preview {
   width: 74px; height: 44px; border-radius: 8px;
-  border: 1px solid rgba(127,127,127,.25);
+  /* v0.48.4: no rim. The 1px hairline read as a bright warm edge on the
+     top-left of every chip (it tints against the art behind it) — the
+     "colour border" the owner kept circling. The art carries its own edge. */
+  border: 0;
 }
 .sw-light  { background: linear-gradient(135deg, #f0ede8 45%, var(--pv-deep) 46%, var(--pv-deep) 78%, #e7e4de); }
 .sw-dark   { background: linear-gradient(135deg, #14181d 45%, var(--pv-bright) 46%, var(--pv-bright) 78%, #0f1216); }

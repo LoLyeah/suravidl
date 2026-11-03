@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.48.4",
+        "title": "The rim",
+        "items": [
+            "The 1px hairline around every scheme chip is gone — it read as a bright warm edge along the top-left, which is the border that kept being circled.",
+        ],
+    },
+    {
         "version": "0.48.3",
         "title": "The follow",
         "items": [
@@ -81,13 +88,6 @@ ENTRIES = [
         "title": "The flush",
         "items": [
             "A job that fails just as the app restarts now comes back as failed, not interrupted: the row is written before the state is shown.",
-        ],
-    },
-    {
-        "version": "0.47.26",
-        "title": "The once",
-        "items": [
-            "The tab arrival now plays once. A button inside the queue no longer blinks every second — its rebuild, not the fade, was what you were seeing.",
         ],
     },
 ]

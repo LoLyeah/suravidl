@@ -17,9 +17,9 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 
 
 def test_the_notes_name_this_release():
-    assert __version__ == "0.48.3"
+    assert __version__ == "0.48.4"
     assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the follow"
+    assert ENTRIES[0]["title"].lower() == "the rim"
     assert len(ENTRIES) == 10
 
 
@@ -34,6 +34,13 @@ def test_no_theme_chip_is_painted_amber():
         block = re.search(rf"\.{cls}\s*\{{([^}}]*)\}}", CSS).group(1)
         assert "#e8a33e" not in block, cls
         assert "var(--pv-" in block, cls
+
+
+def test_no_chip_wears_a_rim():
+    """v0.48.4: the hairline tinted against the art and read as a warm edge."""
+    import re as _re
+    block = _re.search(r"\.sw-preview\s*\{([^}]*)\}", CSS).group(1)
+    assert "border: 0" in block and "1px solid rgba(127,127,127" not in block
 
 
 def test_every_scheme_declares_both_shades():
