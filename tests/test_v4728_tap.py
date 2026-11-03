@@ -21,7 +21,8 @@ SERVICE = (ROOT / "android" / "app" / "src" / "main" / "java" / "com" /
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the tap" for e in ENTRIES)
+    # retired by v0.49.1 "the thumb"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the tap" for e in ENTRIES)
 
 
 def test_the_button_is_there_and_wired():

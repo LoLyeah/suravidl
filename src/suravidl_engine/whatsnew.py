@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.1",
+        "title": "The thumb",
+        "items": [
+            "On a phone the fields finally match the rest of the controls: 44px tall at 16px, so iOS no longer zooms when you tap one.",
+            "A phone on its side is 360px tall — the floating Save bar now waits at the end of the panel instead of covering the schemes.",
+        ],
+    },
+    {
         "version": "0.49.0",
         "title": "The landing",
         "items": [
@@ -80,14 +88,6 @@ ENTRIES = [
         "items": [
             "A download can carry its own title and artist: the file is renamed and its tags rewritten, for that job only — no more site junk in your library.",
             "Split by chapters: one file per section, cut from the finished download in a single pass, named by chapter.",
-        ],
-    },
-    {
-        "version": "0.47.28",
-        "title": "The tap",
-        "items": [
-            "Download now: one tap queues the pasted link at your default quality, no format list — and a link shared to the phone can skip it too (Settings).",
-            "The notification now shows how far along the download is, how fast it runs and how long is left, with a Cancel button.",
         ],
     },
 ]

@@ -270,6 +270,17 @@ take → START, then options. Nothing that acts on a probe may sit above it, and
 a control that shapes a download must be visible next to the control that
 starts it (the armed take lives on the transport, not in a collapsed block).
 
+### Touch and short viewports (v0.49.1)
+
+Every control on a coarse pointer is 44px tall — including the fields, which
+were the last exception at 40px/13-14px. Those also take `font-size: 16px`,
+because iOS zooms the whole page when a smaller field takes focus.
+
+A landscape phone is ~360px tall; below 480px of viewport height the sticky
+Save strips (`#panel-settings .modal-foot`, `#panel-ytdlp .foot-row`) join the
+flow at the end of the panel instead of hovering over it. They still float on a
+portrait phone and on the desktop, where the strip is the primary action.
+
 ## Elevation & Depth
 
 Ambient soft-lift over one room lamp. Depth is carried by translucency first —

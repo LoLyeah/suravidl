@@ -1712,6 +1712,14 @@ footer .linkbtn { color: var(--accent-ink); }
 @media (pointer: coarse) {
   .btn, .btn.sm, .ghost-sm, .stab, .linkbtn, .check, .chk,
   input[type="checkbox"], .swatch, .tab { min-height: 44px; }
+  /* v0.49.1: the fields were the last controls under the thumb floor — 40px
+     tall at 13-14px. iOS zooms the page on a focus under 16px, and a select
+     is the one control a phone user hits most on this screen. */
+  input[type="text"], input[type="url"], input[type="search"],
+  input[type="number"], input[type="password"], input[type="tel"],
+  input[type="email"], select, textarea {
+    min-height: 44px; font-size: 16px;
+  }
   .get { min-height: 44px; padding: 10px 16px; }
   button.chip { min-height: 44px; padding: 9px 12px; }
   .qrow .btn { min-height: 44px; padding: 9px 16px; }
@@ -1774,6 +1782,19 @@ html.theming, html.theming *, html.theming *::before, html.theming *::after {
 }
 
 /* wide rooms: give the deck breathing room */
+/* v0.49.1: a phone on its side is ~360 px tall. The floating Save strip took
+   a third of that and sat over the scheme chips; on short viewports it joins
+   the flow at the end of the panel instead of hovering. */
+@media (max-height: 480px) {
+  #panel-settings .modal-foot,
+  #panel-ytdlp .foot-row {
+    position: static;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--glass-bg);
+  }
+}
+
 @media (min-width: 1440px) {
   main { max-width: 1320px; padding-bottom: 150px; }
 }
