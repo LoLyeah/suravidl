@@ -55,8 +55,24 @@ def test_incomplete_job_marked_interrupted_after_restart(tmp_path, fixture_serve
     job = mgr.create(f"{fixture_server}/tiny.mp4")
     _wait(mgr, job["id"])
 
-    # simulate a crash mid-job: row left in "downloading"
+    # simulate a crash mid-job: row left in "downloading".
+    # The worker publishes its terminal row a beat after the in-memory status
+    # flips, so a rewrite here can be overwritten by the worker itself — the
+    # CI 3.10 job read "completed" back (2026-11-04). Wait for the DURABLE row
+    # first, then rewrite it.
     import sqlite3
+    import time
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        con = sqlite3.connect(db)
+        row = con.execute("SELECT status FROM jobs WHERE id=?", (job["id"],)).fetchone()
+        con.close()
+        if row and row[0] == "completed":
+            break
+        time.sleep(0.02)
+    else:
+        raise AssertionError("the worker never persisted the completed row")
 
     con = sqlite3.connect(db)
     con.execute("UPDATE jobs SET status='downloading' WHERE id=?", (job["id"],))
