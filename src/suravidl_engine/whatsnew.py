@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.3",
+        "title": "The ellipsis",
+        "items": [
+            "Long paths in the folder, rate and proxy fields end in an ellipsis instead of cutting a token in half — long-press shows the whole value.",
+        ],
+    },
+    {
         "version": "0.49.2",
         "title": "The cue",
         "items": [
@@ -80,13 +87,6 @@ ENTRIES = [
         "items": [
             "The queue stops re-reading a finished file's size on every poll, and idles at one request every ten seconds instead of fifty a minute.",
             "Cancelled jobs stop claiming the running lamp; a split keeps its subtitles and its second audio track; Download now obeys an empty field; Escape closes any dialog.",
-        ],
-    },
-    {
-        "version": "0.47.30",
-        "title": "The line",
-        "items": [
-            "The source field is one line again: a flex basis from 0.47.28 became a 220px-tall box on phones, where the row turns into a column.",
         ],
     },
 ]

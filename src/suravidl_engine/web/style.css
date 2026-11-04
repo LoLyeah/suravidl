@@ -812,6 +812,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
    reads as a broken string. Ellipsis it instead — the full sentence is in the
    FAQ right below. */
 #url { text-overflow: ellipsis; }
+/* v0.49.3: machine fields hold long strings too. A path cut mid-token with no
+   ellipsis reads as a rendering glitch; the title carries the whole value. */
+#setDir, #setRateLimit, #setProxy { text-overflow: ellipsis; }
 .paste .btn { padding: 12px 20px; border-radius: 10px; flex: none; }
 .audioRow {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

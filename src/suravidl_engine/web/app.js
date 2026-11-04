@@ -5188,6 +5188,7 @@ async function initAppControls() {
           const { path } = await api("/app/pick-folder", { method: "POST" });
           if (path) {
             $("setDir").value = path;
+            $("setDir").title = path;
             toast(t("selected — press Save"));
           }
         } catch (e) {
@@ -5371,6 +5372,7 @@ async function loadSettings() {
     SETTINGS_SNAPSHOT = s;
     CURRENT = { theme: s.theme, glass: s.glass, accent: s.accent };
     $("setDir").value = s.download_dir || "";
+    $("setDir").title = s.download_dir || "";   // v0.49.3: the field ellipsises
     $("setConc").value = s.max_concurrent;
     $("setReveal").checked = !!s.open_dir_on_complete;
     $("setResume").checked = !!s.auto_resume;

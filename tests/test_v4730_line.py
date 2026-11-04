@@ -19,7 +19,8 @@ CSS = re.sub(r"/\*.*?\*/", "", CSS_RAW, flags=re.S)   # comments quote the trap
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the line" for e in ENTRIES)
+    # retired by v0.49.3 "the ellipsis"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the line" for e in ENTRIES)
 
 
 def test_the_field_has_no_flex_basis():
