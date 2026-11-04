@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.5",
+        "title": "The gap",
+        "items": [
+            "The dashed hint no longer sits flush against the TAKE plate — one 16px step, like every other gap on the deck.",
+        ],
+    },
+    {
         "version": "0.49.4",
         "title": "The day",
         "items": [
@@ -78,14 +85,6 @@ ENTRIES = [
         "items": [
             "A selected swatch is a soft tint with a small LED, never a bright outline — the white edge on AMOLED is gone for good.",
             "Material You now actually appears on Android 12+: the Wallpaper scheme was hidden behind a state you could not reach, and its palette never parsed.",
-        ],
-    },
-    {
-        "version": "0.48.0",
-        "title": "The palette",
-        "items": [
-            "Three more schemes: Cobalt (a grading monitor), Oxide (splicing tape) and Silver (halide mono), each with contrast measured rather than eyeballed.",
-            "On Android 12+, Wallpaper follows your Material You palette. And the bright double ring on a selected swatch is gone.",
         ],
     },
 ]

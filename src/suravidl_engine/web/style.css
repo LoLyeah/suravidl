@@ -1072,6 +1072,9 @@ details.card { padding: 0 18px 6px; }
 #ovBlock[open] .bay-body { max-height: none; opacity: 1; }
 
 /* ---------- empty states ---------- */
+/* v0.49.5: the hint is a block like any other; it sat flush against the
+   transport card, so its dashed edge touched the TAKE plate (owner's circle). */
+#dlEmpty { margin-bottom: 16px; }
 .empty {
   padding: 26px 22px; border: 1px dashed var(--line);
   border-radius: 14px; color: var(--muted); text-align: center;
@@ -1197,7 +1200,7 @@ details.card { padding: 0 18px 6px; }
 .jobhint .ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
 
 /* ---------- v0.46.5: the desk's job selector ---------- */
-.subnav { display: flex; gap: 4px; margin: 0 0 14px; border-bottom: 1px solid var(--line-soft); }
+.subnav { display: flex; gap: 4px; margin: 0 0 16px; border-bottom: 1px solid var(--line-soft); }
 .subbtn { appearance: none; background: transparent; border: 0; color: var(--dim);
   flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center;
   gap: 7px; padding: 10px 6px 9px; font: inherit; font-size: 11px; font-weight: 600;

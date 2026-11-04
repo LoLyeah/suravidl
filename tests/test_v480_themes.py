@@ -57,8 +57,9 @@ def _token(block: str, name: str) -> str:
 
 def test_the_notes_name_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.48.0" and e["title"].lower() == "the palette"
-               for e in ENTRIES)
+    # the palette entry itself retired at v0.49.5 "the gap"; the schemes stay
+    # pinned by the contrast and token tests above
+    assert not any(e["version"] == "0.48.0" for e in ENTRIES)
 
 
 def test_the_selected_swatch_is_not_an_outline():
