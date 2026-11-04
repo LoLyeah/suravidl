@@ -554,6 +554,19 @@ arrives by question. When one need has two platform truths, the copy
 carries both (the phone's Scan, the desktop's extension) — a route the
 reader cannot take is a lie with a button.
 
+### Disabled and unlit states (v0.49.4)
+
+A disabled control never fades its own colour: an accent at 55% opacity reads
+as a different, muddier hue (the START lamp went dusty blue on the day
+ground). Disabled primaries keep the accent's family as a **tint** —
+`--accent-soft` fill, `--accent-ink` label, `--accent-line` border, no glow —
+so the control is still the primary action and unmistakably inert. A disabled
+quiet action drops fill and border entirely.
+
+An unlit LED is a **hollow ring** (`inset 0 0 0 1.5px var(--dim)`), never a
+filled grey dot: filled means lit, and on the day ground a grey dot read as a
+lamp whose light had been turned off.
+
 ## Do's and Don'ts
 
 ### Do:

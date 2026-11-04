@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.4",
+        "title": "The day",
+        "items": [
+            "Light mode's weakest controls, fixed: a disabled START stays in the accent family instead of turning dusty blue, the quick action stops looking like an empty field, and unlit scope lamps are hollow rings.",
+        ],
+    },
+    {
         "version": "0.49.3",
         "title": "The ellipsis",
         "items": [
@@ -79,14 +86,6 @@ ENTRIES = [
         "items": [
             "Three more schemes: Cobalt (a grading monitor), Oxide (splicing tape) and Silver (halide mono), each with contrast measured rather than eyeballed.",
             "On Android 12+, Wallpaper follows your Material You palette. And the bright double ring on a selected swatch is gone.",
-        ],
-    },
-    {
-        "version": "0.47.31",
-        "title": "The polish",
-        "items": [
-            "The queue stops re-reading a finished file's size on every poll, and idles at one request every ten seconds instead of fifty a minute.",
-            "Cancelled jobs stop claiming the running lamp; a split keeps its subtitles and its second audio track; Download now obeys an empty field; Escape closes any dialog.",
         ],
     },
 ]

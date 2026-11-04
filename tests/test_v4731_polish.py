@@ -27,7 +27,8 @@ JOBS_SRC = (ROOT / "src" / "suravidl_engine" / "jobs.py").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["title"].lower() == "the polish" for e in ENTRIES)
+    # retired by v0.49.4 "the day"; the behaviour keeps its own pins
+    assert not any(e["title"].lower() == "the polish" for e in ENTRIES)
 
 
 def test_a_settled_size_is_not_stat_ed_on_every_poll(tmp_path, monkeypatch):

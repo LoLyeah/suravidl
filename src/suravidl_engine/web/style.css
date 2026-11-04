@@ -658,10 +658,30 @@ button { font: inherit; border: 0; cursor: pointer; }
   box-shadow: 0 10px 22px -10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.35);
 }
 @media (hover: hover) { .btn.prime:hover { background: var(--accent2); } }
-.btn.prime:disabled { opacity: .55; cursor: default; }
+.btn.prime:disabled {
+  /* v0.49.4: a 55% accent fill reads as a DIFFERENT colour on the day ground
+     (START went dusty blue under Cobalt, and a neutral plate demoted it to a
+     secondary). A tint of the accent keeps it the primary action and clearly
+     inert: tinted plate, ink label, no glow. */
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+  opacity: 1;
+  box-shadow: none;
+  cursor: default;
+}
 .btn.danger { color: var(--err); border-color: var(--err-line); }
 .btn.quit { color: var(--err); }
 .btn:disabled { opacity: .5; cursor: default; transform: none; }
+/* v0.49.4: the quick action is a ghost that sits on a card of the same fill —
+   disabled it read as an empty input. A hairline and no fill keeps it in the
+   hierarchy as a quiet action, not a box. */
+#quickBtn:disabled {
+  background: transparent;
+  border-color: transparent;
+  color: var(--dim);
+  opacity: 1;
+}
 /* a click that is mid-request looks busy and refuses a second one */
 .btn.busy, .get.busy, .ghost-sm.busy { opacity: .6; pointer-events: none; animation: ledPulse 1.1s ease-in-out infinite; }
 .get:disabled, .ghost-sm:disabled { opacity: .55; cursor: default; transform: none; }
@@ -763,7 +783,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width
 }
 .led {
   width: 7px; height: 7px; border-radius: 50%; flex: none;
-  background: var(--dim);
+  /* v0.49.4: an unlit instrument is a hollow ring, not a filled dark dot. On
+     the day ground the filled grey read as a lit LED whose light was off. */
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--dim);
 }
 .led.ok { background: var(--ok); box-shadow: 0 0 6px var(--ok-line); }
 .led.bad { background: var(--err); box-shadow: 0 0 6px var(--err-line); }
