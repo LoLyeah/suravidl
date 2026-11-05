@@ -1720,6 +1720,10 @@ function forceQueueRepaint() {
 let PROBE_SEQ = 0;
 let PROBE_LIVE = false;          // the current probe is a live stream (v0.46.1)
 let PROBE_URL = "";              // the URL the last good probe read
+/* v0.49.6: the URL a probe REFUSED. Until the box changes or a probe succeeds,
+   the start controls stay dead for exactly that link — the app already knows
+   it cannot read it, so offering "Download now" is a button that lies. */
+let PROBE_FAILED_URL = "";
 let LIVE_START_DEFAULT = false;  // the setting decides the box's default
 
 async function doProbe() {
@@ -1762,6 +1766,13 @@ function showProbeFailure(msg, detail, url) {
   LAST_FAIL = { msg: msg, detail: detail };
   LAST_PROBE = null;
   PROBE_LIVE = false;
+  // Gate only when the engine says the link is UNSUPPORTED — a 403 or a TLS
+  // failure means "could not read it now", and a retry with cookies or a
+  // different network is still legitimate (v0.49.6).
+  const d = (detail && typeof detail === "object") ? detail : {};
+  const unsupported = d.unsupported === true || /unsupported url/i.test(msg || "");
+  PROBE_FAILED_URL = unsupported ? url : "";
+  syncStartState();
   // the engine explains a failure (it owns the "sign-in wall" judgement and
   // says so in its own words) — the UI does not second-guess it
   $("probeMsg").textContent = t("probe failed: {msg}", { msg: msg });
@@ -2500,6 +2511,12 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
   }
   if (!url) {
     toast(t("paste a video link first"), "bad");
+    return false;
+  }
+  if (url === PROBE_FAILED_URL) {
+    // belt and braces behind the disabled controls: no path may queue a link
+    // the probe just refused (v0.49.6)
+    toast(t("this link cannot be read here — use the browser, then Scan"), "bad");
     return false;
   }
   // A start can take most of a second (SQLite lock, a busy worker), and a
@@ -5575,13 +5592,33 @@ syncTabA11y();
    (v0.40.10 audit — a scold toast was doing a disabled state's job). The
    start-without-probe path stays a feature: only emptiness disables it. */
 function syncStartState() {
-  const empty = !$("url").value.trim();
-  $("bestBtn").disabled = empty;
-  // the Forecourt Rule: an empty box means the start controls are not live
-  // (Download now arrived in v0.47.28 without it and scolded instead)
-  if ($("quickBtn")) $("quickBtn").disabled = empty;
+  const url = $("url").value.trim();
+  const empty = !url;
+  // v0.49.6: a probe that REFUSED this link turns the start controls off —
+  // the app knows there is no extractor, so "Download now" must not promise a
+  // download it would only fail. Editing the box brings them back.
+  const refused = !empty && PROBE_FAILED_URL === url;
+  const dead = empty || refused;
+  $("bestBtn").disabled = dead;
+  if ($("quickBtn")) $("quickBtn").disabled = dead;
+  const why = refused ? t("this link cannot be read here — use the browser, then Scan") : "";
+  for (const id of ["quickBtn", "bestBtn"]) {
+    const b = $(id);
+    if (!b) continue;
+    if (why) {
+      if (!b.dataset.ownTitle) b.dataset.ownTitle = b.getAttribute("title") || "";
+      b.title = why;
+    } else if (b.dataset.ownTitle !== undefined) {
+      const own = b.dataset.ownTitle;
+      if (own) b.title = own; else b.removeAttribute("title");
+      delete b.dataset.ownTitle;
+    }
+  }
 }
-$("url").addEventListener("input", syncStartState);
+$("url").addEventListener("input", () => {
+  PROBE_FAILED_URL = "";       // a new link is an unknown link
+  syncStartState();
+});
 syncStartState();
 // moved off initFolderSheet (v0.44.x audit): a download-deck control must not
 // ride an Android folder-sheet initializer

@@ -76,7 +76,7 @@ def test_the_state_line_only_rebuilds_when_it_changes():
 
 
 def test_download_now_obeys_an_empty_field():
-    assert 'if ($("quickBtn")) $("quickBtn").disabled = empty;' in APP
+    assert '$("quickBtn").disabled = dead;' in APP
 
 
 def test_the_poll_backs_off_when_idle():

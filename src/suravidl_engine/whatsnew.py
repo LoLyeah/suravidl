@@ -15,6 +15,13 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.6",
+        "title": "The gate",
+        "items": [
+            "When the probe says a page has no extractor, Download now and START go dead for that link — with the reason in the tooltip — instead of queueing a download that can only fail.",
+        ],
+    },
+    {
         "version": "0.49.5",
         "title": "The gap",
         "items": [
@@ -77,14 +84,6 @@ ENTRIES = [
         "items": [
             "The settings panel's outline and the dot beside a selected name are gone — both were mine, both were wrong.",
             "Wallpaper now sticks: the palette is read once and cached, so a failed bridge call can no longer make it do nothing.",
-        ],
-    },
-    {
-        "version": "0.48.1",
-        "title": "The tint",
-        "items": [
-            "A selected swatch is a soft tint with a small LED, never a bright outline — the white edge on AMOLED is gone for good.",
-            "Material You now actually appears on Android 12+: the Wallpaper scheme was hidden behind a state you could not reach, and its palette never parsed.",
         ],
     },
 ]

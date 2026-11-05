@@ -35,8 +35,8 @@ def _block(marker: str) -> str:
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.48.1" and e["title"].lower() == "the tint"
-               for e in ENTRIES)
+    # retired by v0.49.6 "the gate"; selection stays pinned by the CSS tests
+    assert not any(e["version"] == "0.48.1" for e in ENTRIES)
 
 
 def test_selection_is_back_to_the_047_treatment():
