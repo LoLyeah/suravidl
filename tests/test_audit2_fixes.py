@@ -163,7 +163,17 @@ def test_a_cancelled_downloads_part_file_is_deleted_with_the_job(tmp_path, slow_
     removed and the `.part` stayed on disk forever."""
     mgr = JobManager(download_dir=tmp_path / "dl", db_path=str(tmp_path / "jobs.db"))
     job = mgr.create(f"{slow_fixture_server}/tiny.mp4")
-    time.sleep(0.4)
+    # cancel as soon as the writer has opened its temp file: the old fixed
+    # 0.4 s sleep raced the 0.5 s transfer, and a fast CI runner finished the
+    # 40 kB before the cancel landed (v0.49.7 failed its first CI run exactly
+    # here — "the test needs a partial file to be meaningful")
+    dl_dir = Path(mgr.download_dir)
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        if dl_dir.exists() and any(p.name.endswith((".part", ".ytdl"))
+                                   for p in dl_dir.iterdir()):
+            break
+        time.sleep(0.01)
     mgr.cancel(job["id"])
     for _ in range(50):
         if mgr.get(job["id"])["status"] not in ("queued", "downloading", "merging"):
