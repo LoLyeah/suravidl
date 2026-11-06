@@ -62,6 +62,8 @@
     <path d="M3.5 6.4A1.9 1.9 0 0 1 5.4 4.5h4.2l2 2.4h7A1.9 1.9 0 0 1 20.5 8.8v8.3a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2z"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M5 12h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 5.6v12.8L19 12z"/></symbol>
 </svg>
@@ -973,14 +975,24 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2><span data-i18n="All yt-dlp options ">All yt-dlp options </span><span id="optionsCount" class="muted small mono" role="status"></span></h2>
-      <input id="optionsSearch" type="text" spellcheck="false"
-             aria-label="search yt-dlp options" data-i18n-aria="search yt-dlp options"
-             placeholder="search — e.g. proxy, subtitle, metadata, sleep" data-i18n-ph="search — e.g. proxy, subtitle, metadata, sleep"/>
-      <div id="optionsList" class="optlist"></div>
-      <span class="muted small" data-i18n="Read from the yt-dlp actually installed, so the list can never go stale. Click an option to add it to the raw arguments above.">Read from the yt-dlp actually installed, so the list
-        can never go stale. Click an option to add it to the raw arguments above.</span>
+    <section class="card" id="optionsCard">
+      <!-- v0.49.7 "the index": the count is a quiet right-hand number, not a
+           second clause of the heading; the note explains the list before you
+           read it (it used to sit under a 322-row scroller, where the sticky
+           Save strip covered it) -->
+      <div class="card-head">
+        <h2 data-i18n="All yt-dlp options">All yt-dlp options</h2>
+        <span id="optionsCount" class="count" role="status"></span>
+      </div>
+      <p class="muted small" data-i18n="Read from the yt-dlp actually installed, so the list can never go stale. Click an option to add it to the raw arguments above.">Read from the yt-dlp actually installed, so the list
+        can never go stale. Click an option to add it to the raw arguments above.</p>
+      <label class="optsearch">
+        <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="optionsSearch" type="text" spellcheck="false"
+               aria-label="search yt-dlp options" data-i18n-aria="search yt-dlp options"
+               placeholder="search — proxy, subtitle, sleep" data-i18n-ph="search — proxy, subtitle, sleep"/>
+      </label>
+      <div id="optionsList" class="optlist" role="group" aria-label="yt-dlp options"></div>
     </section>
 
     <div class="foot-row">

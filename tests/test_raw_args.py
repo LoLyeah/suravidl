@@ -193,8 +193,12 @@ def test_options_catalogue_endpoint(client):
     r = client.get("/options", headers=AUTH)
     assert r.status_code == 200
     body = r.json()
-    assert body["count"] > 300, body["count"]
+    assert body["count"] > 200, body["count"]
     by_name = {o["name"]: o for o in body["options"]}
+    # v0.49.7: yt-dlp hides deprecated switches from --help with a sentinel;
+    # the catalogue drops them instead of printing "SUPPRESSHELP" as a help
+    assert "--call-home" not in by_name
+    assert all(o["help"] and o["help"] != "SUPPRESSHELP" for o in body["options"])
     assert "--proxy" in by_name
     assert by_name["--proxy"]["group"].lower().startswith("network")
     assert by_name["--proxy"]["help"]

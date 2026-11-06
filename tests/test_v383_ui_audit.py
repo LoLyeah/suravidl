@@ -152,7 +152,10 @@ def test_armed_text_is_keyboard_operable():
 # ---------- 13. honest grammar, steady machine numbers ----------
 def test_option_search_pluralizes_and_reads_tabular():
     assert 'list.length === 1 ? t("1 match") : t("{n} matches", { n: list.length })' in APP
-    assert 'class="muted small mono"' in tag_of(HTML, "optionsCount")
+    # v0.49.7: the count is its own quiet number at the card's right edge, not
+    # a second clause of the heading — but it is still tabular
+    assert 'class="count"' in tag_of(HTML, "optionsCount")
+    assert "font-variant-numeric: tabular-nums" in CSS
 
 
 # ---------- 14. disclosure toggles announce themselves ----------

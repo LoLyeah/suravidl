@@ -281,6 +281,28 @@ Save strips (`#panel-settings .modal-foot`, `#panel-ytdlp .foot-row`) join the
 flow at the end of the panel instead of hovering over it. They still float on a
 portrait phone and on the desktop, where the strip is the primary action.
 
+### Long lists read as tables, not stacks of cards (v0.49.7)
+
+The yt-dlp options browser holds 250 switches. The category belongs to the
+**run**, so it is one sticky header per group (`General` first, then A→Z, flags
+alphabetical inside), never a label under every row. Flags carry their argument
+in a quieter voice (`--proxy URL`, metavar dimmed); the help is body copy at
+`--muted`, and the row is a flat hairline-separated line with a `+` on the
+flag's own line — not a bordered card per option.
+
+Long help is cut in the string at 300 characters, ending in an explicit `…`,
+with the full text in `title`. `-webkit-line-clamp` looked like the right tool
+and clipped the text with no ellipsis at all (measured in Chromium), so the row
+stopped mid-sentence and said nothing about it.
+
+Search fills the card and the count is a quiet tabular number at its right edge;
+the count never sits inside the heading.
+
+A source of phantom rows: yt-dlp marks deprecated switches (`--call-home`,
+`--write-annotations`) with a `SUPPRESSHELP` sentinel and hides them from its own
+`--help`. The catalogue drops them rather than printing the sentinel as a
+description.
+
 ## Elevation & Depth
 
 Ambient soft-lift over one room lamp. Depth is carried by translucency first —

@@ -1556,6 +1556,81 @@ html[data-theme="light"] .get.picked { border-color: var(--accent2); }
   margin-top: 10px; font-size: 10.5px; font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase; color: var(--dim); opacity: .9;
 }
+
+/* v0.49.7 "the index" — the options browser is one table, not 322 cards.
+   Measured at 412 px before: 51 px of horizontal overflow (the help text ran
+   24 px past the card edge and was clipped mid-word), a 207 px search field in
+   a 388 px card, the category repeated under every flag, and a 78 px row. */
+#optionsCard .card-head { display: flex; align-items: baseline; gap: 10px; }
+#optionsCard .card-head h2 { margin: 0; }
+#optionsCard .count {
+  margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+#optionsCard > p { margin: 6px 0 10px; max-width: 62ch; }
+
+.optsearch { position: relative; display: flex; align-items: center; }
+.optsearch .ico {
+  position: absolute; left: 12px; width: 16px; height: 16px;
+  color: var(--dim); pointer-events: none;
+}
+.optsearch input { width: 100%; padding-left: 36px; margin: 0; }
+
+#optionsList.optlist {
+  display: block; margin: 10px 0 0; padding: 0;
+  max-height: 44vh; overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--line-soft); border-radius: 12px;
+  background: var(--glass-bg);
+}
+/* one header per run of rows, stuck to the top of the scroller so the
+   category is always the first thing you read while scrolling */
+.optgroup {
+  position: sticky; top: 0; z-index: 1;
+  padding: 9px 12px 7px; background: var(--panel-solid);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--dim);
+}
+#optionsList .optrow {
+  display: grid; grid-template-columns: minmax(0, 1fr) 22px;
+  align-items: center; gap: 3px 8px; padding: 10px 12px;
+  border: 0; border-top: 1px solid var(--line-soft); border-radius: 0;
+  background: transparent; cursor: pointer;
+}
+.optgroup + .optrow { border-top: 0; }
+#optionsList .optrow .flag {
+  grid-column: 1; display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 6px; min-width: 0; font-family: "Martian Mono", ui-monospace, Menlo, monospace;
+  font-size: 12.5px; color: var(--text); overflow-wrap: anywhere;
+}
+#optionsList .optrow .metavar { color: var(--dim); font-size: 11.5px; }
+#optionsList .optrow .ohelp {
+  grid-column: 1; min-width: 0; font-size: 12.5px; line-height: 1.45;
+  color: var(--muted); overflow-wrap: anywhere;
+}
+#optionsList .optrow .plus {
+  /* tied to the flag's line, not the middle of a six-line help: the mark
+     belongs to the option's name, and a centred "+" drifted into the prose */
+  grid-column: 2; grid-row: 1; align-self: start; justify-self: end;
+  margin-top: 1px; display: grid; place-items: center;
+  width: 22px; height: 22px; color: var(--dim);
+}
+#optionsList .optrow .plus svg { width: 15px; height: 15px; fill: none;
+  stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+@media (hover: hover) { #optionsList .optrow:hover { background: var(--glass-bg-strong); } }
+@media (hover: hover) { #optionsList .optrow:hover .plus { color: var(--accent-ink); } }
+#optionsList .optrow:active { background: var(--accent-soft); }
+#optionsList .optrow:focus-visible { outline: 2px solid var(--ring, var(--accent));
+  outline-offset: -2px; border-radius: 8px; }
+.optempty { padding: 20px 12px; color: var(--dim); font-size: 12.5px; text-align: center; }
+
+/* wide rooms: the flag gets its own column again, and the help reads as a
+   definition list rather than a wrapped caption */
+@media (min-width: 720px) {
+  #optionsList .optrow { grid-template-columns: minmax(0, 300px) minmax(0, 1fr) 22px; }
+  #optionsList .optrow .ohelp { grid-column: 2; grid-row: 1; }
+  #optionsList .optrow .plus { grid-column: 3; grid-row: 1; }
+}
 .tmsg { color: var(--muted); font-size: 12.5px; }
 details.card > summary {
   cursor: pointer; font-weight: 600; list-style: none;

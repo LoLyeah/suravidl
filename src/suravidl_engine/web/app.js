@@ -653,7 +653,7 @@ const STRINGS = { en: {}, id: {
   "saved “{name}” — {n} option(s)": "“{name}” tersimpan — {n} opsi",
   "saving…": "menyimpan…",
   "search yt-dlp options": "cari opsi yt-dlp",
-  "search — e.g. proxy, subtitle, metadata, sleep": "cari — mis. proxy, subtitle, metadata, sleep",
+  "search — proxy, subtitle, sleep": "cari — proxy, subtitle, sleep",
   "seconds (0–30) · gentler on sites that rate-limit": "detik (0–30) · lebih lembut ke situs pembatas",
   "selected — press Save": "terpilih — tekan Simpan",
   "send it as: Authorization: Bearer <token>": "kirim sebagai: Authorization: Bearer <token>",
@@ -5647,6 +5647,19 @@ async function openOptionsBrowser() {
   $("optionsSearch").focus();
 }
 
+/* yt-dlp's longest help runs to ~970 characters — fourteen lines in a row
+   that is otherwise two. The cut happens in the string, not in CSS: a
+   -webkit-line-clamp clipped the text with no ellipsis at all (measured), so
+   the row just stopped mid-sentence and said nothing about it. */
+const HELP_MAX = 300;
+function trimHelp(text) {
+  const s = text || "";
+  if (s.length <= HELP_MAX) return s;
+  const cut = s.slice(0, HELP_MAX);
+  const space = cut.lastIndexOf(" ");
+  return (space > 200 ? cut.slice(0, space) : cut).trimEnd() + " …";
+}
+
 function renderOptions(query) {
   const q = (query || "").trim().toLowerCase();
   const list = (OPTIONS || []).filter((o) =>
@@ -5654,12 +5667,27 @@ function renderOptions(query) {
     o.help.toLowerCase().includes(q));
   const box = $("optionsList");
   box.innerHTML = "";
-  for (const o of list.slice(0, 400)) {
+  // v0.49.7 "the index": grouped by category, because repeating the category
+  // under all 322 flags cost a line per row and read as noise. General leads,
+  // then A→Z; inside a group the flags stay alphabetical.
+  const lead = (g) => (/^general/i.test(g) ? "" : g.toLowerCase());
+  const sorted = list.slice().sort((a, b) =>
+    lead(a.group).localeCompare(lead(b.group)) || a.name.localeCompare(b.name));
+  let group = null;
+  for (const o of sorted.slice(0, 400)) {
+    if (o.group !== group) {
+      group = o.group;
+      box.append(el("div", "optgroup", group));
+    }
     const row = el("div", "optrow");
-    const left = el("div");
-    left.append(el("div", "flag", o.takes_value ? `${o.name} ${o.metavar || "VALUE"}` : o.name));
-    left.append(el("div", "ogrp", o.group));
-    row.append(left, el("div", "ohelp", o.help || ""));
+    const flag = el("div", "flag");
+    flag.append(el("span", "flagname", o.name));
+    if (o.takes_value) flag.append(el("span", "metavar", o.metavar || "VALUE"));
+    const plus = el("span", "plus");
+    plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-plus"/></svg>';
+    const help = el("div", "ohelp", trimHelp(o.help));
+    if (o.help) help.title = o.help;      // the clamp keeps the rest here
+    row.append(flag, help, plus);
     const add = () => {
       const ta = $("setRawArgs");
       ta.value = (ta.value.trim() + " " +
@@ -5672,7 +5700,7 @@ function renderOptions(query) {
     makeOptionRowReachable(row, add);
     box.append(row);
   }
-  if (!list.length) box.append(el("div", "muted small", t("nothing matches that search")));
+  if (!list.length) box.append(el("div", "optempty", t("nothing matches that search")));
   $("optionsCount").textContent = q
     ? (list.length === 1 ? t("1 match") : t("{n} matches", { n: list.length }))
     : t("{n} options", { n: (OPTIONS || []).length });

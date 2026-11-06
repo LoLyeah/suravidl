@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.7",
+        "title": "The index",
+        "items": [
+            "The yt-dlp options browser reads as one table: a header per category instead of the category under every flag, a full-width search, flags with their argument in a quieter voice, and a + on the row you mean.",
+            "The list no longer runs past the card: the description stops inside it, and the very long ones are cut at a word with an ellipsis — the whole text stays in the tooltip.",
+            "Deprecated switches yt-dlp hides from its own help are gone from the list instead of showing “SUPPRESSHELP” as their description.",
+        ],
+    },
+    {
         "version": "0.49.6",
         "title": "The gate",
         "items": [
@@ -76,14 +85,6 @@ ENTRIES = [
         "title": "The follow",
         "items": [
             "The Light / Dark / AMOLED previews now take their colour from the scheme you pick — no more amber diagonals under Cobalt.",
-        ],
-    },
-    {
-        "version": "0.48.2",
-        "title": "The rollback",
-        "items": [
-            "The settings panel's outline and the dot beside a selected name are gone — both were mine, both were wrong.",
-            "Wallpaper now sticks: the palette is read once and cached, so a failed bridge call can no longer make it do nothing.",
         ],
     },
 ]
