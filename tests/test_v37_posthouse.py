@@ -150,7 +150,7 @@ def test_errors_lead_with_the_human_consequence():
     probe = APP.split("async function doProbe")[1].split("\nfunction ")[0]
     assert "showProbeFailure(e.message, e.detail, url)" in probe, \
         "the structured verdict rides through from the probe"
-    assert "t(humanErr(msg, detail))" in APP, "the human line is built"
+    assert "t(humanErr(msg, detail, url))" in APP, "the human line is built"
     eb = APP.split('} else if (j.status === "error" || j.status === "interrupted") {', 1)[1]
     eb = eb.split("} else if (j.filepath)")[0]
     assert "humanErr(" in eb, "a failed job row leads with machine text"

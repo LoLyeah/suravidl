@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.8",
+        "title": "The dead end",
+        "items": [
+            "The gate reads the verdict now, not one spelling of it: whenever the probe sends you to the browser, Download now and START are off for that link.",
+            "The Reddit /s/ sentence can appear now: the probe asked the error explainer without the link, so that arm could never match.",
+        ],
+    },
+    {
         "version": "0.49.7",
         "title": "The index",
         "items": [
@@ -78,13 +86,6 @@ ENTRIES = [
         "title": "The rim",
         "items": [
             "The 1px hairline around every scheme chip is gone — it read as a bright warm edge along the top-left, which is the border that kept being circled.",
-        ],
-    },
-    {
-        "version": "0.48.3",
-        "title": "The follow",
-        "items": [
-            "The Light / Dark / AMOLED previews now take their colour from the scheme you pick — no more amber diagonals under Cobalt.",
         ],
     },
 ]

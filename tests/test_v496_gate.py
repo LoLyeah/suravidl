@@ -26,7 +26,8 @@ def test_the_notes_still_carry_this_release():
 def test_a_refused_link_arms_the_gate():
     assert "let PROBE_FAILED_URL" in APP
     assert "PROBE_FAILED_URL = unsupported ? url : \"\";" in APP
-    assert 'const unsupported = d.unsupported === true || /unsupported url/i.test(msg || "");' in APP
+    # v0.49.8 widened it: the gate now also reads the sentence on screen
+    assert "browserOnlySay($(\"probeSay\").textContent.trim())" in APP
 
 
 def test_both_start_controls_die_together():

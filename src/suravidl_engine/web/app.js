@@ -727,6 +727,8 @@ const STRINGS = { en: {}, id: {
   "the update is downloaded and verified": "pembaruan sudah diunduh dan diverifikasi",
   "this file": "berkas ini",
   "this page has a player yt-dlp cannot read — press play there, then Scan": "halaman ini punya pemutar yang tidak bisa dibaca yt-dlp — tekan putar di sana, lalu Pindai",
+  "this link cannot be read here — open it in the browser, press play, then Scan": "tautan ini tidak bisa dibaca di sini — buka di browser, tekan putar, lalu Pindai",
+  "this link cannot be read here — open it in the browser, then hand the stream over with the extension": "tautan ini tidak bisa dibaca di sini — buka di browser, lalu serahkan stream-nya lewat ekstensi",
   "type a range like 1-5,8": "ketik rentang seperti 1-5,8",
   "unknown": "tidak diketahui",
   "unknown reason": "alasan tidak diketahui",
@@ -1760,19 +1762,32 @@ async function doProbe() {
   }
 }
 
+/* v0.49.8 "the dead end": one rule, not a guess at the raw text. If the
+   sentence the card shows sends the reader to the browser, this link cannot be
+   downloaded here and "Download now" must not pretend otherwise. Comparing the
+   RENDERED sentence (through t(), so the rule holds in every language) also
+   covers the paths the raw engine line cannot: a browser handoff whose error
+   was already humanised, a player the engine could not read, a media server
+   that wants the page it came from. */
+const BROWSER_ONLY = [
+  "no extractor knows this page — open it in the browser, press play, then Scan for the stream",
+  "no extractor knows this page — play it in your browser, then hand the stream over with the extension",
+  "this page has a player yt-dlp cannot read — press play there, then Scan",
+  "this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; open it in the browser and Scan — the audio may be catchable",
+  "this is a TikTok photo post — a slideshow with music, not a video, so there is nothing to download; play it in your browser — the extension may catch its audio",
+  "the site's media server refuses requests that do not come from its page — open the video in the browser and pick the stream there, or use the extension",
+  "Reddit share links (“/s/” shortcuts) only open in a browser — open it once, copy the full address (it becomes /r/…/comments/…), and paste that",
+];
+function browserOnlySay(said) {
+  return BROWSER_ONLY.some((k) => said === t(k));
+}
+
 /** A failed probe, said the one way — extracted so a language switch can say
  *  it again in the new language (raw text and human line both). */
 function showProbeFailure(msg, detail, url) {
   LAST_FAIL = { msg: msg, detail: detail };
   LAST_PROBE = null;
   PROBE_LIVE = false;
-  // Gate only when the engine says the link is UNSUPPORTED — a 403 or a TLS
-  // failure means "could not read it now", and a retry with cookies or a
-  // different network is still legitimate (v0.49.6).
-  const d = (detail && typeof detail === "object") ? detail : {};
-  const unsupported = d.unsupported === true || /unsupported url/i.test(msg || "");
-  PROBE_FAILED_URL = unsupported ? url : "";
-  syncStartState();
   // the engine explains a failure (it owns the "sign-in wall" judgement and
   // says so in its own words) — the UI does not second-guess it
   $("probeMsg").textContent = t("probe failed: {msg}", { msg: msg });
@@ -1782,9 +1797,20 @@ function showProbeFailure(msg, detail, url) {
   // the human line leads; the raw engine text sits behind "Show details"
   // (v0.37.0: yt-dlp's dialect was the FIRST thing a newcomer had to read)
   $("probeMsg").classList.add("hidden");
-  $("probeSay").textContent = t(humanErr(msg, detail));
+  $("probeSay").textContent = t(humanErr(msg, detail, url));
   $("probeSay").className = "msg bad";
   $("probeSay").classList.remove("hidden");
+  // the gate reads the same sentence the user is reading (v0.49.8). A 403 or a
+  // TLS failure is "could not read it now" — a retry with cookies or another
+  // network is legitimate, so those keep the buttons live.
+  {
+    const d = (detail && typeof detail === "object") ? detail : {};
+    const unsupported = d.unsupported === true
+      || /unsupported url|no (suitable )?extractor/i.test(msg || "")
+      || browserOnlySay($("probeSay").textContent.trim());
+    PROBE_FAILED_URL = unsupported ? url : "";
+    syncStartState();
+  }
   $("probeDetails").textContent = t("Show details");
   $("probeDetails").classList.remove("hidden");
   setScopes("bad", { say: "no readout — see the message above" });
@@ -2516,7 +2542,9 @@ async function startJob(url, fmt, preset, playlist, triggerBtn) {
   if (url === PROBE_FAILED_URL) {
     // belt and braces behind the disabled controls: no path may queue a link
     // the probe just refused (v0.49.6)
-    toast(t("this link cannot be read here — use the browser, then Scan"), "bad");
+    toast(window.AndroidHost
+      ? t("this link cannot be read here — open it in the browser, press play, then Scan")
+      : t("this link cannot be read here — open it in the browser, then hand the stream over with the extension"), "bad");
     return false;
   }
   // A start can take most of a second (SQLite lock, a busy worker), and a
@@ -5601,7 +5629,11 @@ function syncStartState() {
   const dead = empty || refused;
   $("bestBtn").disabled = dead;
   if ($("quickBtn")) $("quickBtn").disabled = dead;
-  const why = refused ? t("this link cannot be read here — use the browser, then Scan") : "";
+  const why = refused
+    ? (window.AndroidHost
+        ? t("this link cannot be read here — open it in the browser, press play, then Scan")
+        : t("this link cannot be read here — open it in the browser, then hand the stream over with the extension"))
+    : "";
   for (const id of ["quickBtn", "bestBtn"]) {
     const b = $(id);
     if (!b) continue;
@@ -6924,7 +6956,7 @@ async function probeInto(it) {
     it.ticked = false;
     it.box.checked = false;
     it.el.classList.add("bad");
-    it.name.textContent = t(humanErr(e.message, e.detail));
+    it.name.textContent = t(humanErr(e.message, e.detail, it.url));
     it.meta.textContent = t("checked and refused \u2014 tick it anyway if you know better");
   }
 }
