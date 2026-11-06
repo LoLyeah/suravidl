@@ -134,6 +134,22 @@ jobs:
             echo "release/version.json for $TAG never appeared" >&2
             exit 1
           fi
+          # The release job writes version.json at the END of its publish
+          # step, and a `release: published` event can start this job while
+          # that step is still running: the fold below then lands FIRST and is
+          # overwritten by publish's upload (v0.49.5 and v0.49.6 both shipped a
+          # manifest without android_apk that way). Wait for the release run on
+          # this commit to finish before folding.
+          SHA=$(git rev-parse HEAD)
+          for i in $(seq 1 90); do
+            st=$(gh run list --repo "$REPO" --workflow=release.yml --commit "$SHA" \
+                   --json status --jq '.[0].status // "none"')
+            case "$st" in
+              completed|none) break ;;
+            esac
+            echo "release run for ${SHA:0:7} is $st — waiting before the fold"
+            sleep 20
+          done
           gh release upload "$TAG" apk/app-release.apk --clobber --repo "$REPO"
           # the APK lands after version.json was written; fold it in so the
           # manifest on the release always describes the complete release
