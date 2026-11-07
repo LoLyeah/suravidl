@@ -169,8 +169,20 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--check", action="store_true", help="print the store's status and stop")
     ap.add_argument("--no-publish", action="store_true", help="upload but do not submit for review")
     ap.add_argument("--bump", choices=("patch", "minor", "major"), help="raise manifest version first")
+    ap.add_argument("--build-only", action="store_true",
+                    help="just pack extension/ into a store-ready zip (no credentials needed)")
+    ap.add_argument("--out", type=pathlib.Path, help="where --build-only writes the zip")
     ap.add_argument("--force", action="store_true", help="upload even if this version is already on the store")
     args = ap.parse_args(argv)
+
+    if args.build_only:
+        if args.bump:
+            print(f"manifest -> {bump_manifest(args.bump)}")
+        out = args.out or pathlib.Path("/tmp/suravidl-extension-chrome.zip")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        build_zip(out)
+        print(f"{out} — version {version_in_zip(out)}, {out.stat().st_size} bytes")
+        return 0
 
     cfg = credentials()
     token = access_token(cfg)

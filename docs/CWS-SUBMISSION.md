@@ -1,5 +1,10 @@
 # Publishing suravidl to the Chrome Web Store
 
+> **Live since 2026-11-07**: <https://chromewebstore.google.com/detail/suravidl/akllhdboeienonojebagehplgigjfkep>
+> (item `akllhdboeienonojebagehplgigjfkep`). Updates are uploaded with
+> `scripts/cws_publish.py` — see [CWS-PUBLISH.md](CWS-PUBLISH.md) — or by hand in
+> the dashboard; the steps below stay as the first-submission record.
+
 The extension ships in every release as **`suravidl-extension-chrome.zip`**
 (manifest at the archive root — what the store expects). Everything below is
 the first-publish runbook; the listing copy is copy-paste ready.

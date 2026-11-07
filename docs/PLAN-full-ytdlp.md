@@ -129,9 +129,12 @@ desktop a left rail.
 
 **Decisions on record — closed threads, not owed work:**
 
-- **Chrome Web Store: Firefox-only, standing.** The MV3 copy keeps building,
-  but Chrome blocks off-store `.crx` installs and the store listing was
-  deliberately skipped (2026-10-01).
+- **Chrome Web Store: published (2026-11-07), reversing the 2026-10-01
+  decision.** The listing is
+  `chromewebstore.google.com/detail/suravidl/akllhdboeienonojebagehplgigjfkep`;
+  the zip in releases stays for unpacks and for browsers that refuse the store.
+  Updates go up through the CWS API (`scripts/cws_publish.py`) or by hand —
+  see [CWS-PUBLISH.md](CWS-PUBLISH.md).
 - **Public hosted downloader: postponed.** A public instance invites abuse
   and attack surface; the engine stays self-hosted (2026-09).
 - **Queue reordering: deferred** (recorded with the v0.22 feature list below)

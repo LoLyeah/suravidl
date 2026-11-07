@@ -239,7 +239,7 @@ const STRINGS = { en: {}, id: {
   "Gallery/Music copies kept": "salinan Gallery/Music dipertahankan",
   "General": "Umum",
   "Get it": "Ambil",
-  "Get it once: Firefox from Mozilla Add-ons, Chrome or Edge from the release zip (load unpacked). Then pair it — the token from Settings → Authentication goes into the extension's Options.": "Pasang sekali: Firefox dari Mozilla Add-ons, Chrome atau Edge dari zip rilis (load unpacked). Lalu pasangkan — token dari Pengaturan → Autentikasi dimasukkan ke Options ekstensi.",
+  "Get it once: Chrome from the Chrome Web Store, Firefox from Mozilla Add-ons. Then pair it — the token from Settings → Authentication goes into the extension's Options.": "Pasang sekali: Chrome dari Chrome Web Store, Firefox dari Mozilla Add-ons. Lalu pasangkan — token dari Pengaturan → Autentikasi dimasukkan ke Options ekstensi.",
   "Get {v}": "Ambil {v}",
   "Glass style": "Gaya kaca",
   "Glass: {name}": "Kaca: {name}",

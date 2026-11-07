@@ -12,7 +12,7 @@ extension, desktop app, Android app. It downloads anything yt-dlp understands
 [![downloads](https://img.shields.io/github/downloads/LoLyeah/suravidl/total?style=for-the-badge&label=downloads&logo=github&logoColor=white)](https://github.com/LoLyeah/suravidl/releases)
 
 [![mozilla add-on](https://img.shields.io/amo/v/suravidl.svg)](https://addons.mozilla.org/en-US/firefox/addon/suravidl/)
-[![chrome / edge](https://img.shields.io/badge/chrome%20%2F%20edge-zip-blue.svg)](https://github.com/LoLyeah/suravidl/releases/latest/download/suravidl-extension-chrome.zip)
+[![chrome web store](https://img.shields.io/badge/chrome%20web%20store-suravidl-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/suravidl/akllhdboeienonojebagehplgigjfkep)
 
 [releases](https://github.com/LoLyeah/suravidl/releases/latest) ·
 history: [docs/PLAN-full-ytdlp.md](docs/PLAN-full-ytdlp.md) ·
@@ -91,8 +91,10 @@ From [Releases](https://github.com/LoLyeah/suravidl/releases/latest):
   launch needs right-click → Open; after that it updates itself in place, like
   Windows.
 - `app-release.apk` — Android (see below). [Obtainium](https://github.com/ImranR98/Obtainium/releases/latest) can also watch these releases and install the updates for you.
-- Extension: Firefox — [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/);
-  Chrome/Edge/Brave — `suravidl-extension-chrome.zip` (load unpacked), both below.
+- Extension: Chrome — [Chrome Web Store](https://chromewebstore.google.com/detail/suravidl/akllhdboeienonojebagehplgigjfkep);
+  Firefox — [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/).
+  Edge and Brave take the Chrome build from the store too; the `.zip` below is
+  for working on the extension itself.
 
 From source:
 
@@ -123,14 +125,18 @@ tab badge shows how many videos were detected.
 
 - **Firefox**: install from [Mozilla Add-ons](https://addons.mozilla.org/en-US/firefox/addon/suravidl/) —
   signed and reviewed by Mozilla, and it updates itself from there.
-- **Chrome / Edge / Brave**: download `suravidl-extension-chrome.zip` from
+- **Chrome / Edge / Brave**: install from the
+  [Chrome Web Store](https://chromewebstore.google.com/detail/suravidl/akllhdboeienonojebagehplgigjfkep) — reviewed by Google, and it updates itself from
+  there. Edge and Brave install from the same listing (they accept Chrome Web
+  Store extensions; if a build refuses, enable *Allow extensions from other
+  stores*).
+- **Without the store** (a browser that blocks it, or a build you want to pin):
+  download `suravidl-extension-chrome.zip` from
   [Releases](https://github.com/LoLyeah/suravidl/releases/latest), unzip it,
-  then `chrome://extensions` → Developer mode → *Load unpacked* → the
-  unzipped folder. (Chrome takes extensions only from its Web Store or an
-  unpacked folder in developer mode; off-store `.crx` installs have been
-  blocked since ~2019 and no Web Store listing exists, so unpacked is the
-  supported route. After an update that touches the extension, re-download
-  the zip and hit *Reload* on that page.)
+  then `chrome://extensions` → Developer mode → *Load unpacked* → the unzipped
+  folder. Off-store `.crx` installs have been blocked since ~2019, so unpacked
+  is the only side door — and after an update that touches the extension you
+  re-download the zip and hit *Reload* on that page.
 - **From the repo** (working on the extension itself): the same *Load
   unpacked* flow with `extension/` — for a Firefox copy, overwrite
   `extension/manifest.json` with `extension/firefox/manifest.json` first
