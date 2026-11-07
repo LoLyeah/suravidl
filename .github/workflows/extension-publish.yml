@@ -1,0 +1,79 @@
+name: extension-publish
+
+# Submits the packed Chrome extension to the Web Store and asks for review.
+# Review is Google's; this only uploads and submits.
+#
+# Needs five repository secrets (Settings → Secrets and variables → Actions):
+#   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN, CWS_PUBLISHER_ID, CWS_ITEM_ID
+# Without them the job says so and succeeds — a fork stays green.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "release tag whose suravidl-extension-chrome.zip to ship (blank = latest)"
+        required: false
+      publish:
+        description: "submit for review after uploading"
+        type: boolean
+        default: true
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Credentials present?
+        id: creds
+        env:
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$CWS_REFRESH_TOKEN" ]; then
+            echo "present=no" >> "$GITHUB_OUTPUT"
+            echo "::notice::CWS secrets are not set — skipping the store submission"
+          else
+            echo "present=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch the packed extension
+        if: steps.creds.outputs.present == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${TAG:-$(gh release view --json tagName -q .tagName)}"
+          echo "shipping $tag"
+          gh release download "$tag" --pattern suravidl-extension-chrome.zip --dir /tmp/ext --clobber
+          unzip -p /tmp/ext/suravidl-extension-chrome.zip manifest.json | python3 -c \
+            'import json,sys; print("manifest version", json.load(sys.stdin)["version"])'
+
+      - name: Upload and submit
+        if: steps.creds.outputs.present == 'yes'
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_ITEM_ID: ${{ secrets.CWS_ITEM_ID }}
+        run: |
+          set -euo pipefail
+          args=(--zip /tmp/ext/suravidl-extension-chrome.zip)
+          if [ "${{ inputs.publish }}" = "false" ]; then args+=(--no-publish); fi
+          python3 scripts/cws_publish.py "${args[@]}"
+
+      - name: Where the store stands
+        if: steps.creds.outputs.present == 'yes'
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_ITEM_ID: ${{ secrets.CWS_ITEM_ID }}
+        run: python3 scripts/cws_publish.py --check
