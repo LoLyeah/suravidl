@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.9",
+        "title": "The formality",
+        "items": [
+            "Download now and START wait for a probe of that exact link: a URL says nothing about whether it can be downloaded, and a live button on an unreadable one only makes a job that fails.",
+            "A probe that finally reads a link lifts an earlier refusal — re-probing the same URL used to leave the buttons dead.",
+            "A failure only the browser can solve no longer offers Retry, which would fail the same way; on the phone it offers the browser instead.",
+        ],
+    },
+    {
         "version": "0.49.8",
         "title": "The dead end",
         "items": [
@@ -79,13 +88,6 @@ ENTRIES = [
         "title": "The landing",
         "items": [
             "A finishing take lands: the COMPLETED pill stamps flat while a scanner pass runs along the row, once — the machine confirming the file.",
-        ],
-    },
-    {
-        "version": "0.48.4",
-        "title": "The rim",
-        "items": [
-            "The 1px hairline around every scheme chip is gone — it read as a bright warm edge along the top-left, which is the border that kept being circled.",
         ],
     },
 ]

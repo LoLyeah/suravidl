@@ -17,9 +17,10 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 
 
 def test_the_notes_still_carry_this_release():
+    # 0.48.4 "the rim" was the tenth-oldest; v0.49.9 retired it. The notes stay
+    # ten deep, and this release's own entry ("the follow") is long gone too.
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.48.4" and e["title"].lower() == "the rim"
-               for e in ENTRIES)
+    assert not any(e["version"] == "0.48.4" for e in ENTRIES)
 
 
 def test_the_theme_chips_read_the_pair():

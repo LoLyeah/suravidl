@@ -727,6 +727,7 @@ const STRINGS = { en: {}, id: {
   "the update is downloaded and verified": "pembaruan sudah diunduh dan diverifikasi",
   "this file": "berkas ini",
   "this page has a player yt-dlp cannot read — press play there, then Scan": "halaman ini punya pemutar yang tidak bisa dibaca yt-dlp — tekan putar di sana, lalu Pindai",
+  "Probe first — the app has to read the link before it can download it": "Cek dulu — aplikasi harus membaca tautannya sebelum bisa mengunduh",
   "this link cannot be read here — open it in the browser, press play, then Scan": "tautan ini tidak bisa dibaca di sini — buka di browser, tekan putar, lalu Pindai",
   "this link cannot be read here — open it in the browser, then hand the stream over with the extension": "tautan ini tidak bisa dibaca di sini — buka di browser, lalu serahkan stream-nya lewat ekstensi",
   "type a range like 1-5,8": "ketik rentang seperti 1-5,8",
@@ -1167,6 +1168,11 @@ function renderTake() {
 async function commitTake(btn) {
   btn = btn || $("bestBtn");
   const url = $("url").value.trim();
+  if (PROBE_OK_URL !== url) {
+    toast(t("Probe first — the app has to read the link before it can download it"), "bad");
+    $("probeBtn").focus();
+    return;
+  }
   const ok = playlistMode()
     ? await startJob(url, null, TAKE.preset, true, btn)
     : await startJob(url, TAKE.fmt, TAKE.preset, false, btn);
@@ -1726,6 +1732,10 @@ let PROBE_URL = "";              // the URL the last good probe read
    the start controls stay dead for exactly that link — the app already knows
    it cannot read it, so offering "Download now" is a button that lies. */
 let PROBE_FAILED_URL = "";
+/* v0.49.9 "the formality": the URL a probe READ successfully. A link the app
+   has not read is not a link it may take — the owner hit exactly this: a
+   plausible .mp4 link, a live "Download now", and a job that could only fail. */
+let PROBE_OK_URL = "";
 let LIVE_START_DEFAULT = false;  // the setting decides the box's default
 
 async function doProbe() {
@@ -1809,6 +1819,7 @@ function showProbeFailure(msg, detail, url) {
       || /unsupported url|no (suitable )?extractor/i.test(msg || "")
       || browserOnlySay($("probeSay").textContent.trim());
     PROBE_FAILED_URL = unsupported ? url : "";
+    PROBE_OK_URL = "";
     syncStartState();
   }
   $("probeDetails").textContent = t("Show details");
@@ -2164,6 +2175,9 @@ function renderChapterChips(info) {
 
 function renderProbe(url, info) {
   LAST_PROBE = { url: url, info: info };
+  PROBE_FAILED_URL = "";      // this link was read: no refusal stands
+  PROBE_OK_URL = url;
+  syncStartState();           // the start controls come alive with the readout
   LAST_FAIL = null;
   $("probeCard").classList.remove("hidden");
   $("dlEmpty").classList.add("hidden");
@@ -2619,6 +2633,11 @@ async function quickStart() {
   if (!url) {
     toast(t("paste a video link first"), "bad");
     $("url").focus();
+    return false;
+  }
+  if (PROBE_OK_URL !== url) {
+    toast(t("Probe first — the app has to read the link before it can download it"), "bad");
+    $("probeBtn").focus();
     return false;
   }
   const btn = $("quickBtn");
@@ -4083,12 +4102,21 @@ function onFiled(j) {
 function onFailed(j) {
   const name = j.title || j.url;
   const why = humanErr(j.error || "", undefined, j.url);
-  const actions = [
-    { label: t("Retry"), prime: true,
+  // v0.49.9: a browser-only verdict is not retryable — the link will fail the
+  // same way, so the toast must not offer a loop. The next step is the browser.
+  const dead = browserOnlySay(why);
+  const actions = [];
+  if (dead) {
+    if (window.AndroidHost && window.AndroidHost.openBrowser) {
+      actions.push({ label: t("Open in the browser"), prime: true,
+        onClick: () => { try { window.AndroidHost.openBrowser(j.url); } catch (_) { } } });
+    }
+  } else {
+    actions.push({ label: t("Retry"), prime: true,
       onClick: () => api(`/jobs/${j.id}/retry`, { method: "POST" })
-        .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad")) },
-    { label: t("Show queue"), onClick: () => showTab("queue") },
-  ];
+        .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad")) });
+  }
+  actions.push({ label: t("Show queue"), onClick: () => showTab("queue") });
   toast(t("Couldn't download \u201c{name}\u201d \u2014 {why}",
           { name: name, why: why }), "bad", { actions: actions });
 }
@@ -5617,8 +5645,11 @@ document.querySelectorAll("#tabs .tab").forEach((b) => {
 syncTabA11y();
 
 /* The forecourt rule: an empty URL box means START is not a live control
-   (v0.40.10 audit — a scold toast was doing a disabled state's job). The
-   start-without-probe path stays a feature: only emptiness disables it. */
+   (v0.40.10 audit — a scold toast was doing a disabled state's job).
+   v0.49.9 "the formality" reverses the rest of it: start-without-probe was a
+   feature until the owner pressed it on a link the engine refused. A URL says
+   nothing about whether it can be downloaded, so the start controls stay off
+   until a probe has read THIS link — paste → Probe → Download now. */
 function syncStartState() {
   const url = $("url").value.trim();
   const empty = !url;
@@ -5626,14 +5657,17 @@ function syncStartState() {
   // the app knows there is no extractor, so "Download now" must not promise a
   // download it would only fail. Editing the box brings them back.
   const refused = !empty && PROBE_FAILED_URL === url;
-  const dead = empty || refused;
+  const unread = !empty && !refused && PROBE_OK_URL !== url;
+  const dead = empty || refused || unread;
   $("bestBtn").disabled = dead;
   if ($("quickBtn")) $("quickBtn").disabled = dead;
   const why = refused
     ? (window.AndroidHost
         ? t("this link cannot be read here — open it in the browser, press play, then Scan")
         : t("this link cannot be read here — open it in the browser, then hand the stream over with the extension"))
-    : "";
+    : unread
+      ? t("Probe first — the app has to read the link before it can download it")
+      : "";
   for (const id of ["quickBtn", "bestBtn"]) {
     const b = $(id);
     if (!b) continue;
@@ -5649,6 +5683,7 @@ function syncStartState() {
 }
 $("url").addEventListener("input", () => {
   PROBE_FAILED_URL = "";       // a new link is an unknown link
+  PROBE_OK_URL = "";           // …and an unread one
   syncStartState();
 });
 syncStartState();

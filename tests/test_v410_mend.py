@@ -275,7 +275,8 @@ def test_one_lamp_rule_holds_in_the_paste_card():
 def test_start_button_reflects_the_empty_forecourt():
     assert "function syncStartState(" in APPJS
     # v0.49.6: emptiness is one of two reasons the control is dead
-    assert 'const dead = empty || refused;' in APPJS
+    # v0.49.9: unread links are dead too, not only empty or refused ones
+    assert 'const dead = empty || refused || unread;' in APPJS
     assert '$("bestBtn").disabled = dead;' in APPJS
     # v0.49.6: the listener also forgets a refusal when the link changes
     assert '$("url").addEventListener("input", () => {' in APPJS
