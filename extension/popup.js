@@ -30,18 +30,91 @@ let SHAPE = null;    // the manifests' own shape: variants + audio tracks
 let SENT = false;
 let INPUTS = [];     // the live row checkboxes, in list order
 let SHOW_PARTS = false;  // a stream's variants/audio unfold on demand
+let SHOW_OLDER = false;  // the finds from before the newest video, on demand
 
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
-// everything; a shell never hides something on a guess.
+// everything; a shell never hides something on a guess. Newest first, within
+// each class: on a feed the most recent find is the video on screen, and the
+// list used to put the oldest one at the top — under the default tick
+// (v0.5.20).
 function visibleItems() {
   const shape = {};
   for (const it of (RANK && RANK.items) || []) shape[it.url] = it;
   const visible = ITEMS.filter((m) => !(shape[m.url] && shape[m.url].hidden));
   const ordered = visible.length ? visible : ITEMS.slice();
-  const kindOf = (m) => (shape[m.url] && shape[m.url].kind) || "";
-  const manifests = ordered.filter((m) => kindOf(m) === "manifest");
-  return manifests.concat(ordered.filter((m) => kindOf(m) !== "manifest"));
+  // The URL's own shape is the floor: an .m3u8/.mpd master is a manifest
+  // whatever the engine says, even when it is down. The engine still decides
+  // what to hide.
+  const kindOf = (m) => (roleOf(m.url).role === "master"
+    ? "manifest"
+    : (shape[m.url] && shape[m.url].kind) || "");
+  const newest = (a, b) => (b.foundAt || 0) - (a.foundAt || 0);
+  const manifests = ordered.filter((m) => kindOf(m) === "manifest").sort(newest);
+  return manifests.concat(ordered.filter((m) => kindOf(m) !== "manifest").sort(newest));
+}
+
+// Same video, or the one before it? A player asks for its rendition and its
+// audio within a second of each other on one origin; a feed's next video
+// arrives when the previous one ends. Finds quieter than this belong to
+// another video, and fold away (v0.5.20).
+const CLUSTER_GAP = 4000;
+
+function hostOf(url) {
+  try { return new URL(url).origin; } catch (_) { return ""; }
+}
+
+function clusters(items) {
+  const out = [];
+  for (const m of items) {
+    const at = m.foundAt || 0;
+    const origin = hostOf(m.url);
+    const cur = out[out.length - 1];
+    if (cur && cur.origin === origin && cur.last - at <= CLUSTER_GAP) {
+      cur.items.push(m);
+      cur.last = at;
+    } else {
+      out.push({ origin, last: at, items: [m] });
+    }
+  }
+  for (const c of out) c.items = orderCluster(c.items);
+  return out;
+}
+
+// The top row is the answer: a manifest first (it is the whole stream), then
+// the biggest video, audio last (it is a track of the video, never a choice of
+// its own), and only then newest.
+function orderCluster(items) {
+  const rank = (m) => (roleOf(m.url).role === "master" ? -1
+    : /^audio\//.test(m.mime || "") ? 1 : 0);
+  return items.slice().sort((a, b) => {
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    if ((b.bytes || 0) !== (a.bytes || 0)) return (b.bytes || 0) - (a.bytes || 0);
+    return (b.foundAt || 0) - (a.foundAt || 0);
+  });
+}
+
+// The biggest video in the newest bunch is the file a person means by "this
+// video"; audio-only tracks are never it (a player fetches them alongside).
+function recommend(items) {
+  // A manifest is the whole stream, whatever its size says: picking it is
+  // picking the video, and the app can still choose a quality inside it.
+  const master = items.find((m) => roleOf(m.url).role === "master");
+  if (master) return master;
+  const videos = items.filter((m) => /^video\//.test(m.mime || "") && m.bytes > 0);
+  const sized = items.filter((m) => m.bytes > 0);
+  const pool = videos.length ? videos : sized;
+  if (!pool.length) return items[0] || null;
+  return pool.reduce((a, b) => (b.bytes > a.bytes ? b : a));
+}
+
+function sizeText(bytes) {
+  if (!bytes || bytes < 1024) return "";
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1024) return (mb / 1024).toFixed(2) + " GB";
+  if (mb >= 10) return Math.round(mb) + " MB";
+  if (mb >= 1) return mb.toFixed(1).replace(/\.0$/, "") + " MB";
+  return Math.max(1, Math.round(bytes / 1024)) + " KB";
 }
 
 function kindWord(m) {
@@ -149,11 +222,12 @@ function streamLabel(m) {
   const role = roleOf(m.url);
   if (role.role === "master") return t("All qualities");
   if (role.role === "audio") return role.name ? t("Audio") + " · " + role.name : t("Audio");
-  if (role.role === "variant") {
-    const info = streamName(m.url);
-    return (info.name || t("Video")) + " · " + role.res;
-  }
   const info = streamName(m.url);
+  // The response knows what the URL does not: an audio-only track is not a
+  // lower-quality video, and calling it one made the list lie (v0.5.20).
+  if (/^audio\//.test(m.mime || "")) {
+    return info.name ? t("Audio") + " · " + info.name : t("Audio");
+  }
   const base = info.name || kindWord(m);
   return info.res ? base + " · " + info.res : base;
 }
@@ -333,6 +407,8 @@ function render() {
     // glance answers "which one do I pick?" — the top, checked row.
     const grouped = groupRows(vis);
     const rows = [];
+    let pickUrl = "";
+    let foldCount = 0;
     if (grouped && !SHOW_PARTS) {
       const sm = shapeMaster(grouped.master.url);
       const quals = sm
@@ -345,6 +421,7 @@ function render() {
       if (audio) label += " · " + t("{n} audio", { n: audio });
       rows.push({ m: grouped.master, label, parts: grouped.parts.length });
       for (const x of grouped.rest) rows.push({ m: x.m, label: streamLabel(x.m) });
+      pickUrl = grouped.master.url;
     } else if (grouped) {
       rows.push({ m: grouped.master, label: streamLabel(grouped.master) });
       for (const p of grouped.parts) {
@@ -352,13 +429,39 @@ function render() {
       }
       for (const x of grouped.rest) rows.push({ m: x.m, label: streamLabel(x.m) });
       rows.push({ toggle: "hide" });
+      pickUrl = grouped.master.url;
     } else {
-      vis.forEach((m) => rows.push({ m, label: streamLabel(m) }));
+      // A feed leaves several videos in one list: the finds that arrived
+      // together are one video's streams, and the newest bunch is the one on
+      // screen. The rest fold away, so the top row is the answer rather than
+      // a lucky guess (v0.5.20).
+      const cl = clusters(vis);
+      const newest = cl[0] ? cl[0].items : [];
+      // The fold line lives OUTSIDE the scrolling list: inside it, it sat
+      // below the fold and nobody ever saw that older finds were there.
+      foldCount = cl.length > 1 && !SHOW_OLDER
+        ? cl.slice(1).reduce((n, c) => n + c.items.length, 0) : 0;
+      if (cl.length > 1 && !SHOW_OLDER) {
+        for (const m of newest) rows.push({ m, label: streamLabel(m) });
+      } else {
+        cl.forEach((c, i) => {
+          if (i > 0) rows.push({ divider: t("Earlier on this page") });
+          for (const m of c.items) rows.push({ m, label: streamLabel(m) });
+        });
+      }
+      pickUrl = (recommend(newest) || {}).url || "";
     }
     const counts = {};
     for (const r of rows) if (r.label) counts[r.label] = (counts[r.label] || 0) + 1;
     const seen = {};
     for (const r of rows) {
+      if (r.divider) {
+        const line = document.createElement("div");
+        line.className = "earlier";
+        line.textContent = r.divider;
+        box.append(line);
+        continue;
+      }
       if (r.toggle) {
         const line = document.createElement("div");
         line.className = "partsline";
@@ -382,12 +485,20 @@ function render() {
       input.type = "checkbox";
       input.name = "stream";
       input.value = m.url;
+      input.checked = m.url === pickUrl;
       input.onchange = refreshDoors;
       INPUTS.push(input);
       const say = document.createElement("span");
       say.className = "ssay";
-      say.textContent = r.label + suffix;
+      const size = sizeText(m.bytes);
+      say.textContent = r.label + suffix + (size ? " · " + size : "");
       pick.append(input, say);
+      if (m.url === pickUrl && !r.part) {
+        const best = document.createElement("span");
+        best.className = "best";
+        best.textContent = t("best");
+        pick.append(best);
+      }
       const raw = document.createElement("pre");
       raw.className = "raw";
       raw.hidden = true;
@@ -420,8 +531,33 @@ function render() {
         box.append(line);
       }
     }
+    // the headline counts the video on screen, not the whole page: with the
+    // older finds folded away, "20 streams" described a list nobody could see
+    if (foldCount) {
+      $("headline").textContent = t("This video — {n} streams", { n: rows.length });
+    }
+    // the fold line, outside the scroll box so it is always in sight
+    const fold = $("foldline");
+    if (fold) {
+      fold.textContent = "";
+      fold.hidden = foldCount === 0;
+      if (foldCount) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "partstoggle";
+        btn.textContent = foldCount === 1
+          ? t("Show 1 earlier find on this page")
+          : t("Show {n} earlier finds on this page", { n: foldCount });
+        btn.onclick = () => { SHOW_OLDER = true; render(); };
+        fold.append(btn);
+      }
+    }
     const first = box.querySelector("input");
-    if (first) first.checked = true;
+    // Something is always ticked — both doors need a pick — but the tick is a
+    // recommendation now, not list position: the newest video's biggest file
+    // (v0.5.20). Before this, a feed page pre-ticked the OLDEST find, which is
+    // usually the video that already finished playing.
+    if (first && !INPUTS.some((i) => i.checked)) first.checked = true;
     const all = $("allbtn");
     if (all) {
       all.onclick = () => {

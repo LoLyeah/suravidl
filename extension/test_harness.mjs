@@ -197,6 +197,37 @@ ok(["one.ts", "two.ts", "three.ts"].every((n) => found().includes("https://cdn/"
 ok(Number(badge[7]) === found().length && Number(badge[7]) >= 5,
    "the badge follows every find");
 
+// 1b. the response teaches a find its size (v0.5.20): the range's total when
+// the player asked for a slice — never the slice's own length.
+listeners.headersReceived[0](req("media", "https://cdn/sized.mp4", {
+  responseHeaders: [
+    { name: "Content-Type", value: "video/mp4; charset=binary" },
+    { name: "Content-Length", value: "65536" },
+    { name: "Content-Range", value: "bytes 0-65535/9437184" },
+  ],
+}));
+await settle();
+let sized = ((store.tabMedia || {})[7] || []).find((m) => m.url === "https://cdn/sized.mp4");
+ok(sized && sized.bytes === 9437184 && sized.mime === "video/mp4",
+   "a 206's range total becomes the find's size and type");
+listeners.headersReceived[0](req("media", "https://cdn/sized.mp4", {
+  responseHeaders: [{ name: "Content-Range", value: "bytes 0-1023/65536" }],
+}));
+await settle();
+sized = ((store.tabMedia || {})[7] || []).find((m) => m.url === "https://cdn/sized.mp4");
+ok(sized && sized.bytes === 9437184,
+   "a later, smaller range does not shrink a known size");
+const gotSized = await new Promise((resolve) => {
+  onMessage({ type: "getMedia", tabId: 7 }, {}, resolve);
+});
+ok(gotSized && gotSized.items.some((i) => i.url === "https://cdn/sized.mp4" &&
+   i.bytes === 9437184 && i.mime === "video/mp4"),
+   "the popup is told the size and the type");
+listeners.headersReceived[0](req("media", "https://cdn/sized.mp4", {
+  responseHeaders: [{ name: "Content-Length", value: "12" }],
+}));
+await settle();
+
 // 2. the pattern list is the engine's
 ok(fetchCalls.some((c) => c.url.endsWith("/sniff/patterns")),
    "the engine's pattern list is fetched at start");
@@ -731,7 +762,7 @@ ok(batched && batched.ok && batched.queued === 2,
       get textContent() { return this._text; },
     });
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
-                 "headline", "subline", "pickgroup", "streams", "send",
+                 "headline", "subline", "pickgroup", "streams", "foldline", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList"];
     const mkNodes = () => {
@@ -840,26 +871,31 @@ ok(batched && batched.ok && batched.queued === 2,
        "firefox: …and offer a chooser");
     const rows = nodes.streams.children;
     const labelOf = (r) => r.children[0].children[1].textContent;
+    // v0.5.20: newest first, and the tick is a recommendation — a manifest
+    // outranks everything, because it is the whole stream.
     ok(rows[0].children[0].children[0].checked === true,
-       "firefox: the first stream is pre-asked for");
-    ok(labelOf(rows[0]) === "Stream 1" && labelOf(rows[1]) === "Stream 2",
-       "firefox: identical rows still get ordinals");
-    ok(labelOf(rows[2]) === "All qualities",
+       "firefox: the recommended stream is pre-asked for");
+    ok(labelOf(rows[0]) === "All qualities",
        "firefox: a master names the whole stream");
-    ok(labelOf(rows[3]) === "Big Buck Bunny 2019 · 720p",
+    ok(labelOf(rows[1]) === "Big Buck Bunny 2019 · 720p",
        "firefox: a real filename names the row, resolution kept");
+    ok(labelOf(rows[2]) === "Stream 1" && labelOf(rows[3]) === "Stream 2",
+       "firefox: identical rows still get ordinals");
+    ok(rows[0].children[0].children[2] &&
+       rows[0].children[0].children[2].textContent === "best",
+       "firefox: …and the recommended row says why it is ticked");
     // the URL door: folded by default, unfolds the raw link, folds back
-    ok(rows[2].children[2].hidden === true, "firefox: raw links start folded");
-    rows[2].children[1].onclick();
-    ok(rows[2].children[2].hidden === false &&
-       rows[2].children[2].textContent === "https://cdn/big-buck-bunny/1080p/master.m3u8?tok=x",
+    ok(rows[0].children[2].hidden === true, "firefox: raw links start folded");
+    rows[0].children[1].onclick();
+    ok(rows[0].children[2].hidden === false &&
+       rows[0].children[2].textContent === "https://cdn/big-buck-bunny/1080p/master.m3u8?tok=x",
        "firefox: the URL button unfolds the raw link");
-    ok(rows[2].children[1].getAttribute("aria-expanded") === "true",
+    ok(rows[0].children[1].getAttribute("aria-expanded") === "true",
        "firefox: …and says it is open");
-    rows[2].children[1].onclick();
-    ok(rows[2].children[2].hidden === true, "firefox: and folds it back");
+    rows[0].children[1].onclick();
+    ok(rows[0].children[2].hidden === true, "firefox: and folds it back");
     rows[0].children[0].children[0].checked = false;
-    rows[3].children[0].children[0].checked = true;
+    rows[1].children[0].children[0].checked = true;
     await nodes.send.onclick();
     const p2 = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
     ok(JSON.parse(p2.opts.body).url === "https://cdn/other/Big.Buck.Bunny.2019.720p.mp4",
@@ -907,6 +943,55 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(String(nodes.allbtn.textContent) === "Select none"
        || String(nodes.allbtn.getAttribute("aria-pressed")) === "true",
        "firefox: …and the door says what a second press will do");
+
+    // — v0.5.20: twenty opaque rows become one video with sizes on it. The
+    //   biggest video of the newest bunch is the tick, an audio track is
+    //   named as audio, and the reel before it folds away —
+    const now = Date.now();
+    const MB = (n) => Math.round(n * 1048576);
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn/earlier/video.mp4?e=1", foundAt: now - 90000,
+        via: "network", mime: "video/mp4", bytes: MB(12) },
+      { url: "https://cdn/reel/a.m4a?x=1", foundAt: now - 1100,
+        via: "network", mime: "audio/mp4", bytes: 950000 },
+      { url: "https://cdn/reel/video.mp4?x=720", foundAt: now - 950,
+        via: "network", mime: "video/mp4", bytes: MB(3) },
+      { url: "https://cdn/reel/video.mp4?x=1080", foundAt: now - 700,
+        via: "network", mime: "video/mp4", bytes: MB(9) },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.20: the popup must load with sized finds (" + e + ")");
+    }
+    await settle();
+    await settle();
+    const srows = nodes.streams.children;
+    ok(srows.length === 3,
+       "v0.5.20: only the newest video's own streams are rows");
+    ok(nodes.headline.textContent === "This video — 3 streams",
+       "v0.5.20: …and the headline counts the video, not the page");
+    ok(/· 9 MB$/.test(labelOf(srows[0])) && srows[0].children[0].children[0].checked,
+       "v0.5.20: the biggest video carries its size, and is the tick");
+    ok(srows[0].children[0].children[2] &&
+       srows[0].children[0].children[2].textContent === "best",
+       "v0.5.20: …and says why it is ticked");
+    ok(/· 3 MB$/.test(labelOf(srows[1])),
+       "v0.5.20: the smaller rendition says its size too");
+    ok(labelOf(srows[2]) === "Audio · 928 KB",
+       "v0.5.20: an audio track is named as audio, not as a video");
+    ok(nodes.foldline.hidden === false && nodes.foldline.children[0] &&
+       /^Show 1 earlier find on this page$/.test(String(nodes.foldline.children[0].textContent)),
+       "v0.5.20: the video before this one folds away — outside the scroll box");
+    nodes.foldline.children[0].onclick();
+    const srows2 = nodes.streams.children;
+    ok(nodes.foldline.hidden === true,
+       "v0.5.20: once unfolded, the fold line goes away");
+    ok(srows2.length === 5 && srows2[3].className === "earlier",
+       "v0.5.20: unfolding shows the earlier finds under their own heading");
+    ok(/· 12 MB$/.test(labelOf(srows2[4])),
+       "v0.5.20: …each with its own size");
+    ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());

@@ -110,7 +110,12 @@ h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 .lbl { font-size: 11px; font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; color: var(--dim); }
 .streams {
-  max-height: 152px; overflow-y: auto; margin-top: 6px;
+  /* the newest video's own streams fit without scrolling; the long tail is
+     folded away behind #foldline, not scrolled past (v0.5.20) */
+  max-height: 236px; overflow-y: auto; margin-top: 6px;
+  /* overflow clips at the padding box: 4px keeps the last row's rounded
+     bottom from sitting flush against the clip edge */
+  padding-bottom: 4px;
   scrollbar-width: thin;                              /* Firefox */
   scrollbar-color: rgba(232, 236, 240, .16) transparent;
 }
@@ -150,9 +155,26 @@ h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 .more:hover { color: var(--text); border-color: var(--line); }
 .more[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 
+/* the recommended row: the newest video's biggest file (v0.5.20) */
+.pickline .best {
+  flex: none; padding: 1px 5px; border-radius: 5px;
+  color: var(--accent); background: var(--accent-soft);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .10em; text-transform: uppercase;
+}
+
+/* the finds from before this video, folded away by default (v0.5.20) */
+.earlier {
+  margin: 9px 0 3px 2px; padding-top: 7px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--dim);
+  font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+}
+
 /* a stream's parts hang under its master; the toggle line stays quiet */
 .stream.part { margin-left: 22px; }
 .partsline { margin: 2px 0 8px 22px; }
+/* outside the scroll box, and at the list's own margin, not a part's */
+.foldline { margin: 5px 0 2px; }
 .partstoggle {
   background: none;
   border: 0;

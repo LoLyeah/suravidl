@@ -66,12 +66,58 @@ function update(mutate) {
   return storageChain;
 }
 
-function remember(tabId, url, via) {
+// What a response says about itself: its type, and the size a person can
+// compare. On a 206 the Content-Length is the chunk the player asked for —
+// the real file size is the range's total, so read that first (v0.5.20).
+function responseMeta(responseHeaders) {
+  let mime = "", len = 0, total = 0;
+  for (const h of responseHeaders || []) {
+    const name = (h && h.name ? h.name : "").toLowerCase();
+    const value = String((h && h.value) == null ? "" : h.value);
+    if (name === "content-type") mime = value.split(";")[0].trim().toLowerCase();
+    else if (name === "content-length") len = parseInt(value, 10) || 0;
+    else if (name === "content-range") {
+      const m = /\/(\d+)\s*$/.exec(value);
+      if (m) total = parseInt(m[1], 10) || 0;
+    }
+  }
+  return { mime, bytes: total || len };
+}
+
+// The same fragment reports its headers over and over during one playback,
+// and every remember() is a storage read-modify-write. Only a changed answer
+// is worth a write (v0.5.20).
+const META_SEEN = new Map();
+
+function learnMeta(tabId, url, meta) {
+  if (!meta.mime && !meta.bytes) return;
+  const key = meta.mime + "|" + meta.bytes;
+  if (META_SEEN.get(url) === key) return;
+  if (META_SEEN.size > 400) META_SEEN.clear();
+  META_SEEN.set(url, key);
+  remember(tabId, url, "network", meta);
+}
+
+function remember(tabId, url, via, meta) {
   update(({ tabMedia, reqHeaders }) => {
     const list = tabMedia[tabId] || [];
+    const at = list.findIndex((m) => m.url === url);
     let added = false;
-    if (!list.some((m) => m.url === url)) {
-      list.push({ url, foundAt: Date.now(), via: via || "network" });
+    if (at >= 0) {
+      // seen again, this time with its response: the find learns what it is
+      // and how big it is, and keeps its place (and its foundAt) in the list.
+      // A later 206 must not shrink a known size back to one chunk.
+      if (!meta) return { tabMedia };
+      const cur = list[at];
+      const mime = meta.mime || cur.mime || "";
+      const bytes = Math.max(meta.bytes || 0, cur.bytes || 0);
+      if (mime === cur.mime && bytes === cur.bytes) return { tabMedia };
+      list[at] = Object.assign({}, cur, { mime, bytes });
+    } else {
+      list.push({
+        url, foundAt: Date.now(), via: via || "network",
+        mime: (meta && meta.mime) || "", bytes: (meta && meta.bytes) || 0,
+      });
       tabMedia[tabId] = list.slice(-KEEP_PER_TAB);
       added = true;
     }
@@ -239,26 +285,30 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
 // The response decides when the name said nothing: a stream served as video/*
 // from a URL no pattern recognises still ends up in the list, which is the
-// whole point of sniffing rather than guessing.
+// whole point of sniffing rather than guessing. And every media response —
+// recognised or not — hands over the two facts a person can sort by: what it
+// is, and how big it is (v0.5.20).
 chrome.webRequest.onHeadersReceived.addListener(
   (details) => {
     if (details.tabId < 0) return;
     if (details.type === "main_frame" || details.type === "sub_frame") return;
-    if (MEDIA_RE.test(details.url)) return; // already known by its name
-    for (const h of details.responseHeaders || []) {
-      if ((h.name || "").toLowerCase() === "content-type" && MEDIA_TYPES.test(h.value || "")) {
-        remember(details.tabId, details.url);
-        // The request headers for this URL were held because its name said
-        // nothing; now that the response proved it is media, they are worth
-        // keeping — a guarded stream needs them to download.
-        heldHeaders(details.url).then((held) => {
-          if (held) commitHeaders(details.url, held);
-          dropHeaders(details.url);
-        });
-        return;
-      }
+    const meta = responseMeta(details.responseHeaders);
+    if (MEDIA_RE.test(details.url)) {
+      learnMeta(details.tabId, details.url, meta);
+      return;
     }
-    dropHeaders(details.url); // the name did not lie after all
+    if (!MEDIA_TYPES.test(meta.mime)) {
+      dropHeaders(details.url); // the name did not lie after all
+      return;
+    }
+    learnMeta(details.tabId, details.url, meta);
+    // The request headers for this URL were held because its name said
+    // nothing; now that the response proved it is media, they are worth
+    // keeping — a guarded stream needs them to download.
+    heldHeaders(details.url).then((held) => {
+      if (held) commitHeaders(details.url, held);
+      dropHeaders(details.url);
+    });
   },
   { urls: ["<all_urls>"] },
   ["responseHeaders"]
@@ -309,6 +359,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const items = (tabMedia[msg.tabId] || []).map((m) => ({
         url: m.url,
         foundAt: m.foundAt,
+        via: m.via || "network",
+        mime: m.mime || "",
+        bytes: m.bytes || 0,
         hasHeaders: !!reqHeaders[m.url],
       }));
       sendResponse({ items });
