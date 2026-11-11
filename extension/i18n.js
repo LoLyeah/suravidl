@@ -39,6 +39,12 @@ const I18N = {
   "Fragment": "Fragmen",
   "Stream": "Stream",
   "best": "terbaik",
+  "Newest": "Terbaru",
+  "Earlier": "Sebelumnya",
+  "Download this one": "Unduh yang ini",
+  "{n} videos found on this page": "{n} video ditemukan di halaman ini",
+  "Pick the one you are watching — the newest find is often the next reel.":
+    "Pilih yang sedang kamu tonton — temuan terbaru sering kali reel berikutnya.",
   "Earlier on this page": "Sebelumnya di halaman ini",
   "This video — {n} streams": "Video ini — {n} stream",
   "Show {n} earlier finds on this page": "Tampilkan {n} temuan sebelumnya di halaman ini",

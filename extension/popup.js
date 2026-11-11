@@ -373,6 +373,110 @@ function status(text, kind) {
   // unhides unreliably); the stylesheet hides it while it is empty
 }
 
+// A feed plays one video and fetches the next one early, so the newest
+// network find is usually NOT the video on screen — the tick used to land on
+// the upcoming reel, and the download felt random. Nothing in the URLs or the
+// timings separates the two, so the popup stops guessing: one card per video,
+// drawn from the file itself, and nothing is picked until a person picks
+// (v0.5.22).
+const MAX_CARDS = 6;
+
+function clockText(sec) {
+  if (!isFinite(sec) || sec <= 0) return "";
+  const s = Math.round(sec);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+// A frame from the file itself. The CDN's frame is cross-origin and would
+// taint the canvas, so the first megabyte is fetched with the page's own
+// cookies and played from a blob: same-origin, drawable, and a working URL is
+// proof the card can be downloaded at all.
+async function cardFrame(url) {
+  if (typeof HTMLVideoElement === "undefined" || typeof fetch !== "function") return null;
+  if (typeof URL === "undefined" || !URL.createObjectURL) return null;
+  let obj = "";
+  const drop = () => { if (obj) URL.revokeObjectURL(obj); };
+  try {
+    const res = await fetch(url, {
+      credentials: "include", cache: "force-cache",
+      headers: { Range: "bytes=0-1048575" },
+    });
+    if (!res || (!res.ok && res.status !== 206)) { drop(); return null; }
+    const part = await res.blob();
+    if (!part || !part.size) { drop(); return null; }
+    obj = URL.createObjectURL(new Blob([part], { type: "video/mp4" }));
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "auto";
+    v.src = obj;
+    const meta = await new Promise((resolve) => {
+      const t = setTimeout(() => resolve(false), 5000);
+      v.onloadedmetadata = () => { clearTimeout(t); resolve(true); };
+      v.onerror = () => { clearTimeout(t); resolve(false); };
+    });
+    if (!meta) { drop(); return null; }
+    const dur = v.duration;
+    const at = Math.min(Math.max(dur / 3, 0.1), 1.5);
+    await new Promise((resolve) => {
+      const t = setTimeout(resolve, 4000);
+      v.onseeked = () => { clearTimeout(t); resolve(); };
+      try { v.currentTime = at; } catch (_) { clearTimeout(t); resolve(); }
+    });
+    const c = document.createElement("canvas");
+    c.width = 240;
+    c.height = 135;
+    const ctx = c.getContext && c.getContext("2d");
+    if (!ctx) { drop(); return { shot: "", dur }; }
+    const vw = v.videoWidth || 16;
+    const vh = v.videoHeight || 9;
+    const scale = Math.max(c.width / vw, c.height / vh);
+    const dw = vw * scale;
+    const dh = vh * scale;
+    ctx.drawImage(v, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+    return { shot: c.toDataURL("image/jpeg", 0.72), dur };
+  } catch (_) {
+    drop();
+    return null;
+  } finally {
+    if (obj) setTimeout(drop, 4000);
+  }
+}
+
+function renderCards(groups) {
+  const box = $("cards");
+  if (!box) return;
+  box.textContent = "";
+  box.hidden = false;
+  groups.slice(0, MAX_CARDS).forEach((c, i) => {
+    const best = recommend(c.items);
+    if (!best) return;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "card";
+    const thumb = document.createElement("span");
+    thumb.className = "thumb";
+    const meta = document.createElement("span");
+    meta.className = "cmeta";
+    const line = document.createElement("span");
+    line.className = "cline";
+    const size = sizeText(best.bytes);
+    line.textContent = (i === 0 ? t("Newest") : t("Earlier")) + (size ? " · " + size : "");
+    const sub = document.createElement("span");
+    sub.className = "csub";
+    sub.textContent = t("Download this one");
+    meta.append(line, sub);
+    card.append(thumb, meta);
+    card.onclick = () => send(best.url, "quick");
+    box.append(card);
+    cardFrame(best.url).then((got) => {
+      if (!got) return;
+      if (got.shot && thumb.style) thumb.style.backgroundImage = "url(" + got.shot + ")";
+      if (got.dur) line.textContent = clockText(got.dur) + (size ? " · " + size : "");
+    }).catch(() => {});
+  });
+}
+
 function render() {
   const vis = visibleItems();
   $("found").hidden = vis.length === 0;
@@ -405,6 +509,34 @@ function render() {
 
   const group = $("pickgroup");
   group.hidden = !many;
+  const grouped = groupRows(vis);
+
+  // A feed leaves one cluster per video, and which of them is on screen is
+  // not knowable from the network. With more than one, the pick belongs to a
+  // person: cards with a frame and a duration, nothing ticked (v0.5.22).
+  const pickable = many && !grouped
+    ? clusters(vis).filter((c) => c.items.some((m) => !/^audio\//.test(m.mime || "")))
+    : [];
+  $("send").onclick = () => send(primaryUrl(), "quality");
+  $("quick").onclick = () => send(primaryUrl(), "quick");
+  if (pickable.length > 1) {
+    INPUTS = [];
+    $("streams").textContent = "";
+    group.hidden = true;
+    $("send").hidden = true;
+    $("quick").hidden = true;
+    $("foldline").hidden = true;
+    $("headline").textContent = t("{n} videos found on this page", { n: pickable.length });
+    $("subline").textContent =
+      t("Pick the one you are watching — the newest find is often the next reel.");
+    renderCards(pickable);
+    refreshDoors();
+    return;
+  }
+  $("send").hidden = false;
+  $("quick").hidden = false;
+  $("cards").hidden = true;
+
   const box = $("streams");
   box.textContent = "";
   INPUTS = [];
@@ -416,7 +548,6 @@ function render() {
     // Rows say what they are; a master's parts fold beneath it and unfold
     // on demand (SHOW_PARTS). The master row carries the summary, so one
     // glance answers "which one do I pick?" — the top, checked row.
-    const grouped = groupRows(vis);
     const rows = [];
     let pickUrl = "";
     let foldCount = 0;
@@ -579,8 +710,6 @@ function render() {
     }
   }
 
-  $("send").onclick = () => send(primaryUrl(), "quality");
-  $("quick").onclick = () => send(primaryUrl(), "quick");
   refreshDoors();
 }
 

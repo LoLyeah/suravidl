@@ -883,7 +883,7 @@ ok(batched && batched.ok && batched.queued === 2,
       get textContent() { return this._text; },
     });
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
-                 "headline", "subline", "pickgroup", "streams", "foldline", "send",
+                 "headline", "subline", "pickgroup", "streams", "foldline", "cards", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList"];
     const mkNodes = () => {
@@ -1065,14 +1065,12 @@ ok(batched && batched.ok && batched.queued === 2,
        || String(nodes.allbtn.getAttribute("aria-pressed")) === "true",
        "firefox: …and the door says what a second press will do");
 
-    // — v0.5.20: twenty opaque rows become one video with sizes on it. The
-    //   biggest video of the newest bunch is the tick, an audio track is
-    //   named as audio, and the reel before it folds away —
+    // — v0.5.20: one video's streams carry their sizes, the biggest is the
+    //   tick, and an audio track is named as audio — (a second video on the
+    //   page is the v0.5.22 card case below) —
     const now = Date.now();
     const MB = (n) => Math.round(n * 1048576);
     ff.store.tabMedia = { 7: [
-      { url: "https://cdn/earlier/video.mp4?e=1", foundAt: now - 90000,
-        via: "network", mime: "video/mp4", bytes: MB(12) },
       { url: "https://cdn/reel/a.m4a?x=1", foundAt: now - 1100,
         via: "network", mime: "audio/mp4", bytes: 950000 },
       { url: "https://cdn/reel/video.mp4?x=720", foundAt: now - 950,
@@ -1090,8 +1088,8 @@ ok(batched && batched.ok && batched.queued === 2,
     const srows = nodes.streams.children;
     ok(srows.length === 3,
        "v0.5.20: only the newest video's own streams are rows");
-    ok(nodes.headline.textContent === "This video — 3 streams",
-       "v0.5.20: …and the headline counts the video, not the page");
+    ok(nodes.headline.textContent === "3 streams found on this page",
+       "v0.5.20: …and one video's streams read as one video");
     ok(/· 9 MB$/.test(labelOf(srows[0])) && srows[0].children[0].children[0].checked,
        "v0.5.20: the biggest video carries its size, and is the tick");
     ok(srows[0].children[0].children[2] &&
@@ -1101,17 +1099,6 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.20: the smaller rendition says its size too");
     ok(labelOf(srows[2]) === "Audio · 928 KB",
        "v0.5.20: an audio track is named as audio, not as a video");
-    ok(nodes.foldline.hidden === false && nodes.foldline.children[0] &&
-       /^Show 1 earlier find on this page$/.test(String(nodes.foldline.children[0].textContent)),
-       "v0.5.20: the video before this one folds away — outside the scroll box");
-    nodes.foldline.children[0].onclick();
-    const srows2 = nodes.streams.children;
-    ok(nodes.foldline.hidden === true,
-       "v0.5.20: once unfolded, the fold line goes away");
-    ok(srows2.length === 5 && srows2[3].className === "earlier",
-       "v0.5.20: unfolding shows the earlier finds under their own heading");
-    ok(/· 12 MB$/.test(labelOf(srows2[4])),
-       "v0.5.20: …each with its own size");
     ff.store.tabMedia = {};
 
     // — v0.5.21: a reel's audio track is named Audio even though the CDN
@@ -1152,6 +1139,47 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.21: the handoff carries the canonical address");
     ok(fbBody && fbBody.urls.includes("https://cdn.fb/clip.mp4?oh=1&bytestart=0"),
        "v0.5.21: …and the slice the player used, as a fallback");
+    ff.store.tabMedia = {};
+
+    // — v0.5.22: a feed holds several videos and nothing on the wire says
+    //   which one is on screen, so the popup stops ticking one: a card per
+    //   video, nothing chosen, and a click downloads THAT card's video —
+    const cardNow = Date.now();
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn.fb/old.mp4?oh=7", foundAt: cardNow - 120000,
+        via: "network", mime: "video/mp4", bytes: 3 * 1048576, alt: "" },
+      { url: "https://cdn.fb/mid.mp4?oh=8", foundAt: cardNow - 60000,
+        via: "network", mime: "video/mp4", bytes: 5 * 1048576, alt: "" },
+      { url: "https://cdn.fb/new.mp4?oh=9", foundAt: cardNow - 500,
+        via: "network", mime: "video/mp4", bytes: 8 * 1048576, alt: "" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.22: the popup must load with several videos (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.cards.hidden === false && nodes.cards.children.length === 3,
+       "v0.5.22: a feed shows one card per video, not a list of streams");
+    ok(nodes.pickgroup.hidden === true && nodes.send.hidden === true &&
+       nodes.quick.hidden === true,
+       "v0.5.22: no checkbox chooser and no pre-chosen door");
+    ok(nodes.headline.textContent === "3 videos found on this page" &&
+       /newest find is often the next reel/.test(nodes.subline.textContent),
+       "v0.5.22: …and the card says which one the newest find tends to be");
+    const cards = nodes.cards.children;
+    ok(/8 MB$/.test(cards[0].children[1].children[0].textContent),
+       "v0.5.22: the newest card is first and carries its size");
+    ok(cards[0].children[1].children[1].textContent === "Download this one",
+       "v0.5.22: each card names its own action");
+    ok(nodes.streams.children.length === 0,
+       "v0.5.22: nothing is ticked on the user's behalf — there is no list to tick");
+    ff.fetchCalls.length = 0;
+    await cards[2].onclick();
+    const cardCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    ok(cardCall && JSON.parse(cardCall.opts.body).url === "https://cdn.fb/old.mp4?oh=7",
+       "v0.5.22: clicking a card downloads that video, the one the person chose");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —

@@ -170,6 +170,27 @@ h1 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
   font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
 }
 
+/* one card per video when a feed has more than one on the page (v0.5.22) */
+.cards { display: grid; gap: 8px; margin-top: 10px; }
+.card {
+  display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center;
+  padding: 6px; text-align: left; cursor: pointer;
+  background: var(--glass-bg); border: 1px solid var(--line-soft);
+  border-radius: 10px; color: var(--text);
+  font-family: "Archivo", system-ui, sans-serif;
+}
+.card:hover { background: var(--glass-bg-strong); border-color: var(--line); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.thumb {
+  width: 92px; height: 52px; border-radius: 6px;
+  background: linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.02));
+  background-size: cover; background-position: center;
+  border: 1px solid var(--line-soft);
+}
+.cmeta { display: grid; gap: 2px; min-width: 0; }
+.cline { font-size: 12.5px; font-weight: 600; }
+.csub { font-size: 11px; font-weight: 600; color: var(--accent); }
+
 /* a stream's parts hang under its master; the toggle line stays quiet */
 .stream.part { margin-left: 22px; }
 .partsline { margin: 2px 0 8px 22px; }
