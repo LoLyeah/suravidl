@@ -84,22 +84,175 @@ function responseMeta(responseHeaders) {
   return { mime, bytes: total || len };
 }
 
+// A fragmented MP4 served in slices — Facebook's reel player does this — is
+// one file asked for many times: the player appends `bytestart` and `byteend`
+// to a signed address, and the CDN answers each slice with 200 and the
+// slice's own length, never a Content-Range. The signature covers the address
+// without those two params, so they come off exactly and every slice lands on
+// the same find instead of twenty (v0.5.21).
+function canonicalMediaUrl(raw) {
+  const text = String(raw || "");
+  const q = text.indexOf("?");
+  if (q < 0) return { url: raw, sliced: false };
+  const hash = text.indexOf("#", q);
+  const head = text.slice(0, q);
+  const query = text.slice(q + 1, hash < 0 ? undefined : hash);
+  const tail = hash < 0 ? "" : text.slice(hash);
+  const parts = query.split("&");
+  const kept = parts.filter((p) => !/^(?:bytestart|byteend)=/.test(p));
+  if (kept.length === parts.length) return { url: raw, sliced: false };
+  // Every other byte of the query stays as the page sent it: the signature
+  // is over this string, and re-serialising (which would turn a value's
+  // "=" into %3D) is exactly how a signed URL starts answering 403.
+  const rest = kept.filter((p) => p !== "").join("&");
+  return { url: head + (rest ? "?" + rest : "") + tail, sliced: true };
+}
+
+// The `efg` parameter is base64url of the player's own description of the
+// track it is about to fetch. Its tag is the one place an audio-only file
+// admits it: the CDN types it video/mp4 exactly like the picture, and a row
+// called "Video" for a soundtrack had a person download silence (v0.5.21).
+function efgKind(raw) {
+  try {
+    const efg = new URL(raw).searchParams.get("efg");
+    if (!efg) return "";
+    const b64 = efg.replace(/-/g, "+").replace(/_/g, "/");
+    const text = atob(b64 + "===".slice((b64.length + 3) % 4));
+    const blob = JSON.parse(text) || {};
+    // the tag is the player's own answer; the other strings are a fallback
+    // for a payload shaped differently, never a second opinion on a real tag
+    const tag = typeof blob.vencode_tag === "string" ? blob.vencode_tag.toLowerCase() : "";
+    const words = tag || Object.keys(blob).map((k) => blob[k])
+      .filter((v) => typeof v === "string")
+      .join(" ")
+      .toLowerCase();
+    if (/audio|heaac/.test(words)) return "audio";
+    if (/dash_|progressive|video/.test(words)) return "video";
+  } catch (_) { /* a payload we cannot read claims nothing */ }
+  return "";
+}
+
+// What a response can honestly say about an audio track the CDN typed as
+// video: the efg tag corrects the name, and nothing else about it changes.
+function efgMime(raw, mime) {
+  return efgKind(raw) === "audio" && (!mime || /^video\//.test(mime))
+    ? "audio/mp4" : mime;
+}
+
 // The same fragment reports its headers over and over during one playback,
 // and every remember() is a storage read-modify-write. Only a changed answer
 // is worth a write (v0.5.20).
 const META_SEEN = new Map();
 
-function learnMeta(tabId, url, meta) {
-  if (!meta.mime && !meta.bytes) return;
-  const key = meta.mime + "|" + meta.bytes;
-  if (META_SEEN.get(url) === key) return;
+function learnMeta(tabId, rawUrl, meta) {
+  // A slice's Content-Length is the chunk the player asked for, never the
+  // file: zero means unknown, which the row says, and the probe below fills
+  // the real size in once (v0.5.21). The efg tag can still correct the type,
+  // because a soundtrack is served as video/mp4 like the picture.
+  const sliced = canonicalMediaUrl(rawUrl).sliced;
+  const learned = { mime: efgMime(rawUrl, meta.mime), bytes: sliced ? 0 : meta.bytes };
+  if (!learned.mime && !learned.bytes) return;
+  const key = learned.mime + "|" + learned.bytes;
+  if (META_SEEN.get(rawUrl) === key) return;
   if (META_SEEN.size > 400) META_SEEN.clear();
-  META_SEEN.set(url, key);
-  remember(tabId, url, "network", meta);
+  META_SEEN.set(rawUrl, key);
+  remember(tabId, rawUrl, "network", learned);
 }
 
-function remember(tabId, url, via, meta) {
-  update(({ tabMedia, reqHeaders }) => {
+// One question per address, asked once: how big is the file? A HEAD is the
+// cheap answer; a CDN that refuses HEAD still answers a one-byte range with
+// the total in Content-Range. Failure is silence — a probe that cannot read
+// the size leaves it unknown, which the row already says (v0.5.21).
+const PROBED = new Set();
+const PROBE_LIVE_MAX = 8;
+let probeLive = 0;
+
+function headerValue(res, name) {
+  try {
+    const h = res && res.headers;
+    return h && typeof h.get === "function" ? String(h.get(name) || "") : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function probeSignal() {
+  // A browser without AbortSignal.timeout probes without a deadline rather
+  // than not at all; the call never throws either way.
+  try { return AbortSignal.timeout(6000); } catch (_) { return undefined; }
+}
+
+function learnProbe(url, bytes, mime) {
+  const audio = efgKind(url) === "audio";
+  update(({ tabMedia }) => {
+    let changed = false;
+    for (const list of Object.values(tabMedia || {})) {
+      for (const m of list || []) {
+        if (m.url !== url) continue;
+        const size = Math.max(bytes, m.bytes || 0);
+        // the efg tag outranks the CDN's type: an audio track is served as
+        // video/mp4, and the probe must not name it back to a video. A type
+        // that is not media at all (octet-stream on a HEAD) is no answer, so
+        // the type the response already taught the find stands.
+        const type = audio && /^video\//.test(mime || "")
+          ? "audio/mp4"
+          : (MEDIA_TYPES.test(mime || "") ? mime : (m.mime || ""));
+        if (size !== m.bytes || type !== m.mime) {
+          m.bytes = size;
+          m.mime = type;
+          changed = true;
+        }
+      }
+    }
+    return changed ? { tabMedia } : {};
+  });
+}
+
+async function probeSize(url, sliceUrl) {
+  if (!url || PROBED.has(url) || probeLive >= PROBE_LIVE_MAX) return;
+  if (PROBED.size > 500) PROBED.clear();
+  PROBED.add(url);
+  probeLive += 1;
+  try {
+    const stored = await api.storage.local.get({ reqHeaders: {} });
+    // the alias commitHeaders keeps is the usual home; the slice's own entry
+    // answers when the request came from a frame that stored nothing else
+    const cap = stored.reqHeaders[url] || stored.reqHeaders[sliceUrl] || {};
+    const referer = cap.headers && cap.headers.referer;
+    const init = () => {
+      const opts = { credentials: "include", cache: "no-store", signal: probeSignal() };
+      if (referer) opts.referrer = referer;
+      return opts;
+    };
+    let bytes = 0, mime = "";
+    try {
+      const res = await fetch(url, Object.assign(init(), { method: "HEAD" }));
+      if (res && res.ok) {
+        bytes = parseInt(headerValue(res, "content-length"), 10) || 0;
+        mime = headerValue(res, "content-type").split(";")[0].trim().toLowerCase();
+      }
+    } catch (_) { /* a refused HEAD is not an answer */ }
+    if (!bytes) {
+      try {
+        const res = await fetch(url, Object.assign(init(), {
+          headers: { Range: "bytes=0-0" },
+        }));
+        if (res && (res.ok || res.status === 206)) {
+          const total = /\/(\d+)\s*$/.exec(headerValue(res, "content-range"));
+          if (total) bytes = parseInt(total[1], 10) || 0;
+        }
+      } catch (_) { /* no range answer either: the size stays unknown */ }
+    }
+    if (bytes > 0) learnProbe(url, bytes, mime);
+  } finally {
+    probeLive -= 1;
+  }
+}
+
+function remember(tabId, rawUrl, via, meta) {
+  const canon = canonicalMediaUrl(rawUrl);
+  const url = canon.url;
+  const done = update(({ tabMedia, reqHeaders }) => {
     const list = tabMedia[tabId] || [];
     const at = list.findIndex((m) => m.url === url);
     let added = false;
@@ -107,16 +260,26 @@ function remember(tabId, url, via, meta) {
       // seen again, this time with its response: the find learns what it is
       // and how big it is, and keeps its place (and its foundAt) in the list.
       // A later 206 must not shrink a known size back to one chunk.
-      if (!meta) return { tabMedia };
       const cur = list[at];
+      // the first slice is the address the player itself used: the engine
+      // gets it as a fallback if the canonical one is refused (v0.5.21)
+      const alt = cur.alt || (canon.sliced ? rawUrl : "");
+      if (!meta) {
+        if (alt === (cur.alt || "")) return { tabMedia };
+        list[at] = Object.assign({}, cur, { alt });
+        return { tabMedia };
+      }
       const mime = meta.mime || cur.mime || "";
       const bytes = Math.max(meta.bytes || 0, cur.bytes || 0);
-      if (mime === cur.mime && bytes === cur.bytes) return { tabMedia };
-      list[at] = Object.assign({}, cur, { mime, bytes });
+      if (mime === cur.mime && bytes === cur.bytes && alt === (cur.alt || "")) {
+        return { tabMedia };
+      }
+      list[at] = Object.assign({}, cur, { mime, bytes, alt });
     } else {
       list.push({
         url, foundAt: Date.now(), via: via || "network",
         mime: (meta && meta.mime) || "", bytes: (meta && meta.bytes) || 0,
+        alt: canon.sliced ? rawUrl : "",
       });
       tabMedia[tabId] = list.slice(-KEEP_PER_TAB);
       added = true;
@@ -126,6 +289,12 @@ function remember(tabId, url, via, meta) {
     }
     return added ? { tabMedia, reqHeaders: prune(reqHeaders) } : { tabMedia };
   });
+  // After the write, so the answer finds the find it belongs to; the probe's
+  // own guard keeps every later slice of the same address from asking again.
+  // A probe that rejects (a worker being torn down) must not become an
+  // unhandled rejection in the service worker.
+  if (canon.sliced) done.then(() => probeSize(url, rawUrl).catch(() => {}));
+  return done;
 }
 
 function loadPatterns() {
@@ -238,8 +407,12 @@ async function pkFor(tabId) {
 }
 
 function commitHeaders(url, pick) {
+  const canon = canonicalMediaUrl(url).url;
   update(({ reqHeaders: store }) => {
     store[url] = { headers: pick, at: Date.now() };
+    // the engine fetches the canonical address, so the captured referer has
+    // to be findable there too; one alias per file is enough (v0.5.21)
+    if (canon !== url && !store[canon]) store[canon] = { headers: pick, at: Date.now() };
     return { reqHeaders: prune(store) };
   });
 }
@@ -358,6 +531,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, ({ tabMedia, reqHeaders }) => {
       const items = (tabMedia[msg.tabId] || []).map((m) => ({
         url: m.url,
+        alt: m.alt || "",
         foundAt: m.foundAt,
         via: m.via || "network",
         mime: m.mime || "",

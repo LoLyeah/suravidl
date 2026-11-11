@@ -96,6 +96,12 @@ function orderCluster(items) {
 
 // The biggest video in the newest bunch is the file a person means by "this
 // video"; audio-only tracks are never it (a player fetches them alongside).
+// A slice the player was still feeding is not a video either: 18 KB of a reel
+// wore the tick until the real file arrived, and the download it started was
+// broken. With another video to pick from, anything under one frame's worth
+// of bytes is not a candidate (v0.5.21).
+const MIN_VIDEO_BYTES = 64 * 1024;
+
 function recommend(items) {
   // A manifest is the whole stream, whatever its size says: picking it is
   // picking the video, and the app can still choose a quality inside it.
@@ -105,7 +111,8 @@ function recommend(items) {
   const sized = items.filter((m) => m.bytes > 0);
   const pool = videos.length ? videos : sized;
   if (!pool.length) return items[0] || null;
-  return pool.reduce((a, b) => (b.bytes > a.bytes ? b : a));
+  const real = pool.filter((m) => m.bytes >= MIN_VIDEO_BYTES);
+  return (real.length ? real : pool).reduce((a, b) => (b.bytes > a.bytes ? b : a));
 }
 
 function sizeText(bytes) {
@@ -310,7 +317,11 @@ async function send(url, mode) {
       : {
           type: "sendHandoff",
           url,
-          urls: visibleItems().map((m) => m.url),
+          // each find's slice fallback rides after the canonical addresses:
+          // the engine prefers the whole file and still has the address the
+          // player itself used if the CDN refuses it (v0.5.21)
+          urls: visibleItems().map((m) => m.url)
+            .concat(visibleItems().filter((m) => m.alt).map((m) => m.alt)).slice(0, 20),
           tabUrl: (TAB && TAB.url) || "",
           tabId: TAB && TAB.id,
         });

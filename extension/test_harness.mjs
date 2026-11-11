@@ -27,6 +27,7 @@ const menusMade = [];
 const store = {};
 const badge = {};
 const fetchCalls = [];
+const headCalls = [];
 let onRemoved = [];
 let onUpdated = [];
 let onMessage = null;
@@ -85,6 +86,26 @@ globalThis.chrome = {
 
 globalThis.fetch = async (url, opts = {}) => {
   fetchCalls.push({ url, opts });
+  // the true-size probe (v0.5.21): this one address answers a HEAD with the
+  // real length, so a sliced find can learn it without downloading a byte
+  if (/^HEAD$/i.test(opts.method || "") && url === "https://cdn.fb/probe.mp4?oh=1") {
+    headCalls.push(url);
+    return { ok: true, status: 200, headers: {
+      get: (n) => (/^content-length$/i.test(n) ? "5242880" : null),
+    } };
+  }
+  // a CDN that refuses HEAD still answers a one-byte range with the total in
+  // Content-Range (v0.5.21)
+  if (url === "https://cdn.fb/ranged.mp4?oh=9") {
+    if (/^HEAD$/i.test(opts.method || "")) {
+      return { ok: false, status: 403, text: async () => "no" };
+    }
+    if (/bytes=0-0/.test(String((opts.headers || {}).Range || ""))) {
+      return { ok: false, status: 206, headers: {
+        get: (n) => (/^content-range$/i.test(n) ? "bytes 0-0/7340032" : null),
+      } };
+    }
+  }
   if (/reddit\.com\/.*\/s\//i.test(url)) {
     // the follow-redirect resolve: Chrome exempts extension fetches that
     // hold host permissions, so the canonical address comes back
@@ -227,6 +248,106 @@ listeners.headersReceived[0](req("media", "https://cdn/sized.mp4", {
   responseHeaders: [{ name: "Content-Length", value: "12" }],
 }));
 await settle();
+
+// 1c. the same file fetched in byte slices (Facebook's reel player): one
+// signed address with bytestart/byteend per range is ONE find, never twenty,
+// and a slice's own length is never mistaken for the file's size (v0.5.21).
+const fbBase = "https://cdn.fb/collapse.mp4?oh=11&oe=22&__gda__=33";
+const fbSlice = (from, to) => fbBase + "&bytestart=" + from + "&byteend=" + to;
+const fbHeaders = [
+  { name: "Content-Type", value: "video/mp4" },
+  { name: "Content-Length", value: "18431" },
+];
+const fbFinds = () => ((store.tabMedia || {})[7] || []).filter((m) => m.url === fbBase);
+listeners.headersReceived[0](req("media", fbSlice(0, 18431), { responseHeaders: fbHeaders }));
+await settle();
+listeners.headersReceived[0](req("media", fbSlice(18432, 36863), { responseHeaders: fbHeaders }));
+await settle();
+ok(fbFinds().length === 1, "the slices of one file collapse to one find");
+ok(fbFinds()[0] && fbFinds()[0].url.indexOf("bytestart") === -1 &&
+   fbFinds()[0].url.indexOf("byteend") === -1,
+   "…keyed by the signed address without the slice params");
+ok(fbFinds()[0] && fbFinds()[0].bytes === 0,
+   "…and 18431 is not taken for the file's size");
+ok(fbFinds()[0] && fbFinds()[0].alt === fbSlice(0, 18431),
+   "…with the first slice kept as the engine's fallback");
+listeners.beforeRequest[0](req("media", fbSlice(36864, 55295)));
+await settle();
+ok(fbFinds().length === 1, "a third slice does not add a second find");
+
+// the signature is over the query as the page sent it: cutting the two range
+// params must not re-encode anything else (a value's "=" would become %3D and
+// the CDN would answer 403 to its own address) (v0.5.21)
+const signed = "https://cdn.fb/signed.mp4?efg=eyJhIjoiYiJ9==&_nc_oc=Adm:ab,cd" +
+               "&bytestart=0&byteend=99";
+listeners.headersReceived[0](req("media", signed, {
+  responseHeaders: [{ name: "Content-Type", value: "video/mp4" },
+                    { name: "Content-Length", value: "100" }],
+}));
+await settle();
+const signedFind = ((store.tabMedia || {})[7] || [])
+  .find((m) => m.url.indexOf("signed.mp4") !== -1);
+ok(signedFind && signedFind.url ===
+   "https://cdn.fb/signed.mp4?efg=eyJhIjoiYiJ9==&_nc_oc=Adm:ab,cd",
+   "…and every other byte of the signed query is left alone");
+
+// 1d. the true size is asked for once per address: a HEAD when the CDN
+// answers one, and never again on the next slice (v0.5.21).
+const probeUrl = "https://cdn.fb/probe.mp4?oh=1";
+listeners.beforeRequest[0](req("media", probeUrl + "&bytestart=0&byteend=1023"));
+listeners.headersReceived[0](req("media", probeUrl + "&bytestart=0&byteend=1023", {
+  responseHeaders: [{ name: "Content-Type", value: "video/mp4" },
+                    { name: "Content-Length", value: "1024" }],
+}));
+await settle();
+await settle();
+const probed = () => ((store.tabMedia || {})[7] || []).find((m) => m.url === probeUrl);
+ok(probed() && probed().bytes === 5242880,
+   "the probe learns the file's true size from the CDN");
+ok(headCalls.length === 1, "…and the address is probed once, not per slice");
+listeners.beforeRequest[0](req("media", probeUrl + "&bytestart=2048&byteend=4095"));
+listeners.headersReceived[0](req("media", probeUrl + "&bytestart=2048&byteend=4095", {
+  responseHeaders: [{ name: "Content-Type", value: "video/mp4" },
+                    { name: "Content-Length", value: "2048" }],
+}));
+await settle();
+await settle();
+ok(headCalls.length === 1, "a later slice of the same file does not re-probe");
+ok(probed() && probed().bytes === 5242880,
+   "…and the known size never shrinks back to a slice");
+
+// a CDN that will not answer HEAD is asked for one byte instead: the total in
+// Content-Range is the same answer (v0.5.21)
+const rangedUrl = "https://cdn.fb/ranged.mp4?oh=9";
+listeners.beforeRequest[0](req("media", rangedUrl + "&bytestart=0&byteend=1023"));
+await settle();
+await settle();
+const ranged = ((store.tabMedia || {})[7] || []).find((m) => m.url === rangedUrl);
+ok(ranged && ranged.bytes === 7340032,
+   "a refused HEAD falls back to the range total");
+
+// 1e. an audio-only track is served as video/mp4 and says so only in `efg`:
+// the find must be labelled audio, or the row offers silence as the video
+// (v0.5.21).
+const efgTag = Buffer.from(JSON.stringify({ vencode_tag: "dash_ln_heaac_vbr3_audio" }))
+  .toString("base64url");
+const efgUrl = "https://cdn.fb/track.m4a?efg=" + efgTag;
+listeners.headersReceived[0](req("media", efgUrl + "&bytestart=0&byteend=9999", {
+  responseHeaders: [{ name: "Content-Type", value: "video/mp4" },
+                    { name: "Content-Length", value: "10000" }],
+}));
+await settle();
+const track = ((store.tabMedia || {})[7] || []).find((m) => m.url === efgUrl);
+ok(track && track.mime === "audio/mp4",
+   "an efg audio tag labels the find audio/mp4, not video/mp4");
+const gotAlt = await new Promise((resolve) => {
+  onMessage({ type: "getMedia", tabId: 7 }, {}, resolve);
+});
+const fbItem = gotAlt && gotAlt.items.find((i) => i.url === fbBase);
+ok(fbItem && fbItem.alt === fbSlice(0, 18431),
+   "getMedia hands the popup the slice fallback with the find");
+ok(gotAlt && gotAlt.items.every((i) => typeof i.alt === "string"),
+   "…and every item says alt, empty when it has none");
 
 // 2. the pattern list is the engine's
 ok(fetchCalls.some((c) => c.url.endsWith("/sniff/patterns")),
@@ -991,6 +1112,46 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.20: unfolding shows the earlier finds under their own heading");
     ok(/· 12 MB$/.test(labelOf(srows2[4])),
        "v0.5.20: …each with its own size");
+    ff.store.tabMedia = {};
+
+    // — v0.5.21: a reel's audio track is named Audio even though the CDN
+    //   typed it video/mp4, the whole file is the pick rather than an 18 KB
+    //   leftover slice, and the slice address rides the handoff as a fallback —
+    const fbNow = Date.now();
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn.fb/q/1?efg=x", foundAt: fbNow - 500,
+        via: "network", mime: "audio/mp4", bytes: 980000, alt: "" },
+      { url: "https://cdn.fb/s/2?oh=2", foundAt: fbNow - 600,
+        via: "network", mime: "video/mp4", bytes: 18431,
+        alt: "https://cdn.fb/s/2?oh=2&bytestart=0" },
+      { url: "https://cdn.fb/clip.mp4?oh=1", foundAt: fbNow - 800,
+        via: "network", mime: "video/mp4", bytes: 5242880,
+        alt: "https://cdn.fb/clip.mp4?oh=1&bytestart=0" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.21: the popup must load with a reel's finds (" + e + ")");
+    }
+    await settle();
+    await settle();
+    const fbRows = nodes.streams.children;
+    ok(fbRows.length === 3, "v0.5.21: the reel's file and its track are separate rows");
+    ok(labelOf(fbRows[2]) === "Audio · 957 KB",
+       "v0.5.21: an audio-only track reads Audio, not Video");
+    ok(fbRows[2].children[0].children[0].checked === false,
+       "v0.5.21: …and is never the tick");
+    ok(fbRows[0].children[0].children[0].checked === true &&
+       fbRows[0].children[0].children[2] &&
+       fbRows[0].children[0].children[2].textContent === "best",
+       "v0.5.21: the whole file is the pick, not the 18 KB slice");
+    await nodes.send.onclick();
+    const fbCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    const fbBody = fbCall && JSON.parse(fbCall.opts.body);
+    ok(fbBody && fbBody.urls.includes("https://cdn.fb/clip.mp4?oh=1"),
+       "v0.5.21: the handoff carries the canonical address");
+    ok(fbBody && fbBody.urls.includes("https://cdn.fb/clip.mp4?oh=1&bytestart=0"),
+       "v0.5.21: …and the slice the player used, as a fallback");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
