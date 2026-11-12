@@ -349,6 +349,20 @@ ok(fbItem && fbItem.alt === fbSlice(0, 18431),
 ok(gotAlt && gotAlt.items.every((i) => typeof i.alt === "string"),
    "…and every item says alt, empty when it has none");
 
+// 1f. a scroll leaves old videos behind: a find past the window is dropped
+// when the next one arrives, so the list is the last few minutes, not the
+// session (v0.5.23)
+store.tabMedia = { 19: [
+  { url: "https://cdn/stale.mp4", foundAt: Date.now() - 25 * 60 * 1000,
+    via: "network", mime: "video/mp4", bytes: 1024 },
+] };
+listeners.beforeRequest[0]({ tabId: 19, type: "media", url: "https://cdn/fresh.mp4" });
+await settle();
+const nineteen = ((store.tabMedia || {})[19] || []).map((m) => m.url);
+ok(!nineteen.includes("https://cdn/stale.mp4") && nineteen.includes("https://cdn/fresh.mp4"),
+   "a find older than the window does not survive the next one");
+delete store.tabMedia[19];
+
 // 2. the pattern list is the engine's
 ok(fetchCalls.some((c) => c.url.endsWith("/sniff/patterns")),
    "the engine's pattern list is fetched at start");
@@ -883,14 +897,16 @@ ok(batched && batched.ok && batched.queued === 2,
       get textContent() { return this._text; },
     });
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
-                 "headline", "subline", "pickgroup", "streams", "foldline", "cards", "send",
+                 "headline", "subline", "pickgroup", "streams", "foldline", "cards",
+                 "cardhint", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
-      for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent"]) {
+      for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent",
+                        "cards", "cardhint"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -1175,6 +1191,8 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.22: each card names its own action");
     ok(nodes.streams.children.length === 0,
        "v0.5.22: nothing is ticked on the user's behalf — there is no list to tick");
+    ok(nodes.cardhint.hidden === false,
+       "v0.5.23: …and the list says what to do when this video is not in it");
     ff.fetchCalls.length = 0;
     await cards[2].onclick();
     const cardCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();

@@ -379,7 +379,7 @@ function status(text, kind) {
 // timings separates the two, so the popup stops guessing: one card per video,
 // drawn from the file itself, and nothing is picked until a person picks
 // (v0.5.22).
-const MAX_CARDS = 6;
+const MAX_CARDS = 10;
 
 function clockText(sec) {
   if (!isFinite(sec) || sec <= 0) return "";
@@ -388,7 +388,7 @@ function clockText(sec) {
 }
 
 // A frame from the file itself. The CDN's frame is cross-origin and would
-// taint the canvas, so the first megabyte is fetched with the page's own
+// taint the canvas, so the first 640 KB are fetched with the page's own
 // cookies and played from a blob: same-origin, drawable, and a working URL is
 // proof the card can be downloaded at all.
 async function cardFrame(url) {
@@ -399,7 +399,7 @@ async function cardFrame(url) {
   try {
     const res = await fetch(url, {
       credentials: "include", cache: "force-cache",
-      headers: { Range: "bytes=0-1048575" },
+      headers: { Range: "bytes=0-655359" },
     });
     if (!res || (!res.ok && res.status !== 206)) { drop(); return null; }
     const part = await res.blob();
@@ -529,6 +529,7 @@ function render() {
     $("headline").textContent = t("{n} videos found on this page", { n: pickable.length });
     $("subline").textContent =
       t("Pick the one you are watching — the newest find is often the next reel.");
+    if ($("cardhint")) $("cardhint").hidden = false;
     renderCards(pickable);
     refreshDoors();
     return;
@@ -536,6 +537,7 @@ function render() {
   $("send").hidden = false;
   $("quick").hidden = false;
   $("cards").hidden = true;
+  if ($("cardhint")) $("cardhint").hidden = true;
 
   const box = $("streams");
   box.textContent = "";

@@ -15,7 +15,11 @@ const FALLBACK_EXT = ["mp4", "m4v", "webm", "mov", "mkv", "avi", "flv", "wmv",
   "flac"];
 const MEDIA_TYPES =
   /^(video\/|audio\/|application\/vnd\.apple\.mpegurl|application\/x-mpegurl|application\/mpegurl|application\/dash\+xml)/i;
-const KEEP_PER_TAB = 20;
+// A feed preloads several videos at once, so one screen can put twenty URLs on
+// the wire; a cap that tight dropped the video being watched while keeping the
+// ones queued after it. Keep a scroll's worth, and let age be the real limit.
+const KEEP_PER_TAB = 60;
+const KEEP_MS = 20 * 60 * 1000;
 const HEADER_KEEP = 100;
 const PENDING_KEEP = 200;
 const action = chrome.action || chrome.browserAction; // MV3 vs Firefox MV2
@@ -281,7 +285,10 @@ function remember(tabId, rawUrl, via, meta) {
         mime: (meta && meta.mime) || "", bytes: (meta && meta.bytes) || 0,
         alt: canon.sliced ? rawUrl : "",
       });
-      tabMedia[tabId] = list.slice(-KEEP_PER_TAB);
+      const now = Date.now();
+      tabMedia[tabId] = list
+        .filter((m) => now - (m.foundAt || 0) < KEEP_MS)
+        .slice(-KEEP_PER_TAB);
       added = true;
     }
     if (added && action && action.setBadgeText) {

@@ -45,6 +45,8 @@ const I18N = {
   "{n} videos found on this page": "{n} video ditemukan di halaman ini",
   "Pick the one you are watching — the newest find is often the next reel.":
     "Pilih yang sedang kamu tonton — temuan terbaru sering kali reel berikutnya.",
+  "If the video you are watching is not here, reload the page and play it for a second.":
+    "Kalau video yang kamu tonton tidak ada di sini, muat ulang halaman lalu putar sebentar.",
   "Earlier on this page": "Sebelumnya di halaman ini",
   "This video — {n} streams": "Video ini — {n} stream",
   "Show {n} earlier finds on this page": "Tampilkan {n} temuan sebelumnya di halaman ini",
