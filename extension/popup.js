@@ -87,17 +87,33 @@ function hostOf(url) {
   try { return new URL(url).origin; } catch (_) { return ""; }
 }
 
+// The CDN shards per object, so a reel's picture and its soundtrack can sit
+// on different edge hosts (video-iad3-1 vs video-iad3-2). Grouping by exact
+// origin split those pairs and the download lost its sound; the asset id in
+// `efg` is the true key, the registrable domain the fallback (v0.5.28).
+function siteOf(url) {
+  try {
+    return new URL(url).hostname.split(".").slice(-2).join(".");
+  } catch (_) {
+    return "";
+  }
+}
+
+function clusterKey(m) {
+  return m.asset ? "asset:" + m.asset : "site:" + siteOf(m.url);
+}
+
 function clusters(items) {
   const out = [];
   for (const m of items) {
     const at = m.foundAt || 0;
-    const origin = hostOf(m.url);
+    const key = clusterKey(m);
     const cur = out[out.length - 1];
-    if (cur && cur.origin === origin && cur.last - at <= CLUSTER_GAP) {
+    if (cur && cur.key === key && cur.last - at <= CLUSTER_GAP) {
       cur.items.push(m);
       cur.last = at;
     } else {
-      out.push({ origin, last: at, items: [m] });
+      out.push({ key, last: at, items: [m] });
     }
   }
   for (const c of out) c.items = orderCluster(c.items);

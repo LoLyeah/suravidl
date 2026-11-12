@@ -116,13 +116,32 @@ function canonicalMediaUrl(raw) {
 // track it is about to fetch. Its tag is the one place an audio-only file
 // admits it: the CDN types it video/mp4 exactly like the picture, and a row
 // called "Video" for a soundtrack had a person download silence (v0.5.21).
-function efgKind(raw) {
+function efgBlob(raw) {
   try {
     const efg = new URL(raw).searchParams.get("efg");
-    if (!efg) return "";
+    if (!efg) return null;
     const b64 = efg.replace(/-/g, "+").replace(/_/g, "/");
     const text = atob(b64 + "===".slice((b64.length + 3) % 4));
-    const blob = JSON.parse(text) || {};
+    return JSON.parse(text) || null;
+  } catch (_) {
+    return null;   // a payload we cannot read claims nothing
+  }
+}
+
+// The parent asset id: equal on a reel's picture and its soundtrack, which
+// is the only key that survives them being served from different edge hosts
+// (Gemini 4 Carbon, 2026-11-12: the CDN shards per representation object).
+function efgAsset(raw) {
+  const blob = efgBlob(raw);
+  if (!blob) return "";
+  const id = blob.xpv_asset_id || blob.video_id || blob.asset_id;
+  return id == null ? "" : String(id);
+}
+
+function efgKind(raw) {
+  try {
+    const blob = efgBlob(raw);
+    if (!blob) return "";
     // the tag is the player's own answer; the other strings are a fallback
     // for a payload shaped differently, never a second opinion on a real tag
     const tag = typeof blob.vencode_tag === "string" ? blob.vencode_tag.toLowerCase() : "";
@@ -275,15 +294,18 @@ function remember(tabId, rawUrl, via, meta) {
       }
       const mime = meta.mime || cur.mime || "";
       const bytes = Math.max(meta.bytes || 0, cur.bytes || 0);
-      if (mime === cur.mime && bytes === cur.bytes && alt === (cur.alt || "")) {
+      const asset = cur.asset || efgAsset(rawUrl) || "";
+      if (mime === cur.mime && bytes === cur.bytes && alt === (cur.alt || "") &&
+          asset === (cur.asset || "")) {
         return { tabMedia };
       }
-      list[at] = Object.assign({}, cur, { mime, bytes, alt });
+      list[at] = Object.assign({}, cur, { mime, bytes, alt, asset });
     } else {
       list.push({
         url, foundAt: Date.now(), via: via || "network",
         mime: (meta && meta.mime) || "", bytes: (meta && meta.bytes) || 0,
         alt: canon.sliced ? rawUrl : "",
+        asset: efgAsset(rawUrl) || "",
       });
       const now = Date.now();
       tabMedia[tabId] = list
@@ -551,6 +573,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         via: m.via || "network",
         mime: m.mime || "",
         bytes: m.bytes || 0,
+        asset: m.asset || "",
         hasHeaders: !!reqHeaders[m.url],
       }));
       sendResponse({ items,

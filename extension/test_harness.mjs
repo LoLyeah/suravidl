@@ -349,6 +349,19 @@ ok(fbItem && fbItem.alt === fbSlice(0, 18431),
 ok(gotAlt && gotAlt.items.every((i) => typeof i.alt === "string"),
    "…and every item says alt, empty when it has none");
 
+// 1g. the parent asset id rides with the find: a reel's picture and sound can
+// be served from different edge hosts, and this is what keeps them one video
+// (v0.5.28)
+const assetUrl = "https://cdn.fb/asset.m4a?efg=" + Buffer.from(
+  JSON.stringify({ xpv_asset_id: 4242, vencode_tag: "dash" })).toString("base64url");
+listeners.beforeRequest[0](req("media", assetUrl));
+await settle();
+const gotAsset = await new Promise((resolve) => {
+  onMessage({ type: "getMedia", tabId: 7 }, {}, resolve);
+});
+ok(gotAsset && gotAsset.items.some((i) => i.url === assetUrl && i.asset === "4242"),
+   "the asset id in efg reaches the popup with the find");
+
 // 1f. a scroll leaves old videos behind: a find past the window is dropped
 // when the next one arrives, so the list is the last few minutes, not the
 // session (v0.5.23)
@@ -1264,6 +1277,42 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(xSent && xSent.audio_url &&
        xSent.audio_url.indexOf("pl/mp4a/128000") !== -1,
        "v0.5.27: …with the page's audio playlist, so the file has sound");
+    ff.store.tabMedia = {};
+
+    // — v0.5.28: one reel, two hosts. Meta shards per object, so the picture
+    //   and the sound of one reel sit on different edge hosts; the asset id in
+    //   `efg` is what keeps them one video, and the download keeps its sound —
+    const shardNow = Date.now();
+    const efgOf = (id) => Buffer.from(JSON.stringify({ xpv_asset_id: id, vencode_tag: "dash" }))
+      .toString("base64url");
+    ff.store.tabMedia = { 7: [
+      { url: "https://video-iad3-1.fna.fbcdn.net/o/pic.mp4?efg=" + efgOf("777"),
+        foundAt: shardNow - 3000, via: "network", mime: "video/mp4",
+        bytes: 5242880, alt: "", asset: "777" },
+      { url: "https://video-iad3-2.fna.fbcdn.net/o/sound.m4a?efg=" + efgOf("777"),
+        foundAt: shardNow - 1200, via: "network", mime: "audio/mp4",
+        bytes: 900000, alt: "", asset: "777" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.28: the popup must load with a split-host reel (" + e + ")");
+    }
+    await settle();
+    await settle();
+    // one video on the page, so the rows are the layout — but the two hosts
+    // are one reel, and the quick door must carry both tracks
+    ok(nodes.streams.children.length === 2 && nodes.cards.hidden === true,
+       "v0.5.28: a reel on two edge hosts is one video, not two");
+    ff.fetchCalls.length = 0;
+    await nodes.quick.onclick();
+    const shardBody = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const shardSent = shardBody && JSON.parse(shardBody.opts.body);
+    ok(shardSent && shardSent.url.indexOf("video-iad3-1") !== -1,
+       "v0.5.28: the picture is the job");
+    ok(shardSent && shardSent.audio_url &&
+       shardSent.audio_url.indexOf("video-iad3-2") !== -1,
+       "v0.5.28: …and the sound from the other edge host rides with it");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
