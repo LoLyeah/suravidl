@@ -285,7 +285,9 @@ class Settings:
             return value
         if key == "cookies_from_browser":
             value = str(value or "").strip()
-            if value:
+            # "auto" is resolved per run, not at save time: the browser that
+            # is signed in may not even be open while Settings is written
+            if value and value.lower() != "auto":
                 from .auth import parse_browser
 
                 parse_browser(value)  # raises ValueError with the known list

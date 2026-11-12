@@ -15,10 +15,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 
 
-def test_the_notes_still_carry_this_release():
+def test_the_notes_retired_this_entry_and_the_fix_stays():
+    # v0.49.11 pushed "The thumb" (0.49.1) out of the ten-entry card; the
+    # 44px floor and the short-viewport rule below are still in the sheet
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.49.1" and e["title"].lower() == "the thumb"
-               for e in ENTRIES)
+    assert not any(e["version"] == "0.49.1" for e in ENTRIES)
 
 
 def test_fields_join_the_thumb_floor():

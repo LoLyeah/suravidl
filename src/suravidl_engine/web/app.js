@@ -421,6 +421,7 @@ const STRINGS = { en: {}, id: {
   "Use cookies from Chromium": "Pakai cookie dari Chromium",
   "Use cookies from Edge": "Pakai cookie dari Edge",
   "Use cookies from Firefox": "Pakai cookie dari Firefox",
+  "Browser cookies: auto-detect": "Cookie browser: deteksi otomatis",
   "Use cookies from Opera": "Pakai cookie dari Opera",
   "Use cookies from Safari": "Pakai cookie dari Safari",
   "Use cookies from Vivaldi": "Pakai cookie dari Vivaldi",

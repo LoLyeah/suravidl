@@ -18,17 +18,205 @@ import tempfile
 from pathlib import Path
 
 
+# --- auto (v0.49.11) -------------------------------------------------------
+# "cookies from browser: auto" picks the browser on this machine that is
+# actually signed in. A host_key match alone is not a login — a logged-out
+# visit still leaves consent and tracking cookies behind — so the scan asks
+# for the session cookie each site sets on sign-in, ranks profiles by when
+# that cookie was last used, and answers with "browser:profile", which is the
+# form yt-dlp takes (Gemini 4 Carbon, 2026-11-12).
+_SESSION_COOKIES = {
+    "facebook.com": ("c_user", "xs"),
+    "instagram.com": ("sessionid",),
+    "x.com": ("auth_token",),
+    "youtube.com": ("SID", "SAPISID"),
+    "tiktok.com": ("sessionid",),
+}
+_CHROMIUM_EPOCH = 11644473600  # seconds between 1601-01-01 and 1970-01-01
+
+
+def _roots() -> list[tuple[str, Path, str]]:
+    """(browser, root, family) for this OS, Snap and Flatpak included."""
+    import sys
+
+    home = Path.home()
+    if sys.platform == "darwin":
+        cfg = home / "Library" / "Application Support"
+        return [
+            ("chrome", cfg / "Google/Chrome", "chromium"),
+            ("chromium", cfg / "Chromium", "chromium"),
+            ("edge", cfg / "Microsoft Edge", "chromium"),
+            ("brave", cfg / "BraveSoftware/Brave-Browser", "chromium"),
+            ("vivaldi", cfg / "Vivaldi", "chromium"),
+            ("opera", cfg / "com.operasoftware.Opera", "chromium"),
+            ("firefox", cfg / "Firefox/Profiles", "firefox"),
+        ]
+    if sys.platform == "win32":
+        local = Path(os.environ.get("LOCALAPPDATA") or home / "AppData/Local")
+        roaming = Path(os.environ.get("APPDATA") or home / "AppData/Roaming")
+        return [
+            ("chrome", local / "Google/Chrome/User Data", "chromium"),
+            ("edge", local / "Microsoft/Edge/User Data", "chromium"),
+            ("brave", local / "BraveSoftware/Brave-Browser/User Data", "chromium"),
+            ("firefox", roaming / "Mozilla/Firefox/Profiles", "firefox"),
+        ]
+    cfg = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+    return [
+        ("chrome", cfg / "google-chrome", "chromium"),
+        ("chromium", cfg / "chromium", "chromium"),
+        ("edge", cfg / "microsoft-edge", "chromium"),
+        ("brave", cfg / "BraveSoftware/Brave-Browser", "chromium"),
+        ("vivaldi", cfg / "vivaldi", "chromium"),
+        ("opera", cfg / "opera", "chromium"),
+        ("firefox", home / ".mozilla/firefox", "firefox"),
+        ("chromium", home / "snap/chromium/common/chromium", "chromium"),
+        ("firefox", home / "snap/firefox/common/.mozilla/firefox", "firefox"),
+        ("chrome", home / ".var/app/com.google.Chrome/config/google-chrome", "chromium"),
+        ("firefox", home / ".var/app/org.mozilla.firefox/.mozilla/firefox", "firefox"),
+    ]
+
+
+def _chromium_profiles(root: Path) -> list[tuple[str, Path]]:
+    out: list[tuple[str, Path]] = []
+    if not root.is_dir():
+        return out
+    for profile in [root / "Default"] + sorted(root.glob("Profile *")):
+        db = profile / "Cookies"
+        if db.is_file():
+            out.append((profile.name, db))
+    if not out and (root / "Cookies").is_file():   # Opera keeps it at the root
+        out.append(("Default", root / "Cookies"))
+    return out
+
+
+def _firefox_profiles(root: Path) -> list[Path]:
+    if not root.is_dir():
+        return []
+    return [p for p in sorted(root.iterdir())
+            if (p / "cookies.sqlite").is_file()]
+
+
+def _cookie_dbs() -> list[tuple[str, str, Path]]:
+    out: list[tuple[str, str, Path]] = []
+    for browser, root, family in _roots():
+        if family == "chromium":
+            out.extend((browser, profile, db)
+                       for profile, db in _chromium_profiles(root))
+        else:
+            out.extend((browser, p.name, p / "cookies.sqlite")
+                       for p in _firefox_profiles(root))
+    return out
+
+
+def _read_cookie_stats(db: Path, host: str, names: tuple[str, ...]):
+    """Copy the database beside its wal/shm and read it; None when unreadable.
+
+    A live browser keeps fresh writes in the -wal file, and Chromium's own
+    database can be locked (Windows holds it exclusively while running), so
+    the copy is the only safe read — and a failed copy just means "skip".
+    """
+    import sqlite3
+    import time
+
+    workdir = Path(tempfile.mkdtemp(prefix="suravidl-db-"))
+    try:
+        copy = workdir / db.name
+        for suffix in ("", "-wal", "-shm"):
+            src = db.with_name(db.name + suffix)
+            if src.is_file():
+                shutil.copy2(src, workdir / (db.name + suffix))
+        if not copy.is_file():
+            return None
+        con = sqlite3.connect(f"file:{copy}?mode=ro", uri=True)
+        try:
+            now = time.time()
+            if db.name.startswith("cookies.sqlite"):
+                rows = con.execute(
+                    "SELECT MAX(lastAccessed), COUNT(*) FROM moz_cookies "
+                    "WHERE host LIKE ? AND (expiry = 0 OR expiry > ?)",
+                    (host, int(now))).fetchone()
+                when = (rows[0] or 0) / 1e6 if rows else 0
+                count = rows[1] if rows else 0
+            else:
+                chrome_now = int((now + _CHROMIUM_EPOCH) * 1e6)
+                rows = con.execute(
+                    "SELECT MAX(last_access_utc), COUNT(*) FROM cookies "
+                    "WHERE host_key LIKE ? AND (expires_utc = 0 OR expires_utc > ?)",
+                    (host, chrome_now)).fetchone()
+                when = ((rows[0] or 0) / 1e6 - _CHROMIUM_EPOCH) if rows else 0
+                count = rows[1] if rows else 0
+            if not count:
+                return None
+            has_session = False
+            if names:
+                placeholders = ",".join("?" for _ in names)
+                table = "moz_cookies" if db.name.startswith("cookies.sqlite") else "cookies"
+                host_col = "host" if table == "moz_cookies" else "host_key"
+                hit = con.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE {host_col} LIKE ? "
+                    f"AND name IN ({placeholders})", (host, *names)).fetchone()
+                has_session = bool(hit and hit[0])
+            return has_session, float(when or 0)
+        finally:
+            con.close()
+    except Exception:
+        return None
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def detect_browser(site: str = "facebook.com") -> str:
+    """'browser:profile' of the signed-in browser for this site, or ''."""
+    import sys
+
+    names = _SESSION_COOKIES.get(site, ())
+    host = "%" + site
+    best = None
+    for browser, profile, db in _cookie_dbs():
+        got = _read_cookie_stats(db, host, names)
+        if got is None:
+            continue
+        has_session, when = got
+        # A cookie is not a login: the site sets consent and tracking cookies
+        # in a logged-out window too, and picking that browser means the
+        # download fails later with "login required" (Carbon, 2026-11-12)
+        if names and not has_session:
+            continue
+        # a session cookie beats one that is merely present; latest use wins
+        # (Carbon: file mtime moves on unrelated traffic, last_access does not)
+        rank = (has_session, when)
+        if best is None or rank > best[0]:
+            best = (rank, browser, profile)
+        elif rank == best[0] and sys.platform == "win32" and browser == "firefox":
+            # Chrome 127+ on Windows encrypts cookies with app-bound keys that
+            # an unprivileged downloader cannot read — prefer Firefox there
+            best = (rank, browser, profile)
+    return f"{best[1]}:{best[2]}" if best else ""
+
+
+def resolve_auto(site: str = "facebook.com") -> str:
+    found = detect_browser(site)
+    if not found:
+        raise ValueError(
+            "no signed-in browser found for " + site + " — set Settings -> "
+            "Authentication -> Browser cookies, or export a cookies.txt")
+    return found
+
+
 def parse_browser(value: str):
-    """'chrome' / 'firefox:Profile 2' -> yt-dlp cookiesfrombrowser tuple."""
+    """'chrome' / 'firefox:Profile 2' / 'auto' -> yt-dlp cookiesfrombrowser tuple."""
     from yt_dlp.cookies import SUPPORTED_BROWSERS, _parse_browser_specification
 
     spec = value.strip()
+    if spec.lower() == "auto":
+        spec = resolve_auto()
     browser, _, profile = spec.partition(":")
     browser = browser.strip().lower()
     if browser not in SUPPORTED_BROWSERS:
         known = ", ".join(sorted(SUPPORTED_BROWSERS))
         raise ValueError(f"unsupported browser {browser!r} (known: {known})")
     return _parse_browser_specification(browser, profile.strip() or None, None, None)
+
 
 
 @contextlib.contextmanager

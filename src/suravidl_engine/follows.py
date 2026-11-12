@@ -105,7 +105,9 @@ def flat_entries(url: str, settings: dict, *, cap: int = CAP_ENTRIES):
     if settings.get("cookies_file"):
         opts["cookiefile"] = settings["cookies_file"]
     if settings.get("cookies_from_browser"):
-        opts["cookiesfrombrowser"] = (settings["cookies_from_browser"],)
+        from .auth import parse_browser
+
+        opts["cookiesfrombrowser"] = parse_browser(settings["cookies_from_browser"])
     if settings.get("proxy"):
         opts["proxy"] = settings["proxy"]
     if settings.get("ip_version") and settings["ip_version"] != "auto":

@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.11",
+        "title": "The match",
+        "items": [
+            "Settings → Authentication → Browser cookies can now be set to auto-detect: the app looks at the browsers on this machine and picks the one actually signed in to the site, not just any browser that holds a cookie for it.",
+            "The choice is made per download and follows the session: a browser you sign out of stops being picked, one you sign into starts.",
+            "When nothing is signed in anywhere, the download says so plainly instead of failing later as a stranger.",
+        ],
+    },
+    {
         "version": "0.49.10",
         "title": "The soundtrack",
         "items": [
@@ -84,14 +93,7 @@ ENTRIES = [
             "The URL field wears one focus cue instead of a ring stacked on a halo, and its hint ends in an ellipsis on a phone instead of cutting a word.",
         ],
     },
-    {
-        "version": "0.49.1",
-        "title": "The thumb",
-        "items": [
-            "On a phone the fields finally match the rest of the controls: 44px tall at 16px, so iOS no longer zooms when you tap one.",
-            "A phone on its side is 360px tall — the floating Save bar now waits at the end of the panel instead of covering the schemes.",
-        ],
-    },
+
 ]
 
 
