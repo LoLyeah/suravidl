@@ -19,10 +19,11 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
-def test_the_notes_still_carry_this_release():
+def test_the_notes_retired_this_entry_and_the_fix_stays():
+    # v0.49.12 pushed "The cue" (0.49.2) out of the ten-entry card; the
+    # focus and paste rules below are still in the stylesheet
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.49.2" and e["title"].lower() == "the cue"
-               for e in ENTRIES)
+    assert not any(e["version"] == "0.49.2" for e in ENTRIES)
 
 
 def test_the_field_wears_one_focus_cue():

@@ -704,7 +704,13 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
     opts: dict = {}
     pps: list[dict] = []
 
-    template = settings.get("filename_template") or DEFAULT_TEMPLATE
+    # the stored template wins; an untouched default follows the chosen
+    # title budget, so "long" is not silently capped at the default's 100B
+    from .names import limit_for, template_for, title_filter
+
+    template = settings.get("filename_template") or ""
+    if not template or template == DEFAULT_TEMPLATE:
+        template = template_for(settings)
     outtmpl = str(Path(download_dir) / (subfolder_prefix(settings.get("subfolders"))
                                         + template))
 
@@ -843,6 +849,10 @@ def build_download_opts(settings: dict, download_dir, archive_path=None,
                 f"{container} needs ffmpeg")
 
     opts["outtmpl"] = outtmpl
+    # A title that is a token, or longer than the preset, is rewritten before
+    # yt-dlp prepares the file name — no post-download rename, and `[id]`
+    # still keeps the file unique (v0.49.12)
+    opts["match_filter"] = title_filter(limit_for(settings))
     if pps:
         opts["postprocessors"] = pps
     if notices:

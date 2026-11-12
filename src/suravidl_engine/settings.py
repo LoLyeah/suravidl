@@ -28,6 +28,7 @@ DEFAULTS = {
                                  # (Settings → Presets): permanence lives in a
                                  # setting, not in session state (v0.36.0)
     "filename_template": "%(title).100B [%(id)s].%(ext)s",
+    "filename_length": "standard",  # short | standard | long | none (v0.49.12)
     "subtitles_mode": "off",     # off | sidecar | embed
     "subtitles_langs": "en",     # comma list, e.g. "en, id" or "all"
     "subtitles_auto": False,     # include auto-generated captions
@@ -335,6 +336,13 @@ class Settings:
             from .download_opts import validate_template
 
             return validate_template(str(value or ""))
+        if key == "filename_length":
+            from .names import TITLE_LIMITS
+
+            v = str(value or "standard").strip().lower() or "standard"
+            if v not in TITLE_LIMITS:
+                raise ValueError(f"filename_length must be one of {list(TITLE_LIMITS)}")
+            return v
         if key == "subfolders":
             from .download_opts import SUBFOLDER_MODES
 

@@ -19,7 +19,7 @@ BACKGROUND = (ROOT / "extension" / "background.js").read_text()
 
 def test_the_notes_name_this_release():
     # v0.49.11 took the newest slot; this release's entry stays in the card
-    assert __version__ == "0.49.11"
+    assert __version__ == "0.49.12"
     assert ENTRIES[0]["version"] == __version__
     entry = next(e for e in ENTRIES if e["version"] == "0.49.10")
     assert entry["title"].lower() == "the soundtrack"

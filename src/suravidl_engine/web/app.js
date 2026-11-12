@@ -422,6 +422,13 @@ const STRINGS = { en: {}, id: {
   "Use cookies from Edge": "Pakai cookie dari Edge",
   "Use cookies from Firefox": "Pakai cookie dari Firefox",
   "Browser cookies: auto-detect": "Cookie browser: deteksi otomatis",
+  "File name length": "Panjang nama file",
+  "Short — about 60 letters": "Pendek — sekitar 60 huruf",
+  "Standard — about 100 letters": "Standar — sekitar 100 huruf",
+  "Long — about 180 letters": "Panjang — sekitar 180 huruf",
+  "No limit": "Tanpa batas",
+  "A title that is only a long token is replaced with the uploader and the date.":
+    "Judul yang hanya berupa token panjang diganti dengan nama pengunggah dan tanggal.",
   "Use cookies from Opera": "Pakai cookie dari Opera",
   "Use cookies from Safari": "Pakai cookie dari Safari",
   "Use cookies from Vivaldi": "Pakai cookie dari Vivaldi",
@@ -5455,6 +5462,7 @@ async function loadSettings() {
     $("setCookiesBrowser").value = s.cookies_from_browser || "";
     $("setImpersonate").value = s.impersonate || "";
     $("setTemplate").value = s.filename_template || "";
+    $("setNameLength").value = s.filename_length || "standard";
     $("setSubfolders").value = s.subfolders || "off";
     $("setContainer").value = s.video_container || "auto";
     $("setLiveFromStart").checked = !!s.live_from_start;
@@ -6041,6 +6049,7 @@ function settingsFormPayload() {
       cookies_from_browser: $("setCookiesBrowser").value,
       impersonate: $("setImpersonate").value,
       filename_template: $("setTemplate").value.trim(),
+      filename_length: $("setNameLength").value,
       subfolders: $("setSubfolders").value,
       video_container: $("setContainer").value,
       live_from_start: $("setLiveFromStart").checked,

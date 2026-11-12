@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.12",
+        "title": "The handle",
+        "items": [
+            "Settings → Media has a File name length choice now: Short, Standard, Long or No limit. The title is cut by characters people can see, never through the middle of a CJK character or an emoji.",
+            "A title that is only a long token — the wall of letters some sites hand back — is replaced with who posted it and the date, so the file is readable in Finder and sorts by time.",
+            "The video's own id still rides at the end of the name, so two downloads never overwrite each other.",
+        ],
+    },
+    {
         "version": "0.49.11",
         "title": "The match",
         "items": [
@@ -84,13 +93,6 @@ ENTRIES = [
         "title": "The ellipsis",
         "items": [
             "Long paths in the folder, rate and proxy fields end in an ellipsis instead of cutting a token in half — long-press shows the whole value.",
-        ],
-    },
-    {
-        "version": "0.49.2",
-        "title": "The cue",
-        "items": [
-            "The URL field wears one focus cue instead of a ring stacked on a halo, and its hint ends in an ellipsis on a phone instead of cutting a word.",
         ],
     },
 

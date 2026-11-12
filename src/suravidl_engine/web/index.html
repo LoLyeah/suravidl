@@ -613,6 +613,17 @@
         </div>
 
         <div class="field row">
+          <label class="lbl" for="setNameLength" data-i18n="File name length">File name length</label>
+          <select id="setNameLength" aria-label="File name length" data-i18n-aria="File name length">
+            <option value="short" data-i18n="Short — about 60 letters">Short — about 60 letters</option>
+            <option value="standard" data-i18n="Standard — about 100 letters">Standard — about 100 letters</option>
+            <option value="long" data-i18n="Long — about 180 letters">Long — about 180 letters</option>
+            <option value="none" data-i18n="No limit">No limit</option>
+          </select>
+          <span class="muted small" data-i18n="A title that is only a long token is replaced with the uploader and the date.">A title that is only a long token is replaced with the uploader and the date.</span>
+        </div>
+
+        <div class="field row">
           <label class="lbl" for="setSubfolders" data-i18n="Subfolders">Subfolders</label>
           <select id="setSubfolders">
             <option value="off" data-i18n="Off — everything in one folder">Off — everything in one folder</option>
