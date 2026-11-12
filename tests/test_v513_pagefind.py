@@ -55,5 +55,6 @@ def test_the_background_only_accepts_reports_with_a_sender_tab():
     # v0.46.10 audit B/F2: every PRIVILEGED branch refuses a tab sender —
     # a content script may only ever report a sighting (or, since
     # v0.5.16, the page's decode key: pkFind)
-    assert ('&& !(msg && (msg.type === "pageFind" || msg.type === "pkFind")))'
+    assert ('const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster"]);'
             in src)
+    assert "&& !(msg && REPORT_ONLY.has(msg.type))" in src

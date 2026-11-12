@@ -31,6 +31,7 @@ let SENT = false;
 let INPUTS = [];     // the live row checkboxes, in list order
 let SHOW_PARTS = false;  // a stream's variants/audio unfold on demand
 let SHOW_OLDER = false;  // the finds from before the newest video, on demand
+let POSTER = "";    // the player's own poster image for this page, when it has one
 
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
@@ -51,7 +52,29 @@ function visibleItems() {
     : (shape[m.url] && shape[m.url].kind) || "");
   const newest = (a, b) => (b.foundAt || 0) - (a.foundAt || 0);
   const manifests = ordered.filter((m) => kindOf(m) === "manifest").sort(newest);
-  return manifests.concat(ordered.filter((m) => kindOf(m) !== "manifest").sort(newest));
+  const rest = ordered.filter((m) => kindOf(m) !== "manifest").sort(newest);
+  // Next to a playlist, a fragment is a piece of it: X's player fetches an
+  // fMP4 init file and .m4s slices on the same host as the variant playlist,
+  // and the list offered them as downloads — a card that fetched 700 KB of
+  // header and called it a video (v0.5.27). The engine's rank hides the
+  // .m4s ones; the init is a plain .mp4, so it is caught here by name.
+  const playlists = ordered.filter((m) => /\.(m3u8|mpd)(\?|$)/i.test(m.url));
+  if (playlists.length) {
+    const hosts = new Set(playlists.map((m) => hostOf(m.url)));
+    return manifests.concat(rest.filter((m) =>
+      !hosts.has(hostOf(m.url)) || !isFragment(m)));
+  }
+  return manifests.concat(rest);
+}
+
+// A slice of a stream that happens to be served as its own file: an HLS
+// segment by extension, or an fMP4 init named by a bare hash (X).
+const SEG_EXT = /\.(ts|m4s|m4f|cmfv|cmfa)(\?|$)/i;
+const INIT_PATH = /\/vid\/[^?]*\/[A-Za-z0-9_-]{10,24}\.mp4(\?|$)/i;
+
+function isFragment(m) {
+  if (SEG_EXT.test(m.url)) return true;
+  return INIT_PATH.test(m.url);
 }
 
 // Same video, or the one before it? A player asks for its rendition and its
@@ -107,6 +130,12 @@ function recommend(items) {
   // picking the video, and the app can still choose a quality inside it.
   const master = items.find((m) => roleOf(m.url).role === "master");
   if (master) return master;
+  // A variant playlist is the whole of a video track even when its name says
+  // nothing: X serves 720p as MOsW…m3u8 beside fMP4 fragments, and the
+  // fragments' known sizes used to win the tick (v0.5.27).
+  const playlist = items.find((m) => /\.(m3u8|mpd)(\?|$)/i.test(m.url) &&
+    !/^audio\//.test(m.mime || ""));
+  if (playlist) return playlist;
   const videos = items.filter((m) => /^video\//.test(m.mime || "") && m.bytes > 0);
   const sized = items.filter((m) => m.bytes > 0);
   const pool = videos.length ? videos : sized;
@@ -479,6 +508,11 @@ function showOne(m) {
   const size = sizeText(m.bytes);
   ov.hidden = false;
   $("onemeta").textContent = size;
+  // the player's poster first (instant, works for HLS), the file's own frame
+  // when it can be drawn (v0.5.27)
+  if (POSTER && $("onethumb").style) {
+    $("onethumb").style.backgroundImage = "url(" + POSTER + ")";
+  }
   cardFrame(m.url).then((got) => {
     if (!got) return;
     if (got.shot && $("onethumb").style) {
@@ -526,6 +560,7 @@ function renderCards(groups) {
     meta.append(line, acts);
     card.append(thumb, meta);
     box.append(card);
+    if (POSTER && thumb.style) thumb.style.backgroundImage = "url(" + POSTER + ")";
     cardFrame(best.url).then((got) => {
       if (!got) return;
       if (got.shot && thumb.style) thumb.style.backgroundImage = "url(" + got.shot + ")";
@@ -574,8 +609,11 @@ function render() {
   const pickable = many && !grouped
     ? clusters(vis).filter((c) => c.items.some((m) => !/^audio\//.test(m.mime || "")))
     : [];
+  // the page's own audio track rides the quick door here too: on HLS the
+  // picture and the sound are separate playlists (v0.5.27)
+  const aud = vis.find((m) => /^audio\//.test(m.mime || ""));
   $("send").onclick = () => send(primaryUrl(), "quality");
-  $("quick").onclick = () => send(primaryUrl(), "quick");
+  $("quick").onclick = () => send(primaryUrl(), "quick", aud && aud.url);
   if (pickable.length > 1) {
     INPUTS = [];
     $("streams").textContent = "";
@@ -868,6 +906,7 @@ $("rescan").onclick = () => location.reload();
   } catch (_) { /* nothing to mirror */ }
   const res = await api.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
   ITEMS = (res && res.items) || [];
+  POSTER = (res && res.poster) || "";
   try {
     RANK = await api.runtime.sendMessage({ type: "rank", items: ITEMS });
     SHAPE = await api.runtime.sendMessage({

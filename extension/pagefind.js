@@ -33,6 +33,18 @@
     } catch (_) { /* a sniffer must never break the page */ }
   }
 
+  let posterLast = "";
+  function reportPoster(raw) {
+    try {
+      if (!raw || typeof raw !== "string") return;
+      let u;
+      try { u = new URL(raw, location.href).href; } catch (_) { return; }
+      if (!/^https?:/i.test(u) || u === posterLast) return;
+      posterLast = u;
+      api.runtime.sendMessage({ type: "pagePoster", url: u });
+    } catch (_) { /* a sniffer must never break the page */ }
+  }
+
   // The decode key of a scrambled-playlist player (v0.5.16): Chrome reads
   // it in the MAIN world (pk.js posts it here); Firefox's MV2 content
   // scripts read page globals directly via wrappedJSObject — one door per
@@ -77,6 +89,9 @@
       for (const el of document.querySelectorAll(MEDIA_TAGS)) {
         const s = el.currentSrc || el.src;
         if (s) report(s, "player");
+        // the player's poster is a real picture of what is playing, and the
+        // only one available when the stream itself is HLS (v0.5.27)
+        if (el.poster) reportPoster(el.poster);
       }
     } catch (_) {}
   }

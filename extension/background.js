@@ -62,7 +62,7 @@ let storageChain = Promise.resolve();
 function update(mutate) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {} }, (data) => {
+      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {}, tabPoster: {} }, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -498,9 +498,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // Through the same chain as every other write: a tab closing mid-stream is
   // exactly when an un-chained read-modify-write would resurrect its finds, or
   // drop another tab's.
-  update(({ tabMedia }) => {
+  update(({ tabMedia, tabPoster }) => {
     delete tabMedia[tabId];
-    return { tabMedia };
+    delete tabPoster[tabId];
+    return { tabMedia, tabPoster };
   });
 });
 
@@ -513,14 +514,21 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // so the URL is always there when it matters (no new permission: this needs
   // the one it already has).
   if (!changeInfo || !changeInfo.url) return;
-  update(({ tabMedia }) => {
+  update(({ tabMedia, tabPoster }) => {
     if (tabMedia[tabId]) {
       delete tabMedia[tabId];
+      delete tabPoster[tabId];
       if (action && action.setBadgeText) action.setBadgeText({ tabId, text: "" });
     }
-    return { tabMedia };
+    return { tabMedia, tabPoster };
   });
 });
+
+// The only messages a CONTENT SCRIPT may send: sightings. Everything else
+// here drives the engine or reads stored state, and belongs to the
+// extension's own pages, which carry no tab (v0.46.10 audit B/F2; v0.5.27
+// added the player's poster to the sightings, nothing else).
+const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster"]);
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // v0.46.10 audit B/F2: pagefind.js runs in every frame of every page, so a
@@ -529,13 +537,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // decode key (pkFind, v0.5.16). Every other action here drives the engine
   // or reads stored state and belongs to the extension's own pages
   // (popup/options), which carry no tab.
-  if (_sender && _sender.tab
-      && !(msg && (msg.type === "pageFind" || msg.type === "pkFind"))) {
+  if (_sender && _sender.tab && !(msg && REPORT_ONLY.has(msg.type))) {
     sendResponse({ ok: false, error: "refused" });
     return false;
   }
   if (msg && msg.type === "getMedia") {
-    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {} }, ({ tabMedia, reqHeaders }) => {
+    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, tabPoster: {} },
+      ({ tabMedia, reqHeaders, tabPoster }) => {
       const items = (tabMedia[msg.tabId] || []).map((m) => ({
         url: m.url,
         alt: m.alt || "",
@@ -545,7 +553,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         bytes: m.bytes || 0,
         hasHeaders: !!reqHeaders[m.url],
       }));
-      sendResponse({ items });
+      sendResponse({ items,
+        poster: ((tabPoster || {})[msg.tabId] || {}).url || "" });
     });
     return true; // async response
   }
@@ -576,6 +585,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "recentJobs") {
     recentJobs().then(sendResponse);
     return true;
+  }
+  if (msg && msg.type === "pagePoster") {
+    // the player's own poster is the one picture available for a stream the
+    // extension cannot decode (HLS), so a row can still wear a face (v0.5.27)
+    const tabId = _sender && _sender.tab ? _sender.tab.id : undefined;
+    if (typeof tabId === "number" && tabId >= 0 && msg.url) {
+      update(({ tabPoster }) => {
+        tabPoster[tabId] = { url: String(msg.url), at: Date.now() };
+        return { tabPoster };
+      });
+      sendResponse({ ok: true });
+      return false;
+    }
+    sendResponse({ ok: false });
+    return false;
   }
   if (msg && msg.type === "pageFind") {
     // the page-side layer (v0.5.13): only a content script can send this —

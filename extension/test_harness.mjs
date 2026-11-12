@@ -1227,6 +1227,45 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.25: Choose quality hands over the card's own video");
     ff.store.tabMedia = {};
 
+    // — v0.5.27: an HLS page's fragments are not videos. X serves a variant
+    //   playlist beside its fMP4 init and .m4s slices; the list must offer the
+    //   playlist, and the quick door must carry the audio playlist with it —
+    const xNow = Date.now();
+    ff.store.tabMedia = { 7: [
+      { url: "https://video.twimg.com/amplify_video/1/pl/avc1/720x720/MOsW8Yq6Cu6dt5_Y.m3u8",
+        foundAt: xNow - 900, via: "network", mime: "application/vnd.apple.mpegurl", bytes: 0, alt: "" },
+      { url: "https://video.twimg.com/amplify_video/1/vid/avc1/0/0/720x720/5u43bC8n-gZg3YJP.mp4",
+        foundAt: xNow - 880, via: "network", mime: "video/mp4", bytes: 700000, alt: "" },
+      { url: "https://video.twimg.com/amplify_video/1/vid/avc1/0/3000/720x720/JEDgVfR0KiUQJVO.m4s",
+        foundAt: xNow - 860, via: "network", mime: "video/mp4", bytes: 250000, alt: "" },
+      { url: "https://video.twimg.com/amplify_video/1/pl/mp4a/128000/c2eI4O7dPVe-hHHj.m3u8",
+        foundAt: xNow - 840, via: "network", mime: "audio/mp4", bytes: 0, alt: "" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.27: the popup must load with an HLS find list (" + e + ")");
+    }
+    await settle();
+    await settle();
+    const xrows = nodes.streams.children;
+    ok(xrows.length === 2,
+       "v0.5.27: the playlist and its audio are the rows; init and slices are not");
+    ok(xrows[0].children[0].children[0].checked &&
+       xrows[0].children[0].children[0].value.indexOf(".m3u8") !== -1 &&
+       xrows[0].children[0].children[0].value.indexOf("m4a") === -1,
+       "v0.5.27: the video playlist is the pick, not a fragment");
+    ff.fetchCalls.length = 0;
+    await nodes.quick.onclick();
+    const xBody = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const xSent = xBody && JSON.parse(xBody.opts.body);
+    ok(xSent && xSent.url.indexOf("avc1/720x720") !== -1,
+       "v0.5.27: quick download sends the playlist");
+    ok(xSent && xSent.audio_url &&
+       xSent.audio_url.indexOf("pl/mp4a/128000") !== -1,
+       "v0.5.27: …with the page's audio playlist, so the file has sound");
+    ff.store.tabMedia = {};
+
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());
     try { new Function(popupFull)(); }
