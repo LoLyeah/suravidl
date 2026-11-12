@@ -260,7 +260,9 @@ def test_create_keeps_its_positional_contract():
 
     params = list(inspect.signature(JobManager.create).parameters)
     assert params[:5] == ["self", "url", "fmt", "extra_headers", "preset"]
-    assert params[-1] == "xor_key", "new parameters go last"
+    # v0.5.24 appended audio_url after xor_key: still the tail, still safe
+    assert params[-1] == "audio_url", "new parameters go last"
+    assert params[-2] == "xor_key"
 
 
 # --- the extension side: the key's travel ------------------------------------

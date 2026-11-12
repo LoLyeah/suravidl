@@ -298,7 +298,7 @@ function refreshDoors() {
 
 // The two doors: "quality" hands the find over (the app opens on the format
 // list); "quick" queues the best quality right now — no window, no choosing.
-async function send(url, mode) {
+async function send(url, mode, audio) {
   if (SENT || !url) return;
   const quick = mode === "quick";
   const picks = quick ? checkedUrls() : [];
@@ -312,7 +312,10 @@ async function send(url, mode) {
   try {
     res = await api.runtime.sendMessage(quick
       ? (single
-          ? { type: "sendToEngine", url: picks[0] || url, tabId: TAB && TAB.id }
+          // the feed's soundtrack rides with the picture: one job, one
+          // playable file, no silent download (v0.5.24)
+          ? { type: "sendToEngine", url: picks[0] || url, audioUrl: (audio || ""),
+              tabId: TAB && TAB.id }
           : { type: "sendBatch", urls: picks, tabId: TAB && TAB.id })
       : {
           type: "sendHandoff",
@@ -467,7 +470,8 @@ function renderCards(groups) {
     sub.textContent = t("Download this one");
     meta.append(line, sub);
     card.append(thumb, meta);
-    card.onclick = () => send(best.url, "quick");
+    const track = c.items.find((m) => /^audio\//.test(m.mime || ""));
+    card.onclick = () => send(best.url, "quick", track && track.url);
     box.append(card);
     cardFrame(best.url).then((got) => {
       if (!got) return;

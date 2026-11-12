@@ -59,6 +59,9 @@ class JobRequest(BaseModel):
     handoff_id: str | None = None
     # the sniffer's captured decode key for scrambled playlists (v0.47.0)
     xor_key: str | None = None
+    # a feed serves picture and sound as two files; the extension sends the
+    # pair, and the engine joins them into one download (v0.5.24)
+    audio_url: str | None = None
 
 
 class OpenUrlRequest(BaseModel):
@@ -1107,7 +1110,8 @@ def create_app(download_dir, auth_token: str | None = None,
                          playlist_items=body.playlist_items,
                          raw_args=raw,
                          overrides=overrides,
-                         live=body.live)
+                         live=body.live,
+                         audio_url=body.audio_url)
         remember_site_quality(body.url, body.fmt)
         return redact_job(job)
 

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import threading
 import time
 import uuid
@@ -733,7 +734,10 @@ class JobManager:
                # mid-signature insertion broke them: a headers dict landed
                # on the key and the door refused it, caught by the 16k
                # emulator board)
-               xor_key: str | None = None) -> dict:
+               xor_key: str | None = None,
+               # the feed's separate audio track, paired by the extension
+               # (v0.5.24) — appended after xor_key for the same reason
+               audio_url: str | None = None) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the
@@ -748,6 +752,13 @@ class JobManager:
         why = blocked_reason(url)
         if why:
             raise ValueError(why)
+        audio_url = (audio_url or "").strip() or None
+        if audio_url:
+            if len(audio_url) > URL_MAX:
+                raise ValueError("that audio URL is too long")
+            why = blocked_reason(audio_url)
+            if why:
+                raise ValueError(why)
         if len(self._pending) >= MAX_QUEUE:
             raise ValueError(
                 f"the queue is full ({MAX_QUEUE} waiting) — let some "
@@ -818,6 +829,9 @@ class JobManager:
             # which follow grabbed it (None for a hand-made job)
             "video_id": (video_id or None),
             "follow_id": (follow_id or None),
+            # in memory only: a resume after a restart downloads the picture
+            # alone rather than failing, which is what it did before
+            "audio_url": audio_url,
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -1844,6 +1858,68 @@ class JobManager:
                        f"“{landed.name}”")
         return info2
 
+    @staticmethod
+    def _note(job: dict, text: str) -> None:
+        job["note"] = "; ".join(filter(None, [job.get("note"), text]))
+
+    def _join_audio(self, job: dict, opts: dict, target_dir: Path) -> None:
+        """Fetch the feed's separate audio track and join it to the video.
+
+        A reel arrives as picture and sound in two files, so a job for the
+        picture alone is silent — the owner's report, 2026-11-12. The audio
+        is small, ffmpeg joins it without re-encoding, and a join that fails
+        leaves the video exactly as it came, with a note on the card: never
+        an error, because the download itself did work (v0.5.24).
+        """
+        from .cut import ffmpeg_exe
+
+        video = Path(str(job.get("filepath") or ""))
+        if not video.is_file():
+            return
+        exe = ffmpeg_exe()
+        if not exe:
+            self._note(job, "downloaded without sound — ffmpeg is not installed")
+            return
+        audio = None
+        out = target_dir / (".sv-join-" + str(job.get("id")) + ".mp4")
+        try:
+            a_opts = dict(opts)
+            a_opts["outtmpl"] = str(target_dir / ".sv-audio-%(id)s.%(ext)s")
+            a_opts["format"] = "bestaudio/b"
+            # the settings' postprocessors belong to the picture (subtitles,
+            # thumbnail, metadata on the video), and an archive entry for the
+            # audio would make the second run skip it silently
+            a_opts.pop("postprocessors", None)
+            a_opts.pop("download_archive", None)
+            a_opts["progress_hooks"] = []
+            a_opts["postprocessor_hooks"] = []
+            info = extract_info(a_opts, job["audio_url"], download=True) or {}
+            got = (info.get("requested_downloads") or [{}])[0]
+            audio = Path(str(got.get("filepath") or info.get("filepath") or ""))
+            if not audio.is_file():
+                raise RuntimeError("the audio track did not arrive")
+            p = subprocess.run(
+                [exe, "-hide_banner", "-loglevel", "error", "-y",
+                 "-i", str(video), "-i", str(audio),
+                 "-map", "0:v:0", "-map", "1:a:0", "-c", "copy",
+                 "-movflags", "+faststart", str(out)],
+                capture_output=True, text=True, timeout=900)
+            if p.returncode != 0 or not out.is_file() or out.stat().st_size == 0:
+                why = (p.stderr or "").strip().splitlines()
+                raise RuntimeError(why[-1] if why else "ffmpeg could not join them")
+            final = video if video.suffix.lower() == ".mp4" else video.with_suffix(".mp4")
+            if final != video:
+                video.unlink(missing_ok=True)
+            os.replace(out, final)
+            job["filepath"] = str(final)
+            job["files"] = [str(final)]
+        except Exception as e:  # noqa: BLE001 — the picture is still a good file
+            out.unlink(missing_ok=True)
+            self._note(job, f"downloaded without sound — {e}")
+        finally:
+            if audio is not None:
+                audio.unlink(missing_ok=True)
+
     def _execute(self, job: dict, fmt: str | None, extra_headers: dict | None):
         if _stop_requested(job):  # cancelled or paused while queued
             return
@@ -2125,6 +2201,11 @@ class JobManager:
                     if sub_fp not in made:
                         made.append(sub_fp)
                 job["files"] = made
+                # a feed serves picture and sound as two files; the extension
+                # pairs them, and the job must still land ONE playable file
+                # (v0.5.24)
+                if job.get("audio_url"):
+                    self._join_audio(job, opts, target_dir)
                 # this download only: rename/tag/split it (v0.47.29)
                 try:
                     self._apply_finish_meta(job)

@@ -1164,6 +1164,8 @@ ok(batched && batched.ok && batched.queued === 2,
     ff.store.tabMedia = { 7: [
       { url: "https://cdn.fb/old.mp4?oh=7", foundAt: cardNow - 120000,
         via: "network", mime: "video/mp4", bytes: 3 * 1048576, alt: "" },
+      { url: "https://cdn.fb/old.m4a?oh=6", foundAt: cardNow - 119000,
+        via: "network", mime: "audio/mp4", bytes: 900000, alt: "" },
       { url: "https://cdn.fb/mid.mp4?oh=8", foundAt: cardNow - 60000,
         via: "network", mime: "video/mp4", bytes: 5 * 1048576, alt: "" },
       { url: "https://cdn.fb/new.mp4?oh=9", foundAt: cardNow - 500,
@@ -1196,8 +1198,11 @@ ok(batched && batched.ok && batched.queued === 2,
     ff.fetchCalls.length = 0;
     await cards[2].onclick();
     const cardCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
-    ok(cardCall && JSON.parse(cardCall.opts.body).url === "https://cdn.fb/old.mp4?oh=7",
+    const cardBody = cardCall && JSON.parse(cardCall.opts.body);
+    ok(cardBody && cardBody.url === "https://cdn.fb/old.mp4?oh=7",
        "v0.5.22: clicking a card downloads that video, the one the person chose");
+    ok(cardBody && cardBody.audio_url === "https://cdn.fb/old.m4a?oh=6",
+       "v0.5.24: …with its own soundtrack, so the file is not silent");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
