@@ -17,11 +17,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
-def test_the_notes_name_this_release():
-    assert __version__ == "0.49.9"
-    assert ENTRIES[0]["version"] == __version__
-    assert ENTRIES[0]["title"].lower() == "the formality"
-    assert len(ENTRIES) == 10
+def test_the_notes_still_carry_this_release():
+    # v0.49.10 moved the newest slot on: this release's entry must survive
+    # the rolling card, and the current release's own test owns slot 0
+    assert any(e["version"] == "0.49.9" and e["title"].lower() == "the formality"
+               for e in ENTRIES)
 
 
 def test_the_permission_is_the_read():

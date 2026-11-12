@@ -1878,7 +1878,8 @@ class JobManager:
             return
         exe = ffmpeg_exe()
         if not exe:
-            self._note(job, "downloaded without sound — ffmpeg is not installed")
+            self._note(job, "downloaded without sound — ffmpeg is not installed"
+                        "; Settings can fetch it")
             return
         audio = None
         out = target_dir / (".sv-join-" + str(job.get("id")) + ".mp4")

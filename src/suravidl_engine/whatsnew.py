@@ -15,6 +15,15 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.10",
+        "title": "The soundtrack",
+        "items": [
+            "A video sent from the browser extension now arrives with its sound: the page serves picture and audio as two files, and the app joins them into one before the download lands.",
+            "The join copies the streams — nothing is re-encoded — so the file is the one the site served, only whole.",
+            "Without ffmpeg the picture still downloads, and the card says the sound was not joined and that Settings can fetch ffmpeg in one click.",
+        ],
+    },
+    {
         "version": "0.49.9",
         "title": "The formality",
         "items": [
@@ -81,13 +90,6 @@ ENTRIES = [
         "items": [
             "On a phone the fields finally match the rest of the controls: 44px tall at 16px, so iOS no longer zooms when you tap one.",
             "A phone on its side is 360px tall — the floating Save bar now waits at the end of the panel instead of covering the schemes.",
-        ],
-    },
-    {
-        "version": "0.49.0",
-        "title": "The landing",
-        "items": [
-            "A finishing take lands: the COMPLETED pill stamps flat while a scanner pass runs along the row, once — the machine confirming the file.",
         ],
     },
 ]

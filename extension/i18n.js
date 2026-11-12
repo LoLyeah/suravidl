@@ -41,7 +41,8 @@ const I18N = {
   "best": "terbaik",
   "Newest": "Terbaru",
   "Earlier": "Sebelumnya",
-  "Download this one": "Unduh yang ini",
+  "Download": "Unduh",
+  "Quality": "Kualitas",
   "{n} videos found on this page": "{n} video ditemukan di halaman ini",
   "Pick the one you are watching — the newest find is often the next reel.":
     "Pilih yang sedang kamu tonton — temuan terbaru sering kali reel berikutnya.",

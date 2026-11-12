@@ -20,9 +20,11 @@ APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
 def test_the_notes_still_carry_this_release():
+    # v0.49.10 retired this entry (the oldest of ten); the feature stays
+    # pinned by the behaviour tests below, the announcement by git
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.49.0" and e["title"].lower() == "the landing"
-               for e in ENTRIES)
+    assert not any(e["version"] == "0.49.0" and e["title"].lower() == "the landing"
+                   for e in ENTRIES)
 
 
 def test_the_beat_only_fires_on_a_real_transition():

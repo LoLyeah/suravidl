@@ -42,5 +42,5 @@ def test_the_version_chip_reads_the_manifest():
 def test_the_shipped_version_moved_together():
     chrome = json.loads((EXT / "manifest.json").read_text())
     firefox = json.loads((EXT / "firefox" / "manifest.json").read_text())
-    assert chrome["version"] == firefox["version"] == "0.5.24"
-    assert "v0.5.24" in OPTS
+    assert chrome["version"] == firefox["version"] == "0.5.25"
+    assert "v0.5.25" in OPTS

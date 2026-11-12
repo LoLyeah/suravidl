@@ -21,7 +21,7 @@
   "version": {
     "license": "MIT",
     "release_notes": {
-      "en-US": "The extension's engine page — where you paste the address and the token — now looks like the app it belongs to: same faces, one amber Save, and Show/Hide on the token so you can check it. From the previous update: streams that disguise their segments as images now download whole, and each row in the list says what it is — “All qualities”, a resolution, or an audio track."
+      "en-US": "A feed now shows one card per video — a frame taken from the file itself, its duration and size — instead of a list of streams, and each card downloads that video with its sound: the page serves picture and audio as two files, and the app joins them. Every card keeps both doors, best quality now or the app's own chooser, and the list says what to do when the video you are watching is not in it."
     },
     "compatibility": [
       "firefox"

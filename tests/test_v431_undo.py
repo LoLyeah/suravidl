@@ -222,7 +222,10 @@ def test_the_rolling_card_keeps_ten_and_the_retired_stay_retired():
     versions = [e["version"] for e in whatsnew.ENTRIES]
     titles = [e["title"] for e in whatsnew.ENTRIES]
     assert len(versions) == 10
-    assert versions[0] == "0.49.9"
+    assert versions[0] == "0.49.10"
+    # v0.49.10 retired the oldest: "The landing" (0.49.0)
+    assert "0.49.0" not in versions
+    assert "The landing" not in titles
     assert "0.47.20" not in versions
     assert "The layer" not in titles
     assert "0.47.19" not in versions

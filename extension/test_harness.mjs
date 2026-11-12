@@ -1189,20 +1189,38 @@ ok(batched && batched.ok && batched.queued === 2,
     const cards = nodes.cards.children;
     ok(/8 MB$/.test(cards[0].children[1].children[0].textContent),
        "v0.5.22: the newest card is first and carries its size");
-    ok(cards[0].children[1].children[1].textContent === "Download this one",
+    const acts0 = cards[0].children[1].children[1];
+    ok(acts0.children[0].textContent === "Download",
        "v0.5.22: each card names its own action");
+    ok(acts0.children[1].textContent === "Quality",
+       "v0.5.25: …and keeps the app's quality door beside it");
     ok(nodes.streams.children.length === 0,
        "v0.5.22: nothing is ticked on the user's behalf — there is no list to tick");
     ok(nodes.cardhint.hidden === false,
        "v0.5.23: …and the list says what to do when this video is not in it");
     ff.fetchCalls.length = 0;
-    await cards[2].onclick();
+    await cards[2].children[1].children[1].children[0].onclick();
     const cardCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
     const cardBody = cardCall && JSON.parse(cardCall.opts.body);
     ok(cardBody && cardBody.url === "https://cdn.fb/old.mp4?oh=7",
        "v0.5.22: clicking a card downloads that video, the one the person chose");
     ok(cardBody && cardBody.audio_url === "https://cdn.fb/old.m4a?oh=6",
        "v0.5.24: …with its own soundtrack, so the file is not silent");
+
+    // the other door, on the same card: the card's video goes to the app's
+    // chooser, not somebody else's (v0.5.25)
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.25: the popup must load for the quality door (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ff.fetchCalls.length = 0;
+    await nodes.cards.children[1].children[1].children[1].children[1].onclick();
+    const qualCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
+    ok(qualCall && JSON.parse(qualCall.opts.body).url === "https://cdn.fb/mid.mp4?oh=8",
+       "v0.5.25: Choose quality hands over the card's own video");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —

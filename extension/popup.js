@@ -454,8 +454,7 @@ function renderCards(groups) {
   groups.slice(0, MAX_CARDS).forEach((c, i) => {
     const best = recommend(c.items);
     if (!best) return;
-    const card = document.createElement("button");
-    card.type = "button";
+    const card = document.createElement("div");
     card.className = "card";
     const thumb = document.createElement("span");
     thumb.className = "thumb";
@@ -465,13 +464,25 @@ function renderCards(groups) {
     line.className = "cline";
     const size = sizeText(best.bytes);
     line.textContent = (i === 0 ? t("Newest") : t("Earlier")) + (size ? " · " + size : "");
-    const sub = document.createElement("span");
-    sub.className = "csub";
-    sub.textContent = t("Download this one");
-    meta.append(line, sub);
-    card.append(thumb, meta);
+    // both doors stay, on the video this card names: the quick one takes the
+    // best quality straight away, the other opens the app's chooser. A feed
+    // answers the first; a page with real formats needs the second (v0.5.25)
+    const acts = document.createElement("span");
+    acts.className = "cacts";
+    const dl = document.createElement("button");
+    dl.type = "button";
+    dl.className = "cdl";
+    dl.textContent = t("Download");
     const track = c.items.find((m) => /^audio\//.test(m.mime || ""));
-    card.onclick = () => send(best.url, "quick", track && track.url);
+    dl.onclick = () => send(best.url, "quick", track && track.url);
+    const q = document.createElement("button");
+    q.type = "button";
+    q.className = "cqual";
+    q.textContent = t("Quality");
+    q.onclick = () => send(best.url, "quality");
+    acts.append(dl, q);
+    meta.append(line, acts);
+    card.append(thumb, meta);
     box.append(card);
     cardFrame(best.url).then((got) => {
       if (!got) return;

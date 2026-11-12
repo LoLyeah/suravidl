@@ -23,7 +23,7 @@ the first-publish runbook; the listing copy is copy-paste ready.
 1. <https://chrome.google.com/webstore/devconsole> → **Add new item**.
 2. Upload `suravidl-extension-chrome.zip`. The item is created in **Draft**
    (nothing is public yet) and gets its permanent extension ID.
-3. The manifest version becomes the item version (currently **0.5.24**).
+3. The manifest version becomes the item version (currently **0.5.25**).
 
 ## 2. Store listing
 
