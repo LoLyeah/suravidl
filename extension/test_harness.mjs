@@ -898,7 +898,7 @@ ok(batched && batched.ok && batched.queued === 2,
     });
     const ids = ["engine", "engineText", "found", "site", "favicon", "hostline",
                  "headline", "subline", "pickgroup", "streams", "foldline", "cards",
-                 "cardhint", "send",
+                 "cardhint", "onevideo", "onethumb", "onemeta", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList"];
     const mkNodes = () => {
@@ -906,7 +906,7 @@ ok(batched && batched.ok && batched.queued === 2,
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
       for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent",
-                        "cards", "cardhint"]) {
+                        "cards", "cardhint", "onevideo"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -1115,6 +1115,8 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.20: the smaller rendition says its size too");
     ok(labelOf(srows[2]) === "Audio · 928 KB",
        "v0.5.20: an audio track is named as audio, not as a video");
+    ok(nodes.onevideo.hidden === false,
+       "v0.5.26: one video on the page shows its own frame above the rows");
     ff.store.tabMedia = {};
 
     // — v0.5.21: a reel's audio track is named Audio even though the CDN
@@ -1198,6 +1200,8 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.22: nothing is ticked on the user's behalf — there is no list to tick");
     ok(nodes.cardhint.hidden === false,
        "v0.5.23: …and the list says what to do when this video is not in it");
+    ok(nodes.onevideo.hidden === true,
+       "v0.5.26: the card layout does not repeat a single frame above the cards");
     ff.fetchCalls.length = 0;
     await cards[2].children[1].children[1].children[0].onclick();
     const cardCall = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();

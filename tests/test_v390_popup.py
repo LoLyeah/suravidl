@@ -116,7 +116,11 @@ def test_the_popup_speaks_the_promise_namespace_guard():
 def test_the_popup_keeps_the_engine_behind_the_background():
     """The popup must not know the engine's address or the token — that is
     the background's job; the popup only sends messages."""
-    assert "http://" not in POPUP_JS and "https://" not in POPUP_JS
+    # v0.5.26 draws the raw-link glyph as inline SVG, whose *namespace* is
+    # the only "http://" the popup may name — it is an XML identifier, not
+    # an address anything fetches
+    addrs = POPUP_JS.replace("http://www.w3.org/2000/svg", "")
+    assert "http://" not in addrs and "https://" not in addrs
     assert "engineToken" not in POPUP_JS
 
 

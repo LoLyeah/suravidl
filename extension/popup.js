@@ -222,6 +222,31 @@ function shapeMaster(url) {
     .find((it) => it.url === url && it.master) || null;
 }
 
+// The raw-link door's face: a chain, drawn rather than typed — no font on
+// any of the three platforms carries a link glyph reliably (v0.5.26).
+function linkGlyph() {
+  try {
+    if (typeof document.createElementNS !== "function") return null;
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "12");
+    svg.setAttribute("height", "12");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2.2");
+    svg.setAttribute("stroke-linecap", "round");
+    const a = document.createElementNS(ns, "path");
+    a.setAttribute("d", "M10.5 13.5a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1");
+    const b = document.createElementNS(ns, "path");
+    b.setAttribute("d", "M13.5 10.5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1");
+    svg.append(a, b);
+    return svg;
+  } catch (_) {
+    return null;   // a shell without SVG still gets the word
+  }
+}
+
 function streamLabel(m) {
   const child = shapeChild(m.url);
   if (child.role === "variant" && child.res) return t("Video") + " · " + child.res;
@@ -446,6 +471,23 @@ async function cardFrame(url) {
   }
 }
 
+// One video on the page: its own frame above the rows, with its duration.
+// The same fetch that draws it also proves the URL plays (v0.5.26).
+function showOne(m) {
+  const ov = $("onevideo");
+  if (!ov || !m) return;
+  const size = sizeText(m.bytes);
+  ov.hidden = false;
+  $("onemeta").textContent = size;
+  cardFrame(m.url).then((got) => {
+    if (!got) return;
+    if (got.shot && $("onethumb").style) {
+      $("onethumb").style.backgroundImage = "url(" + got.shot + ")";
+    }
+    if (got.dur) $("onemeta").textContent = clockText(got.dur) + (size ? " · " + size : "");
+  }).catch(() => {});
+}
+
 function renderCards(groups) {
   const box = $("cards");
   if (!box) return;
@@ -541,6 +583,7 @@ function render() {
     $("send").hidden = true;
     $("quick").hidden = true;
     $("foldline").hidden = true;
+    $("onevideo").hidden = true;
     $("headline").textContent = t("{n} videos found on this page", { n: pickable.length });
     $("subline").textContent =
       t("Pick the one you are watching — the newest find is often the next reel.");
@@ -664,8 +707,11 @@ function render() {
       raw.textContent = m.url;
       const more = document.createElement("button");
       more.type = "button";
-      more.className = "more";
-      more.textContent = "URL";
+      more.className = "more icon";
+      // a link glyph says "the raw address" at a glance; the word "URL"
+      // read as another action next to Download (v0.5.26)
+      const glyph = linkGlyph();
+      if (glyph) more.append(glyph); else more.textContent = "URL";
       more.setAttribute("aria-expanded", "false");
       more.setAttribute("aria-label",
         t("Show the raw link — {name}", { name: say.textContent }));
@@ -725,6 +771,10 @@ function render() {
         refreshDoors();
       };
     }
+    const shown = rows.find((r) => r.m && r.m.url === pickUrl) || rows.find((r) => r.m);
+    showOne((shown && shown.m) || vis[0]);
+  } else {
+    showOne(vis[0]);
   }
 
   refreshDoors();
