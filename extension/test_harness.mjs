@@ -881,7 +881,7 @@ ok(batched && batched.ok && batched.queued === 2,
     // a doorman — plain words, a chooser only when the page offered several
     // streams, and ONE handoff; the quality pick happens in the app)
     const el = (tag = "div") => ({
-      tagName: tag, hidden: false, className: "", value: "", src: "",
+      tagName: tag, hidden: false, className: "", value: "", src: "", style: {},
       checked: false, disabled: false, name: "", type: "", onclick: null, children: [],
       classList: {
         _s: new Set(),
@@ -1314,6 +1314,30 @@ ok(batched && batched.ok && batched.queued === 2,
        shardSent.audio_url.indexOf("video-iad3-2") !== -1,
        "v0.5.28: …and the sound from the other edge host rides with it");
     ff.store.tabMedia = {};
+
+    // — v0.5.29: one poster for the tab is not a picture of every card. The
+    //   fallback painted the last swept element's poster (an ad, a hover
+    //   preview, a 1x1 spacer) across the whole list —
+    const posterNow = Date.now();
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn.fb/one.mp4", foundAt: posterNow - 60000, via: "network",
+        mime: "video/mp4", bytes: 3000000, alt: "", asset: "1" },
+      { url: "https://cdn.fb/two.mp4", foundAt: posterNow - 1000, via: "network",
+        mime: "video/mp4", bytes: 3000000, alt: "", asset: "2" },
+    ] };
+    ff.store.tabPoster = { 7: { url: "https://cdn.fb/poster.jpg", at: posterNow } };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.29: the popup must load with a tab poster (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.cards.children.length === 2, "v0.5.29: two videos, two cards");
+    ok(nodes.cards.children.every((c) => !c.children[0].style.backgroundImage),
+       "v0.5.29: no card wears the page's single poster");
+    ff.store.tabMedia = {};
+    ff.store.tabPoster = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());

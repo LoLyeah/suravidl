@@ -23,8 +23,8 @@ def test_every_extension_version_string_agrees():
     m3 = json.loads((ROOT / "extension/manifest.json").read_text())
     m2 = json.loads((ROOT / "extension/firefox/manifest.json").read_text())
     html = (ROOT / "extension/popup.html").read_text()
-    assert m3["version"] == m2["version"] == "0.5.28"
-    assert "v0.5.28" in html
+    assert m3["version"] == m2["version"] == "0.5.29"
+    assert "v0.5.29" in html
 
 
 def test_each_manifest_gets_the_permission_its_browser_has():
@@ -50,6 +50,6 @@ def test_the_store_notes_carry_the_new_doors():
     meta = (ROOT / "docs/amo-metadata.json").read_text()
     json.loads(meta)   # the submission must never ship invalid JSON
     assert "contextMenus" in meta, "the approval notes justify the new permission"
-    # v0.5.28 reworded the release notes for the card view and the joined
+    # v0.5.29 reworded the release notes for the card view and the joined
     # audio; the pin follows the current text, not the old one
     assert "one card per video" in meta, "the release notes say what changed"

@@ -86,12 +86,17 @@
   // chosen — then the attribute. No pattern prefilter: this is evidence.
   function sweep() {
     try {
+      const vids = document.querySelectorAll("video");
       for (const el of document.querySelectorAll(MEDIA_TAGS)) {
         const s = el.currentSrc || el.src;
         if (s) report(s, "player");
-        // the player's poster is a real picture of what is playing, and the
-        // only one available when the stream itself is HLS (v0.5.27)
-        if (el.poster) reportPoster(el.poster);
+        // the player's poster is a picture of what is playing, and the only
+        // one available when the stream is HLS — but only when there is ONE
+        // video on the page: on a feed the last swept element is an ad or a
+        // hover preview, and that picture is not this list's (v0.5.29)
+        if (el.poster && vids.length === 1 && el.tagName.toLowerCase() === "video") {
+          reportPoster(el.poster);
+        }
       }
     } catch (_) {}
   }

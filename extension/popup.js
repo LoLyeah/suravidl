@@ -103,6 +103,23 @@ function clusterKey(m) {
   return m.asset ? "asset:" + m.asset : "site:" + siteOf(m.url);
 }
 
+// A poster belongs to the page's one video, not to every find, and it must
+// never sit behind a frame that is about to be drawn — a poster behind a
+// canvas is exactly the mess reported as a bugged thumbnail (v0.5.29).
+// Players also use 1x1 spacer pixels as posters, so ask the image its size.
+function applyPoster(node) {
+  if (!POSTER || !node || !node.style) return;
+  try {
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 2 && img.naturalHeight > 2) {
+        node.style.backgroundImage = "url(" + POSTER + ")";
+      }
+    };
+    img.src = POSTER;
+  } catch (_) { /* a picture we cannot read is no picture */ }
+}
+
 function clusters(items) {
   const out = [];
   for (const m of items) {
@@ -524,16 +541,13 @@ function showOne(m) {
   const size = sizeText(m.bytes);
   ov.hidden = false;
   $("onemeta").textContent = size;
-  // the player's poster first (instant, works for HLS), the file's own frame
-  // when it can be drawn (v0.5.27)
-  if (POSTER && $("onethumb").style) {
-    $("onethumb").style.backgroundImage = "url(" + POSTER + ")";
-  }
   cardFrame(m.url).then((got) => {
-    if (!got) return;
-    if (got.shot && $("onethumb").style) {
+    if (got && got.shot && $("onethumb").style) {
       $("onethumb").style.backgroundImage = "url(" + got.shot + ")";
+    } else {
+      applyPoster($("onethumb"));   // nothing to draw: the page's own picture
     }
+    if (!got) return;
     if (got.dur) $("onemeta").textContent = clockText(got.dur) + (size ? " · " + size : "");
   }).catch(() => {});
 }
@@ -576,7 +590,6 @@ function renderCards(groups) {
     meta.append(line, acts);
     card.append(thumb, meta);
     box.append(card);
-    if (POSTER && thumb.style) thumb.style.backgroundImage = "url(" + POSTER + ")";
     cardFrame(best.url).then((got) => {
       if (!got) return;
       if (got.shot && thumb.style) thumb.style.backgroundImage = "url(" + got.shot + ")";
