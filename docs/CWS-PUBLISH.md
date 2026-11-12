@@ -75,7 +75,7 @@ share one code path.
 
 ```bash
 python3 scripts/cws_publish.py --check          # published version, review state
-python3 scripts/cws_publish.py --bump patch     # 0.5.29 → 0.5.30, upload, submit
+python3 scripts/cws_publish.py --bump patch     # 0.5.30 → 0.5.31, upload, submit
 python3 scripts/cws_publish.py --zip dist/suravidl-extension-chrome.zip
 python3 scripts/cws_publish.py --no-publish     # upload a draft only
 ```

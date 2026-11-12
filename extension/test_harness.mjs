@@ -618,7 +618,9 @@ ok(batched && batched.ok && batched.queued === 2,
       onRemoved: { addListener: (fn) => ff.onRemoved.push(fn) },
       onUpdated: { addListener: (fn) => ff.onUpdated.push(fn) },
       query(_q, cb) {
-        if (typeof cb === "function") Promise.resolve().then(() => cb([{ id: 7 }]));
+        if (typeof cb === "function") {
+          Promise.resolve().then(() => cb([{ id: 7, url: ff.tabUrl || "https://example.com/" }]));
+        }
         return undefined;                                  // measured: no promise
       },
     },
@@ -639,7 +641,7 @@ ok(batched && batched.ok && batched.queued === 2,
       get: (defaults) => Promise.resolve(readStore(defaults)),
       set: (obj) => { Object.assign(ff.store, clone(obj)); return Promise.resolve(); },
     } },
-    tabs: { query: () => Promise.resolve([{ id: 7 }]) },
+    tabs: { query: () => Promise.resolve([{ id: 7, url: ff.tabUrl || "https://example.com/" }]) },
     runtime: { sendMessage: sendToBg, openOptionsPage() {} },
     menus: {
       create: (props, cb) => { ffMenus.made.push(props); if (cb) cb(); return Promise.resolve(); },
@@ -913,13 +915,14 @@ ok(batched && batched.ok && batched.queued === 2,
                  "headline", "subline", "pickgroup", "streams", "foldline", "cards",
                  "cardhint", "onevideo", "onethumb", "onemeta", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
-                 "optsLink", "ver", "allbtn", "recent", "recentList"];
+                 "optsLink", "ver", "allbtn", "recent", "recentList",
+                 "pagedoor", "pagedl"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
       for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent",
-                        "cards", "cardhint", "onevideo"]) {
+                        "cards", "cardhint", "onevideo", "pagedoor"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -1338,6 +1341,38 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.29: no card wears the page's single poster");
     ff.store.tabMedia = {};
     ff.store.tabPoster = {};
+
+    // — v0.5.30: the page door. A friends-only reel's CDN address is signed
+    //   for the player that fetched it and refuses a replay, so the one route
+    //   that works is the page itself, fetched by the app with its cookies —
+    ff.tabUrl = "https://www.facebook.com/reel/1234567890";
+    ff.store.tabMedia = {};
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.30: the popup must load on a reel page (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.pagedoor.hidden === false,
+       "v0.5.30: a reel page offers the page door");
+    ff.fetchCalls.length = 0;
+    await nodes.pagedl.onclick();
+    const pageBody = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const pageSent = pageBody && JSON.parse(pageBody.opts.body);
+    ok(pageSent && pageSent.url === ff.tabUrl,
+       "v0.5.30: the job is the page itself, not a sniffed address");
+    ok(pageSent && !pageSent.audio_url,
+       "v0.5.30: no sniffed audio rides a page job");
+
+    ff.tabUrl = "https://github.com/LoLyeah/suravidl";
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); } catch (e) { /* measured above */ }
+    await settle();
+    await settle();
+    ok(nodes.pagedoor.hidden === true,
+       "v0.5.30: a page that is not a video page keeps the door shut");
+    ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());

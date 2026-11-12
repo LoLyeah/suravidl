@@ -23,6 +23,11 @@ const I18N = {
   "Select none": "Kosongkan",
   "Choose quality in suravidl": "Pilih kualitas di suravidl",
   "Quick download — best quality": "Unduh cepat — kualitas terbaik",
+  "Download this page with the app": "Unduh halaman ini dengan aplikasi",
+  "For friends-only or unlisted videos: the app fetches the page itself, with the cookies in its Settings → Authentication.":
+    "Untuk video khusus teman atau tidak publik: aplikasi mengambil halamannya sendiri, memakai cookie di Pengaturan → Autentikasi.",
+  "✓ Sent — suravidl is fetching the page itself.": "✓ Terkirim — suravidl mengambil halamannya sendiri.",
+  "suravidl did not take it: {why}": "suravidl tidak menerimanya: {why}",
   "Nothing playing yet": "Belum ada yang diputar",
   "If this page has a video, play it for a moment, then press Check again.":
     "Kalau halaman ini memutar video, putar sebentar lalu tekan Cek lagi.",

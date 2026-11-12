@@ -103,6 +103,59 @@ function clusterKey(m) {
   return m.asset ? "asset:" + m.asset : "site:" + siteOf(m.url);
 }
 
+// Some videos are only reachable through the page itself: a friends-only
+// reel, an unlisted post. Sniffed CDN URLs are signed for the player that
+// fetched them, and Meta's CDN refuses a replay of a range-locked address.
+// The app's own yt-dlp path takes the page URL and its saved cookies, so the
+// extension offers that door on the sites it knows (v0.5.30).
+const PAGE_HOSTS = /^(?:www\.|m\.|mobile\.)?(facebook\.com|fb\.watch|x\.com|twitter\.com|instagram\.com|tiktok\.com|youtube\.com|youtu\.be|vimeo\.com)$/i;
+const PAGE_PATH = /(?:^|\/)(reel|reels|videos?|watch|status|stories|posts?|p|tv)(?:\/|$)|\/status\/\d+/i;
+
+function pageDoor(tab) {
+  try {
+    const u = new URL((tab && tab.url) || "");
+    if (!PAGE_HOSTS.test(u.hostname)) return "";
+    return PAGE_PATH.test(u.pathname) ? u.href : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function togglePageDoor() {
+  const href = pageDoor(TAB);
+  const box = $("pagedoor"), btn = $("pagedl");
+  if (!box || !btn) return;
+  box.hidden = !href;
+  if (href && !btn.onclick) btn.onclick = sendPage;
+}
+
+async function sendPage() {
+  const href = pageDoor(TAB);
+  const btn = $("pagedl");
+  if (SENT || !href || !btn) return;
+  btn.classList.add("busy");
+  btn.disabled = true;
+  status(t("Sending to suravidl…"), "");
+  let res = null;
+  try {
+    // no captured headers: the page is not a media request, and the app's
+    // own cookie setting is what makes a private page readable
+    res = await api.runtime.sendMessage({ type: "sendToEngine", url: href,
+                                          tabId: TAB && TAB.id });
+  } catch (e) {
+    res = { ok: false, error: String(e) };
+  }
+  if (res && res.ok) {
+    SENT = true;
+    status(t("✓ Sent — suravidl is fetching the page itself."), "ok");
+    return;
+  }
+  btn.classList.remove("busy");
+  btn.disabled = false;
+  status(t("suravidl did not take it: {why}",
+           { why: (res && res.error) || "?" }), "bad");
+}
+
 // A poster belongs to the page's one video, not to every find, and it must
 // never sit behind a frame that is about to be drawn — a poster behind a
 // canvas is exactly the mess reported as a bugged thumbnail (v0.5.29).
@@ -942,5 +995,6 @@ $("rescan").onclick = () => location.reload();
       type: "shape", items: ITEMS, tabId: (TAB || {}).id,
     });
   } catch (_) { /* engine not answering: show everything */ }
+  togglePageDoor();
   render();
 })();
