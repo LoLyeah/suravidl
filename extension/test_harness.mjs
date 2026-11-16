@@ -362,6 +362,33 @@ const gotAsset = await new Promise((resolve) => {
 ok(gotAsset && gotAsset.items.some((i) => i.url === assetUrl && i.asset === "4242"),
    "the asset id in efg reaches the popup with the find");
 
+// 1i. a VOD's chunks do not evict its manifest (v0.5.32). Sixty segments
+// used to fill the ring, push the playlist out, and leave the popup showing
+// fragments with no stream — Carbon named it as the highest-leverage defect.
+{
+  store.tabMedia = {};        // this page starts empty, whatever ran before
+  store.tabManifests = {};
+  const vod = "https://cdn.vod/hls/abc";
+  listeners.beforeRequest[0](req("media", vod + "/master.m3u8"));
+  await settle();
+  for (let i = 0; i < 80; i++) {
+    listeners.beforeRequest[0](req("media", vod + "/seg-" + i + ".m4s"));
+  }
+  await settle();
+  const gotVod = await new Promise((resolve) => {
+    onMessage({ type: "getMedia", tabId: 7 }, {}, resolve);
+  });
+  const vodItems = gotVod.items;
+  ok(vodItems.some((i) => i.url === vod + "/master.m3u8"),
+     "the manifest survives eighty segments");
+  const families = vodItems.filter((i) => i.parts > 0);
+  ok(families.length === 1 && families[0].parts === 80,
+     "…and the eighty parts are one row");
+  ok(vodItems.length <= 4, "…so the list stays a list, not a wall");
+  ok(!vodItems.some((i) => /seg-\d+\.m4s$/.test(i.url) && i.url !== families[0].url),
+     "…with no stray fragment rows beside it");
+}
+
 // 1h. an MSE marker lands per tab and reaches the popup (v0.5.31): a player
 // fed by JavaScript leaves no file on the wire, and the popup must say so
 onMessage({ type: "pageMse" }, { tab: { id: 7 } }, () => {});
@@ -1036,7 +1063,8 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(nodes.pickgroup.hidden === false && nodes.streams.children.length === 4,
        "firefox: …and offer a chooser");
     const rows = nodes.streams.children;
-    const labelOf = (r) => r.children[0].children[1].textContent;
+    const labelOf = (r) => (r && r.children[0] && r.children[0].children[1]
+      ? r.children[0].children[1].textContent : "<no row>");
     // v0.5.20: newest first, and the tick is a recommendation — a manifest
     // outranks everything, because it is the whole stream.
     ok(rows[0].children[0].children[0].checked === true,
@@ -1115,6 +1143,7 @@ ok(batched && batched.ok && batched.queued === 2,
     //   page is the v0.5.22 card case below) —
     const now = Date.now();
     const MB = (n) => Math.round(n * 1048576);
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://cdn/reel/a.m4a?x=1", foundAt: now - 1100,
         via: "network", mime: "audio/mp4", bytes: 950000 },
@@ -1146,12 +1175,14 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.20: an audio track is named as audio, not as a video");
     ok(nodes.onevideo.hidden === false,
        "v0.5.26: one video on the page shows its own frame above the rows");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.21: a reel's audio track is named Audio even though the CDN
     //   typed it video/mp4, the whole file is the pick rather than an 18 KB
     //   leftover slice, and the slice address rides the handoff as a fallback —
     const fbNow = Date.now();
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://cdn.fb/q/1?efg=x", foundAt: fbNow - 500,
         via: "network", mime: "audio/mp4", bytes: 980000, alt: "" },
@@ -1173,7 +1204,7 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(fbRows.length === 3, "v0.5.21: the reel's file and its track are separate rows");
     ok(labelOf(fbRows[2]) === "Audio · 957 KB",
        "v0.5.21: an audio-only track reads Audio, not Video");
-    ok(fbRows[2].children[0].children[0].checked === false,
+    ok(fbRows[2] && fbRows[2].children[0].children[0].checked === false,
        "v0.5.21: …and is never the tick");
     ok(fbRows[0].children[0].children[0].checked === true &&
        fbRows[0].children[0].children[2] &&
@@ -1186,12 +1217,14 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.21: the handoff carries the canonical address");
     ok(fbBody && fbBody.urls.includes("https://cdn.fb/clip.mp4?oh=1&bytestart=0"),
        "v0.5.21: …and the slice the player used, as a fallback");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.22: a feed holds several videos and nothing on the wire says
     //   which one is on screen, so the popup stops ticking one: a card per
     //   video, nothing chosen, and a click downloads THAT card's video —
     const cardNow = Date.now();
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://cdn.fb/old.mp4?oh=7", foundAt: cardNow - 120000,
         via: "network", mime: "video/mp4", bytes: 3 * 1048576, alt: "" },
@@ -1254,12 +1287,14 @@ ok(batched && batched.ok && batched.queued === 2,
     const qualCall = ff.fetchCalls.filter((c) => c.url.endsWith("/handoff")).pop();
     ok(qualCall && JSON.parse(qualCall.opts.body).url === "https://cdn.fb/mid.mp4?oh=8",
        "v0.5.25: Choose quality hands over the card's own video");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.27: an HLS page's fragments are not videos. X serves a variant
     //   playlist beside its fMP4 init and .m4s slices; the list must offer the
     //   playlist, and the quick door must carry the audio playlist with it —
     const xNow = Date.now();
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://video.twimg.com/amplify_video/1/pl/avc1/720x720/MOsW8Yq6Cu6dt5_Y.m3u8",
         foundAt: xNow - 900, via: "network", mime: "application/vnd.apple.mpegurl", bytes: 0, alt: "" },
@@ -1293,6 +1328,7 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(xSent && xSent.audio_url &&
        xSent.audio_url.indexOf("pl/mp4a/128000") !== -1,
        "v0.5.27: …with the page's audio playlist, so the file has sound");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.28: one reel, two hosts. Meta shards per object, so the picture
@@ -1301,6 +1337,7 @@ ok(batched && batched.ok && batched.queued === 2,
     const shardNow = Date.now();
     const efgOf = (id) => Buffer.from(JSON.stringify({ xpv_asset_id: id, vencode_tag: "dash" }))
       .toString("base64url");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://video-iad3-1.fna.fbcdn.net/o/pic.mp4?efg=" + efgOf("777"),
         foundAt: shardNow - 3000, via: "network", mime: "video/mp4",
@@ -1329,12 +1366,14 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(shardSent && shardSent.audio_url &&
        shardSent.audio_url.indexOf("video-iad3-2") !== -1,
        "v0.5.28: …and the sound from the other edge host rides with it");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.29: one poster for the tab is not a picture of every card. The
     //   fallback painted the last swept element's poster (an ad, a hover
     //   preview, a 1x1 spacer) across the whole list —
     const posterNow = Date.now();
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = { 7: [
       { url: "https://cdn.fb/one.mp4", foundAt: posterNow - 60000, via: "network",
         mime: "video/mp4", bytes: 3000000, alt: "", asset: "1" },
@@ -1352,6 +1391,7 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(nodes.cards.children.length === 2, "v0.5.29: two videos, two cards");
     ok(nodes.cards.children.every((c) => !c.children[0].style.backgroundImage),
        "v0.5.29: no card wears the page's single poster");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
     ff.store.tabPoster = {};
 
@@ -1359,6 +1399,7 @@ ok(batched && batched.ok && batched.queued === 2,
     //   for the player that fetched it and refuses a replay, so the one route
     //   that works is the page itself, fetched by the app with its cookies —
     ff.tabUrl = "https://www.facebook.com/reel/1234567890";
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
     nodes = installDom(mkNodes());
     try { new Function(popupFull)(); }
@@ -1385,11 +1426,13 @@ ok(batched && batched.ok && batched.queued === 2,
     await settle();
     ok(nodes.pagedoor.hidden === true,
        "v0.5.30: a page that is not a video page keeps the door shut");
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
 
     // — v0.5.31: a JS-fed player is named, not denied. "Nothing playing yet"
     //   is a lie when the page is streaming through MediaSource —
     ff.tabUrl = "https://www.tiktok.com/@someone/video/123";
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
     ff.store.tabMse = { 7: Date.now() };
     nodes = installDom(mkNodes());
@@ -1444,6 +1487,7 @@ ok(batched && batched.ok && batched.queued === 2,
     ff.healthOk = true;
 
     // — nothing playing: the plate offers its own way out —
+    ff.store.tabManifests = {};   // a fixture starts from an empty page
     ff.store.tabMedia = {};
     nodes = installDom(mkNodes());
     try { new Function(popupFull)(); }

@@ -223,10 +223,13 @@ function recommend(items) {
   const playlist = items.find((m) => /\.(m3u8|mpd)(\?|$)/i.test(m.url) &&
     !/^audio\//.test(m.mime || ""));
   if (playlist) return playlist;
-  const videos = items.filter((m) => /^video\//.test(m.mime || "") && m.bytes > 0);
-  const sized = items.filter((m) => m.bytes > 0);
+  // a collapsed chunk family is an address for one part, never the video:
+  // ticking it downloads a slice (v0.5.32)
+  const pickable = items.filter((m) => !(m.parts > 1));
+  const videos = pickable.filter((m) => /^video\//.test(m.mime || "") && m.bytes > 0);
+  const sized = pickable.filter((m) => m.bytes > 0);
   const pool = videos.length ? videos : sized;
-  if (!pool.length) return items[0] || null;
+  if (!pool.length) return pickable[0] || null;
   const real = pool.filter((m) => m.bytes >= MIN_VIDEO_BYTES);
   return (real.length ? real : pool).reduce((a, b) => (b.bytes > a.bytes ? b : a));
 }
@@ -377,7 +380,9 @@ function streamLabel(m) {
     return info.name ? t("Audio") + " · " + info.name : t("Audio");
   }
   const base = info.name || kindWord(m);
-  return info.res ? base + " · " + info.res : base;
+  const line = info.res ? base + " · " + info.res : base;
+  // one row for a whole segmented stream: the parts are not separate videos
+  return m.parts > 1 ? line + " · " + t("{n} parts", { n: m.parts }) : line;
 }
 
 // When the list has exactly one master, the other playlists on its origin
@@ -783,6 +788,10 @@ function render() {
         });
       }
       pickUrl = (recommend(newest) || {}).url || "";
+      // Only parts are known: a download here would be one chunk of a film,
+      // so the doors step aside and the page door below is the route (v0.5.32)
+      $("send").hidden = !pickUrl;
+      $("quick").hidden = !pickUrl;
     }
     const counts = {};
     for (const r of rows) if (r.label) counts[r.label] = (counts[r.label] || 0) + 1;

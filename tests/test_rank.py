@@ -32,9 +32,15 @@ def test_fragments_with_no_playlist_stay_visible_but_admit_what_they_are():
     assert all("playlist" in i["reason"] for i in out["items"])
 
 
-def test_a_playlist_on_another_host_hides_nothing():
+def test_a_playlist_on_another_host_still_hides_its_fragments():
+    # v0.5.32: a VOD routinely serves its manifest from an API host and its
+    # parts from a CDN. The old same-origin rule then hid nothing, and the
+    # popup showed forty chunks instead of one stream (Carbon, 2026-11-12).
     out = rank(["https://a.example/seg.ts", "https://b.example/master.m3u8"])
-    assert out["hidden"] == 0
+    assert out["hidden"] == 1
+    by = {i["url"]: i for i in out["items"]}
+    assert by["https://a.example/seg.ts"]["hidden"]
+    assert "master.m3u8" in by["https://a.example/seg.ts"]["reason"]
 
 
 def test_ordinary_media_is_left_alone():

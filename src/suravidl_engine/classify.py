@@ -548,9 +548,10 @@ def rank(urls: list) -> dict:
     manifest from the same origin is in the same list — and told *why*, so a
     shell can say "3 fragments hidden" instead of making rows vanish.
 
-    Same origin, not same folder: an ad's segment list is usually served from
-    the same host as the real stream's, and hiding one fragment costs nothing
-    while showing forty of them costs the user everything.
+    Host does not matter (v0.5.32): a VOD's manifest often comes from an API
+    host while its parts come from a CDN, and requiring the same origin there
+    hid nothing — which is how a wall of chunks reached the popup. A fragment
+    is attributed to the manifest it sits closest to in the URL, and hidden.
 
     When two manifests share an origin, a fragment is attributed to the one it
     actually sits next to (longest common path prefix) — the reason should name
@@ -563,8 +564,13 @@ def rank(urls: list) -> dict:
             items.append({"url": u, "kind": "manifest", "hidden": False, "reason": ""})
         elif _ext_of(u) in SEGMENT_EXT:
             path = urlsplit(u).path
-            here = [m for m in manifests if _origin_of(m) == _origin_of(u)]
-            best = max(here, key=lambda m: _common_prefix_len(urlsplit(m).path, path),
+            # A fragment belongs to whichever manifest sits closest to it in
+            # the URL, not only one on its own origin: a VOD routinely serves
+            # its manifest from an API host and its parts from a CDN, and the
+            # origin rule then showed the user forty chunks instead of one
+            # stream (Gemini 4 Carbon, 2026-11-12).
+            best = max(manifests,
+                       key=lambda m: _common_prefix_len(urlsplit(m).path, path),
                        default="")
             if best:
                 items.append({"url": u, "kind": "segment", "hidden": True,

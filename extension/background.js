@@ -63,7 +63,7 @@ function update(mutate) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
       chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {},
-                           tabPoster: {}, tabMse: {} }, (data) => {
+                           tabPoster: {}, tabMse: {}, tabManifests: {} }, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -273,12 +273,69 @@ async function probeSize(url, sliceUrl) {
   }
 }
 
+// A VOD's segments outnumber everything else on the wire, and the ring buffer
+// kept one slot per segment: sixty chunks evicted the manifest that explains
+// them, and the popup fell back to showing fragments with no playlist
+// (Gemini 4 Carbon, 2026-11-12). Two fixes, both here at capture time:
+//   * a manifest is PINNED per tab, outside the ring, so it cannot be evicted
+//   * segments collapse into one row per URL template, however many arrive
+const SEG_RE = /\.(ts|m4s|m4f|cmfv|cmfa)(\?|$)/i;
+const MANIFEST_RE = /\.(m3u8|mpd)(\?|$)/i;
+const MANIFEST_MIME = /(mpegurl|dash\+xml)/i;
+
+function segmentFamily(raw) {
+  // A family is a NAME TEMPLATE, not a folder: `seg-1.m4s` and `seg-2.m4s` are
+  // one stream, while `one.ts` and `two.ts` are two files that happen to live
+  // together. Only a run of digits is treated as the part number.
+  try {
+    const u = new URL(raw);
+    const parts = u.pathname.split("/");
+    const file = parts.pop() || "";
+    const m = /\d+/.exec(file);
+    if (!m) return "";
+    const template = file.slice(0, m.index) + "#" + file.slice(m.index + m[0].length);
+    return u.origin + parts.join("/") + "/" + template;
+  } catch (_) {
+    return "";
+  }
+}
+
 function remember(tabId, rawUrl, via, meta) {
   const canon = canonicalMediaUrl(rawUrl);
   const url = canon.url;
-  const done = update(({ tabMedia, reqHeaders }) => {
+  const done = update(({ tabMedia, reqHeaders, tabManifests }) => {
     const list = tabMedia[tabId] || [];
-    const at = list.findIndex((m) => m.url === url);
+    const now = Date.now();
+    let at = list.findIndex((m) => m.url === url);
+
+    // A manifest is pinned out of the ring entirely: it explains every segment
+    // that follows, and losing it is what made a VOD's popup a wall of chunks.
+    const mime = (meta && meta.mime) || "";
+    let pinned = false;
+    if (MANIFEST_RE.test(url) || MANIFEST_MIME.test(mime)) {
+      tabManifests[tabId] = tabManifests[tabId] || {};
+      tabManifests[tabId][url] = now;
+      const keys = Object.keys(tabManifests[tabId]).sort(
+        (a, b) => tabManifests[tabId][a] - tabManifests[tabId][b]);
+      while (keys.length > 8) delete tabManifests[tabId][keys.shift()];
+      pinned = true;
+    }
+
+    // Segments of one stream share a folder and differ only in their last
+    // name: keep ONE row for the family, whatever the part count.
+    const family = SEG_RE.test(url) ? segmentFamily(url) : "";
+    if (family && at < 0) {
+      at = list.findIndex((m) => m.family === family);
+      if (at >= 0) {
+        const cur = list[at];
+        list[at] = Object.assign({}, cur, {
+          parts: (cur.parts || 1) + 1, foundAt: now,
+          bytes: Math.max(cur.bytes || 0, (meta && meta.bytes) || 0),
+        });
+        return { tabMedia, tabManifests };
+      }
+    }
+
     let added = false;
     if (at >= 0) {
       // seen again, this time with its response: the find learns what it is
@@ -289,26 +346,26 @@ function remember(tabId, rawUrl, via, meta) {
       // gets it as a fallback if the canonical one is refused (v0.5.21)
       const alt = cur.alt || (canon.sliced ? rawUrl : "");
       if (!meta) {
-        if (alt === (cur.alt || "")) return { tabMedia };
+        if (alt === (cur.alt || "")) return { tabMedia, tabManifests };
         list[at] = Object.assign({}, cur, { alt });
-        return { tabMedia };
+        return { tabMedia, tabManifests };
       }
       const mime = meta.mime || cur.mime || "";
       const bytes = Math.max(meta.bytes || 0, cur.bytes || 0);
       const asset = cur.asset || efgAsset(rawUrl) || "";
       if (mime === cur.mime && bytes === cur.bytes && alt === (cur.alt || "") &&
           asset === (cur.asset || "")) {
-        return { tabMedia };
+        return { tabMedia, tabManifests };
       }
       list[at] = Object.assign({}, cur, { mime, bytes, alt, asset });
     } else {
       list.push({
-        url, foundAt: Date.now(), via: via || "network",
+        url, foundAt: now, via: via || "network",
         mime: (meta && meta.mime) || "", bytes: (meta && meta.bytes) || 0,
         alt: canon.sliced ? rawUrl : "",
         asset: efgAsset(rawUrl) || "",
+        family, parts: family ? 1 : 0,
       });
-      const now = Date.now();
       tabMedia[tabId] = list
         .filter((m) => now - (m.foundAt || 0) < KEEP_MS)
         .slice(-KEEP_PER_TAB);
@@ -317,7 +374,9 @@ function remember(tabId, rawUrl, via, meta) {
     if (added && action && action.setBadgeText) {
       action.setBadgeText({ tabId, text: String(tabMedia[tabId].length) });
     }
-    return added ? { tabMedia, reqHeaders: prune(reqHeaders) } : { tabMedia };
+    return added
+      ? { tabMedia, reqHeaders: prune(reqHeaders), tabManifests }
+      : { tabMedia, tabManifests };
   });
   // After the write, so the answer finds the find it belongs to; the probe's
   // own guard keeps every later slice of the same address from asking again.
@@ -521,11 +580,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // Through the same chain as every other write: a tab closing mid-stream is
   // exactly when an un-chained read-modify-write would resurrect its finds, or
   // drop another tab's.
-  update(({ tabMedia, tabPoster, tabMse }) => {
+  update(({ tabMedia, tabPoster, tabMse, tabManifests }) => {
     delete tabMedia[tabId];
     delete tabPoster[tabId];
     delete tabMse[tabId];
-    return { tabMedia, tabPoster, tabMse };
+    delete tabManifests[tabId];
+    return { tabMedia, tabPoster, tabMse, tabManifests };
   });
 });
 
@@ -538,14 +598,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // so the URL is always there when it matters (no new permission: this needs
   // the one it already has).
   if (!changeInfo || !changeInfo.url) return;
-  update(({ tabMedia, tabPoster, tabMse }) => {
+  update(({ tabMedia, tabPoster, tabMse, tabManifests }) => {
     if (tabMedia[tabId]) {
       delete tabMedia[tabId];
       delete tabPoster[tabId];
       delete tabMse[tabId];
+      delete tabManifests[tabId];
       if (action && action.setBadgeText) action.setBadgeText({ tabId, text: "" });
     }
-    return { tabMedia, tabPoster, tabMse };
+    return { tabMedia, tabPoster, tabMse, tabManifests };
     });
 });
 
@@ -567,9 +628,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg && msg.type === "getMedia") {
-    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, tabPoster: {}, tabMse: {} },
-      ({ tabMedia, reqHeaders, tabPoster, tabMse }) => {
-      const items = (tabMedia[msg.tabId] || []).map((m) => ({
+    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, tabPoster: {}, tabMse: {},
+                               tabManifests: {} },
+      ({ tabMedia, reqHeaders, tabPoster, tabMse, tabManifests }) => {
+      const held = tabMedia[msg.tabId] || [];
+      // pinned manifests ride in front even after the ring has moved on: they
+      // are the only rows that can explain the segments (v0.5.32)
+      const pinned = Object.entries((tabManifests || {})[msg.tabId] || {})
+        .filter(([u]) => !held.some((m) => m.url === u))
+        .map(([u, at]) => ({ url: u, foundAt: at, via: "manifest",
+                             mime: "", bytes: 0, alt: "", asset: "",
+                             family: "", parts: 0 }));
+      const items = pinned.concat(held).map((m) => ({
         url: m.url,
         alt: m.alt || "",
         foundAt: m.foundAt,
@@ -577,6 +647,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         mime: m.mime || "",
         bytes: m.bytes || 0,
         asset: m.asset || "",
+        family: m.family || "",
+        parts: m.parts || 0,
         hasHeaders: !!reqHeaders[m.url],
       }));
       sendResponse({ items,

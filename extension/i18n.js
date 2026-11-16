@@ -25,6 +25,7 @@ const I18N = {
   "Quick download — best quality": "Unduh cepat — kualitas terbaik",
   "Download this page with the app": "Unduh halaman ini dengan aplikasi",
   "This player streams through JavaScript": "Pemutar ini menyiarkan lewat JavaScript",
+  "{n} parts": "{n} bagian",
   "The extension can only offer files the page fetches as addresses. Let the app fetch the page itself — the button below does that.":
     "Ekstensi hanya bisa menawarkan berkas yang diambil halaman sebagai alamat. Biarkan aplikasi mengambil halamannya sendiri — tombol di bawah melakukannya.",
   "For friends-only or unlisted videos: the app fetches the page itself, with the cookies in its Settings → Authentication.":
