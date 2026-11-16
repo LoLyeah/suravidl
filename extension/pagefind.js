@@ -33,6 +33,18 @@
     } catch (_) { /* a sniffer must never break the page */ }
   }
 
+  // A blob:/MediaSource source is a marker, not a URL (v0.5.31): it proves the
+  // player is fed by JavaScript, which is exactly the case where a network
+  // sniffer sees fragments and slices instead of a file. The phone's browser
+  // has always reported this; the desktop shell now says it too, so the popup
+  // can point at the page door instead of "nothing playing".
+  let mseSaid = false;
+  function reportMse() {
+    if (mseSaid) return;
+    mseSaid = true;
+    try { api.runtime.sendMessage({ type: "pageMse" }); } catch (_) {}
+  }
+
   let posterLast = "";
   function reportPoster(raw) {
     try {
@@ -89,7 +101,8 @@
       const vids = document.querySelectorAll("video");
       for (const el of document.querySelectorAll(MEDIA_TAGS)) {
         const s = el.currentSrc || el.src;
-        if (s) report(s, "player");
+        if (s && /^(blob|mediasource):/i.test(s)) reportMse();
+        else if (s) report(s, "player");
         // the player's poster is a picture of what is playing, and the only
         // one available when the stream is HLS — but only when there is ONE
         // video on the page: on a feed the last swept element is an ad or a

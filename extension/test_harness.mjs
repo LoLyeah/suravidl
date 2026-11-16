@@ -362,6 +362,19 @@ const gotAsset = await new Promise((resolve) => {
 ok(gotAsset && gotAsset.items.some((i) => i.url === assetUrl && i.asset === "4242"),
    "the asset id in efg reaches the popup with the find");
 
+// 1h. an MSE marker lands per tab and reaches the popup (v0.5.31): a player
+// fed by JavaScript leaves no file on the wire, and the popup must say so
+onMessage({ type: "pageMse" }, { tab: { id: 7 } }, () => {});
+await settle();
+const gotMse = await new Promise((resolve) => {
+  onMessage({ type: "getMedia", tabId: 7 }, {}, resolve);
+});
+ok(gotMse && gotMse.mse === true, "the tab remembers its player is fed by JavaScript");
+const gotNoMse = await new Promise((resolve) => {
+  onMessage({ type: "getMedia", tabId: 19 }, {}, resolve);
+});
+ok(gotNoMse && gotNoMse.mse === false, "…and another tab is not tarred with it");
+
 // 1f. a scroll leaves old videos behind: a find past the window is dropped
 // when the next one arrives, so the list is the last few minutes, not the
 // session (v0.5.23)
@@ -916,7 +929,7 @@ ok(batched && batched.ok && batched.queued === 2,
                  "cardhint", "onevideo", "onethumb", "onemeta", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList",
-                 "pagedoor", "pagedl"];
+                 "pagedoor", "pagedl", "emptyHead", "emptySub"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
@@ -1374,6 +1387,23 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.30: a page that is not a video page keeps the door shut");
     ff.store.tabMedia = {};
 
+    // — v0.5.31: a JS-fed player is named, not denied. "Nothing playing yet"
+    //   is a lie when the page is streaming through MediaSource —
+    ff.tabUrl = "https://www.tiktok.com/@someone/video/123";
+    ff.store.tabMedia = {};
+    ff.store.tabMse = { 7: Date.now() };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.31: the popup must load with an MSE marker (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.empty.hidden === false &&
+       nodes.emptyHead.textContent === "This player streams through JavaScript",
+       "v0.5.31: an empty page with an MSE marker says why");
+    ff.store.tabMse = {};
+
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());
     try { new Function(popupFull)(); }
@@ -1479,8 +1509,8 @@ ok(batched && batched.ok && batched.queued === 2,
     ],
   });
   await settle();
-  ok(r.sent.length && r.sent.every((m) => m.type === "pageFind"),
-     "page side: reports are pageFind messages");
+  ok(r.sent.length && r.sent.every((m) => m.type === "pageFind" || m.type === "pageMse"),
+     "page side: reports are finds and markers, nothing else");
   ok(r.sent.some((m) => m.url === "https://cdn/from-player-noext" && m.via === "player"),
      "page side: a player source is reported whatever it looks like");
   ok(!r.sent.some((m) => /^blob:/.test(m.url)),
@@ -1493,6 +1523,8 @@ ok(batched && batched.ok && batched.queued === 2,
      "page side: a video-initiated timeline request is evidence");
   ok(!r.sent.some((m) => m.url === "https://cdn/logo.png"),
      "page side: the scan keeps network noise out");
+  ok(r.sent.filter((m) => m.type === "pageMse").length === 1,
+     "page side: a blob source is reported once as an MSE marker (v0.5.31)");
 
   const late = [];
   const r2 = runPage({ els: late });

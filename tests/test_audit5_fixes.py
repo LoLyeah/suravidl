@@ -226,7 +226,7 @@ def test_get_without_the_key_answers_401_not_the_token(tmp_path):
 
 def test_a_content_script_cannot_reach_the_privileged_actions():
     bg = (EXT / "background.js").read_text(encoding="utf-8")
-    assert ('const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster"]);'
+    assert ('const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster", "pageMse"]);'
             in bg), "a content script may only ever report a sighting"
     assert "&& !(msg && REPORT_ONLY.has(msg.type))" in bg
     assert 'sendResponse({ ok: false, error: "refused" })' in bg

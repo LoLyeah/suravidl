@@ -62,7 +62,8 @@ let storageChain = Promise.resolve();
 function update(mutate) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {}, tabPoster: {} }, (data) => {
+      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {},
+                           tabPoster: {}, tabMse: {} }, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -520,10 +521,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // Through the same chain as every other write: a tab closing mid-stream is
   // exactly when an un-chained read-modify-write would resurrect its finds, or
   // drop another tab's.
-  update(({ tabMedia, tabPoster }) => {
+  update(({ tabMedia, tabPoster, tabMse }) => {
     delete tabMedia[tabId];
     delete tabPoster[tabId];
-    return { tabMedia, tabPoster };
+    delete tabMse[tabId];
+    return { tabMedia, tabPoster, tabMse };
   });
 });
 
@@ -536,21 +538,22 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // so the URL is always there when it matters (no new permission: this needs
   // the one it already has).
   if (!changeInfo || !changeInfo.url) return;
-  update(({ tabMedia, tabPoster }) => {
+  update(({ tabMedia, tabPoster, tabMse }) => {
     if (tabMedia[tabId]) {
       delete tabMedia[tabId];
       delete tabPoster[tabId];
+      delete tabMse[tabId];
       if (action && action.setBadgeText) action.setBadgeText({ tabId, text: "" });
     }
-    return { tabMedia, tabPoster };
-  });
+    return { tabMedia, tabPoster, tabMse };
+    });
 });
 
 // The only messages a CONTENT SCRIPT may send: sightings. Everything else
 // here drives the engine or reads stored state, and belongs to the
 // extension's own pages, which carry no tab (v0.46.10 audit B/F2; v0.5.27
 // added the player's poster to the sightings, nothing else).
-const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster"]);
+const REPORT_ONLY = new Set(["pageFind", "pkFind", "pagePoster", "pageMse"]);
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   // v0.46.10 audit B/F2: pagefind.js runs in every frame of every page, so a
@@ -564,8 +567,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return false;
   }
   if (msg && msg.type === "getMedia") {
-    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, tabPoster: {} },
-      ({ tabMedia, reqHeaders, tabPoster }) => {
+    chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, tabPoster: {}, tabMse: {} },
+      ({ tabMedia, reqHeaders, tabPoster, tabMse }) => {
       const items = (tabMedia[msg.tabId] || []).map((m) => ({
         url: m.url,
         alt: m.alt || "",
@@ -577,7 +580,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         hasHeaders: !!reqHeaders[m.url],
       }));
       sendResponse({ items,
-        poster: ((tabPoster || {})[msg.tabId] || {}).url || "" });
+        poster: ((tabPoster || {})[msg.tabId] || {}).url || "",
+        mse: !!(tabMse || {})[msg.tabId] });
     });
     return true; // async response
   }
@@ -608,6 +612,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === "recentJobs") {
     recentJobs().then(sendResponse);
     return true;
+  }
+  if (msg && msg.type === "pageMse") {
+    // the player is fed by JavaScript: a fact worth keeping per tab, because
+    // it changes what the popup should say when it has no file to offer
+    const tabId = _sender && _sender.tab ? _sender.tab.id : undefined;
+    if (typeof tabId === "number" && tabId >= 0) {
+      update(({ tabMse }) => {
+        tabMse[tabId] = Date.now();
+        return { tabMse };
+      });
+      sendResponse({ ok: true });
+      return false;
+    }
+    sendResponse({ ok: false });
+    return false;
   }
   if (msg && msg.type === "pagePoster") {
     // the player's own poster is the one picture available for a stream the

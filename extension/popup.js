@@ -32,6 +32,7 @@ let INPUTS = [];     // the live row checkboxes, in list order
 let SHOW_PARTS = false;  // a stream's variants/audio unfold on demand
 let SHOW_OLDER = false;  // the finds from before the newest video, on demand
 let POSTER = "";    // the player's own poster image for this page, when it has one
+let MSE = false;    // the player is fed by JavaScript: no file is on the wire
 
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
@@ -651,10 +652,20 @@ function renderCards(groups) {
   });
 }
 
+function emptyLooksJsFed() {
+  return MSE && !ITEMS.length;
+}
+
 function render() {
   const vis = visibleItems();
   $("found").hidden = vis.length === 0;
   $("empty").hidden = vis.length > 0;
+  // a JS-fed player leaves nothing to list; saying "nothing playing" would be
+  // a lie, and the page door below is the route that works (v0.5.31)
+  if (emptyLooksJsFed()) {
+    $("emptyHead").textContent = t("This player streams through JavaScript");
+    $("emptySub").textContent = t("The extension can only offer files the page fetches as addresses. Let the app fetch the page itself — the button below does that.");
+  }
   if (!vis.length) return;
 
   if (TAB && TAB.url) {
@@ -989,6 +1000,7 @@ $("rescan").onclick = () => location.reload();
   const res = await api.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
   ITEMS = (res && res.items) || [];
   POSTER = (res && res.poster) || "";
+  MSE = !!(res && res.mse);
   try {
     RANK = await api.runtime.sendMessage({ type: "rank", items: ITEMS });
     SHAPE = await api.runtime.sendMessage({
