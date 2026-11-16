@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.13",
+        "title": "The take",
+        "items": [
+            "On a phone the play sheet stops fighting itself: a long title clamps to two lines, and Mark in, Mark out, Cut this take and Close sit in a tidy two-by-two instead of one squeezed row.",
+            "The picture is capped a little shorter on a phone so the controls above it stay on screen with it.",
+        ],
+    },
+    {
         "version": "0.49.12",
         "title": "The handle",
         "items": [
@@ -86,13 +94,6 @@ ENTRIES = [
         "title": "The day",
         "items": [
             "Light mode's weakest controls, fixed: a disabled START stays in the accent family instead of turning dusty blue, the quick action stops looking like an empty field, and unlit scope lamps are hollow rings.",
-        ],
-    },
-    {
-        "version": "0.49.3",
-        "title": "The ellipsis",
-        "items": [
-            "Long paths in the folder, rate and proxy fields end in an ellipsis instead of cutting a token in half — long-press shows the whole value.",
         ],
     },
 

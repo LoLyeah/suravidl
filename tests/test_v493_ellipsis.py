@@ -19,10 +19,11 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 APP = (ROOT / "src" / "suravidl_engine" / "web" / "app.js").read_text()
 
 
-def test_the_notes_still_carry_this_release():
+def test_the_notes_retired_this_entry_and_the_fix_stays():
+    # v0.49.13 pushed "The ellipsis" (0.49.3) out of the ten-entry card; the
+    # machine fields below still ellipsise
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.49.3" and e["title"].lower() == "the ellipsis"
-               for e in ENTRIES)
+    assert not any(e["version"] == "0.49.3" for e in ENTRIES)
 
 
 def test_the_machine_fields_ellipsise():
