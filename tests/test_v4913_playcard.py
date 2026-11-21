@@ -35,8 +35,9 @@ def phone_block() -> str:
 
 
 def test_the_notes_name_this_release():
-    assert ENTRIES[0]["version"] == "0.49.13"
-    assert ENTRIES[0]["title"].lower() == "the take"
+    # the entry survives in the card even after a newer release takes slot 0
+    assert any(e["version"] == "0.49.13" and e["title"].lower() == "the take"
+               for e in ENTRIES)
 
 
 def test_the_head_becomes_a_two_by_two():

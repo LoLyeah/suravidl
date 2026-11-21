@@ -247,10 +247,41 @@ jobs:
         run: |
           python3 scripts/generate_release_manifest.py dist \
               --tag "$REF_NAME" --repo "${{ github.repository }}"
+      # GitHub's own notes are a compare link here: every release is a direct
+      # commit to main, so there are no pull requests to list. The script
+      # writes the release's own what's-new entry plus the commits since the
+      # previous tag, grouped by kind (v0.49.14).
+      - name: Write the release notes
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: python3 scripts/release_notes.py --tag "$REF_NAME" --out "$RUNNER_TEMP/RELEASE_NOTES.md"
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/RELEASE_NOTES.md
+      # The changelog is generated, never hand-edited: one entry per tag, the
+      # same text the release page carries. Committed back to main after the
+      # release, with a rebase retry because a shared branch moves.
+      - name: Update CHANGELOG.md
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -e
+          python3 scripts/release_notes.py --all --out CHANGELOG.md
+          git config user.name "suravidl release"
+          git config user.email "suravidl@fritzkier.com"
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "changelog already current"
+            exit 0
+          fi
+          git commit -m "docs: changelog for $REF_NAME"
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main
+            if git push origin HEAD:main; then break; fi
+            sleep 10
+          done
+
       # The release was created with GITHUB_TOKEN: events it produces do not
       # start other workflows (GitHub's anti-recursion rule) -- except
       # workflow_dispatch, which is exactly this call. The android run then

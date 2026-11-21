@@ -15,6 +15,14 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.14",
+        "title": "The heading",
+        "items": [
+            "The play card's header on a desktop stops shoving itself apart: a long title shrinks and clamps to two lines instead of running off the card's left edge.",
+            "Mark in, Mark out, Cut this take and Close keep their words on one line, however narrow the row gets.",
+        ],
+    },
+    {
         "version": "0.49.13",
         "title": "The take",
         "items": [
@@ -87,13 +95,6 @@ ENTRIES = [
         "title": "The gap",
         "items": [
             "The dashed hint no longer sits flush against the TAKE plate — one 16px step, like every other gap on the deck.",
-        ],
-    },
-    {
-        "version": "0.49.4",
-        "title": "The day",
-        "items": [
-            "Light mode's weakest controls, fixed: a disabled START stays in the accent family instead of turning dusty blue, the quick action stops looking like an empty field, and unlit scope lamps are hollow rings.",
         ],
     },
 

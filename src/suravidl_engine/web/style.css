@@ -1365,6 +1365,17 @@ html[data-theme="light"] .modal { box-shadow: var(--shadow), inset 0 1px 0 var(-
 .modal.wide { max-width: 760px; }
 .modal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .modal-head h2 { margin: 0; }
+/* The head is a row of buttons with a title beside them (v0.49.14). A title
+   with no spaces has a min-content width as wide as the whole token, so it
+   refused to shrink: it ran off the card's left edge and squeezed the four
+   buttons until "Mark in" broke into two lines and "Cut this take" into
+   three. Let the title shrink and clamp; keep every button's words whole. */
+.modal-head .title {
+  flex: 1 1 auto; min-width: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere; line-height: 1.35;
+}
+.modal-head .btn { flex: 0 0 auto; white-space: nowrap; }
 .modal-foot { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .modal-foot.right { justify-content: flex-end; }
 .confirm-msg { font-size: 14px; line-height: 1.5; }
