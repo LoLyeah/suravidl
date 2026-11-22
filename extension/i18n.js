@@ -26,6 +26,16 @@ const I18N = {
   "Download this page with the app": "Unduh halaman ini dengan aplikasi",
   "This player streams through JavaScript": "Pemutar ini menyiarkan lewat JavaScript",
   "{n} parts": "{n} bagian",
+  "suravidl needs its API token": "suravidl membutuhkan token API",
+  "The app refuses every download without it, so nothing on this page can be sent yet.":
+    "Aplikasi menolak setiap unduhan tanpa token ini, jadi belum ada yang bisa dikirim dari halaman ini.",
+  "In the app: Settings → Authentication → Show token. Paste it into the extension's options.":
+    "Di aplikasi: Pengaturan → Autentikasi → Tampilkan token. Tempel di opsi ekstensi.",
+  "Open the token settings": "Buka pengaturan token",
+  "API token (required)": "Token API (wajib)",
+  "No token saved: every download will be refused with 401 until you paste one here.":
+    "Belum ada token: setiap unduhan akan ditolak dengan 401 sampai kamu menempelkannya di sini.",
+  "saved — but no token: downloads will be refused": "tersimpan — tapi tanpa token: unduhan akan ditolak",
   "The extension can only offer files the page fetches as addresses. Let the app fetch the page itself — the button below does that.":
     "Ekstensi hanya bisa menawarkan berkas yang diambil halaman sebagai alamat. Biarkan aplikasi mengambil halamannya sendiri — tombol di bawah melakukannya.",
   "For friends-only or unlisted videos: the app fetches the page itself, with the cookies in its Settings → Authentication.":

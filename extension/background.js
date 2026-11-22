@@ -1079,9 +1079,16 @@ async function resolveEngine() {
 // token is not configured yet — the popup's "not running" state is about
 // the app, not about credentials.
 async function engineState() {
+  // The token is not optional and not discoverable: the engine answers 401 to
+  // everything without it, so "is one saved?" is part of the state the popup
+  // needs before it offers a single door (unreleased).
+  const stored = await api.storage.local.get({ engineToken: "" });
+  const hasToken = !!String(stored.engineToken || "").trim();
   const eng = await resolveEngine();
-  if (!eng.ok) return { ok: false, error: "cannot reach the engine at " + eng.base };
-  return { ok: true, version: eng.version, url: eng.base };
+  if (!eng.ok) {
+    return { ok: false, hasToken, error: "cannot reach the engine at " + eng.base };
+  }
+  return { ok: true, hasToken, version: eng.version, url: eng.base };
 }
 
 // Hand the find over (v0.39.0): the engine probes the stream itself — with

@@ -25,15 +25,18 @@
                placeholder="http://127.0.0.1:8787" />
         <p class="hint" data-i18n="Usually http://127.0.0.1:8787 — leave it unless you changed the port.">Usually http://127.0.0.1:8787 — leave it unless you changed the port.</p>
 
-        <label for="engineToken" data-i18n="API token">API token</label>
+        <label for="engineToken" data-i18n="API token (required)">API token (required)</label>
         <div class="tokenrow">
-          <input id="engineToken" type="password" spellcheck="false"
+          <input id="engineToken" type="password" spellcheck="false" required
+                 aria-required="true"
                  placeholder="from suravidl → Settings → Authentication"
                  data-i18n-ph="from suravidl → Settings → Authentication" />
           <button id="reveal" class="reveal" type="button"
                   aria-label="Show the token" data-i18n="Show">Show</button>
         </div>
         <p class="hint" data-i18n="In the app: Settings → Authentication → Show token.">In the app: Settings → Authentication → Show token.</p>
+        <p class="hint warn" id="tokenWarn" hidden
+           data-i18n="No token saved: every download will be refused with 401 until you paste one here.">No token saved: every download will be refused with 401 until you paste one here.</p>
 
         <div class="row">
           <button id="save" class="save" type="button" data-i18n="Save">Save</button>

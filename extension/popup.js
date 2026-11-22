@@ -1005,6 +1005,18 @@ $("rescan").onclick = () => location.reload();
     $("down").hidden = false;
     $("found").hidden = true;
     $("empty").hidden = true;
+    $("pagedoor").hidden = true;
+    return;
+  }
+  if (state.hasToken === false) {
+    // No token: every door ends in 401. Say it before a person downloads and
+    // then wonders why the app refused (unreleased).
+    $("token").hidden = false;
+    $("found").hidden = true;
+    $("empty").hidden = true;
+    $("pagedoor").hidden = true;
+    const open = $("tokenOpts");
+    if (open) open.onclick = () => api.runtime.openOptionsPage();
     return;
   }
   try {

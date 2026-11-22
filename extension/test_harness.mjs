@@ -608,7 +608,10 @@ ok(batched && batched.ok && batched.queued === 2,
   const ff = {
     listeners: { beforeRequest: [], beforeSendHeaders: [], headersReceived: [],
                  beforeRedirect: [] },
-    spec: null, store: {}, badge: {}, fetchCalls: [], onRemoved: [], onUpdated: [], onMessage: null,
+    // a configured install is the normal case; the no-token state has its own
+    // test and would otherwise turn every popup test into that plate
+    spec: null, store: { engineToken: "test-token" }, badge: {}, fetchCalls: [],
+    onRemoved: [], onUpdated: [], onMessage: null,
     jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
     batchStatus: 200, batchSkipped: false, jobsList: null, jobsListStatus: 200,
   };
@@ -956,13 +959,13 @@ ok(batched && batched.ok && batched.queued === 2,
                  "cardhint", "onevideo", "onethumb", "onemeta", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList",
-                 "pagedoor", "pagedl", "emptyHead", "emptySub"];
+                 "pagedoor", "pagedl", "emptyHead", "emptySub", "token", "tokenOpts"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
       for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent",
-                        "cards", "cardhint", "onevideo", "pagedoor"]) {
+                        "cards", "cardhint", "onevideo", "pagedoor", "token"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -1489,6 +1492,34 @@ ok(batched && batched.ok && batched.queued === 2,
     const feedSent = feedBody && JSON.parse(feedBody.opts.body);
     ok(feedSent && !feedSent.page_url,
        "v0.49.15: a feed's card sends no page_url");
+    ff.store.tabMedia = {};
+
+    // — v0.5.33 (unreleased): no token means nothing works, and the popup says
+    //   so before a person presses a door that can only 401 —
+    ff.store.engineToken = "";
+    ff.store.tabMedia = {};
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.5.33: the popup must load without a token (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.token.hidden === false &&
+       nodes.found.hidden === true && nodes.empty.hidden === true,
+       "v0.5.33: no token says so, instead of showing a list it cannot send");
+    ok(nodes.pagedoor.hidden === true,
+       "v0.5.33: …and the page door is off too");
+    ok(typeof nodes.tokenOpts.onclick === "function",
+       "v0.5.33: the plate opens the token settings");
+
+    ff.store.engineToken = "test-token";
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); } catch (e) { /* measured above */ }
+    await settle();
+    await settle();
+    ok(nodes.token.hidden === true,
+       "v0.5.33: a configured install never sees that plate");
     ff.store.tabMedia = {};
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —

@@ -79,6 +79,8 @@ input[type="text"]:focus, input[type="password"]:focus {
   line-height: 1.5;
 }
 .hint b { color: var(--muted); font-weight: 600; }
+/* an empty token is a broken setup, not a preference */
+.hint.warn { color: var(--err, #ff8a80); }
 
 .row { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
 
