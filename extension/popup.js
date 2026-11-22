@@ -1018,6 +1018,20 @@ $("rescan").onclick = () => location.reload();
     $("pagedoor").hidden = true;
     return;
   }
+  // The other direction: the extension is newer than the app it is talking
+  // to. Without this the pair fails one door at a time (unreleased).
+  if (state.api && state.api < 2) {
+    $("oldext").hidden = false;
+    $("found").hidden = true;
+    $("empty").hidden = true;
+    $("pagedoor").hidden = true;
+    const say = $("oldextSay");
+    if (say) {
+      say.textContent = t("This extension is newer than the app (v{v}). Update the app from its own window.",
+                          { v: state.version || "?" });
+    }
+    return;
+  }
   const mine = (api.runtime.getManifest && api.runtime.getManifest().version) || "";
   if (state.minExtension && versionLess(mine, state.minExtension)) {
     // The app has moved on and this build does not speak its language: say so

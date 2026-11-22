@@ -33,6 +33,8 @@ const I18N = {
     "Di aplikasi: Pengaturan → Autentikasi → Tampilkan token. Tempel di opsi ekstensi.",
   "Open the token settings": "Buka pengaturan token",
   "This extension is older than the app": "Ekstensi ini lebih lama dari aplikasinya",
+  "This extension is newer than the app (v{v}). Update the app from its own window.":
+    "Ekstensi ini lebih baru dari aplikasinya (v{v}). Perbarui aplikasi dari jendelanya sendiri.",
   "This copy is v{v}; the app needs v{min} or newer.":
     "Salinan ini v{v}; aplikasi butuh v{min} atau lebih baru.",
   "Update it where you installed it — the browser's extensions page, or the store — then reopen the popup.":

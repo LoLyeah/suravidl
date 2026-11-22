@@ -720,7 +720,7 @@ ok(batched && batched.ok && batched.queued === 2,
       const port = (/127\.0\.0\.1:(\d+)\//.exec(url) || [])[1] || "8787";
       if (ff.healthOk && (!ff.enginePort || String(ff.enginePort) === port)) {
         return { ok: true, status: 200, json: async () => ({
-          ok: true, version: "0.39.2", api: 2,
+          ok: true, version: "0.39.2", api: ff.api || 2,
           min_extension: ff.minExtension || "0.5.24" }) };
       }
       throw new Error("connect ECONNREFUSED " + url);
@@ -1546,6 +1546,22 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(/9\.9\.9/.test(nodes.oldextSay.textContent),
        "handshake: …and the plate names the version the app needs");
     ff.minExtension = "0.5.24";
+
+    // — unreleased: the other direction. A newer extension with an older app
+    //   is a mismatch too, and the popup says which side to update —
+    ff.api = 1;
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("handshake: the popup must load against an older app (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.oldext.hidden === false && nodes.found.hidden === true,
+       "handshake: an app older than this extension is named, not stumbled into");
+    ok(/newer than the app/.test(nodes.oldextSay.textContent),
+       "handshake: …and the plate says which side to update");
+    ff.api = 2;
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());

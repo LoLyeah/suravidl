@@ -103,6 +103,25 @@ def test_the_page_retry_replaces_a_silent_file(tmp_path, monkeypatch):
     assert "the sniffed address had no sound" in (job.get("note") or "")
 
 
+def test_ffprobe_follows_the_android_export(tmp_path, monkeypatch):
+    """Android's binaries are libffmpeg.so / libffprobe.so, and the shell
+    exports the exact path — guessing a sibling by suffix found nothing."""
+    probe = tmp_path / "libffprobe.so"
+    probe.write_text("x")
+    monkeypatch.setenv("SURAVIDL_FFPROBE", str(probe))
+    assert _manager(tmp_path)._ffprobe_exe() == str(probe)
+
+
+def test_ffprobe_is_found_beside_a_libffmpeg(tmp_path, monkeypatch):
+    ff = tmp_path / "libffmpeg.so"
+    ff.write_text("x")
+    probe = tmp_path / "libffprobe.so"
+    probe.write_text("x")
+    monkeypatch.delenv("SURAVIDL_FFPROBE", raising=False)
+    monkeypatch.setenv("SURAVIDL_FFMPEG", str(ff))
+    assert _manager(tmp_path)._ffprobe_exe() == str(probe)
+
+
 @needs_ffmpeg
 def test_a_page_copy_that_is_also_silent_is_not_taken(tmp_path, monkeypatch):
     mgr = _manager(tmp_path)

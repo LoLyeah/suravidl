@@ -1896,16 +1896,25 @@ class JobManager:
         job["note"] = "; ".join(filter(None, [job.get("note"), text]))
 
     def _ffprobe_exe(self) -> str:
-        """ffprobe beside the ffmpeg this engine resolved, else from PATH."""
+        """The ffprobe that belongs with this engine's ffmpeg.
+
+        Android exports the exact path (SURAVIDL_FFPROBE) because its binaries
+        are `libffmpeg.so` / `libffprobe.so`, not `ffmpeg` / `ffprobe` — and a
+        sibling guess that only swaps the extension found nothing there, which
+        silently turned the whole check off on the phone (found while
+        re-reading the change, 2026-11-22).
+        """
+        env = os.environ.get("SURAVIDL_FFPROBE", "").strip()
+        if env and Path(env).is_file():
+            return env
         from .cut import ffmpeg_exe
 
         exe = ffmpeg_exe()
-        if not exe:
-            return ""
-        sibling = Path(exe).with_name(
-            "ffprobe" + (Path(exe).suffix if os.name == "nt" else ""))
-        if sibling.is_file():
-            return str(sibling)
+        if exe:
+            path = Path(exe)
+            sibling = path.with_name(path.name.replace("ffmpeg", "ffprobe"))
+            if sibling.is_file():
+                return str(sibling)
         return shutil.which("ffprobe") or ""
 
     def _probe_file(self, path) -> dict | None:
