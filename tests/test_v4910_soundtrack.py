@@ -30,7 +30,8 @@ def test_the_job_door_carries_the_paired_track():
     assert "audio_url: str | None = None" in API
     assert "audio_url=body.audio_url" in API
     params = list(inspect.signature(jobs.JobManager.create).parameters)
-    assert params[-1] == "audio_url"
+    assert "audio_url" in params
+    assert params[-1] == "page_url"      # appended by the silent-file work
 
 
 def test_the_join_says_what_it_could_not_do():

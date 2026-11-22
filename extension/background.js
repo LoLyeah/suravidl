@@ -674,7 +674,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg && msg.type === "sendToEngine") {
-    sendToEngine(msg.url, msg.tabId, msg.audioUrl).then(sendResponse);
+    sendToEngine(msg.url, msg.tabId, msg.audioUrl, msg.pageUrl).then(sendResponse);
     return true;
   }
   if (msg && msg.type === "sendBatch") {
@@ -806,7 +806,7 @@ async function shapeWithEngine(items, tabId) {
   return null;
 }
 
-async function sendToEngine(url, tabId, audioUrl) {
+async function sendToEngine(url, tabId, audioUrl, pageUrl) {
   url = await resolveShareUrl(url);
   const stored = await api.storage.local.get({ engineToken: "", reqHeaders: {} });
   const captured = (stored.reqHeaders[url] && stored.reqHeaders[url].headers) || {};
@@ -826,6 +826,9 @@ async function sendToEngine(url, tabId, audioUrl) {
       body: JSON.stringify({ url, headers: captured,
                              // a feed's soundtrack, paired by the popup
                              audio_url: audioUrl || undefined,
+                             // the page this find came from: a silent result
+                             // retries through it once (unreleased)
+                             page_url: pageUrl || undefined,
                              xor_key: (await pkFor(tabId)) || undefined }),
     });
   } catch (e) {

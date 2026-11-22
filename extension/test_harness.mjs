@@ -1447,6 +1447,50 @@ ok(batched && batched.ok && batched.queued === 2,
        "v0.5.31: an empty page with an MSE marker says why");
     ff.store.tabMse = {};
 
+    // — v0.49.15 (unreleased): the quick door tells the engine which page the
+    //   find came from, so a silent download can retry through it. Only when
+    //   the page holds ONE video — on a feed the URL names the feed —
+    ff.tabUrl = "https://www.facebook.com/reel/1234567890";
+    ff.store.tabManifests = {};
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn.fb/pic.mp4?oh=1", foundAt: Date.now() - 800,
+        via: "network", mime: "video/mp4", bytes: 5242880, alt: "" },
+      { url: "https://cdn.fb/snd.m4a?oh=2", foundAt: Date.now() - 700,
+        via: "network", mime: "audio/mp4", bytes: 900000, alt: "" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("v0.49.15: the popup must load with one video (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ff.fetchCalls.length = 0;
+    await nodes.quick.onclick();
+    const oneBody = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const oneSent = oneBody && JSON.parse(oneBody.opts.body);
+    ok(oneSent && oneSent.page_url === ff.tabUrl,
+       "v0.49.15: a one-video page rides with the job as page_url");
+
+    // two videos on the page: the tab URL names the feed, not either video
+    ff.store.tabMedia = { 7: [
+      { url: "https://cdn.fb/a.mp4?oh=1", foundAt: Date.now() - 90000,
+        via: "network", mime: "video/mp4", bytes: 3000000, alt: "" },
+      { url: "https://cdn.fb/b.mp4?oh=2", foundAt: Date.now() - 1000,
+        via: "network", mime: "video/mp4", bytes: 3000000, alt: "" },
+    ] };
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); } catch (e) { /* measured above */ }
+    await settle();
+    await settle();
+    ff.fetchCalls.length = 0;
+    await nodes.cards.children[0].children[1].children[1].children[0].onclick();
+    const feedBody = ff.fetchCalls.filter((c) => c.url.endsWith("/jobs")).pop();
+    const feedSent = feedBody && JSON.parse(feedBody.opts.body);
+    ok(feedSent && !feedSent.page_url,
+       "v0.49.15: a feed's card sends no page_url");
+    ff.store.tabMedia = {};
+
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());
     try { new Function(popupFull)(); }

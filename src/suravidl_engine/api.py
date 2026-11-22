@@ -62,6 +62,10 @@ class JobRequest(BaseModel):
     # a feed serves picture and sound as two files; the extension sends the
     # pair, and the engine joins them into one download (v0.5.24)
     audio_url: str | None = None
+    # the page this find came from: when a download lands silent, the engine
+    # retries once through the page itself, where yt-dlp reads the whole
+    # manifest instead of one sniffed address (unreleased)
+    page_url: str | None = None
 
 
 class OpenUrlRequest(BaseModel):
@@ -1111,7 +1115,8 @@ def create_app(download_dir, auth_token: str | None = None,
                          raw_args=raw,
                          overrides=overrides,
                          live=body.live,
-                         audio_url=body.audio_url)
+                         audio_url=body.audio_url,
+                         page_url=body.page_url)
         remember_site_quality(body.url, body.fmt)
         return redact_job(job)
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import errno
 import json
+import logging
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import threading
@@ -14,6 +16,8 @@ from collections import deque
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
+
+log = logging.getLogger("suravidl.jobs")
 
 import yt_dlp
 
@@ -737,7 +741,10 @@ class JobManager:
                xor_key: str | None = None,
                # the feed's separate audio track, paired by the extension
                # (v0.5.24) — appended after xor_key for the same reason
-               audio_url: str | None = None) -> dict:
+               audio_url: str | None = None,
+               # the page the find came from: a silent result retries through
+               # it once, where yt-dlp sees the whole manifest (unreleased)
+               page_url: str | None = None) -> dict:
         from .settings import validate_overrides
 
         # a job with no URL is not a job: it would only fail later, in the
@@ -752,6 +759,15 @@ class JobManager:
         why = blocked_reason(url)
         if why:
             raise ValueError(why)
+        # The page a find came from. Kept in memory only: it exists to retry a
+        # silent download through yt-dlp once, not to outlive the run.
+        page_url = (page_url or "").strip() or None
+        if page_url:
+            if len(page_url) > URL_MAX:
+                raise ValueError("that page URL is too long")
+            why = blocked_reason(page_url)
+            if why:
+                raise ValueError(why)
         audio_url = (audio_url or "").strip() or None
         if audio_url:
             if len(audio_url) > URL_MAX:
@@ -832,6 +848,7 @@ class JobManager:
             # in memory only: a resume after a restart downloads the picture
             # alone rather than failing, which is what it did before
             "audio_url": audio_url,
+            "page_url": page_url,
         }
         with self._lock:
             self._jobs[job_id] = job
@@ -1862,6 +1879,77 @@ class JobManager:
     def _note(job: dict, text: str) -> None:
         job["note"] = "; ".join(filter(None, [job.get("note"), text]))
 
+    def _ffprobe_audio(self, path) -> bool | None:
+        """Does this file carry a sound track? None when it cannot be asked.
+
+        A silent file used to be indistinguishable from a good one: the card
+        said "completed" and the person found out when they played it. ffprobe
+        answers in milliseconds, and it sits beside the ffmpeg a mux needs
+        anyway.
+        """
+        from .cut import ffmpeg_exe
+
+        target = Path(str(path or ""))
+        if not target.is_file():
+            return None
+        exe = ffmpeg_exe()
+        if not exe:
+            return None
+        probe = Path(exe).with_name(
+            "ffprobe" + (Path(exe).suffix if os.name == "nt" else ""))
+        probe_str = str(probe) if probe.is_file() else (shutil.which("ffprobe") or "")
+        if not probe_str:
+            return None
+        try:
+            p = subprocess.run(
+                [probe_str, "-v", "error", "-select_streams", "a",
+                 "-show_entries", "stream=index", "-of", "csv=p=0", str(target)],
+                capture_output=True, text=True, timeout=60)
+        except Exception:  # noqa: BLE001 - an unanswerable probe is not a verdict
+            return None
+        if p.returncode != 0:
+            return None
+        return bool((p.stdout or "").strip())
+
+    def _retry_with_page(self, job: dict, opts: dict, target_dir: Path) -> bool:
+        """Fetch the same video through its page, which carries the sound.
+
+        The card door downloads one sniffed address; when that address is a
+        picture-only stream the file is silent. yt-dlp on the page URL reads
+        the whole manifest and muxes both tracks, so a silent result gets one
+        retry there — once, never a loop (Gemini 4 Neon, 2026-11-22).
+        """
+        page = str(job.get("page_url") or "").strip()
+        if not page or page == job.get("url") or job.get("_page_retry"):
+            return False
+        job["_page_retry"] = True
+        try:
+            retry = dict(opts)
+            retry["format"] = "bv*+ba/b"
+            retry["outtmpl"] = str(target_dir / ".sv-page-%(id)s.%(ext)s")
+            retry["overwrites"] = True
+            retry.pop("download_archive", None)
+            info = extract_info(retry, page, download=True) or {}
+            got = (info.get("requested_downloads") or [{}])[0]
+            made = Path(str(got.get("filepath") or info.get("filepath") or ""))
+            if not made.is_file() or self._ffprobe_audio(made) is not True:
+                made.unlink(missing_ok=True)
+                return False
+            old = Path(str(job.get("filepath") or ""))
+            if old.is_file() and made.suffix.lower() == old.suffix.lower():
+                os.replace(made, old)
+                job["filepath"] = str(old)
+                job["files"] = [str(old)]
+            else:
+                old.unlink(missing_ok=True)
+                job["filepath"] = str(made)
+                job["files"] = [str(made)]
+            self._note(job, "the sniffed address had no sound — fetched the page itself")
+            return True
+        except Exception as e:  # noqa: BLE001 - a retry that fails leaves the picture
+            log.warning("page retry failed for %s: %s", job.get("id"), e)
+            return False
+
     def _join_audio(self, job: dict, opts: dict, target_dir: Path) -> None:
         """Fetch the feed's separate audio track and join it to the video.
 
@@ -2211,7 +2299,15 @@ class JobManager:
                 try:
                     self._apply_finish_meta(job)
                 except Exception as e:  # noqa: BLE001 - never fail a good download
-                    self._log(f"finish-meta failed for {job.get('id')}: {e}")
+                    log.warning("finish-meta failed for %s: %s", job.get("id"), e)
+                # A silent file is worse than a visible failure (Gemini 4 Neon,
+                # 2026-11-22): ask the file itself whether it has a sound
+                # track, retry once through the page when it does not, and say
+                # so on the card when even that cannot find one.
+                if self._ffprobe_audio(job.get("filepath")) is False:
+                    if not self._retry_with_page(job, opts, target_dir):
+                        self._note(job, "downloaded without sound — the site "
+                                        "served a picture-only file")
             with self._lock:
                 if _stop_requested(job):
                     # a cancel (or pause) that landed while yt-dlp was finishing

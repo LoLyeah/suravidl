@@ -446,6 +446,10 @@ function refreshDoors() {
 // list); "quick" queues the best quality right now — no window, no choosing.
 async function send(url, mode, audio) {
   if (SENT || !url) return;
+  // The page URL only names THIS video when the page holds one: on a feed it
+  // names the feed, and a retry through it would fetch a stranger. The engine
+  // uses it only when the download lands silent.
+  const pageUrl = clusters(visibleItems()).length === 1 ? pageDoor(TAB) : "";
   const quick = mode === "quick";
   const picks = quick ? checkedUrls() : [];
   const single = !quick || picks.length <= 1;
@@ -461,7 +465,7 @@ async function send(url, mode, audio) {
           // the feed's soundtrack rides with the picture: one job, one
           // playable file, no silent download (v0.5.24)
           ? { type: "sendToEngine", url: picks[0] || url, audioUrl: (audio || ""),
-              tabId: TAB && TAB.id }
+              pageUrl, tabId: TAB && TAB.id }
           : { type: "sendBatch", urls: picks, tabId: TAB && TAB.id })
       : {
           type: "sendHandoff",
