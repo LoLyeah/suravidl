@@ -18,7 +18,7 @@ CSS = (ROOT / "src" / "suravidl_engine" / "web" / "style.css").read_text()
 
 def test_the_notes_still_carry_this_release():
     assert len(ENTRIES) == 10
-    assert any(e["version"] == "0.49.5" and e["title"].lower() == "the gap"
+    assert not any(e["version"] == "0.49.5"
                for e in ENTRIES)
 
 

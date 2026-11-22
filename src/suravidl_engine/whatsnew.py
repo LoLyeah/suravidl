@@ -15,6 +15,16 @@ from . import __version__
 
 ENTRIES = [
     {
+        "version": "0.49.15",
+        "title": "The handshake",
+        "items": [
+            "The app and the browser extension now check each other: an out-of-date copy says so on the spot and names which side to update, instead of failing one download at a time.",
+            "A failed download offers Support info on its own row — versions and the last few failures, no token, cookies or links — and Settings → Advanced copies the same block.",
+            "A download with no sound is caught from the file itself: one retry through the page when that can fix it, and a plain sentence on the card when it cannot.",
+            "A job that cannot fit is refused before it starts, with the free space in the message, and a file shorter than its source says so.",
+        ],
+    },
+    {
         "version": "0.49.14",
         "title": "The heading",
         "items": [
@@ -88,13 +98,6 @@ ENTRIES = [
         "title": "The gate",
         "items": [
             "When the probe says a page has no extractor, Download now and START go dead for that link — with the reason in the tooltip — instead of queueing a download that can only fail.",
-        ],
-    },
-    {
-        "version": "0.49.5",
-        "title": "The gap",
-        "items": [
-            "The dashed hint no longer sits flush against the TAKE plate — one 16px step, like every other gap on the deck.",
         ],
     },
 

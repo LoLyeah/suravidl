@@ -83,7 +83,7 @@ globalThis.chrome = {
   },
   runtime: {
     onMessage: { addListener: (fn) => (onMessage = fn) },
-    getManifest: () => ({ version: "0.5.32" }),
+    getManifest: () => ({ version: "0.5.33" }),
   },
   };
 
@@ -690,7 +690,7 @@ ok(batched && batched.ok && batched.queued === 2,
     } },
     tabs: { query: () => Promise.resolve([{ id: 7, url: ff.tabUrl || "https://example.com/" }]) },
     runtime: { sendMessage: sendToBg, openOptionsPage() {},
-               getManifest: () => ({ version: "0.5.32" }) },
+               getManifest: () => ({ version: "0.5.33" }) },
     menus: {
       create: (props, cb) => { ffMenus.made.push(props); if (cb) cb(); return Promise.resolve(); },
       removeAll: (cb) => { if (cb) cb(); return Promise.resolve(); },

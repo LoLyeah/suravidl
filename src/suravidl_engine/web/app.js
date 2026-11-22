@@ -426,6 +426,10 @@ const STRINGS = { en: {}, id: {
   "Copies versions and the last few failures — no token, no cookies, no links. Paste it into a bug report.":
     "Menyalin versi dan beberapa kegagalan terakhir — tanpa token, tanpa cookie, tanpa tautan. Tempel di laporan bug.",
   "Copy support info": "Salin info dukungan",
+  "Support info": "Info dukungan",
+  "copy versions and the last failures — no secrets":
+    "salin versi dan kegagalan terakhir — tanpa rahasia",
+  "support info copied": "info dukungan tersalin",
   "copy failed — select the text below": "gagal menyalin — pilih teks di bawah",
   "File name length": "Panjang nama file",
   "Short — about 60 letters": "Pendek — sekitar 60 huruf",
@@ -3655,11 +3659,24 @@ function jobRow(j) {
       const ok = await copyText(errText);
       toast(ok ? t("error copied") : t("copy failed"), ok ? "ok" : "bad");
     };
+    // Where the failure is, the report is one click away (unreleased): the
+    // Settings card is three tabs from the thing that just went wrong.
+    const support = el("button", "ghost-sm", t("Support info"));
+    support.title = t("copy versions and the last failures — no secrets");
+    support.onclick = async () => {
+      try {
+        const { ok } = await copyDiagnostics();
+        toast(ok ? t("support info copied") : t("copy failed"),
+              ok ? "ok" : "bad");
+      } catch (e) {
+        toast(String(e), "bad");
+      }
+    };
     const retry = el("button", "ghost-sm", t("Retry"));
     retry.onclick = () => api(`/jobs/${j.id}/retry`, { method: "POST" })
       .then(refreshJobs)
       .catch((e) => toast(t("retry failed: {msg}", { msg: e.message }), "bad"));
-    r.append(copy, retry);
+    r.append(copy, support, retry);
     // a certificate failure is the one case where "checks off" can help:
     // offer it on the row itself (v0.47.19)
     if (j.error && /certificate|SSL/i.test(j.error)) {
@@ -6003,13 +6020,18 @@ function diagText(d) {
   return rows.join("\n");
 }
 
+async function copyDiagnostics() {
+  const d = await api("/diagnostics");
+  const text = diagText(d);
+  const ok = await copyText(text);
+  return { ok, text };
+}
+
 if ($("copyDiag")) {
   $("copyDiag").onclick = async () => {
     $("diagMsg").textContent = "";
     try {
-      const d = await api("/diagnostics");
-      const text = diagText(d);
-      const ok = await copyText(text);
+      const { ok, text } = await copyDiagnostics();
       $("diagOut").textContent = text;
       $("diagOut").classList.remove("hidden");
       $("diagMsg").textContent = ok
