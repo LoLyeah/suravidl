@@ -402,7 +402,7 @@ function loadPatterns() {
         const eng = await resolveEngine();
         if (!eng.ok) return;
         const res = await fetch(eng.base + "/sniff/patterns", {
-          headers: { Authorization: "Bearer " + stored.engineToken },
+          headers: authHeaders(stored.engineToken),
         });
         if (!res.ok) return;
         const body = await res.json();
@@ -763,7 +763,7 @@ async function rankWithEngine(items) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + stored.engineToken,
+        ...authHeaders(stored.engineToken),
       },
       body: JSON.stringify({ urls: items.map((m) => m.url) }),
     });
@@ -791,7 +791,7 @@ async function shapeWithEngine(items, tabId) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + stored.engineToken,
+        ...authHeaders(stored.engineToken),
       },
       body: JSON.stringify({
         urls: items.map((m) => m.url),
@@ -821,7 +821,7 @@ async function sendToEngine(url, tabId, audioUrl, pageUrl) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + stored.engineToken,
+        ...authHeaders(stored.engineToken),
       },
       body: JSON.stringify({ url, headers: captured,
                              // a feed's soundtrack, paired by the popup
@@ -877,7 +877,7 @@ async function sendBatchToEngine(urls, tabId) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + stored.engineToken,
+        ...authHeaders(stored.engineToken),
       },
       body: JSON.stringify(Object.keys(headersByUrl).length
         ? { urls: resolvedList, headers_by_url: headersByUrl,
@@ -995,7 +995,7 @@ async function recentJobs() {
   if (!eng.ok) return { ok: false, jobs: [] };
   try {
     const res = await fetch(eng.base + "/jobs", {
-      headers: { Authorization: "Bearer " + stored.engineToken },
+      headers: authHeaders(stored.engineToken),
       cache: "no-store",
     });
     if (!res.ok) return { ok: false, jobs: [] };
@@ -1035,7 +1035,10 @@ async function probeBase(base, ms = 700) {
     clearTimeout(timer);
     if (!res.ok) return null;
     const body = await res.json();
-    return body && body.ok ? { base, version: body.version || "" } : null;
+    return body && body.ok
+      ? { base, version: body.version || "",
+          minExtension: body.min_extension || "", api: body.api || 0 }
+      : null;
   } catch (_) {
     return null;
   }
@@ -1069,7 +1072,8 @@ async function resolveEngine() {
       if (hit.base !== configured && stored.discoveredUrl !== hit.base) {
         api.storage.local.set({ discoveredUrl: hit.base });
       }
-      return { ok: true, base: hit.base, version: hit.version };
+      return { ok: true, base: hit.base, version: hit.version,
+               minExtension: hit.minExtension || "", api: hit.api || 0 };
     }
   }
   return { ok: false, base: configured };
@@ -1078,6 +1082,21 @@ async function resolveEngine() {
 // Is the engine up? /health needs no token, so this answers even when the
 // token is not configured yet — the popup's "not running" state is about
 // the app, not about credentials.
+// Who we are, on every call (unreleased). The engine refuses an extension
+// older than it supports, and the popup refuses an engine that expects a
+// newer extension — the two update on different clocks (a store review is
+// days; the desktop app updates itself in minutes).
+const EXT_VERSION = (() => {
+  try { return (api.runtime.getManifest && api.runtime.getManifest().version) || ""; }
+  catch (_) { return ""; }
+})();
+
+function authHeaders(token) {
+  const h = { Authorization: "Bearer " + token };
+  if (EXT_VERSION) h["X-Suravidl-Extension"] = EXT_VERSION;
+  return h;
+}
+
 async function engineState() {
   // The token is not optional and not discoverable: the engine answers 401 to
   // everything without it, so "is one saved?" is part of the state the popup
@@ -1088,7 +1107,9 @@ async function engineState() {
   if (!eng.ok) {
     return { ok: false, hasToken, error: "cannot reach the engine at " + eng.base };
   }
-  return { ok: true, hasToken, version: eng.version, url: eng.base };
+  return { ok: true, hasToken, version: eng.version, url: eng.base,
+           minExtension: eng.minExtension || "", api: eng.api || 0,
+           extension: EXT_VERSION };
 }
 
 // Hand the find over (v0.39.0): the engine probes the stream itself — with
@@ -1112,7 +1133,7 @@ async function sendHandoff(url, urls, tabUrl, tabId) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + stored.engineToken,
+        ...authHeaders(stored.engineToken),
       },
       body: JSON.stringify({ url, urls: urls || [], headers: captured,
                              tab_url: tabUrl || "",

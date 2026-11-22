@@ -32,6 +32,11 @@ const I18N = {
   "In the app: Settings → Authentication → Show token. Paste it into the extension's options.":
     "Di aplikasi: Pengaturan → Autentikasi → Tampilkan token. Tempel di opsi ekstensi.",
   "Open the token settings": "Buka pengaturan token",
+  "This extension is older than the app": "Ekstensi ini lebih lama dari aplikasinya",
+  "This copy is v{v}; the app needs v{min} or newer.":
+    "Salinan ini v{v}; aplikasi butuh v{min} atau lebih baru.",
+  "Update it where you installed it — the browser's extensions page, or the store — then reopen the popup.":
+    "Perbarui di tempat kamu memasangnya — halaman ekstensi browser, atau toko — lalu buka ulang popup.",
   "API token (required)": "Token API (wajib)",
   "No token saved: every download will be refused with 401 until you paste one here.":
     "Belum ada token: setiap unduhan akan ditolak dengan 401 sampai kamu menempelkannya di sini.",

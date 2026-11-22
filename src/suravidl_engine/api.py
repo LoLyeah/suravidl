@@ -4,10 +4,12 @@ import json
 import os
 import re
 import secrets
+import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
@@ -165,8 +167,17 @@ class RetryRequest(BaseModel):
     raw_args: str | None = None
 
 
-# one batch is a click, not a crawl: a bigger paste belongs in several goes
 BATCH_MAX = 20
+
+# What an extension must be to talk to this engine (unreleased). The two are
+# updated on different clocks — a store build is reviewed for days while the
+# desktop app updates itself — and a half-old pair fails in ways that look like
+# bugs. The engine advertises both numbers in /health, and refuses a request
+# that declares an older extension rather than quietly doing half the job.
+API_LEVEL = 2
+MIN_EXTENSION = "0.5.24"
+FEATURES = ("audio_url", "page_url", "page_retry", "diagnostics", "ext_version")
+
 
 # Nothing here accepts an upload: every request body is a small JSON
 # document (the largest is a 20-URL batch). A ceiling turns "how big can a
@@ -577,7 +588,36 @@ def create_app(download_dir, auth_token: str | None = None,
         # (the extension and the shells use it for engine discovery) — it
         # must not hand the host's folder layout to every local socket.
         # The UI learns the folder from /settings, which needs the token.
-        return {"ok": True, "version": __version__}
+        #
+        # It DOES say what this engine can do, and which extension it needs
+        # (unreleased): a store build and a desktop build update on different
+        # clocks, and "silently older half" was the source of three separate
+        # support rounds.
+        return {"ok": True, "version": __version__, "api": API_LEVEL,
+                "min_extension": MIN_EXTENSION, "features": FEATURES}
+
+    # -- the handshake (unreleased) --------------------------------------
+    def _ext_version(request: Request) -> str:
+        return (request.headers.get("x-suravidl-extension") or "").strip()
+
+    def _vtuple(text: str) -> tuple:
+        parts = [int(x) for x in re.findall(r"\d+", text or "")[:3]]
+        return tuple(parts + [0] * (3 - len(parts)))
+
+    def _extension_gate(request: Request) -> None:
+        """Refuse an extension older than this engine supports, loudly.
+
+        Silently doing half the job is what turned three bugs into support
+        rounds: the old shell does not send the audio track, the new engine
+        cannot pair what it never received.
+        """
+        declared = _ext_version(request)
+        if declared and _vtuple(declared) < _vtuple(MIN_EXTENSION):
+            raise HTTPException(
+                status_code=409,
+                detail=(f"this browser extension is too old ({declared}); the "
+                        f"app needs {MIN_EXTENSION} or newer — update it where "
+                        "you installed it, then reopen the popup"))
 
     @app.get("/", response_class=HTMLResponse)
     def index(k: str | None = None):
@@ -1006,9 +1046,10 @@ def create_app(download_dir, auth_token: str | None = None,
                               xor_key=body.xor_key)
 
     @app.post("/handoff")
-    def create_handoff(body: HandoffRequest,
+    def create_handoff(body: HandoffRequest, request: Request,
                        _mgr: JobManager = Depends(require_auth)):
         """The extension hands over a find; the probe runs here, engine-side."""
+        _extension_gate(request)
         url = str(body.url or "").strip()
         if not url.startswith(("http://", "https://")):
             raise HTTPException(status_code=400,
@@ -1121,19 +1162,23 @@ def create_app(download_dir, auth_token: str | None = None,
         return redact_job(job)
 
     @app.post("/jobs")
-    def create_job(body: JobRequest, mgr: JobManager = Depends(require_auth)):
+    def create_job(body: JobRequest, request: Request,
+                   mgr: JobManager = Depends(require_auth)):
+        _extension_gate(request)
         try:
             return _queue_one(body, mgr)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
     @app.post("/jobs/batch")
-    def create_jobs(body: BatchJobRequest, mgr: JobManager = Depends(require_auth)):
+    def create_jobs(body: BatchJobRequest, request: Request,
+                    mgr: JobManager = Depends(require_auth)):
         """Queue several links at once (the v0.22 feature review's #5).
 
         One bad link must not cost the user the good ones: each is queued on
         its own and the refusals come back in `skipped`, with the reason.
         """
+        _extension_gate(request)
         urls = [str(u or "").strip() for u in body.urls]
         urls = [u for u in urls if u]
         if not urls:
@@ -1296,16 +1341,22 @@ def create_app(download_dir, auth_token: str | None = None,
                 "count": len(lines), "entries": lines[-200:]}
 
     @app.get("/diagnostics")
-    def get_diagnostics(mgr: JobManager = Depends(require_auth)):
+    def get_diagnostics(request: Request, mgr: JobManager = Depends(require_auth)):
         """The one-paste bug report (v0.46.0): versions, the ffmpeg probe
         summary, redacted settings, the log tail, a jobs summary.
 
         Redaction happens engine-side (diagnostics.build_payload) — the UI
-        never holds the secrets, so it cannot leak them."""
+        never holds the secrets, so it cannot leak them. The handshake fields
+        are added here: which extension asked, and which one this engine
+        expects (unreleased) — the mismatch is the first thing a report shows.
+        """
         from . import diagnostics, logcap
 
-        return diagnostics.build_payload(
+        payload = diagnostics.build_payload(
             settings=settings.get(), logs=logcap.lines(), jobs=mgr.list())
+        payload.update({"api": API_LEVEL, "min_extension": MIN_EXTENSION,
+                        "extension": _ext_version(request) or None})
+        return payload
 
     @app.get("/logs")
     def get_logs(_mgr: JobManager = Depends(require_auth)):

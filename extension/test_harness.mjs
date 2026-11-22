@@ -81,8 +81,11 @@ globalThis.chrome = {
     onUpdated: { addListener: (fn) => onUpdated.push(fn) },
     query() {},
   },
-  runtime: { onMessage: { addListener: (fn) => (onMessage = fn) } },
-};
+  runtime: {
+    onMessage: { addListener: (fn) => (onMessage = fn) },
+    getManifest: () => ({ version: "0.5.32" }),
+  },
+  };
 
 globalThis.fetch = async (url, opts = {}) => {
   fetchCalls.push({ url, opts });
@@ -613,6 +616,7 @@ ok(batched && batched.ok && batched.queued === 2,
     spec: null, store: { engineToken: "test-token" }, badge: {}, fetchCalls: [],
     onRemoved: [], onUpdated: [], onMessage: null,
     jobsStatus: 200, handoffStatus: 200, healthOk: true, enginePort: 0,
+    minExtension: "0.5.24",
     batchStatus: 200, batchSkipped: false, jobsList: null, jobsListStatus: 200,
   };
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -685,7 +689,8 @@ ok(batched && batched.ok && batched.queued === 2,
       set: (obj) => { Object.assign(ff.store, clone(obj)); return Promise.resolve(); },
     } },
     tabs: { query: () => Promise.resolve([{ id: 7, url: ff.tabUrl || "https://example.com/" }]) },
-    runtime: { sendMessage: sendToBg, openOptionsPage() {} },
+    runtime: { sendMessage: sendToBg, openOptionsPage() {},
+               getManifest: () => ({ version: "0.5.32" }) },
     menus: {
       create: (props, cb) => { ffMenus.made.push(props); if (cb) cb(); return Promise.resolve(); },
       removeAll: (cb) => { if (cb) cb(); return Promise.resolve(); },
@@ -714,7 +719,9 @@ ok(batched && batched.ok && batched.queued === 2,
       // the engine's port ladder: ff.enginePort narrows which rung answers
       const port = (/127\.0\.0\.1:(\d+)\//.exec(url) || [])[1] || "8787";
       if (ff.healthOk && (!ff.enginePort || String(ff.enginePort) === port)) {
-        return { ok: true, status: 200, json: async () => ({ ok: true, version: "0.39.2" }) };
+        return { ok: true, status: 200, json: async () => ({
+          ok: true, version: "0.39.2", api: 2,
+          min_extension: ff.minExtension || "0.5.24" }) };
       }
       throw new Error("connect ECONNREFUSED " + url);
     }
@@ -959,13 +966,15 @@ ok(batched && batched.ok && batched.queued === 2,
                  "cardhint", "onevideo", "onethumb", "onemeta", "send",
                  "empty", "down", "retry", "rescan", "quick", "status",
                  "optsLink", "ver", "allbtn", "recent", "recentList",
-                 "pagedoor", "pagedl", "emptyHead", "emptySub", "token", "tokenOpts"];
+                 "pagedoor", "pagedl", "emptyHead", "emptySub", "token", "tokenOpts",
+                 "oldext", "oldextSay"];
     const mkNodes = () => {
       const nodes = {};
       for (const id of ids) nodes[id] = el();
       // mirrors popup.html: these start hidden and the script unhides them
       for (const id of ["found", "empty", "down", "pickgroup", "site", "favicon", "recent",
-                        "cards", "cardhint", "onevideo", "pagedoor", "token"]) {
+                        "cards", "cardhint", "onevideo", "pagedoor", "token",
+                        "oldext"]) {
         nodes[id].hidden = true;
       }
       return nodes;
@@ -1521,6 +1530,22 @@ ok(batched && batched.ok && batched.queued === 2,
     ok(nodes.token.hidden === true,
        "v0.5.33: a configured install never sees that plate");
     ff.store.tabMedia = {};
+
+    // — unreleased: an app that expects a newer extension says so, instead of
+    //   failing one door at a time —
+    ff.minExtension = "9.9.9";
+    nodes = installDom(mkNodes());
+    try { new Function(popupFull)(); }
+    catch (e) {
+      failures.push("handshake: the popup must load against a newer app (" + e + ")");
+    }
+    await settle();
+    await settle();
+    ok(nodes.oldext.hidden === false && nodes.found.hidden === true,
+       "handshake: an out-of-date extension is told, before any door");
+    ok(/9\.9\.9/.test(nodes.oldextSay.textContent),
+       "handshake: …and the plate names the version the app needs");
+    ff.minExtension = "0.5.24";
 
     // — the popup mirrors the engine's jobs, notes and all (v0.5.12) —
     nodes = installDom(mkNodes());

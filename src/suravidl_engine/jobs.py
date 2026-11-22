@@ -19,6 +19,10 @@ from pathlib import Path
 
 log = logging.getLogger("suravidl.jobs")
 
+# A download that cannot start beats one that dies at 97%: below this much
+# free space a job is refused at the door, in words a person can act on.
+DISK_FLOOR_BYTES = 300 * 1024 * 1024
+
 import yt_dlp
 
 from .auth import explain_download_error
@@ -759,6 +763,18 @@ class JobManager:
         why = blocked_reason(url)
         if why:
             raise ValueError(why)
+        # Where this would land, before anything is queued: a full drive is a
+        # failure that looks like a network bug from the other side.
+        target_dir = Path(str(download_dir or self.download_dir))
+        try:
+            free = shutil.disk_usage(str(target_dir)).free
+        except OSError:
+            free = None
+        if free is not None and free < DISK_FLOOR_BYTES:
+            raise ValueError(
+                f"only {free // (1024 ** 2)} MB free where this download would "
+                "land — free some space or choose another folder in Settings")
+
         # The page a find came from. Kept in memory only: it exists to retry a
         # silent download through yt-dlp once, not to outlive the run.
         page_url = (page_url or "").strip() or None
@@ -1879,37 +1895,55 @@ class JobManager:
     def _note(job: dict, text: str) -> None:
         job["note"] = "; ".join(filter(None, [job.get("note"), text]))
 
-    def _ffprobe_audio(self, path) -> bool | None:
-        """Does this file carry a sound track? None when it cannot be asked.
-
-        A silent file used to be indistinguishable from a good one: the card
-        said "completed" and the person found out when they played it. ffprobe
-        answers in milliseconds, and it sits beside the ffmpeg a mux needs
-        anyway.
-        """
+    def _ffprobe_exe(self) -> str:
+        """ffprobe beside the ffmpeg this engine resolved, else from PATH."""
         from .cut import ffmpeg_exe
 
+        exe = ffmpeg_exe()
+        if not exe:
+            return ""
+        sibling = Path(exe).with_name(
+            "ffprobe" + (Path(exe).suffix if os.name == "nt" else ""))
+        if sibling.is_file():
+            return str(sibling)
+        return shutil.which("ffprobe") or ""
+
+    def _probe_file(self, path) -> dict | None:
+        """What the finished file actually is: its streams and its length.
+
+        One call answers three questions that used to reach the person as a
+        "completed" card: is there sound, is there a picture, and is it as long
+        as the source said. None when ffprobe cannot answer — never a guess.
+        """
         target = Path(str(path or ""))
         if not target.is_file():
             return None
-        exe = ffmpeg_exe()
+        exe = self._ffprobe_exe()
         if not exe:
-            return None
-        probe = Path(exe).with_name(
-            "ffprobe" + (Path(exe).suffix if os.name == "nt" else ""))
-        probe_str = str(probe) if probe.is_file() else (shutil.which("ffprobe") or "")
-        if not probe_str:
             return None
         try:
             p = subprocess.run(
-                [probe_str, "-v", "error", "-select_streams", "a",
-                 "-show_entries", "stream=index", "-of", "csv=p=0", str(target)],
+                [exe, "-v", "error", "-show_entries", "stream=codec_type",
+                 "-show_entries", "format=duration", "-of", "json", str(target)],
                 capture_output=True, text=True, timeout=60)
+            if p.returncode != 0:
+                return None
+            data = json.loads(p.stdout or "{}")
         except Exception:  # noqa: BLE001 - an unanswerable probe is not a verdict
             return None
-        if p.returncode != 0:
-            return None
-        return bool((p.stdout or "").strip())
+        kinds = {str(s.get("codec_type") or "")
+                 for s in (data.get("streams") or [])}
+        try:
+            duration = float((data.get("format") or {}).get("duration") or 0)
+        except (TypeError, ValueError):
+            duration = 0.0
+        return {"audio": "audio" in kinds, "video": "video" in kinds,
+                "duration": duration or None}
+
+    def _ffprobe_audio(self, path) -> bool | None:
+        """Does this file carry a sound track? None when it cannot be asked."""
+        probe = self._probe_file(path)
+        return None if probe is None else bool(probe["audio"])
 
     def _retry_with_page(self, job: dict, opts: dict, target_dir: Path) -> bool:
         """Fetch the same video through its page, which carries the sound.
@@ -2304,10 +2338,28 @@ class JobManager:
                 # 2026-11-22): ask the file itself whether it has a sound
                 # track, retry once through the page when it does not, and say
                 # so on the card when even that cannot find one.
-                if self._ffprobe_audio(job.get("filepath")) is False:
-                    if not self._retry_with_page(job, opts, target_dir):
-                        self._note(job, "downloaded without sound — the site "
-                                        "served a picture-only file")
+                probe = self._probe_file(job.get("filepath"))
+                if probe is not None:
+                    if not probe["audio"]:
+                        if not self._retry_with_page(job, opts, target_dir):
+                            self._note(job, "downloaded without sound — the "
+                                            "site served a picture-only file")
+                        probe = self._probe_file(job.get("filepath"))
+                    if probe is not None:
+                        try:
+                            expected = float((info or {}).get("duration") or 0)
+                        except (TypeError, ValueError):
+                            expected = 0.0
+                        got = float(probe.get("duration") or 0)
+                        # A section download is shorter on purpose, and a
+                        # split one is shorter per part: only an untouched
+                        # whole-video job can be judged against the source.
+                        if (expected > 30 and got and got < expected * 0.9
+                                and not opts.get("download_ranges")
+                                and not job.get("split")):
+                            self._note(job, "the file is shorter than the "
+                                            f"source ({int(got)} s of "
+                                            f"{int(expected)} s)")
             with self._lock:
                 if _stop_requested(job):
                     # a cancel (or pause) that landed while yt-dlp was finishing

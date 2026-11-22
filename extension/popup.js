@@ -112,6 +112,16 @@ function clusterKey(m) {
 const PAGE_HOSTS = /^(?:www\.|m\.|mobile\.)?(facebook\.com|fb\.watch|x\.com|twitter\.com|instagram\.com|tiktok\.com|youtube\.com|youtu\.be|vimeo\.com)$/i;
 const PAGE_PATH = /(?:^|\/)(reel|reels|videos?|watch|status|stories|posts?|p|tv)(?:\/|$)|\/status\/\d+/i;
 
+// "0.5.9" < "0.5.24", which string comparison gets wrong.
+function versionLess(a, b) {
+  const num = (v) => String(v || "").split(".").map((x) => parseInt(x, 10) || 0);
+  const [x, y] = [num(a), num(b)];
+  for (let i = 0; i < 3; i += 1) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  }
+  return false;
+}
+
 function pageDoor(tab) {
   try {
     const u = new URL((tab && tab.url) || "");
@@ -1006,6 +1016,21 @@ $("rescan").onclick = () => location.reload();
     $("found").hidden = true;
     $("empty").hidden = true;
     $("pagedoor").hidden = true;
+    return;
+  }
+  const mine = (api.runtime.getManifest && api.runtime.getManifest().version) || "";
+  if (state.minExtension && versionLess(mine, state.minExtension)) {
+    // The app has moved on and this build does not speak its language: say so
+    // instead of failing one door at a time (unreleased).
+    $("oldext").hidden = false;
+    $("found").hidden = true;
+    $("empty").hidden = true;
+    $("pagedoor").hidden = true;
+    const say = $("oldextSay");
+    if (say) {
+      say.textContent = t("This copy is v{v}; the app needs v{min} or newer.",
+                          { v: mine || "?", min: state.minExtension });
+    }
     return;
   }
   if (state.hasToken === false) {

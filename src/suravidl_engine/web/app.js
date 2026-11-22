@@ -422,6 +422,11 @@ const STRINGS = { en: {}, id: {
   "Use cookies from Edge": "Pakai cookie dari Edge",
   "Use cookies from Firefox": "Pakai cookie dari Firefox",
   "Browser cookies: auto-detect": "Cookie browser: deteksi otomatis",
+  "Support": "Dukungan",
+  "Copies versions and the last few failures — no token, no cookies, no links. Paste it into a bug report.":
+    "Menyalin versi dan beberapa kegagalan terakhir — tanpa token, tanpa cookie, tanpa tautan. Tempel di laporan bug.",
+  "Copy support info": "Salin info dukungan",
+  "copy failed — select the text below": "gagal menyalin — pilih teks di bawah",
   "File name length": "Panjang nama file",
   "Short — about 60 letters": "Pendek — sekitar 60 huruf",
   "Standard — about 100 letters": "Standar — sekitar 100 huruf",
@@ -5968,6 +5973,54 @@ async function saveCurrentAsPreset() {
 }
 
 $("optionsBtn").onclick = openOptionsBrowser;
+
+// The support block (unreleased): versions and the last failures, in a shape
+// a person can paste into a message. The engine already strips URLs, cookies
+// and paths — this only formats, and shows the same text it copies so nobody
+// has to trust a clipboard.
+function diagText(d) {
+  const jobs = d.jobs || {};
+  const counts = Object.entries(jobs.counts || {})
+    .map(([k, v]) => k + " " + v).join(", ");
+  // the ffmpeg summary is an object (path, version, encoders), not a string,
+  // and its version line carries a copyright notice that belongs in a log
+  const ffRaw = typeof d.ffmpeg === "string"
+    ? d.ffmpeg : (d.ffmpeg && d.ffmpeg.version) || "unknown";
+  const ff = String(ffRaw).split(" Copyright")[0].trim();
+  const rows = [
+    "suravidl " + d.engine + " (api " + d.api + ")",
+    "extension " + (d.extension || "not reported") +
+      " (min " + d.min_extension + ")",
+    "yt-dlp " + d["yt-dlp"] + " · " + ff,
+    "python " + d.python + " · " + d.platform,
+    "jobs " + (counts || "none"),
+  ];
+  (jobs.recent || []).forEach((j) => {
+    let line = "- " + (j.status || "?") + "  " + (j.title || "");
+    if (j.error) line += " · " + j.error;
+    rows.push(line);
+  });
+  return rows.join("\n");
+}
+
+if ($("copyDiag")) {
+  $("copyDiag").onclick = async () => {
+    $("diagMsg").textContent = "";
+    try {
+      const d = await api("/diagnostics");
+      const text = diagText(d);
+      const ok = await copyText(text);
+      $("diagOut").textContent = text;
+      $("diagOut").classList.remove("hidden");
+      $("diagMsg").textContent = ok
+        ? t("Copied")
+        : t("copy failed — select the text below");
+    } catch (e) {
+      $("diagMsg").textContent = String(e);
+    }
+  };
+}
+
 $("optionsSearch").oninput = (e) => renderOptions(e.target.value);
 
 /** Escape is the keyboard way out of Settings (the tab bar is the visible one). */

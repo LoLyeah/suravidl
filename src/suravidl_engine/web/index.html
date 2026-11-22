@@ -840,6 +840,16 @@
             the arguments field in the </span><button id="optionsBtn" class="linkbtn" type="button" data-i18n="yt-dlp tab →">yt-dlp tab →</button><span data-i18n=" becomes editable, and every option yt-dlp supports can be browsed there.">
             becomes editable, and every option yt-dlp supports can be browsed there.</span></span>
         </div>
+
+        <div class="field">
+          <label class="lbl" data-i18n="Support">Support</label>
+          <span class="muted small" data-i18n="Copies versions and the last few failures — no token, no cookies, no links. Paste it into a bug report.">Copies versions and the last few failures — no token, no cookies, no links. Paste it into a bug report.</span>
+          <div class="row" style="margin-top:8px">
+            <button id="copyDiag" class="btn sm" type="button" data-i18n="Copy support info">Copy support info</button>
+            <span id="diagMsg" class="muted small" role="status" aria-live="polite"></span>
+          </div>
+          <pre id="diagOut" class="muted small hidden" style="white-space:pre-wrap;margin-top:8px;max-height:220px;overflow:auto"></pre>
+        </div>
       </div><!-- /spanel-advanced -->
 
       <div class="spanel hidden" id="spanel-device" role="tabpanel" aria-labelledby="tabDevice">
