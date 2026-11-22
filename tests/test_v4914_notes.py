@@ -41,8 +41,20 @@ def test_one_release_names_itself_and_its_changes():
     text = run("--tag", "v0.46.17")
     assert text.startswith("# suravidl 0.46.17 — The namesake")
     assert "- Two different videos could end up under one filename" in text
-    assert "### Changes" in text
+    assert "## Commits" in text
     assert "**Fixes**" in text or "**Features**" in text
+
+
+def test_a_release_page_carries_its_meta_and_a_compare_link():
+    text = run("--tag", "v0.49.15")
+    assert "extension 0.5.33" in text
+    assert "github.com/LoLyeah/suravidl/compare/v0.49.14...v0.49.15" in text
+
+
+def test_the_release_commit_body_is_unescaped():
+    text = run("--tag", "v0.45.2")
+    assert "\\u2014" not in text
+    assert "—" in text
 
 
 def test_only_the_tags_own_whats_new_entry_is_used():
@@ -55,7 +67,7 @@ def test_only_the_tags_own_whats_new_entry_is_used():
 
 def test_a_release_commit_is_not_listed_as_a_change():
     text = run("--tag", "v0.49.13")
-    assert "### Changes" not in text     # a one-commit cut: notes only
+    assert "## Commits" not in text      # a one-commit cut: notes only
 
 
 def test_an_unknown_tag_is_refused():
@@ -70,10 +82,10 @@ def test_the_changelog_holds_every_tag_newest_first(tmp_path):
     run("--all", "--out", str(dest))
     text = dest.read_text()
     assert text.startswith("# Changelog")
-    headings = [line for line in text.splitlines() if line.startswith("## v")]
+    headings = [line for line in text.splitlines() if line.startswith("## [v")]
     known = tags()
     assert len(headings) == len(known)
     # newest first, by version not by string: 0.49.9 < 0.49.10
-    assert headings[0].split()[1] == sorted(
-        known, key=lambda t: tuple(int(x) for x in t.lstrip("v").split(".")),
-        reverse=True)[0]
+    newest = sorted(known, key=lambda t: tuple(int(x) for x in t.lstrip("v").split(".")),
+                    reverse=True)[0]
+    assert headings[0].startswith(f"## [{newest}]")

@@ -16,6 +16,7 @@ messages, and write only the file they were told to write.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -68,6 +69,53 @@ def tag_date(tag: str) -> str:
     return git("log", "-1", "--format=%cs", tag)
 
 
+def repo_slug() -> str:
+    """owner/repo from origin, so a release can link its own diff."""
+    try:
+        url = git("remote", "get-url", "origin")
+    except SystemExit:
+        return ""
+    m = re.search(r"github\.com[:/]+([^/]+)/([^/.]+)", url)
+    return f"{m.group(1)}/{m.group(2)}" if m else ""
+
+
+def compare_url(prev: str, tag: str) -> str:
+    slug = repo_slug()
+    if not slug or not prev:
+        return ""
+    return f"https://github.com/{slug}/compare/{prev}...{tag}"
+
+
+def extension_version(tag: str) -> str:
+    try:
+        data = git("show", f"{tag}:extension/manifest.json")
+        return str(json.loads(data).get("version") or "")
+    except (SystemExit, ValueError):
+        return ""
+
+
+def release_detail(tag: str) -> str:
+    """The body of the tag's own commit — the notes written at cut time.
+
+    The subject is the release line (already in the heading), and the test
+    count is bookkeeping; everything else is what actually shipped, which the
+    in-app card compresses into four bullets.
+    """
+    try:
+        message = git("log", "-1", "--format=%B", tag)
+    except SystemExit:
+        return ""
+    lines = message.splitlines()[1:]          # drop the subject
+    keep = []
+    for line in lines:
+        low = line.strip().lower()
+        if low.startswith(("suite", "tests", "co-authored-by:", "signed-off-by:")):
+            continue
+        keep.append(line.rstrip())
+    text = "\n".join(keep).strip()
+    return text[:1800]
+
+
 def commits_between(tag: str) -> list[tuple[str, str]]:
     prev = previous_tag(tag)
     span = f"{prev}..{tag}" if prev else tag
@@ -78,6 +126,9 @@ def commits_between(tag: str) -> list[tuple[str, str]]:
             continue
         sha, subject = line.split("\x1f", 1)
         subject = subject.strip()
+        # the release workflow's own bookkeeping commits are not this release
+        if subject.lower().startswith("docs: changelog for"):
+            continue
         m = SUBJECT_RE.match(subject)
         # a release commit is the tag's own message, not a change — unless it
         # is the ONLY thing between two tags (a one-commit cut), in which case
@@ -105,7 +156,11 @@ def whatsnew_at(tag: str) -> tuple[str, str, list[str]]:
     tm = re.search(r'"title":\s*"([^"]+)"', block)
     title = tm.group(1) if tm else ""
     items = re.findall(r'^\s{12}"((?:[^"\\]|\\.)*)",\s*$', block, re.M)
-    return version, title, [i.replace('\\"', '"') for i in items][:6]
+    def unescape(text: str) -> str:
+        text = text.replace('\\"', '"').replace("\\'", "'")
+        return re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), text)
+    return (version, unescape(title),
+            [unescape(i) for i in items][:6])
 
 
 def group_for(kind: str) -> str:
@@ -115,19 +170,8 @@ def group_for(kind: str) -> str:
     return "Other" if kind else "Other"
 
 
-def notes_for(tag: str, *, with_commits: bool = True, heading: int = 1) -> str:
-    version, title, items = whatsnew_at(tag)
-    name = f"suravidl {version or tag.lstrip('v')}"
-    if title:
-        name += f" — {title}"
-    lines = ["#" * heading + f" {name}", ""]
-    if items:
-        lines += [f"- {item}" for item in items] + [""]
-    if not with_commits:
-        return "\n".join(lines).rstrip() + "\n"
-    commits = commits_between(tag)
-    if not commits:
-        return "\n".join(lines).rstrip() + "\n"
+def group_lines(commits: list[tuple[str, str]]) -> list[str]:
+    """Conventional-commit subjects under their headings, sha included."""
     buckets: dict[str, list[str]] = {}
     for sha, subject in commits:
         m = SUBJECT_RE.match(subject)
@@ -135,18 +179,65 @@ def notes_for(tag: str, *, with_commits: bool = True, heading: int = 1) -> str:
         text = m["text"] if m else subject
         scope = m["scope"] if m else None
         shown = f"{scope}: {text}" if scope else text
-        buckets.setdefault(group_for(kind), []).append(f"- {shown} ({sha})")
-    lines.append(f"### Changes ({len(commits)})")
-    lines.append("")
+        buckets.setdefault(group_for(kind), []).append(f"- {shown} (`{sha}`)")
+    out: list[str] = []
     for name, _ in GROUPS:
         if name in buckets:
-            lines.append(f"**{name}**")
-            lines += buckets.pop(name)
-            lines.append("")
+            out.append(f"**{name}**")
+            out += buckets.pop(name)
+            out.append("")
     for name, entries in buckets.items():      # a kind nobody listed
-        lines.append(f"**{name}**")
-        lines += entries
-        lines.append("")
+        out.append(f"**{name}**")
+        out += entries
+        out.append("")
+    return out
+
+
+def notes_for(tag: str, *, with_commits: bool = True, heading: int = 1,
+              detail: bool = True) -> str:
+    """One release page: what it is, when, its highlights, and its detail.
+
+    `detail` carries the tag's own commit message — the notes written at cut
+    time — which is what makes a release page read like a release page and not
+    like four bullets. The changelog skips it: ten lines per tag, not a book.
+    """
+    version, title, items = whatsnew_at(tag)
+    name = f"suravidl {version or tag.lstrip('v')}"
+    if title:
+        name += f" — {title}"
+    lines = ["#" * heading + f" {name}", ""]
+    meta = [tag_date(tag)]
+    ext = extension_version(tag)
+    if ext:
+        meta.append(f"extension {ext}")
+    link = compare_url(previous_tag(tag), tag)
+    if link:
+        meta.append(f"[compare]({link})")
+    lines += [" · ".join(meta), ""]
+    if items:
+        lines += ["#" * (heading + 1) + " Highlights", ""]
+        lines += [f"- {item}" for item in items] + [""]
+    if detail:
+        body = release_detail(tag)
+        # The release commit is written from the same work the card summarises;
+        # printing both verbatim says everything twice. Keep it only when it
+        # adds something the highlights do not (a specific cause, a caveat).
+        if items:
+            words = lambda text: {w.lower().strip(".,;:()—–-\"") for w in text.split()
+                                  if len(w) > 3}
+            have, want = words(body), words(" ".join(items))
+            if want and len(have & want) / len(want) > 0.45:
+                body = ""
+        if body:
+            lines += ["#" * (heading + 1) + " What changed", "", body, ""]
+    if not with_commits:
+        return "\n".join(lines).rstrip() + "\n"
+    commits = commits_between(tag)
+    if not commits:
+        return "\n".join(lines).rstrip() + "\n"
+    lines.append("#" * (heading + 1) + f" Commits ({len(commits)})")
+    lines.append("")
+    lines += group_lines(commits)
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -155,17 +246,21 @@ def changelog() -> str:
     lines = [
         "# Changelog",
         "",
-        "Every tagged release, newest first. Entries are the notes the app shows",
-        "after an update, followed by the commits that landed since the tag before.",
+        "Every tagged release, newest first.",
+        "Generated by `scripts/release_notes.py` from the tags and their commits",
+        "— do not edit by hand.",
         "",
     ]
     if not tags:
         return "\n".join(lines) + "_No tags yet._\n"
     for tag in tags:
-        lines.append(f"## {tag} — {tag_date(tag)}")
+        lines.append(f"## [{tag}](https://github.com/{repo_slug()}/releases/tag/{tag})"
+                     f" — {tag_date(tag)}")
         lines.append("")
-        body = notes_for(tag, heading=3).split("\n", 1)
-        lines.append(body[1].strip() if len(body) > 1 else "")
+        # drop the heading and the meta line (the H2 above already carries
+        # the tag, the date and the link); keep the content
+        parts = notes_for(tag, heading=3, detail=False).split("\n\n")
+        lines.append("\n\n".join(parts[2:]).strip())
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
