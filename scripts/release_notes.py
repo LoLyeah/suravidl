@@ -31,12 +31,12 @@ DESCRIPTION = ("Local video downloader for Windows, macOS, Linux and Android —
 # The release pages follow the shape used by the other repos in this account:
 # three shelves, every commit in the range, full links, and a package table.
 SHELVES = [
-    ("🚀", "Features & Improvements",
+    ("Features & Improvements",
      {"feat", "feature", "perf", "improve", "ext", "sound", "handshake", "ui",
       "engine", "api", "web", "names", "wip", "cut", "player", "theme"}),
-    ("🐛", "Bug Fixes", {"fix", "bugfix", "hotfix", "bug"}),
+    ("Bug Fixes", {"fix", "bugfix", "hotfix", "bug"}),
 ]
-FALLBACK = ("🛠️", "Build, CI & Platform Packaging")
+FALLBACK = "Build, CI & Platform Packaging"
 
 # name → (platform, format, description); order is the table's order
 PACKAGES = [
@@ -184,16 +184,16 @@ def whatsnew_at(tag: str) -> tuple[str, str, list[str]]:
             [unescape(i) for i in items][:6])
 
 
-def shelf_for(subject: str) -> tuple[str, str]:
+def shelf_for(subject: str) -> str:
     m = SUBJECT_RE.match(subject)
     kind = m["kind"] if m else ""
     # a release commit is the human summary of what shipped (every tag before
     # v0.49 had exactly one), so it shelves with the work, not with the build
     if kind == "release" or VERSION_SUBJECT.match(subject) or BARE_VERSION.match(subject):
-        return SHELVES[0][:2]
-    for emoji, name, kinds in SHELVES:
+        return SHELVES[0][0]
+    for name, kinds in SHELVES:
         if kind in kinds:
-            return emoji, name
+            return name
     return FALLBACK
 
 
@@ -220,7 +220,7 @@ def display_subject(subject: str) -> str:
 
 def bullets(commits: list[tuple[str, str]]) -> list[str]:
     """Every commit in the range, one bullet, its shelf as an H4."""
-    shells: dict[tuple[str, str], list[str]] = {}
+    shells: dict[str, list[str]] = {}
     for sha, subject in commits:
         shelf = shelf_for(subject)
         subject = display_subject(subject)
@@ -229,14 +229,13 @@ def bullets(commits: list[tuple[str, str]]) -> list[str]:
         link = f" ([{short}]({url}))" if url else f" ({short})"
         shells.setdefault(shelf, []).append(f"* {subject}{link}")
     out: list[str] = []
-    for emoji, name, _ in SHELVES:
-        if (emoji, name) in shells:
-            out += [f"#### {emoji} {name}", ""]
-            out += shells.pop((emoji, name))
+    for name, _ in SHELVES:
+        if name in shells:
+            out += [f"#### {name}", ""]
+            out += shells.pop(name)
             out.append("")
     if shells:                       # everything else, under the last shelf
-        emoji, name = FALLBACK
-        out += [f"#### {emoji} {name}", ""]
+        out += [f"#### {FALLBACK}", ""]
         for key, entries in shells.items():
             out += entries
         out.append("")
@@ -252,7 +251,7 @@ def package_table(assets: list[str] | None) -> list[str]:
     if not rows:
         return []
     out = [
-        "### 📦 Download Packages",
+        "### Download Packages",
         "",
         "| Platform | Format | Filename | Description |",
         "|:---|:---|:---|:---|",
@@ -266,29 +265,29 @@ def notes_for(tag: str, *, heading: int = 2,
               assets: list[str] | None = None) -> str:
     """One release page, in the shape the other repos in this account use.
 
-        ## 🚀 suravidl v0.49.15 — The handshake
+        ## suravidl 0.49.15 — The handshake
 
         <one line about what this product is>
 
-        ### 📄 What's Changed
+        ### What's Changed
 
-        #### 🚀 Features & Improvements
+        #### Features & Improvements
         * subject ([sha7](commit url))
 
-        #### 🐛 Bug Fixes
-        #### 🛠️ Build, CI & Platform Packaging
+        #### Bug Fixes
+        #### Build, CI & Platform Packaging
 
         **Full Changelog**: <compare url>
 
-        ### 📦 Download Packages
+        ### Download Packages
         | Platform | Format | Filename | Description |
     """
     version, title, _ = whatsnew_at(tag)
-    name = f"🚀 suravidl {version or tag.lstrip('v')}"
+    name = f"suravidl {version or tag.lstrip('v')}"
     if title:
         name += f" — {title}"
     lines = ["#" * heading + f" {name}", "", DESCRIPTION, ""]
-    lines += ["#" * (heading + 1) + " 📄 What's Changed", ""]
+    lines += ["#" * (heading + 1) + " What's Changed", ""]
     commits = commits_between(tag)
     lines += bullets(commits) if commits else ["_No commits recorded._", ""]
     link = compare_url(previous_tag(tag), tag)

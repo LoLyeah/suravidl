@@ -53,13 +53,13 @@ def test_the_script_is_executable_and_has_a_usage():
 
 def test_one_release_reads_like_a_release_page():
     text = run("--tag", "v0.46.17")
-    assert text.startswith("## 🚀 suravidl 0.46.17 — The namesake")
-    assert "### 📄 What's Changed" in text
+    assert text.startswith("## suravidl 0.46.17 — The namesake")
+    assert "### What's Changed" in text
     assert "**Full Changelog**: https://github.com/LoLyeah/suravidl/compare/" in text
     # one of the three shelves, as the reference pages use
-    assert "#### 🚀 Features & Improvements" in text \
-        or "#### 🐛 Bug Fixes" in text \
-        or "#### 🛠️ Build, CI & Platform Packaging" in text
+    assert "#### Features & Improvements" in text \
+        or "#### Bug Fixes" in text \
+        or "#### Build, CI & Platform Packaging" in text
 
 
 def test_every_commit_is_a_bullet_with_its_own_link():
@@ -75,14 +75,14 @@ def test_the_download_table_matches_the_files(tmp_path):
     for name in ("suravidl-macos-arm64.dmg", "notes.txt"):
         (tmp_path / name).write_text("x")
     text = run("--tag", "v0.49.15", "--assets-dir", str(tmp_path))
-    assert "### 📦 Download Packages" in text
+    assert "### Download Packages" in text
     assert "| **macOS** | DMG | `suravidl-macos-arm64.dmg` |" in text
     assert "notes.txt" not in text          # only known packages are rows
 
 
 def test_no_table_without_files():
     text = run("--tag", "v0.49.15")
-    assert "### 📦 Download Packages" not in text
+    assert "### Download Packages" not in text
 
 
 def test_only_the_tags_own_whats_new_entry_is_used():
