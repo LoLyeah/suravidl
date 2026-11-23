@@ -3,9 +3,10 @@
 
 The release workflow used GitHub's auto notes, which on this repo are a
 compare link and nothing else — every release is a direct commit to main, not
-a pull request. This script writes the notes a person can read: the release's
-own "what's new" entry (the same text the app shows after an update) followed
-by the commits that landed since the previous tag, grouped by kind.
+a pull request. This script writes the page instead, in the shape the other
+repos in this account use: the product line, "What's Changed" with every
+commit since the previous tag on one of three shelves, the compare link, and
+a table of the packages actually attached to the release.
 
     scripts/release_notes.py --tag v0.49.14 --out notes.md
     scripts/release_notes.py --all --out CHANGELOG.md
@@ -24,18 +25,38 @@ from pathlib import Path
 
 TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 
-# Conventional-commit prefixes, in the order the notes read them. `release:`
-# is the commit that changes the version; it is the tag's own message, so it
-# is not a "change" to report.
-GROUPS = [
-    ("Features", ("feat", "feature")),
-    ("Fixes", ("fix", "bugfix", "hotfix")),
-    ("Performance", ("perf",)),
-    ("Docs", ("docs", "doc")),
-    ("Build & CI", ("build", "ci", "chore", "test", "tests")),
-    ("Other", ()),
+DESCRIPTION = ("Local video downloader for Windows, macOS, Linux and Android — with a "
+               "browser extension that hands it the page you are on.")
+
+# The release pages follow the shape used by the other repos in this account:
+# three shelves, every commit in the range, full links, and a package table.
+SHELVES = [
+    ("🚀", "Features & Improvements",
+     {"feat", "feature", "perf", "improve", "ext", "sound", "handshake", "ui",
+      "engine", "api", "web", "names", "wip", "cut", "player", "theme"}),
+    ("🐛", "Bug Fixes", {"fix", "bugfix", "hotfix", "bug"}),
 ]
-SKIP = {"release", "changelog"}
+FALLBACK = ("🛠️", "Build, CI & Platform Packaging")
+
+# name → (platform, format, description); order is the table's order
+PACKAGES = [
+    ("suravidl-windows-x64-setup.exe", "Windows", "Setup Installer",
+     "Recommended installer (x64)"),
+    ("suravidl-windows-x64.exe", "Windows", "Portable",
+     "Single executable, no install"),
+    ("suravidl-macos-arm64.dmg", "macOS", "DMG",
+     "Apple silicon (M1 and later)"),
+    ("suravidl-macos-arm64.zip", "macOS", "Zip",
+     "Apple silicon, zipped app"),
+    ("suravidl-linux-x64.AppImage", "Linux", "AppImage",
+     "Portable Linux build (x86_64)"),
+    ("app-release.apk", "Android", "Universal APK",
+     "Signed APK for phones and tablets"),
+    ("suravidl-extension-chrome.zip", "Chrome", "Extension",
+     "Chrome Web Store package"),
+    ("suravidl-extension-firefox.xpi", "Firefox", "Extension",
+     "Signed add-on"),
+]
 SUBJECT_RE = re.compile(r"^(?P<kind>[a-z]+)(?:\((?P<scope>[^)]*)\))?!?:\s*(?P<text>.+)$")
 
 
@@ -94,6 +115,16 @@ def extension_version(tag: str) -> str:
         return ""
 
 
+def release_assets(tag: str) -> list[str] | None:
+    """The file names on the published release, or None if gh cannot say."""
+    out = subprocess.run(
+        ["gh", "release", "view", tag, "--json", "assets", "--jq", ".assets[].name"],
+        capture_output=True, text=True)
+    if out.returncode != 0:
+        return None
+    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
 def release_detail(tag: str) -> str:
     """The body of the tag's own commit — the notes written at cut time.
 
@@ -119,24 +150,14 @@ def release_detail(tag: str) -> str:
 def commits_between(tag: str) -> list[tuple[str, str]]:
     prev = previous_tag(tag)
     span = f"{prev}..{tag}" if prev else tag
-    raw = git("log", span, "--no-merges", "--format=%h%x1f%s", "--reverse")
-    kept, dropped = [], []
+    raw = git("log", span, "--no-merges", "--format=%H%x1f%s", "--reverse")
+    commits = []
     for line in raw.splitlines():
         if "\x1f" not in line:
             continue
         sha, subject = line.split("\x1f", 1)
-        subject = subject.strip()
-        # the release workflow's own bookkeeping commits are not this release
-        if subject.lower().startswith("docs: changelog for"):
-            continue
-        m = SUBJECT_RE.match(subject)
-        # a release commit is the tag's own message, not a change — unless it
-        # is the ONLY thing between two tags (a one-commit cut), in which case
-        # "no commits" would be a lie
-        # a release commit is the tag's own message, not a change: the notes
-        # above already say what shipped
-        (dropped if m and m["kind"] in SKIP else kept).append((sha, subject))
-    return kept
+        commits.append((sha, subject.strip()))
+    return commits
 
 
 def whatsnew_at(tag: str) -> tuple[str, str, list[str]]:
@@ -163,81 +184,97 @@ def whatsnew_at(tag: str) -> tuple[str, str, list[str]]:
             [unescape(i) for i in items][:6])
 
 
-def group_for(kind: str) -> str:
-    for name, kinds in GROUPS:
+def shelf_for(subject: str) -> tuple[str, str]:
+    m = SUBJECT_RE.match(subject)
+    kind = m["kind"] if m else ""
+    for emoji, name, kinds in SHELVES:
         if kind in kinds:
-            return name
-    return "Other" if kind else "Other"
+            return emoji, name
+    return FALLBACK
 
 
-def group_lines(commits: list[tuple[str, str]]) -> list[str]:
-    """Conventional-commit subjects under their headings, sha included."""
-    buckets: dict[str, list[str]] = {}
+def bullets(commits: list[tuple[str, str]]) -> list[str]:
+    """Every commit in the range, one bullet, its shelf as an H4."""
+    shells: dict[tuple[str, str], list[str]] = {}
     for sha, subject in commits:
+        # "wip(sound): ..." was true while it was being written and is not true
+        # on the page of the release that ships it; the scope keeps the meaning
         m = SUBJECT_RE.match(subject)
-        kind = m["kind"] if m else ""
-        text = m["text"] if m else subject
-        scope = m["scope"] if m else None
-        shown = f"{scope}: {text}" if scope else text
-        buckets.setdefault(group_for(kind), []).append(f"- {shown} (`{sha}`)")
+        if m and m["kind"] == "wip" and m["scope"]:
+            subject = f"{m['scope']}: {m['text']}"
+        short = sha[:7]
+        url = f"https://github.com/{repo_slug()}/commit/{sha}" if repo_slug() else ""
+        link = f" ([{short}]({url}))" if url else f" ({short})"
+        shells.setdefault(shelf_for(subject), []).append(f"* {subject}{link}")
     out: list[str] = []
-    for name, _ in GROUPS:
-        if name in buckets:
-            out.append(f"**{name}**")
-            out += buckets.pop(name)
+    for emoji, name, _ in SHELVES:
+        if (emoji, name) in shells:
+            out += [f"#### {emoji} {name}", ""]
+            out += shells.pop((emoji, name))
             out.append("")
-    for name, entries in buckets.items():      # a kind nobody listed
-        out.append(f"**{name}**")
-        out += entries
+    if shells:                       # everything else, under the last shelf
+        emoji, name = FALLBACK
+        out += [f"#### {emoji} {name}", ""]
+        for key, entries in shells.items():
+            out += entries
         out.append("")
     return out
 
 
-def notes_for(tag: str, *, with_commits: bool = True, heading: int = 1,
-              detail: bool = True) -> str:
-    """One release page: what it is, when, its highlights, and its detail.
+def package_table(assets: list[str] | None) -> list[str]:
+    # No file list, no table: a release page must not promise a package it
+    # cannot show. CI passes --assets-dir dist; the backfill reads the release.
+    if not assets:
+        return []
+    rows = [p for p in PACKAGES if p[0] in assets]
+    if not rows:
+        return []
+    out = [
+        "### 📦 Download Packages",
+        "",
+        "| Platform | Format | Filename | Description |",
+        "|:---|:---|:---|:---|",
+    ]
+    for name, platform, fmt, note in rows:
+        out.append(f"| **{platform}** | {fmt} | `{name}` | {note} |")
+    return out
 
-    `detail` carries the tag's own commit message — the notes written at cut
-    time — which is what makes a release page read like a release page and not
-    like four bullets. The changelog skips it: ten lines per tag, not a book.
+
+def notes_for(tag: str, *, heading: int = 2,
+              assets: list[str] | None = None) -> str:
+    """One release page, in the shape the other repos in this account use.
+
+        ## 🚀 suravidl v0.49.15 — The handshake
+
+        <one line about what this product is>
+
+        ### 📄 What's Changed
+
+        #### 🚀 Features & Improvements
+        * subject ([sha7](commit url))
+
+        #### 🐛 Bug Fixes
+        #### 🛠️ Build, CI & Platform Packaging
+
+        **Full Changelog**: <compare url>
+
+        ### 📦 Download Packages
+        | Platform | Format | Filename | Description |
     """
-    version, title, items = whatsnew_at(tag)
-    name = f"suravidl {version or tag.lstrip('v')}"
+    version, title, _ = whatsnew_at(tag)
+    name = f"🚀 suravidl {version or tag.lstrip('v')}"
     if title:
         name += f" — {title}"
-    lines = ["#" * heading + f" {name}", ""]
-    meta = [tag_date(tag)]
-    ext = extension_version(tag)
-    if ext:
-        meta.append(f"extension {ext}")
+    lines = ["#" * heading + f" {name}", "", DESCRIPTION, ""]
+    lines += ["#" * (heading + 1) + " 📄 What's Changed", ""]
+    commits = commits_between(tag)
+    lines += bullets(commits) if commits else ["_No commits recorded._", ""]
     link = compare_url(previous_tag(tag), tag)
     if link:
-        meta.append(f"[compare]({link})")
-    lines += [" · ".join(meta), ""]
-    if items:
-        lines += ["#" * (heading + 1) + " Highlights", ""]
-        lines += [f"- {item}" for item in items] + [""]
-    if detail:
-        body = release_detail(tag)
-        # The release commit is written from the same work the card summarises;
-        # printing both verbatim says everything twice. Keep it only when it
-        # adds something the highlights do not (a specific cause, a caveat).
-        if items:
-            words = lambda text: {w.lower().strip(".,;:()—–-\"") for w in text.split()
-                                  if len(w) > 3}
-            have, want = words(body), words(" ".join(items))
-            if want and len(have & want) / len(want) > 0.45:
-                body = ""
-        if body:
-            lines += ["#" * (heading + 1) + " What changed", "", body, ""]
-    if not with_commits:
-        return "\n".join(lines).rstrip() + "\n"
-    commits = commits_between(tag)
-    if not commits:
-        return "\n".join(lines).rstrip() + "\n"
-    lines.append("#" * (heading + 1) + f" Commits ({len(commits)})")
-    lines.append("")
-    lines += group_lines(commits)
+        lines += [f"**Full Changelog**: {link}", ""]
+    table = package_table(assets)
+    if table:
+        lines += table
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -253,14 +290,20 @@ def changelog() -> str:
     ]
     if not tags:
         return "\n".join(lines) + "_No tags yet._\n"
+    slug = repo_slug()
     for tag in tags:
-        lines.append(f"## [{tag}](https://github.com/{repo_slug()}/releases/tag/{tag})"
+        version, title, _ = whatsnew_at(tag)
+        name = f"v{version or tag.lstrip('v')}"
+        if title:
+            name += f" — {title}"
+        lines.append(f"## [{name}](https://github.com/{slug}/releases/tag/{tag})"
                      f" — {tag_date(tag)}")
         lines.append("")
-        # drop the heading and the meta line (the H2 above already carries
-        # the tag, the date and the link); keep the content
-        parts = notes_for(tag, heading=3, detail=False).split("\n\n")
-        lines.append("\n\n".join(parts[2:]).strip())
+        entries = bullets(commits_between(tag))
+        lines.append("\n".join(entries).strip() or "_No commits recorded._")
+        link = compare_url(previous_tag(tag), tag)
+        if link:
+            lines += ["", f"**Full Changelog**: {link}"]
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -270,7 +313,20 @@ def main() -> int:
     ap.add_argument("--tag", help="write the notes for one tag")
     ap.add_argument("--all", action="store_true", help="write the whole changelog")
     ap.add_argument("--out", default="-", help="file to write, or - for stdout")
+    ap.add_argument("--assets-dir", help="directory of release files (CI: dist)")
+    ap.add_argument("--assets-from-release", action="store_true",
+                    help="read the file names off the published release (gh)")
     args = ap.parse_args()
+
+    assets: list[str] | None = None
+    if args.assets_dir:
+        assets = sorted(p.name for p in Path(args.assets_dir).iterdir() if p.is_file())
+    elif args.assets_from_release and args.tag:
+        assets = release_assets(args.tag)
+        if assets is None:
+            print("could not read the release's assets; writing without a table",
+                  file=sys.stderr)
+            assets = []
 
     if args.all:
         text = changelog()
@@ -279,7 +335,7 @@ def main() -> int:
         if not known:
             print(f"no such tag: {args.tag}", file=sys.stderr)
             return 2
-        text = notes_for(args.tag)
+        text = notes_for(args.tag, assets=assets)
     else:
         ap.error("one of --tag or --all is required")
 

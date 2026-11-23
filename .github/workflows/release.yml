@@ -254,7 +254,7 @@ jobs:
       - name: Write the release notes
         env:
           REF_NAME: ${{ github.ref_name }}
-        run: python3 scripts/release_notes.py --tag "$REF_NAME" --out "$RUNNER_TEMP/RELEASE_NOTES.md"
+        run: python3 scripts/release_notes.py --tag "$REF_NAME" --assets-dir dist --out "$RUNNER_TEMP/RELEASE_NOTES.md"
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
