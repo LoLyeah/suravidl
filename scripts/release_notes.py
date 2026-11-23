@@ -187,25 +187,47 @@ def whatsnew_at(tag: str) -> tuple[str, str, list[str]]:
 def shelf_for(subject: str) -> tuple[str, str]:
     m = SUBJECT_RE.match(subject)
     kind = m["kind"] if m else ""
+    # a release commit is the human summary of what shipped (every tag before
+    # v0.49 had exactly one), so it shelves with the work, not with the build
+    if kind == "release" or VERSION_SUBJECT.match(subject) or BARE_VERSION.match(subject):
+        return SHELVES[0][:2]
     for emoji, name, kinds in SHELVES:
         if kind in kinds:
             return emoji, name
     return FALLBACK
 
 
+VERSION_SUBJECT = re.compile(r'^v\d+\.\d+\.\d+(?:\s+"[^"]*")?\s*[—–-]\s*')
+BARE_VERSION = re.compile(r'^v\d+\.\d+\.\d+(?:\s+"[^"]*")?\s*$')
+
+
+def display_subject(subject: str) -> str:
+    """How a commit reads on the page of the release that ships it.
+
+    "wip(sound): ..." was true while it was being written, not afterwards;
+    "release: v0.49.15 — ..." repeats the heading. Neither is worth the ink.
+    """
+    m = SUBJECT_RE.match(subject)
+    if m:
+        if m["kind"] == "wip" and m["scope"]:
+            subject = f"{m['scope']}: {m['text']}"
+        elif m["kind"] == "release":
+            subject = m["text"]
+    if BARE_VERSION.match(subject):
+        return subject
+    return VERSION_SUBJECT.sub("", subject)
+
+
 def bullets(commits: list[tuple[str, str]]) -> list[str]:
     """Every commit in the range, one bullet, its shelf as an H4."""
     shells: dict[tuple[str, str], list[str]] = {}
     for sha, subject in commits:
-        # "wip(sound): ..." was true while it was being written and is not true
-        # on the page of the release that ships it; the scope keeps the meaning
-        m = SUBJECT_RE.match(subject)
-        if m and m["kind"] == "wip" and m["scope"]:
-            subject = f"{m['scope']}: {m['text']}"
+        shelf = shelf_for(subject)
+        subject = display_subject(subject)
         short = sha[:7]
         url = f"https://github.com/{repo_slug()}/commit/{sha}" if repo_slug() else ""
         link = f" ([{short}]({url}))" if url else f" ({short})"
-        shells.setdefault(shelf_for(subject), []).append(f"* {subject}{link}")
+        shells.setdefault(shelf, []).append(f"* {subject}{link}")
     out: list[str] = []
     for emoji, name, _ in SHELVES:
         if (emoji, name) in shells:
