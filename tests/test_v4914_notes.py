@@ -95,7 +95,9 @@ def test_only_the_tags_own_whats_new_entry_is_used():
 
 def test_a_single_commit_cut_still_lists_that_commit():
     text = run("--tag", "v0.49.13")
-    assert "release: v0.49.13" in text
+    # the version is in the heading; the bullet is what the commit did
+    assert "* the play sheet on a phone ([9f1ae9d]" in text
+    assert "release: v0.49.13" not in text
 
 
 def test_an_unknown_tag_is_refused():
