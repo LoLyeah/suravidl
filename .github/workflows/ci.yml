@@ -12,7 +12,12 @@ jobs:
       matrix:
         python: ["3.10", "3.12"]
     steps:
+      # the release-notes tests read tags and history; a shallow checkout has
+      # neither (the suite reads real tags by design, v0.49.15)
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}

@@ -26,6 +26,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "release_notes.py"
 
@@ -38,9 +40,17 @@ def run(*args: str) -> str:
 
 
 def tags() -> list[str]:
-    out = subprocess.run(["git", "tag", "-l", "v*"], cwd=ROOT,
-                         capture_output=True, text=True, check=True).stdout
+    try:
+        out = subprocess.run(["git", "tag", "-l", "v*"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return []
     return [t for t in out.split() if t.count(".") == 2]
+
+
+# These checks read the real tags: that is the point of them. A shallow clone
+# has none, so say so instead of failing on "no such tag".
+pytestmark = pytest.mark.skipif(not tags(), reason="this checkout has no tags")
 
 
 def test_the_script_is_executable_and_has_a_usage():
