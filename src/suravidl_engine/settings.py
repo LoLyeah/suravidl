@@ -123,9 +123,11 @@ PER_JOB_DENIED = {
     "site_quality",      # memory about you, not an option for this download
 }
 PER_JOB_KEYS = tuple(k for k in DEFAULTS if k not in PER_JOB_DENIED)
+_PER_JOB_KEY_SET = frozenset(PER_JOB_KEYS)
 
 # A preset patch may additionally name the audio intent (built-in presets only).
 PRESET_PATCH_KEYS = PER_JOB_KEYS + ("preset",)
+_PRESET_PATCH_KEY_SET = frozenset(PRESET_PATCH_KEYS)
 
 
 def validate_overrides(patch: dict | None) -> dict:
@@ -139,7 +141,7 @@ def validate_overrides(patch: dict | None) -> dict:
         return {}
     if not isinstance(patch, dict):
         raise ValueError("overrides must be an object")
-    unknown = sorted(set(patch) - set(PER_JOB_KEYS))
+    unknown = sorted(set(patch) - _PER_JOB_KEY_SET)
     if unknown:
         raise ValueError(f"these options cannot be set per download: {unknown}")
     return {k: Settings._validate(k, v) for k, v in patch.items()}
@@ -149,7 +151,7 @@ def validate_preset_patch(patch: dict | None) -> dict:
     """A preset is a named patch: per-job keys plus an optional audio intent."""
     if not isinstance(patch, dict) or not patch:
         raise ValueError("a preset needs a patch with at least one option")
-    unknown = sorted(set(patch) - set(PRESET_PATCH_KEYS))
+    unknown = sorted(set(patch) - _PRESET_PATCH_KEY_SET)
     if unknown:
         raise ValueError(f"unknown preset options: {unknown}")
     out: dict = {}

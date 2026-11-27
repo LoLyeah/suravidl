@@ -990,17 +990,23 @@ let DESKTOP = false;
 let APP_INFO = null;   // /app/info payload (desktop capabilities)
 
 /* ---------- drawn icons (the sprite lives in index.html) ---------- */
+const _ICO_TPL = new Map();
+
 /** `ico("play")` → a span the CSS sizes; one stroke system, no emoji. */
 function ico(name) {
-  const s = document.createElement("span");
-  s.className = "ico";
   // v0.46.10 audit B/F8: every call site passes a literal today, but a
   // helper that concatenates a name into innerHTML is a sink waiting for
   // one dynamic call — only sprite ids ever reach the string.
   const id = /^[a-z0-9-]{1,24}$/.test(name) ? name : "info";
-  s.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
-    id + '"/></svg>';
-  return s;
+  let tpl = _ICO_TPL.get(id);
+  if (!tpl) {
+    tpl = document.createElement("span");
+    tpl.className = "ico";
+    tpl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-' +
+      id + '"/></svg>';
+    _ICO_TPL.set(id, tpl);
+  }
+  return tpl.cloneNode(true);
 }
 
 /* ---------- the human voice of an engine error ---------- */
@@ -2399,13 +2405,18 @@ function renderQueueBadge(jobs) {
   const badge = $("queueCount");
   if (!badge) return;
   const list = jobs || [];
-  const active = list.filter((j) =>
-    ["queued", "downloading", "merging"].includes(j.status)).length;
+  let active = 0, failedRaw = 0;
+  for (const j of list) {
+    if (ACTIVE.has(j.status)) active += 1;
+    else if (j.status === "error" || j.status === "interrupted") failedRaw += 1;
+  }
   // v0.46.6: when nothing is in flight but failures exist, the badge
   // carries the failure count in rose — a dead download must never hide
   // behind a clean tab (queue critique, 2026-10-11)
-  const failed = active ? 0 : list.filter((j) =>
-    j.status === "error" || j.status === "interrupted").length;
+  const failed = active ? 0 : failedRaw;
+  const sig = active + "|" + failed + "|" + LANG;
+  if (badge.dataset.sig === sig) return;
+  badge.dataset.sig = sig;
   const n = active || failed;
   const was = !badge.classList.contains("hidden");
   badge.textContent = n > 9 ? "9+" : String(n);
@@ -3144,18 +3155,22 @@ async function settleThenDelete(job) {
    everything filed — each behind its own single confirm. */
 function renderQueueActions(jobs) {
   const list = jobs || [];
-  const failed = list.filter((j) => QUEUE_BUCKETS.error.includes(j.status)).length;
-  const filed = list.filter((j) => QUEUE_BUCKETS.filed.includes(j.status)).length;
   // v0.46.7 "the brief": the queue answers its own question before you
   // scroll — counts on the chips and one mono state line (critique round 2)
   const counts = { all: list.length, active: 0, filed: 0, error: 0, stopped: 0 };
   for (const j of list) counts[queueBucket(j.status)] += 1;
+  const failed = counts.error;
+  const filed = counts.filed;
   const filters = $("queueFilters");
   if (filters) {
-    for (const b of filters.querySelectorAll("[data-qfilter]")) {
-      const base = t(b.dataset.i18n || b.textContent);
-      const n = counts[b.dataset.qfilter] || 0;
-      b.textContent = n ? base + " " + n : base;
+    const fsig = counts.all + "|" + counts.active + "|" + filed + "|" + failed + "|" + counts.stopped + "|" + LANG;
+    if (filters.dataset.sig !== fsig) {
+      filters.dataset.sig = fsig;
+      for (const b of filters.querySelectorAll("[data-qfilter]")) {
+        const base = t(b.dataset.i18n || b.textContent);
+        const n = counts[b.dataset.qfilter] || 0;
+        b.textContent = n ? base + " " + n : base;
+      }
     }
   }
   const st = $("queueState");
@@ -3182,6 +3197,9 @@ function renderQueueActions(jobs) {
   }
   const box = $("queueActions");
   if (!box) return;
+  const asig = failed + "|" + filed + "|" + LANG;
+  if (box.dataset.sig === asig) return;
+  box.dataset.sig = asig;
   const rb = $("queueRetryFailed"), cb = $("queueClearFiled");
   const ch = $("queueClearHistory");
   rb.textContent = t("Retry failed ({n})", { n: failed });
@@ -3484,6 +3502,15 @@ function deleteButton(j) {
   return b;
 }
 
+let _CHEV_TPL = null;
+function chevIcon() {
+  if (!_CHEV_TPL) {
+    _CHEV_TPL = el("span", "chev");
+    _CHEV_TPL.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chev"/></svg>';
+  }
+  return _CHEV_TPL.cloneNode(true);
+}
+
 function jobRow(j) {
   const row = el("div", "job");
   row.setAttribute("role", "listitem");
@@ -3496,9 +3523,9 @@ function jobRow(j) {
   const title = el("span", "jobtitle");
   // a drawn caret, not a guessed cursor (v0.46.7): the fold had no
   // affordance — cursor:pointer never reaches touch (critique round 2)
-  const chev = el("span", "chev");
-  chev.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chev"/></svg>';
-  title.append(chev, document.createTextNode(j.title || prettySource(j.url)));
+  const titleText = j.title || prettySource(j.url);
+  const titleNode = document.createTextNode(titleText);
+  title.append(chevIcon(), titleNode);
   title.title = j.url;
   // the title ellipsises on a phone and nothing hover-reveals it there: a
   // tap unfolds the whole line (2026-10-01 report). v0.38.3: it is a real
@@ -3536,6 +3563,10 @@ function jobRow(j) {
     e.preventDefault();
     flip();
   };
+  row._titleEl = title;
+  row._titleNode = titleNode;
+  row._lastTitle = titleText;
+  row._lastUrl = j.url;
   const pillWord = j.live
     ? (j.status === "downloading" ? t("recording")
       : j.status === "paused" ? t("recorded (stopped)") : t(j.status))
@@ -3601,6 +3632,8 @@ function jobRow(j) {
     const fill = el("div", "fill active" + (sized ? "" : " indet"));
     fill.style.width = sized ? progressPct(j).toFixed(1) + "%" : "100%";
     bar.append(fill);
+    row._barEl = bar;
+    row._fillEl = fill;
     row.append(bar);
     // v0.47.6 "the clock": the finishing phase names its step and counts up —
     // a 600 MB copy-mux is minutes of silence otherwise (owner's screenshot,
@@ -3612,7 +3645,10 @@ function jobRow(j) {
       row.append(ph);
     }
     const meta = el("div", "jmeta");
-    meta.append(...metaParts(j).map((s) => el("span", "", s)));
+    const parts = metaParts(j);
+    row._metaEl = meta;
+    row._metaSig = parts.join("\x00");
+    meta.append(...parts.map((s) => el("span", "", s)));
     row.append(meta);
   } else if (j.status === "error" || j.status === "interrupted") {
     // the human consequence leads; the engine's own dialect goes below,
@@ -3897,7 +3933,7 @@ const LANDED = new Set();
 
 function updateJobRow(row, j) {
   const was = row.dataset.status;   // the state this row was painted in
-  row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
+  if (was !== j.status) row.dataset.status = j.status;   // v0.40.2: what the queue sieve reads
   if (row.dataset.sig !== jobSig(j)) {
     const fresh = jobRow(j);
     fresh.dataset.id = j.id;
@@ -3925,32 +3961,65 @@ function updateJobRow(row, j) {
     row.replaceWith(fresh);
     return fresh;
   }
-  const title = row.querySelector(".jobtitle");
-  const text = j.title || prettySource(j.url);
+  const title = row._titleEl || row.querySelector(".jobtitle");
   if (title) {
-    // rewrite the TEXT NODE, never textContent: assigning textContent wiped
-    // the chevron out of every row on the first poll, so the fold lost its
-    // caret and the title fell back to the raw URL (v0.47.19 — found while
-    // chasing a failed row that showed its address)
-    const textNode = [...title.childNodes].find((n) => n.nodeType === Node.TEXT_NODE);
-    if (textNode) {
-      if (textNode.nodeValue !== text) textNode.nodeValue = text;
-    } else {
-      title.append(document.createTextNode(text));
+    const text = j.title || (row._lastUrl === j.url && row._lastTitle
+      ? row._lastTitle : prettySource(j.url));
+    if (row._lastTitle !== text) {
+      // rewrite the TEXT NODE, never textContent: assigning textContent wiped
+      // the chevron out of every row on the first poll, so the fold lost its
+      // caret and the title fell back to the raw URL (v0.47.19 — found while
+      // chasing a failed row that showed its address)
+      let textNode = row._titleNode;
+      if (!textNode) {
+        for (const n of title.childNodes) {
+          if (n.nodeType === Node.TEXT_NODE) { textNode = n; break; }
+        }
+        row._titleNode = textNode;
+      }
+      if (textNode) {
+        if (textNode.nodeValue !== text) textNode.nodeValue = text;
+      } else {
+        textNode = document.createTextNode(text);
+        row._titleNode = textNode;
+        title.append(textNode);
+      }
+      row._lastTitle = text;
     }
-    title.title = j.url;
+    if (row._lastUrl !== j.url) {
+      title.title = j.url;
+      row._lastUrl = j.url;
+    }
   }
-  const fill = row.querySelector(".fill");
+  // settled rows have no live bar or speed/eta strip to poll
+  if (!ACTIVE.has(j.status)) return row;
+  const fill = row._fillEl !== undefined ? row._fillEl : (row._fillEl = row.querySelector(".fill"));
   if (fill && !fill.classList.contains("indet")) {
-    fill.style.width = progressPct(j).toFixed(1) + "%";
-    const bar = row.querySelector(".bar");
-    if (bar) bar.setAttribute("aria-valuenow", progressPct(j).toFixed(0));
+    const pct = progressPct(j);
+    const w = pct.toFixed(1) + "%";
+    if (row._lastWidth !== w) {
+      fill.style.width = w;
+      row._lastWidth = w;
+      const bar = row._barEl !== undefined ? row._barEl : (row._barEl = row.querySelector(".bar"));
+      const now = pct.toFixed(0);
+      if (bar && row._lastNow !== now) {
+        bar.setAttribute("aria-valuenow", now);
+        row._lastNow = now;
+      }
+    }
   }
   // v0.46.6: the settled strip shares the .jmeta look but is not live data —
   // the poll's metaParts rewrite belongs to the ACTIVE row only (the rig
   // caught the strip being overwritten with speed/ETA on the next poll)
-  const meta = row.querySelector(".jmeta:not(.settled)");
-  if (meta) meta.replaceChildren(...metaParts(j).map((s) => el("span", "", s)));
+  const meta = row._metaEl !== undefined ? row._metaEl : (row._metaEl = row.querySelector(".jmeta:not(.settled)"));
+  if (meta) {
+    const parts = metaParts(j);
+    const msig = parts.join("\x00");
+    if (row._metaSig !== msig) {
+      row._metaSig = msig;
+      meta.replaceChildren(...parts.map((s) => el("span", "", s)));
+    }
+  }
   return row;
 }
 
@@ -3963,9 +4032,12 @@ function queueBucket(status) {
   return "active";
 }
 
+let QUEUE_FILTERED = false;
+
 /** Apply QFILTER to the rows on screen right now and say what got hidden,
  *  so a filtered view never reads as an empty queue. */
 function applyQueueFilter() {
+  if (QFILTER === "all" && !QUEUE_FILTERED) return;
   const box = $("jobs");
   if (!box) return;
   // the failure caption belongs to the All view only (v0.46.7)
@@ -4021,6 +4093,7 @@ function applyQueueFilter() {
         : t("{n} jobs hidden by this filter", { n: hidden });
     }
   }
+  QUEUE_FILTERED = QFILTER !== "all" || hidden > 0;
 }
 
 /** The chips row: one pick at a time, announced; "Show all" is the way back
@@ -4225,7 +4298,9 @@ async function refreshJobs() {
     };
     const list = jobs.sort((a, b) => {
       const d = rank(a) - rank(b);
-      return d !== 0 ? d : (b.created_at || "").localeCompare(a.created_at || "");
+      if (d !== 0) return d;
+      const ac = a.created_at || "", bc = b.created_at || "";
+      return bc < ac ? -1 : bc > ac ? 1 : 0;
     });
     // a finish that speaks: the FIRST poll that sees a job become completed
     // says so — once (v0.37.0)
@@ -4263,55 +4338,84 @@ async function refreshJobs() {
     // list while fading ("the screen scrolls to the bottom", 2026-10-07;
     // it was content motion, not scrolling). Marking first lets the
     // anchors skip the dying rows and everyone keeps their place.
+    const existing = new Map();
     box.querySelectorAll(".job").forEach((r) => {
       if (!keep.has(r.dataset.id)) leaveRow(r, true);   // the reader's spot stays
+      else existing.set(r.dataset.id, r);
     });
-    // the failures gather under a quiet caption when success leads above
-    // (v0.46.7) — it disappears whenever either side empties or a filter
-    // other than All is on
-    box.querySelectorAll(".jgroup").forEach((g) => g.remove());
-    {
-      const firstFailed = box.querySelector(
-        '.job[data-status="error"], .job[data-status="interrupted"]');
-      const firstFiled = box.querySelector('.job[data-status="completed"]');
-      if (firstFailed && firstFiled) {
-        const failedN = list.filter((j) =>
-          QUEUE_BUCKETS.error.includes(j.status)).length;
-        const g = el("div", "jgroup", t("{n} failed", { n: failedN }));
-        if (QFILTER !== "all") g.classList.add("hidden");
-        box.insertBefore(g, firstFailed);
-      }
-    }
-    let prev = null;
-    for (const j of list) {
-      keep.add(j.id);
-      let row = box.querySelector(`.job[data-id="${j.id}"]`);
-      if (!row) {
-        row = jobRow(j);
+    if (existing.size === 0) {
+      box.querySelectorAll(".jgroup").forEach((g) => g.remove());
+      const frag = document.createDocumentFragment();
+      let firstFailed = null, firstFiled = null, failedN = 0;
+      for (const j of list) {
+        const row = jobRow(j);
         row.dataset.id = j.id;
         row.classList.add("enter");
+        if (!firstFailed && (j.status === "error" || j.status === "interrupted")) firstFailed = row;
+        if (!firstFiled && j.status === "completed") firstFiled = row;
+        if (QUEUE_BUCKETS.error.includes(j.status)) failedN += 1;
+        frag.append(row);
+      }
+      if (firstFailed && firstFiled) {
+        const g = el("div", "jgroup", t("{n} failed", { n: failedN }));
+        g.dataset.sig = failedN + "|" + LANG;
+        g.classList.toggle("hidden", QFILTER !== "all");
+        frag.insertBefore(g, firstFailed);
+      }
+      box.append(frag);
+    } else {
+      let prev = null;
+      let firstFailed = null, firstFiled = null, failedN = 0;
+      for (const j of list) {
+        let row = existing.get(j.id);
+        if (!row) {
+          row = jobRow(j);
+          row.dataset.id = j.id;
+          row.classList.add("enter");
+        } else {
+          row = updateJobRow(row, j);
+        }
+        if (!firstFailed && (j.status === "error" || j.status === "interrupted")) firstFailed = row;
+        if (!firstFiled && j.status === "completed") firstFiled = row;
+        if (QUEUE_BUCKETS.error.includes(j.status)) failedN += 1;
+        let anchor = prev ? prev.nextElementSibling : box.firstElementChild;
+        // v0.45.13: skip PAST dying rows when anchoring the order — the old
+        // chain could land on a `.leaving` sibling, so the deleted row's
+        // neighbours were inserted BEFORE it and the dying row visibly
+        // sailed to the end of the list (the 2026-10-07 "screen scrolls to
+        // the bottom" report — it was content motion, not scrolling).
+        // The dying row keeps its exact place while it fades; everyone
+        // else keeps theirs.
+        // v0.46.13: skip the failure caption too — it is decoration this
+        // same function inserted before the first failed row, and the walk
+        // used to land on it, so EVERY failed row was torn out and
+        // re-inserted past it on EVERY poll. Re-inserting a row restarts
+        // its `enter` fade — the field's blinking error card (2026-10-12).
+        while (anchor && (anchor.classList.contains("leaving") ||
+                          anchor.classList.contains("jgroup"))) {
+          anchor = anchor.nextElementSibling;
+        }
+        if (row !== anchor) box.insertBefore(row, anchor);
+        prev = row;
+      }
+      // keep the failure caption without tearing it out on unchanged polls
+      const groups = box.querySelectorAll(".jgroup");
+      if (firstFailed && firstFiled) {
+        const sig = failedN + "|" + LANG;
+        let g = groups[0] || null;
+        for (let k = 1; k < groups.length; k++) groups[k].remove();
+        if (!g) {
+          g = el("div", "jgroup", t("{n} failed", { n: failedN }));
+          g.dataset.sig = sig;
+        } else if (g.dataset.sig !== sig) {
+          g.textContent = t("{n} failed", { n: failedN });
+          g.dataset.sig = sig;
+        }
+        g.classList.toggle("hidden", QFILTER !== "all");
+        if (g.nextElementSibling !== firstFailed) box.insertBefore(g, firstFailed);
       } else {
-        row = updateJobRow(row, j);
+        groups.forEach((g) => g.remove());
       }
-      let anchor = prev ? prev.nextElementSibling : box.firstElementChild;
-      // v0.45.13: skip PAST dying rows when anchoring the order — the old
-      // chain could land on a `.leaving` sibling, so the deleted row's
-      // neighbours were inserted BEFORE it and the dying row visibly
-      // sailed to the end of the list (the 2026-10-07 "screen scrolls to
-      // the bottom" report — it was content motion, not scrolling).
-      // The dying row keeps its exact place while it fades; everyone
-      // else keeps theirs.
-      // v0.46.13: skip the failure caption too — it is decoration this
-      // same function inserted before the first failed row, and the walk
-      // used to land on it, so EVERY failed row was torn out and
-      // re-inserted past it on EVERY poll. Re-inserting a row restarts
-      // its `enter` fade — the field's blinking error card (2026-10-12).
-      while (anchor && (anchor.classList.contains("leaving") ||
-                        anchor.classList.contains("jgroup"))) {
-        anchor = anchor.nextElementSibling;
-      }
-      if (row !== anchor) box.insertBefore(row, anchor);
-      prev = row;
     }
     applyQueueFilter();          // v0.40.2: a repaint keeps the view
   } catch (e) {

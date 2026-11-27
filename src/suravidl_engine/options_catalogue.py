@@ -12,10 +12,14 @@ from yt_dlp.options import create_parser
 # Its own --help hides them; a catalogue that prints "SUPPRESSHELP" as the
 # description does not (v0.49.7).
 _HELP_HIDDEN = "SUPPRESSHELP"
+_CATALOGUE_CACHE: list[dict] | None = None
 
 
 def build_catalogue() -> list[dict]:
     """Every long option, grouped the way yt-dlp's own CLI groups them."""
+    global _CATALOGUE_CACHE
+    if _CATALOGUE_CACHE is not None:
+        return _CATALOGUE_CACHE
     parser = create_parser()
     groups = [("General", parser)]
     groups += [(g.title or "Other", g) for g in parser.option_groups]
@@ -38,4 +42,5 @@ def build_catalogue() -> list[dict]:
                 "help": help_text,
             })
     entries.sort(key=lambda e: (e["group"], e["name"]))
+    _CATALOGUE_CACHE = entries
     return entries

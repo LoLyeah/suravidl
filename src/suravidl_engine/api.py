@@ -356,6 +356,28 @@ def _file_kind(path: Path) -> str:
     return "other"
 
 
+def _scandir_files(root: Path):
+    """Yield (DirEntry, rel_posix) recursively using one scandir walk."""
+    if not root.is_dir():
+        return
+    stack = [(root, "")]
+    while stack:
+        cur, prefix = stack.pop()
+        try:
+            with os.scandir(cur) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            sub = f"{prefix}{entry.name}/"
+                            stack.append((Path(entry.path), sub))
+                        elif entry.is_file(follow_symlinks=False):
+                            yield entry, f"{prefix}{entry.name}"
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+
+
 def _file_entries(root: Path) -> dict:
     """The download folder's own files, newest first, for the folder sheet.
 
@@ -365,23 +387,18 @@ def _file_entries(root: Path) -> dict:
     useful than its newest page in a phone-sized sheet.
     """
     out: list[dict] = []
-    try:
-        for p in root.rglob("*"):
-            if not p.is_file():
-                continue
-            name = p.name
-            if (name.startswith(".") or name.endswith(_FILE_SKIP_SUFFIXES)
-                    or ".part-" in name):
-                continue
-            try:
-                st = p.stat()
-            except OSError:
-                continue
-            out.append({"name": p.relative_to(root).as_posix(),
-                        "path": str(p), "bytes": st.st_size,
-                        "mtime": st.st_mtime, "kind": _file_kind(p)})
-    except OSError:
-        pass
+    for entry, rel in _scandir_files(root):
+        name = entry.name
+        if (name.startswith(".") or name.endswith(_FILE_SKIP_SUFFIXES)
+                or ".part-" in name):
+            continue
+        try:
+            st = entry.stat(follow_symlinks=False)
+        except OSError:
+            continue
+        out.append({"name": rel,
+                    "path": entry.path, "bytes": st.st_size,
+                    "mtime": st.st_mtime, "kind": _file_kind(Path(name))})
     out.sort(key=lambda f: f["mtime"], reverse=True)
     return {"total": len(out), "files": out[:FILE_LIST_MAX]}
 
@@ -560,9 +577,9 @@ def create_app(download_dir, auth_token: str | None = None,
         so write failures are swallowed and the offer simply stays as it was.
         """
         try:
-            memory = site_memory.record(
-                settings.get().get("site_quality"), url, fmt)
-            if memory is not None:
+            cur = settings.get().get("site_quality") or {}
+            memory = site_memory.record(cur, url, fmt)
+            if memory is not None and (memory != cur or list(memory) != list(cur)):
                 settings.update({"site_quality": memory})
         except (ValueError, OSError):
             pass
@@ -670,7 +687,7 @@ def create_app(download_dir, auth_token: str | None = None,
         from .options_catalogue import build_catalogue
 
         catalogue = build_catalogue()
-        return {"count": len(catalogue), "options": catalogue}
+        return JSONResponse({"count": len(catalogue), "options": catalogue})
 
     @app.get("/version")
     def version(_mgr: JobManager = Depends(require_auth)):
@@ -1251,23 +1268,17 @@ def create_app(download_dir, auth_token: str | None = None,
             raise HTTPException(status_code=400, detail=str(e)) from e
         return {"ok": True}
 
-    def _dir_files(root: Path) -> list[Path]:
-        try:
-            return [p for p in root.rglob("*") if p.is_file()] if root.exists() else []
-        except OSError:
-            return []
-
     def _dir_stats(root: Path) -> tuple[int, int]:
         """(files, bytes) under a root; a file that vanished mid-walk is just
         not counted."""
-        files = _dir_files(root)
-        total = 0
-        for p in files:
+        count = total = 0
+        for entry, _ in _scandir_files(root):
             try:
-                total += p.stat().st_size
+                total += entry.stat(follow_symlinks=False).st_size
+                count += 1
             except OSError:
                 pass
-        return len(files), total
+        return count, total
 
     def _wipe_dir(root: Path) -> tuple[int, int]:
         """Delete every file under `root` (deepest first) and the directories
@@ -1467,7 +1478,9 @@ def create_app(download_dir, auth_token: str | None = None,
 
     @app.get("/jobs")
     def list_jobs(mgr: JobManager = Depends(require_auth)):
-        return {"jobs": [redact_job(j) for j in mgr.list()]}
+        # bypass fastapi's recursive jsonable_encoder: every field on a
+        # redacted job is already a JSON primitive
+        return JSONResponse({"jobs": [redact_job(j) for j in mgr.list()]})
 
     @app.post("/jobs/forget")
     def forget_completed(body: JobsForgetRequest | None = None,

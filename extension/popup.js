@@ -34,6 +34,50 @@ let SHOW_OLDER = false;  // the finds from before the newest video, on demand
 let POSTER = "";    // the player's own poster image for this page, when it has one
 let MSE = false;    // the player is fed by JavaScript: no file is on the wire
 
+const _urlCache = new Map();
+function parseUrl(url) {
+  let u = _urlCache.get(url);
+  if (u !== undefined) return u;
+  try { u = new URL(url); } catch (_) { u = null; }
+  if (_urlCache.size > 500) _urlCache.clear();
+  _urlCache.set(url, u);
+  return u;
+}
+
+let _rankFor = null;
+let _rankMap = Object.create(null);
+function rankMap() {
+  if (_rankFor !== RANK) {
+    _rankFor = RANK;
+    _rankMap = Object.create(null);
+    for (const it of (RANK && RANK.items) || []) _rankMap[it.url] = it;
+  }
+  return _rankMap;
+}
+
+let _shapeFor = null;
+let _shapeChildren = new Map();
+let _shapeMasters = new Map();
+function ensureShapeIndex() {
+  if (_shapeFor === SHAPE) return;
+  _shapeFor = SHAPE;
+  _shapeChildren = new Map();
+  _shapeMasters = new Map();
+  for (const it of (SHAPE && SHAPE.items) || []) {
+    if (it.master) _shapeMasters.set(it.url, it);
+    for (const v of it.variants || []) {
+      if (!_shapeChildren.has(v.url)) {
+        _shapeChildren.set(v.url, { role: "variant", res: resFromResolution(v.res), name: "" });
+      }
+    }
+    for (const a of it.audio || []) {
+      if (!_shapeChildren.has(a.url)) {
+        _shapeChildren.set(a.url, { role: "audio", res: "", name: a.name || a.lang || "" });
+      }
+    }
+  }
+}
+
 // Visible finds, playlists first: a manifest is the thing worth choosing —
 // its fragments are pieces of it. No rank answer (engine down) shows
 // everything; a shell never hides something on a guess. Newest first, within
@@ -41,25 +85,31 @@ let MSE = false;    // the player is fed by JavaScript: no file is on the wire
 // list used to put the oldest one at the top — under the default tick
 // (v0.5.20).
 function visibleItems() {
-  const shape = {};
-  for (const it of (RANK && RANK.items) || []) shape[it.url] = it;
+  const shape = rankMap();
   const visible = ITEMS.filter((m) => !(shape[m.url] && shape[m.url].hidden));
   const ordered = visible.length ? visible : ITEMS.slice();
   // The URL's own shape is the floor: an .m3u8/.mpd master is a manifest
   // whatever the engine says, even when it is down. The engine still decides
   // what to hide.
-  const kindOf = (m) => (roleOf(m.url).role === "master"
-    ? "manifest"
-    : (shape[m.url] && shape[m.url].kind) || "");
   const newest = (a, b) => (b.foundAt || 0) - (a.foundAt || 0);
-  const manifests = ordered.filter((m) => kindOf(m) === "manifest").sort(newest);
-  const rest = ordered.filter((m) => kindOf(m) !== "manifest").sort(newest);
+  const manifests = [];
+  const rest = [];
+  const playlists = [];
+  for (const m of ordered) {
+    const kind = roleOf(m.url).role === "master"
+      ? "manifest"
+      : ((shape[m.url] && shape[m.url].kind) || "");
+    if (kind === "manifest") manifests.push(m);
+    else rest.push(m);
+    if (/\.(m3u8|mpd)(\?|$)/i.test(m.url)) playlists.push(m);
+  }
+  manifests.sort(newest);
+  rest.sort(newest);
   // Next to a playlist, a fragment is a piece of it: X's player fetches an
   // fMP4 init file and .m4s slices on the same host as the variant playlist,
   // and the list offered them as downloads — a card that fetched 700 KB of
   // header and called it a video (v0.5.27). The engine's rank hides the
   // .m4s ones; the init is a plain .mp4, so it is caught here by name.
-  const playlists = ordered.filter((m) => /\.(m3u8|mpd)(\?|$)/i.test(m.url));
   if (playlists.length) {
     const hosts = new Set(playlists.map((m) => hostOf(m.url)));
     return manifests.concat(rest.filter((m) =>
@@ -85,7 +135,8 @@ function isFragment(m) {
 const CLUSTER_GAP = 4000;
 
 function hostOf(url) {
-  try { return new URL(url).origin; } catch (_) { return ""; }
+  const u = parseUrl(url);
+  return u ? u.origin : "";
 }
 
 // The CDN shards per object, so a reel's picture and its soundtrack can sit
@@ -93,11 +144,8 @@ function hostOf(url) {
 // origin split those pairs and the download lost its sound; the asset id in
 // `efg` is the true key, the registrable domain the fallback (v0.5.28).
 function siteOf(url) {
-  try {
-    return new URL(url).hostname.split(".").slice(-2).join(".");
-  } catch (_) {
-    return "";
-  }
+  const u = parseUrl(url);
+  return u ? u.hostname.split(".").slice(-2).join(".") : "";
 }
 
 function clusterKey(m) {
@@ -207,8 +255,11 @@ function clusters(items) {
 function orderCluster(items) {
   const rank = (m) => (roleOf(m.url).role === "master" ? -1
     : /^audio\//.test(m.mime || "") ? 1 : 0);
+  const ranks = new Map();
+  for (const m of items) ranks.set(m, rank(m));
   return items.slice().sort((a, b) => {
-    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    const ra = ranks.get(a), rb = ranks.get(b);
+    if (ra !== rb) return ra - rb;
     if ((b.bytes || 0) !== (a.bytes || 0)) return (b.bytes || 0) - (a.bytes || 0);
     return (b.foundAt || 0) - (a.foundAt || 0);
   });
@@ -254,9 +305,8 @@ function sizeText(bytes) {
 }
 
 function kindWord(m) {
-  const shape = {};
-  for (const it of (RANK && RANK.items) || []) shape[it.url] = it;
-  const kind = (shape[m.url] && shape[m.url].kind) || "";
+  const it = rankMap()[m.url];
+  const kind = (it && it.kind) || "";
   if (kind === "manifest") return t("Playlist");
   if (kind === "media") return t("Video");
   if (kind === "segment") return t("Fragment");
@@ -280,8 +330,8 @@ function resToken(text) {
 }
 
 function streamName(url) {
-  let u;
-  try { u = new URL(url); } catch (_) { return { name: "", res: "" }; }
+  const u = parseUrl(url);
+  if (!u) return { name: "", res: "" };
   const res = resToken(u.pathname + " " + u.search);
   const last = u.pathname.split("/").filter(Boolean).pop() || "";
   let seg = last;
@@ -307,22 +357,35 @@ function streamName(url) {
 const AUDIO_SEG = /^(audio|audios|native|jpn|japanese|eng|english|ind|indo|indonesian|commentary)$/i;
 const MASTER_SEG = /^(master|index|playlist|manifest|main|hls|stream)$/i;
 
+const _roleCache = new Map();
+
 function roleOf(url) {
-  let u;
-  try { u = new URL(url); } catch (_) { return { role: "other" }; }
-  const path = u.pathname;
-  if (!/\.(m3u8|mpd)$/i.test(path) && !/(master|manifest|playlist)/i.test(path)) {
-    return { role: "other" };
+  const hit = _roleCache.get(url);
+  if (hit) return hit;
+  const u = parseUrl(url);
+  let out;
+  if (!u) {
+    out = { role: "other" };
+  } else {
+    const path = u.pathname;
+    if (!/\.(m3u8|mpd)$/i.test(path) && !/(master|manifest|playlist)/i.test(path)) {
+      out = { role: "other" };
+    } else {
+      const last = (path.split("/").filter(Boolean).pop() || "")
+        .replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[._-]+/g, " ");
+      if (/\/audio?s?\//i.test(path) || AUDIO_SEG.test(last)) {
+        out = { role: "audio", name: last };
+      } else if (MASTER_SEG.test(last)) {
+        out = { role: "master" };
+      } else {
+        const res = resToken(last);
+        out = res ? { role: "variant", res } : { role: "playlist", name: last };
+      }
+    }
   }
-  const last = (path.split("/").filter(Boolean).pop() || "")
-    .replace(/\.[a-z0-9]{1,5}$/i, "").replace(/[._-]+/g, " ");
-  if (/\/audio?s?\//i.test(path) || AUDIO_SEG.test(last)) {
-    return { role: "audio", name: last };
-  }
-  if (MASTER_SEG.test(last)) return { role: "master" };
-  const res = resToken(last);
-  if (res) return { role: "variant", res };
-  return { role: "playlist", name: last };
+  if (_roleCache.size > 500) _roleCache.clear();
+  _roleCache.set(url, out);
+  return out;
 }
 
 // The engine read the manifests themselves: a variant's resolution, an audio
@@ -333,29 +396,24 @@ function resFromResolution(r) {
 }
 
 function shapeChild(url) {
-  const out = { role: "", res: "", name: "" };
-  for (const it of (SHAPE && SHAPE.items) || []) {
-    for (const v of it.variants || []) {
-      if (v.url === url) { out.role = "variant"; out.res = resFromResolution(v.res); }
-    }
-    for (const a of it.audio || []) {
-      if (a.url === url) { out.role = "audio"; out.name = a.name || a.lang || ""; }
-    }
-    if (out.role) break;
-  }
-  return out;
+  ensureShapeIndex();
+  return _shapeChildren.get(url) || { role: "", res: "", name: "" };
 }
 
 function shapeMaster(url) {
-  return ((SHAPE && SHAPE.items) || [])
-    .find((it) => it.url === url && it.master) || null;
+  ensureShapeIndex();
+  return _shapeMasters.get(url) || null;
 }
 
 // The raw-link door's face: a chain, drawn rather than typed — no font on
 // any of the three platforms carries a link glyph reliably (v0.5.26).
+let _linkGlyphTpl = null;
 function linkGlyph() {
   try {
     if (typeof document.createElementNS !== "function") return null;
+    if (_linkGlyphTpl && typeof _linkGlyphTpl.cloneNode === "function") {
+      return _linkGlyphTpl.cloneNode(true);
+    }
     const ns = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(ns, "svg");
     svg.setAttribute("viewBox", "0 0 24 24");
@@ -370,7 +428,8 @@ function linkGlyph() {
     const b = document.createElementNS(ns, "path");
     b.setAttribute("d", "M13.5 10.5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1");
     svg.append(a, b);
-    return svg;
+    _linkGlyphTpl = svg;
+    return typeof svg.cloneNode === "function" ? svg.cloneNode(true) : svg;
   } catch (_) {
     return null;   // a shell without SVG still gets the word
   }
@@ -405,15 +464,16 @@ function groupRows(vis) {
   roles.forEach((r, i) => { if (r.role === "master") masters.push(i); });
   if (masters.length !== 1) return null;
   const mi = masters[0];
-  let origin = "";
-  try { origin = new URL(vis[mi].url).origin; } catch (_) { return null; }
+  const mu = parseUrl(vis[mi].url);
+  if (!mu) return null;
+  const origin = mu.origin;
   const parts = [];
   const rest = [];
   vis.forEach((m, i) => {
     if (i === mi) return;
     const r = roles[i];
-    let same = false;
-    try { same = new URL(m.url).origin === origin; } catch (_) { /* keep apart */ }
+    const u = parseUrl(m.url);
+    const same = !!u && u.origin === origin;
     if (same && (r.role === "variant" || r.role === "audio" || r.role === "playlist")) {
       parts.push({ m, role: r });
     } else {
@@ -718,8 +778,9 @@ function render() {
   // A feed leaves one cluster per video, and which of them is on screen is
   // not knowable from the network. With more than one, the pick belongs to a
   // person: cards with a frame and a duration, nothing ticked (v0.5.22).
-  const pickable = many && !grouped
-    ? clusters(vis).filter((c) => c.items.some((m) => !/^audio\//.test(m.mime || "")))
+  const clustered = many && !grouped ? clusters(vis) : null;
+  const pickable = clustered
+    ? clustered.filter((c) => c.items.some((m) => !/^audio\//.test(m.mime || "")))
     : [];
   // the page's own audio track rides the quick door here too: on HLS the
   // picture and the sound are separate playlists (v0.5.27)
@@ -787,7 +848,7 @@ function render() {
       // together are one video's streams, and the newest bunch is the one on
       // screen. The rest fold away, so the top row is the answer rather than
       // a lucky guess (v0.5.20).
-      const cl = clusters(vis);
+      const cl = clustered || clusters(vis);
       const newest = cl[0] ? cl[0].items : [];
       // The fold line lives OUTSIDE the scrolling list: inside it, it sat
       // below the fold and nobody ever saw that older finds were there.
@@ -810,12 +871,13 @@ function render() {
     const counts = {};
     for (const r of rows) if (r.label) counts[r.label] = (counts[r.label] || 0) + 1;
     const seen = {};
+    const outNodes = [];
     for (const r of rows) {
       if (r.divider) {
         const line = document.createElement("div");
         line.className = "earlier";
         line.textContent = r.divider;
-        box.append(line);
+        outNodes.push(line);
         continue;
       }
       if (r.toggle) {
@@ -827,7 +889,7 @@ function render() {
         btn.textContent = t("Hide the separate streams");
         btn.onclick = () => { SHOW_PARTS = false; render(); };
         line.append(btn);
-        box.append(line);
+        outNodes.push(line);
         continue;
       }
       const m = r.m;
@@ -877,7 +939,7 @@ function render() {
         if (opening && raw.scrollIntoView) raw.scrollIntoView({ block: "nearest" });
       };
       row.append(pick, more, raw);
-      box.append(row);
+      outNodes.push(row);
       if (r.parts) {
         const line = document.createElement("div");
         line.className = "partsline";
@@ -887,8 +949,11 @@ function render() {
         btn.textContent = t("Show the {n} separate streams", { n: r.parts });
         btn.onclick = () => { SHOW_PARTS = true; render(); };
         line.append(btn);
-        box.append(line);
+        outNodes.push(line);
       }
+    }
+    for (let k = 0; k < outNodes.length; k += 200) {
+      box.append(...outNodes.slice(k, k + 200));
     }
     // the headline counts the video on screen, not the whole page: with the
     // older finds folded away, "20 streams" described a list nobody could see
@@ -1058,18 +1123,22 @@ $("rescan").onclick = () => location.reload();
     if (open) open.onclick = () => api.runtime.openOptionsPage();
     return;
   }
-  try {
-    renderRecent(await api.runtime.sendMessage({ type: "recentJobs" }));
-  } catch (_) { /* nothing to mirror */ }
-  const res = await api.runtime.sendMessage({ type: "getMedia", tabId: tab.id });
+  const [recRes, mediaRes] = await Promise.all([
+    api.runtime.sendMessage({ type: "recentJobs" }).catch(() => null),
+    api.runtime.sendMessage({ type: "getMedia", tabId: tab.id }),
+  ]);
+  if (recRes) {
+    try { renderRecent(recRes); } catch (_) { /* nothing to mirror */ }
+  }
+  const res = mediaRes;
   ITEMS = (res && res.items) || [];
   POSTER = (res && res.poster) || "";
   MSE = !!(res && res.mse);
   try {
-    RANK = await api.runtime.sendMessage({ type: "rank", items: ITEMS });
-    SHAPE = await api.runtime.sendMessage({
-      type: "shape", items: ITEMS, tabId: (TAB || {}).id,
-    });
+    [RANK, SHAPE] = await Promise.all([
+      api.runtime.sendMessage({ type: "rank", items: ITEMS }),
+      api.runtime.sendMessage({ type: "shape", items: ITEMS, tabId: (TAB || {}).id }),
+    ]);
   } catch (_) { /* engine not answering: show everything */ }
   togglePageDoor();
   render();

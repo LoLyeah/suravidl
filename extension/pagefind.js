@@ -98,7 +98,8 @@
   // chosen — then the attribute. No pattern prefilter: this is evidence.
   function sweep() {
     try {
-      const vids = document.querySelectorAll("video");
+      let videoCount = 0;
+      let singlePoster = "";
       for (const el of document.querySelectorAll(MEDIA_TAGS)) {
         const s = el.currentSrc || el.src;
         if (s && /^(blob|mediasource):/i.test(s)) reportMse();
@@ -107,10 +108,12 @@
         // one available when the stream is HLS — but only when there is ONE
         // video on the page: on a feed the last swept element is an ad or a
         // hover preview, and that picture is not this list's (v0.5.29)
-        if (el.poster && vids.length === 1 && el.tagName.toLowerCase() === "video") {
-          reportPoster(el.poster);
+        if (el.tagName && el.tagName.toLowerCase() === "video") {
+          videoCount += 1;
+          if (videoCount === 1 && el.poster) singlePoster = el.poster;
         }
       }
+      if (videoCount === 1 && singlePoster) reportPoster(singlePoster);
     } catch (_) {}
   }
 
@@ -118,12 +121,22 @@
   // was just reloaded, a player that started in a very early inline
   // script): the performance timeline keeps the receipts. Patterns keep
   // the network noise out here — the timeline has everything.
+  const scannedKeys = new Set();
   function scan() {
     try {
       const es = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
+      // position cannot be the bookmark: the timeline's buffer drops its
+      // oldest entries when it fills, so indexes shift left underneath us
+      // and an index past the end would skip the newest finds. A name plus
+      // startTime is stable, and startTime only moves forward.
       for (const e of es) {
         const u = (e && e.name) || "";
         if (!u) continue;
+        const at = e.startTime || 0;
+        const key = u + "\u0000" + at;
+        if (scannedKeys.has(key)) continue;
+        if (scannedKeys.size > 2000) scannedKeys.clear();
+        scannedKeys.add(key);
         if (e.initiatorType === "video" || e.initiatorType === "audio") {
           report(u, "player");           // the player requested it: evidence
         } else if (MEDIA_RE && MEDIA_RE.test(u.split("#")[0])) {
@@ -134,8 +147,19 @@
   }
 
   let soon = null;
-  function scheduleSweep() {
+  function scheduleSweep(records) {
     if (soon) return;
+    if (Array.isArray(records)) {
+      let hasEl = false;
+      for (const r of records) {
+        if (!r || !r.addedNodes) continue;
+        for (const n of r.addedNodes) {
+          if (n && n.nodeType === 1) { hasEl = true; break; }
+        }
+        if (hasEl) break;
+      }
+      if (!hasEl) return;
+    }
     try {
       soon = setTimeout(() => { soon = null; sweep(); }, 250);
     } catch (_) { sweep(); }

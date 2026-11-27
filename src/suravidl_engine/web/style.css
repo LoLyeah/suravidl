@@ -1099,6 +1099,9 @@ details.card { padding: 0 18px 6px; }
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-hi);
   animation: enter var(--t-base) var(--e-out) both;
+  /* skip layout/backdrop blur work for off-screen cards in long queues */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
 }
 .jobtop { display: flex; align-items: center; gap: 10px; }
 .jobtitle {

@@ -58,12 +58,15 @@ function prunePk(tabPk) {
 // tick — a player asks for its manifest and its first fragments together. So
 // every write is chained: without it the last writer wins and finds disappear
 // (found the hard way, by the Node harness in extension/test_harness.mjs).
+const ALL_STORAGE_KEYS = {
+  tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {},
+  tabPoster: {}, tabMse: {}, tabManifests: {},
+};
 let storageChain = Promise.resolve();
-function update(mutate) {
+function update(mutate, keys = ALL_STORAGE_KEYS) {
   storageChain = storageChain
     .then(() => new Promise((resolve) => {
-      chrome.storage.local.get({ tabMedia: {}, reqHeaders: {}, shareMap: {}, tabPk: {},
-                           tabPoster: {}, tabMse: {}, tabManifests: {} }, (data) => {
+      chrome.storage.local.get(keys, (data) => {
         chrome.storage.local.set(mutate(data) || {}, resolve);
       });
     }))
@@ -464,7 +467,7 @@ function holdHeaders(url, pick) {
 }
 
 function dropHeaders(url) {
-  pending.delete(url);
+  if (!pending.delete(url)) return;
   _mirrorPending();
 }
 
@@ -503,7 +506,7 @@ function commitHeaders(url, pick) {
     // to be findable there too; one alias per file is enough (v0.5.21)
     if (canon !== url && !store[canon]) store[canon] = { headers: pick, at: Date.now() };
     return { reqHeaders: prune(store) };
-  });
+  }, { reqHeaders: {} });
 }
 
 chrome.webRequest.onBeforeRequest.addListener(
@@ -586,7 +589,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     delete tabMse[tabId];
     delete tabManifests[tabId];
     return { tabMedia, tabPoster, tabMse, tabManifests };
-  });
+  }, { tabMedia: {}, tabPoster: {}, tabMse: {}, tabManifests: {} });
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
@@ -607,7 +610,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
       if (action && action.setBadgeText) action.setBadgeText({ tabId, text: "" });
     }
     return { tabMedia, tabPoster, tabMse, tabManifests };
-    });
+    }, { tabMedia: {}, tabPoster: {}, tabMse: {}, tabManifests: {} });
 });
 
 // The only messages a CONTENT SCRIPT may send: sightings. Everything else
@@ -632,10 +635,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
                                tabManifests: {} },
       ({ tabMedia, reqHeaders, tabPoster, tabMse, tabManifests }) => {
       const held = tabMedia[msg.tabId] || [];
+      const heldUrls = new Set(held.map((m) => m.url));
       // pinned manifests ride in front even after the ring has moved on: they
       // are the only rows that can explain the segments (v0.5.32)
       const pinned = Object.entries((tabManifests || {})[msg.tabId] || {})
-        .filter(([u]) => !held.some((m) => m.url === u))
+        .filter(([u]) => !heldUrls.has(u))
         .map(([u, at]) => ({ url: u, foundAt: at, via: "manifest",
                              mime: "", bytes: 0, alt: "", asset: "",
                              family: "", parts: 0 }));
@@ -693,7 +697,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       update(({ tabMse }) => {
         tabMse[tabId] = Date.now();
         return { tabMse };
-      });
+      }, { tabMse: {} });
       sendResponse({ ok: true });
       return false;
     }
@@ -708,7 +712,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       update(({ tabPoster }) => {
         tabPoster[tabId] = { url: String(msg.url), at: Date.now() };
         return { tabPoster };
-      });
+      }, { tabPoster: {} });
       sendResponse({ ok: true });
       return false;
     }
@@ -742,7 +746,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       update(({ tabPk }) => {
         tabPk[tabId] = { pk: msg.pk, at: Date.now() };
         return { tabPk: prunePk(tabPk) };
-      });
+      }, { tabPk: {} });
       sendResponse({ ok: true });
       return false;
     }
@@ -947,7 +951,7 @@ function rememberShare(from, to) {
     while (keys.length > 40) delete map[keys.shift()];
     SHARE_MAP = map;
     return { shareMap: map };
-  });
+  }, { shareMap: {} });
 }
 
 async function resolveShareUrl(url) {
@@ -1002,7 +1006,10 @@ async function recentJobs() {
     const body = await res.json();
     const jobs = (body.jobs || [])
       .slice()
-      .sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")))
+      .sort((a, b) => {
+        const ac = String(a.created_at || ""), bc = String(b.created_at || "");
+        return bc < ac ? -1 : bc > ac ? 1 : 0;
+      })
       .slice(0, RECENT_KEEP)
       .map((j) => ({
         id: j.id,

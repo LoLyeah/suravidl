@@ -102,9 +102,13 @@ class PresetStore:
 
     def get(self, name: str) -> dict | None:
         name = normalize_name(name)
-        for entry in self.list():
-            if entry["name"] == name:
-                return entry
+        if name in BUILTIN_PRESETS:
+            return {"name": name, "patch": BUILTIN_PRESETS[name],
+                    "builtin": True,
+                    "description": BUILTIN_DESCRIPTIONS.get(name, "")}
+        if name in self._data:
+            return {"name": name, "patch": self._data[name],
+                    "builtin": False, "description": ""}
         return None
 
     def save(self, name: str, patch: dict) -> dict:

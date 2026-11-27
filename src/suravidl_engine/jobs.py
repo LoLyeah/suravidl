@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import sqlite3
+import stat
 import subprocess
 import threading
 import time
@@ -148,6 +149,15 @@ def _same_file(a, b) -> bool:
         return False
 
 
+def _reg_size(path) -> int | None:
+    """File size in one stat syscall; None when missing or not a regular file."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return st.st_size if stat.S_ISREG(st.st_mode) else None
+
+
 def _stat_size(job: dict) -> int | None:
     """Bytes on disk for a job's files — what the expanded queue card shows.
 
@@ -159,24 +169,21 @@ def _stat_size(job: dict) -> int | None:
     """
     path = job.get("filepath")
     split = bool((job.get("overrides") or {}).get("split_chapters"))
-    try:
-        # a split row's filepath is only its FIRST section: summing is the
-        # only honest answer there (v0.47.29 audit)
-        if path and os.path.isfile(path) and not split:
-            return os.path.getsize(path)
-    except OSError:
-        pass
+    # a split row's filepath is only its FIRST section: summing is the
+    # only honest answer there (v0.47.29 audit)
+    if path and not split:
+        sz = _reg_size(path)
+        if sz is not None:
+            return sz
 
     total, found = 0, False
     for f in job.get("files") or []:
         if f == path and not split:
             continue
-        try:
-            if os.path.isfile(f):
-                total += os.path.getsize(f)
-                found = True
-        except OSError:
-            continue
+        sz = _reg_size(f)
+        if sz is not None:
+            total += sz
+            found = True
     # v0.46.10 audit A/F9: a transfer in flight leaves its bytes in a
     # `.part` (the hook records the name in `partials`; `filepath` does
     # not exist until the final rename) — disk is the truth for live
@@ -185,13 +192,11 @@ def _stat_size(job: dict) -> int | None:
     if not found:
         for p in job.get("partials") or []:
             for cand in (str(p), str(p) + ".part"):
-                try:
-                    if os.path.isfile(cand):
-                        total += os.path.getsize(cand)
-                        found = True
-                        break
-                except OSError:
-                    continue
+                sz = _reg_size(cand)
+                if sz is not None:
+                    total += sz
+                    found = True
+                    break
     return total if found else None
 
 # A URL longer than this is junk, not a link (the audit found the engine
@@ -460,6 +465,9 @@ class JobManager:
         # ids deleted by the user: a worker finishing (or writing progress) a
         # moment later must not write the row back
         self._deleted: set[str] = set()
+        # rows already in sqlite can take the direct UPDATE path without
+        # re-serializing immutable headers/overrides on every tick
+        self._persisted_ids: set[str] = set()
         # adaptive concurrency gate: capacity can change at runtime
         self._cap_cv = threading.Condition(threading.Lock())
         self._capacity = max(1, int(max_concurrent))
@@ -492,6 +500,9 @@ class JobManager:
                 # not worth a failed boot.
                 try:
                     self._con.execute("PRAGMA journal_mode=WAL")
+                    # wal is crash-safe under synchronous=normal without an
+                    # fsync per progress write
+                    self._con.execute("PRAGMA synchronous=NORMAL")
                 except sqlite3.Error:  # pragma: no cover - fs-dependent
                     pass
             with self._con:
@@ -606,6 +617,7 @@ class JobManager:
                             pass
             for row in self._con.execute("SELECT * FROM jobs"):
                 self._jobs[row["id"]] = self._row_to_job(row)
+                self._persisted_ids.add(row["id"])
 
     def _scrub_persisted_cookies(self) -> bool:
         """Redact cookie values already in old rows. True if anything changed."""
@@ -679,8 +691,33 @@ class JobManager:
         with self._db_lock, self._con:
             # a deleted job must stay deleted: a late write from the worker
             # thread (progress, completion) must not resurrect the row
-            if job["id"] in self._deleted:
+            jid = job["id"]
+            if jid in self._deleted:
                 return
+            prog = job["progress"]
+            files_json = json.dumps(job["files"]) if job.get("files") else None
+            parts_json = json.dumps(job["partials"]) if job.get("partials") else None
+            dl_dir = job.get("download_dir") or str(self.download_dir)
+            live_int = 1 if job.get("live") else 0
+            if jid in self._persisted_ids:
+                cur = self._con.execute(
+                    "UPDATE jobs SET status=?, title=?, filepath=?, error=?,"
+                    " downloaded_bytes=?, total_bytes=?, speed=?, eta=?,"
+                    " completed_at=?, files=?, partials=?, download_dir=?,"
+                    " replaced_by=?, live=?, video_id=?, follow_id=?, note=?"
+                    " WHERE id=?",
+                    (
+                        job["status"], job.get("title"), job.get("filepath"),
+                        job.get("error"), prog["downloaded_bytes"],
+                        prog["total_bytes"], prog["speed"], prog["eta"],
+                        job.get("completed_at"), files_json, parts_json,
+                        dl_dir, job.get("replaced_by"), live_int,
+                        job.get("video_id"), job.get("follow_id"),
+                        job.get("note"), jid,
+                    ),
+                )
+                if cur.rowcount:
+                    return
             self._con.execute(
                 "INSERT INTO jobs (id, url, fmt, preset, playlist_items,"
                 " raw_args, overrides, headers, xor_key, status, title,"
@@ -701,7 +738,7 @@ class JobManager:
                 " follow_id=excluded.follow_id,"
                 " note=excluded.note",
                 (
-                    job["id"], job["url"], job.get("fmt"), job.get("preset"),
+                    jid, job["url"], job.get("fmt"), job.get("preset"),
                     job.get("playlist_items"),
                     job.get("raw_args"),
                     json.dumps(job["overrides"]) if job.get("overrides") else None,
@@ -710,20 +747,21 @@ class JobManager:
                     job.get("xor_key"),
                     job["status"], job.get("title"), job.get("filepath"),
                     job.get("error"),
-                    job["progress"]["downloaded_bytes"],
-                    job["progress"]["total_bytes"], job["progress"]["speed"],
-                    job["progress"]["eta"], job.get("created_at"),
+                    prog["downloaded_bytes"],
+                    prog["total_bytes"], prog["speed"],
+                    prog["eta"], job.get("created_at"),
                     job.get("completed_at"),
-                    json.dumps(job["files"]) if job.get("files") else None,
-                    json.dumps(job["partials"]) if job.get("partials") else None,
-                    job.get("download_dir") or str(self.download_dir),
+                    files_json,
+                    parts_json,
+                    dl_dir,
                     job.get("replaced_by"),
-                    1 if job.get("live") else 0,
+                    live_int,
                     job.get("video_id"),
                     job.get("follow_id"),
                     job.get("note"),
                 ),
             )
+            self._persisted_ids.add(jid)
 
     # -- public API --------------------------------------------------------
     def create(self, url: str, fmt: str | None = None,
@@ -1133,6 +1171,7 @@ class JobManager:
             # back (`_save` checks that set under the same lock)
             with self._db_lock, self._con:
                 self._deleted.update(gone)
+                self._persisted_ids.difference_update(gone)
                 self._con.execute(
                     "DELETE FROM jobs WHERE status = 'completed'")
         return len(gone)
@@ -1657,6 +1696,7 @@ class JobManager:
         # nor slip past the check and bring the row back.
         with self._db_lock, self._con:
             self._deleted.add(job_id)
+            self._persisted_ids.discard(job_id)
             self._con.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         out = {"deleted": deleted, "freed_bytes": freed,
                "filepath": job.get("filepath")}
@@ -1954,7 +1994,8 @@ class JobManager:
         probe = self._probe_file(path)
         return None if probe is None else bool(probe["audio"])
 
-    def _retry_with_page(self, job: dict, opts: dict, target_dir: Path) -> bool:
+    def _retry_with_page(self, job: dict, opts: dict, target_dir: Path,
+                         _probe_out: list | None = None) -> bool:
         """Fetch the same video through its page, which carries the sound.
 
         The card door downloads one sniffed address; when that address is a
@@ -1975,7 +2016,8 @@ class JobManager:
             info = extract_info(retry, page, download=True) or {}
             got = (info.get("requested_downloads") or [{}])[0]
             made = Path(str(got.get("filepath") or info.get("filepath") or ""))
-            if not made.is_file() or self._ffprobe_audio(made) is not True:
+            probe = self._probe_file(made) if made.is_file() else None
+            if not probe or not probe["audio"]:
                 made.unlink(missing_ok=True)
                 return False
             old = Path(str(job.get("filepath") or ""))
@@ -1987,6 +2029,8 @@ class JobManager:
                 old.unlink(missing_ok=True)
                 job["filepath"] = str(made)
                 job["files"] = [str(made)]
+            if _probe_out is not None:
+                _probe_out.append(probe)
             self._note(job, "the sniffed address had no sound — fetched the page itself")
             return True
         except Exception as e:  # noqa: BLE001 - a retry that fails leaves the picture
@@ -2075,8 +2119,14 @@ class JobManager:
         class _Cancelled(Exception):
             pass
 
+        last_save = time.monotonic()
+        last_partials_len = len(job.get("partials") or [])
+        last_had_fp = bool(job.get("filepath"))
+
         def hook(d):
-            self._last_tick[job["id"]] = time.monotonic()
+            nonlocal last_save, last_partials_len, last_had_fp
+            now = time.monotonic()
+            self._last_tick[job["id"]] = now
             if not job.get("live") and (d.get("info_dict") or {}).get("is_live"):
                 job["live"] = True
             if _stop_requested(job):  # stop requested mid-run
@@ -2084,6 +2134,7 @@ class JobManager:
             d_info = d.get("info_dict") or {}
             if _pp_note(job, d):     # a postprocessor step, not a download
                 self._save(job)
+                last_save = now
                 return
             # Record the target as soon as yt-dlp names it. A cancelled or
             # failed download used to keep `filepath = None`, so deleting the
@@ -2107,6 +2158,7 @@ class JobManager:
                         made.append(str(name))
                         job["files"] = made
             if d["status"] == "downloading":
+                prev_status = job["status"]
                 job["status"] = "downloading"
                 job["progress"] = {
                     "downloaded_bytes": d.get("downloaded_bytes") or 0,
@@ -2120,10 +2172,22 @@ class JobManager:
                     "playlist_count": d_info.get("n_entries")
                     or d.get("playlist_count"),
                 }
-                self._save(job)
+                # progress lives in memory for live polls; flush to sqlite on
+                # target/status changes or at most once a second
+                cur_partials_len = len(job.get("partials") or [])
+                cur_had_fp = bool(job.get("filepath"))
+                if (prev_status != "downloading"
+                        or cur_partials_len != last_partials_len
+                        or cur_had_fp != last_had_fp
+                        or now - last_save >= 1.0):
+                    self._save(job)
+                    last_save = now
+                    last_partials_len = cur_partials_len
+                    last_had_fp = cur_had_fp
             elif d["status"] == "finished":
                 job["status"] = "merging"
                 self._save(job)
+                last_save = now
 
         # the job's own folder, not "whatever Settings says today": a row
         # resumed after a download-folder change must find its .part again
@@ -2350,10 +2414,14 @@ class JobManager:
                 probe = self._probe_file(job.get("filepath"))
                 if probe is not None:
                     if not probe["audio"]:
-                        if not self._retry_with_page(job, opts, target_dir):
+                        retried_probe: list = []
+                        if self._retry_with_page(job, opts, target_dir,
+                                                 _probe_out=retried_probe):
+                            probe = (retried_probe[0] if retried_probe
+                                     else self._probe_file(job.get("filepath")))
+                        else:
                             self._note(job, "downloaded without sound — the "
                                             "site served a picture-only file")
-                        probe = self._probe_file(job.get("filepath"))
                     if probe is not None:
                         try:
                             expected = float((info or {}).get("duration") or 0)

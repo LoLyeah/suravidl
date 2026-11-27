@@ -366,6 +366,7 @@ class StreamCopyFixPP(FFmpegPostProcessor):
             return False                 # no ffmpeg — nothing we can do
         streams, bad = got
         if not bad:
+            fixed[path] = mtime
             return False                 # nothing flagged — fast path out
         for drop, real, convert in self._attempt_ladder(streams, bad):
             if len(drop) == len(streams):
